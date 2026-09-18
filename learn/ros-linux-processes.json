@@ -56,15 +56,7 @@
      [
       {
        "t": "text",
-       "v": "The terminal sends the signal "
-      },
-      {
-       "t": "b",
-       "v": "SIGINT"
-      },
-      {
-       "t": "text",
-       "v": " (number 2) to every process in the foreground process group."
+       "v": "The terminal sends SIGINT, signal number 2, to every process in the foreground process group."
       }
      ],
      [
@@ -76,15 +68,7 @@
      [
       {
        "t": "text",
-       "v": "The shell then reports the exit status as "
-      },
-      {
-       "t": "b",
-       "v": "128 + the signal number"
-      },
-      {
-       "t": "text",
-       "v": ", so "
+       "v": "The shell reports 128 plus the signal number as the exit status, so "
       },
       {
        "t": "code",
@@ -92,29 +76,13 @@
       },
       {
        "t": "text",
-       "v": " prints "
-      },
-      {
-       "t": "b",
-       "v": "130"
-      },
-      {
-       "t": "text",
-       "v": "."
+       "v": " prints 130."
       }
      ],
      [
       {
        "t": "text",
-       "v": "A program that must save its work installs a handler that "
-      },
-      {
-       "t": "b",
-       "v": "only sets a flag"
-      },
-      {
-       "t": "text",
-       "v": ". Its main loop checks the flag, stops, cleans up in normal code and returns 0, or whatever status it chooses."
+       "v": "A program that must save its work installs a handler that only sets a flag. Its main loop sees the flag, stops, cleans up in normal code and returns 0, or whatever status it chooses."
       }
      ]
     ]
@@ -124,7 +92,7 @@
     "c": [
      {
       "t": "text",
-      "v": "ROS 2 does exactly this: "
+      "v": "ROS 2 works this way: "
      },
      {
       "t": "code",
@@ -132,7 +100,7 @@
      },
      {
       "t": "text",
-      "v": " installs a SIGINT handler, and "
+      "v": " installs handlers for SIGINT and SIGTERM, and after either signal "
      },
      {
       "t": "code",
@@ -140,7 +108,7 @@
      },
      {
       "t": "text",
-      "v": " turns false."
+      "v": " returns false."
      }
     ]
    },
@@ -148,28 +116,8 @@
     "t": "p",
     "c": [
      {
-      "t": "b",
-      "v": "Pass:"
-     },
-     {
       "t": "text",
-      "v": " all four points, including 130. "
-     },
-     {
-      "t": "b",
-      "v": "Partly:"
-     },
-     {
-      "t": "text",
-      "v": " you missed 130 or the \"only set a flag\" rule. "
-     },
-     {
-      "t": "b",
-      "v": "Fail:"
-     },
-     {
-      "t": "text",
-      "v": " more."
+      "v": "You pass if you had all four points, including 130. Missing 130 or the rule about only setting a flag is a partial pass, and missing more is a fail."
      }
     ]
    }
@@ -190,101 +138,39 @@
        "c": [
         {
          "t": "text",
-         "v": "A "
-        },
-        {
-         "t": "b",
-         "v": "process"
-        },
-        {
-         "t": "text",
-         "v": " is a running program. It has:"
+         "v": "Start a process, stop it with a signal, and see what the shell reports:"
         }
        ]
       },
       {
-       "t": "ul",
-       "items": [
-        [
-         {
-          "t": "text",
-          "v": "a process id (PID) and a parent (PPID);"
-         }
-        ],
-        [
-         {
-          "t": "text",
-          "v": "its own memory;"
-         }
-        ],
-        [
-         {
-          "t": "text",
-          "v": "open files, including stdin, stdout and stderr;"
-         }
-        ],
-        [
-         {
-          "t": "text",
-          "v": "a state, which "
-         },
-         {
-          "t": "code",
-          "v": "ps"
-         },
-         {
-          "t": "text",
-          "v": " shows as "
-         },
-         {
-          "t": "code",
-          "v": "R"
-         },
-         {
-          "t": "text",
-          "v": " running, "
-         },
-         {
-          "t": "code",
-          "v": "S"
-         },
-         {
-          "t": "text",
-          "v": " sleeping, "
-         },
-         {
-          "t": "code",
-          "v": "T"
-         },
-         {
-          "t": "text",
-          "v": " stopped or "
-         },
-         {
-          "t": "code",
-          "v": "Z"
-         },
-         {
-          "t": "text",
-          "v": " zombie."
-         }
-        ]
-       ]
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "sleep 100 &                     # start in the background; $! holds its process ID\nps -o pid,ppid,stat,cmd -p $!   # its ID, its parent's ID, its state (S: sleeping) and its command\nkill -TERM $!                   # send SIGTERM, the polite request to stop\nwait $!; echo $?                # prints 143\nfalse; echo $?                  # prints 1"
       },
       {
        "t": "p",
        "c": [
         {
          "t": "text",
-         "v": "Every process except PID 1 has a parent. When a process ends, its "
+         "v": "A "
         },
         {
-         "t": "b",
+         "t": "i",
+         "v": "process"
+        },
+        {
+         "t": "text",
+         "v": " is a running program. The kernel gives it a process ID (PID), its own memory, and a table of open files, which starts with stdin, stdout and stderr. Every process except the first one, PID 1, has a parent. When a process ends, the kernel keeps its "
+        },
+        {
+         "t": "i",
          "v": "exit status"
         },
         {
          "t": "text",
-         "v": " waits until the parent collects it with "
+         "v": " until the parent collects it by calling "
         },
         {
          "t": "code",
@@ -292,7 +178,15 @@
         },
         {
          "t": "text",
-         "v": ". A shell is such a parent: it collects the status and shows it in "
+         "v": ". In the session above your shell is the parent of "
+        },
+        {
+         "t": "code",
+         "v": "sleep"
+        },
+        {
+         "t": "text",
+         "v": ", and "
         },
         {
          "t": "code",
@@ -300,7 +194,7 @@
         },
         {
          "t": "text",
-         "v": "."
+         "v": " shows the status it collected."
         }
        ]
       },
@@ -308,12 +202,16 @@
        "t": "p",
        "c": [
         {
-         "t": "b",
-         "v": "Exit status"
+         "t": "text",
+         "v": "An exit status is a number from 0 to 255. 0 means success, and any other value is a failure whose meaning the program chooses, such as the 1 from "
+        },
+        {
+         "t": "code",
+         "v": "false"
         },
         {
          "t": "text",
-         "v": " is a number from 0 to 255. 0 means success, and anything else is a failure whose meaning the program defines. When a signal kills a process, the shell reports 128 + the signal number."
+         "v": ". A process killed by a signal never returns a status of its own, so the shell reports 128 plus the signal number. SIGTERM is signal 15, which is where the 143 comes from."
         }
        ]
       },
@@ -325,12 +223,12 @@
          "v": "A "
         },
         {
-         "t": "b",
+         "t": "i",
          "v": "signal"
         },
         {
          "t": "text",
-         "v": " is an asynchronous notification sent to a process. The ones you will meet:"
+         "v": " is a notification the kernel delivers to a process, interrupting whatever it was doing. A process can install a handler for most signals. Without one, the default action applies, and for most signals that means the process terminates. These are the signals you will meet:"
         }
        ]
       },
@@ -358,13 +256,13 @@
         [
          {
           "t": "text",
-          "v": "Default"
+          "v": "Default action"
          }
         ],
         [
          {
           "t": "text",
-          "v": "Can be caught?"
+          "v": "Can a handler catch it?"
          }
         ]
        ],
@@ -437,7 +335,7 @@
           },
           {
            "t": "text",
-           "v": " escalation"
+           "v": " after 5 s"
           }
          ],
          [
@@ -484,7 +382,7 @@
          ],
          [
           {
-           "t": "b",
+           "t": "text",
            "v": "no"
           }
          ]
@@ -511,13 +409,13 @@
          [
           {
            "t": "text",
-           "v": "terminate with a core dump"
+           "v": "terminate and dump core"
           }
          ],
          [
           {
            "t": "text",
-           "v": "yes, but don't"
+           "v": "yes"
           }
          ]
         ],
@@ -555,13 +453,13 @@
          [
           {
            "t": "text",
-           "v": "terminate with a core dump"
+           "v": "terminate and dump core"
           }
          ],
          [
           {
            "t": "text",
-           "v": "yes, but don't"
+           "v": "yes"
           }
          ]
         ],
@@ -636,7 +534,16 @@
        "c": [
         {
          "t": "text",
-         "v": "The shell commands to know:"
+         "v": "A handler for SIGSEGV or SIGABRT runs in a process that is already broken, so there is little it can do safely. Leave those two to their default action and read the core dump or the sanitizer report instead."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "To look at running processes and what they use, these commands cover most needs:"
         }
        ]
       },
@@ -645,30 +552,14 @@
        "lang": "sh",
        "tag": "",
        "expect": "",
-       "text": "ps -ef                                   # every process, with PID and PPID\nps -o pid,ppid,stat,rss,cmd -p 1234      # one process: state, resident memory in KB, command\npgrep -a talker                          # find processes by name\ntop                                      # live CPU and memory; press M to sort by memory\nkill -TERM 1234                          # ask a process to stop (the default signal)\nkill -INT 1234                           # the same signal as Ctrl+C\nkill -KILL 1234                          # force: no clean-up is possible\ncat /proc/1234/status                    # the kernel's view: state, threads, memory\njournalctl -k | grep -i \"out of memory\"  # was it killed by the OOM killer?"
+       "text": "ps -ef                                   # every process, with its PID and its parent's PID\nps -o pid,ppid,stat,rss,cmd -p 1234      # one process: state, resident memory in KB, command\npgrep -a talker                          # find processes by name\ntop                                      # live CPU and memory use; press M to sort by memory\nkill -TERM 1234                          # ask a process to stop (kill sends SIGTERM by default)\nkill -INT 1234                           # the same signal as Ctrl+C\nkill -KILL 1234                          # stop it at once; it gets no chance to clean up\ncat /proc/1234/status                    # the kernel's view: state, threads, memory\njournalctl -k | grep -i \"out of memory\"  # was it killed by the out-of-memory killer?"
       },
       {
        "t": "p",
        "c": [
         {
          "t": "text",
-         "v": "A small session that shows exit statuses:"
-        }
-       ]
-      },
-      {
-       "t": "code",
-       "lang": "sh",
-       "tag": "",
-       "expect": "",
-       "text": "sleep 100 &                  # run in the background; $! is its PID\nps -o pid,ppid,stat,cmd -p $!\nkill -TERM $!                # ask it to stop\nwait $!; echo $?             # 143 = 128 + 15\nfalse; echo $?               # 1: an ordinary failure"
-      },
-      {
-       "t": "p",
-       "c": [
-        {
-         "t": "text",
-         "v": "Why this matters for robotics: every ROS 2 node is a process. "
+         "v": "Every ROS 2 node is a process, so all of this applies to your robot. When you press Ctrl+C in a terminal running "
         },
         {
          "t": "code",
@@ -676,7 +567,39 @@
         },
         {
          "t": "text",
-         "v": " starts several and, when you press Ctrl+C, sends each of them SIGINT. Then it escalates to SIGTERM and finally SIGKILL for nodes that don't stop in time. A node that ignores shutdown gets killed without cleaning up."
+         "v": ", the launch system sends SIGINT to each node it started. A node that is still running 5 seconds later gets SIGTERM, and one that is still running 5 seconds after that gets SIGKILL, which it cannot catch. These are the defaults of the launch settings "
+        },
+        {
+         "t": "code",
+         "v": "sigterm_timeout"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "sigkill_timeout"
+        },
+        {
+         "t": "text",
+         "v": ". By default "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::init"
+        },
+        {
+         "t": "text",
+         "v": " installs handlers for both SIGINT and SIGTERM, and they only tell the node to shut down. So a C++ node whose loop never checks "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::ok()"
+        },
+        {
+         "t": "text",
+         "v": " survives both signals, holds up shutdown for 10 seconds, and is then killed with SIGKILL without cleaning up."
         }
        ]
       }
@@ -839,101 +762,69 @@
        "c": [
         {
          "t": "text",
-         "v": "Points to check in your own version:"
+         "v": "Compare your version on three points. The flag has to be a lock-free "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic<bool>"
+        },
+        {
+         "t": "text",
+         "v": " or a "
+        },
+        {
+         "t": "code",
+         "v": "volatile std::sig_atomic_t"
+        },
+        {
+         "t": "text",
+         "v": ". A plain "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " that the handler writes and the loop reads is a data race, and the compiler may keep it in a register and never see the change. The handler must do nothing except set that flag. And a signal doesn't cut the sleep short. It interrupts the "
+        },
+        {
+         "t": "code",
+         "v": "nanosleep"
+        },
+        {
+         "t": "text",
+         "v": " call underneath, but "
+        },
+        {
+         "t": "code",
+         "v": "sleep_for"
+        },
+        {
+         "t": "text",
+         "v": " calls it again for the time that is left, so the loop can take up to one more tick to notice the flag. With 100 ms ticks that doesn't matter."
         }
        ]
       },
       {
-       "t": "ul",
-       "items": [
-        [
-         {
-          "t": "b",
-          "v": "The flag type."
-         },
-         {
-          "t": "text",
-          "v": " It is a lock-free "
-         },
-         {
-          "t": "code",
-          "v": "std::atomic<bool>"
-         },
-         {
-          "t": "text",
-          "v": ", or "
-         },
-         {
-          "t": "code",
-          "v": "volatile std::sig_atomic_t"
-         },
-         {
-          "t": "text",
-          "v": ". A plain "
-         },
-         {
-          "t": "code",
-          "v": "bool"
-         },
-         {
-          "t": "text",
-          "v": " is a data race: the compiler may keep it in a register and never see the change."
-         }
-        ],
-        [
-         {
-          "t": "b",
-          "v": "The work in the handler."
-         },
-         {
-          "t": "text",
-          "v": " There is none apart from setting the flag."
-         }
-        ],
-        [
-         {
-          "t": "b",
-          "v": "`sleep_for` and signals."
-         },
-         {
-          "t": "text",
-          "v": " A signal ends a sleeping system call early on Linux, but "
-         },
-         {
-          "t": "code",
-          "v": "sleep_for"
-         },
-         {
-          "t": "text",
-          "v": " goes back to sleep for the rest of the time. So the loop may take up to one tick longer to notice the flag. That's fine for 100 ms ticks."
-         }
-        ],
-        [
-         {
-          "t": "b",
-          "v": "The better API."
-         },
-         {
-          "t": "text",
-          "v": " "
-         },
-         {
-          "t": "code",
-          "v": "sigaction"
-         },
-         {
-          "t": "text",
-          "v": " is the precise API for installing handlers. "
-         },
-         {
-          "t": "code",
-          "v": "std::signal"
-         },
-         {
-          "t": "text",
-          "v": " is enough on Linux, where the handler stays installed."
-         }
-        ]
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "sigaction"
+        },
+        {
+         "t": "text",
+         "v": " is the more precise way to install a handler, because it lets you choose which signals are blocked while the handler runs. On Linux, "
+        },
+        {
+         "t": "code",
+         "v": "std::signal"
+        },
+        {
+         "t": "text",
+         "v": " is enough for this program, because glibc leaves the handler installed after it has run once."
+        }
        ]
       }
      ]
@@ -950,142 +841,150 @@
      "minutes": 10,
      "blocks": [
       {
-       "t": "ul",
-       "items": [
-        [
-         {
-          "t": "b",
-          "v": "Zombie."
-         },
-         {
-          "t": "text",
-          "v": " A child has exited, but its parent never called "
-         },
-         {
-          "t": "code",
-          "v": "wait()"
-         },
-         {
-          "t": "text",
-          "v": ". It shows as "
-         },
-         {
-          "t": "code",
-          "v": "Z"
-         },
-         {
-          "t": "text",
-          "v": " or "
-         },
-         {
-          "t": "code",
-          "v": "<defunct>"
-         },
-         {
-          "t": "text",
-          "v": " in "
-         },
-         {
-          "t": "code",
-          "v": "ps"
-         },
-         {
-          "t": "text",
-          "v": ". It uses no memory, but it holds its PID. A long-running parent that starts children and never waits for them leaks PIDs until the system can't start processes. The fix is for the parent to wait for its children, or to handle SIGCHLD."
-         }
-        ],
-        [
-         {
-          "t": "b",
-          "v": "Orphan."
-         },
-         {
-          "t": "text",
-          "v": " The parent died first. The child is adopted by PID 1, or by a \"subreaper\" such as systemd, which waits for it when it ends. That's harmless, but it means that killing a launcher doesn't necessarily stop what it started."
-         }
-        ],
-        [
-         {
-          "t": "b",
-          "v": "Unsafe work in a handler."
-         },
-         {
-          "t": "text",
-          "v": " A signal can arrive in the middle of any function, including in the middle of "
-         },
-         {
-          "t": "code",
-          "v": "printf"
-         },
-         {
-          "t": "text",
-          "v": " or "
-         },
-         {
-          "t": "code",
-          "v": "malloc"
-         },
-         {
-          "t": "text",
-          "v": ", which hold internal locks. If the handler calls the same function, the process can deadlock or corrupt memory. Only "
-         },
-         {
-          "t": "i",
-          "v": "async-signal-safe"
-         },
-         {
-          "t": "text",
-          "v": " functions are allowed in a handler: "
-         },
-         {
-          "t": "code",
-          "v": "write"
-         },
-         {
-          "t": "text",
-          "v": ", "
-         },
-         {
-          "t": "code",
-          "v": "_exit"
-         },
-         {
-          "t": "text",
-          "v": " and a few others. "
-         },
-         {
-          "t": "code",
-          "v": "printf"
-         },
-         {
-          "t": "text",
-          "v": ", "
-         },
-         {
-          "t": "code",
-          "v": "new"
-         },
-         {
-          "t": "text",
-          "v": ", "
-         },
-         {
-          "t": "code",
-          "v": "std::cout"
-         },
-         {
-          "t": "text",
-          "v": ", locking a mutex and "
-         },
-         {
-          "t": "code",
-          "v": "exit"
-         },
-         {
-          "t": "text",
-          "v": " are not. Set a flag, and do everything else in normal code:"
-         }
-        ]
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A child that has exited stays in the process table until its parent collects its status with "
+        },
+        {
+         "t": "code",
+         "v": "wait()"
+        },
+        {
+         "t": "text",
+         "v": ". Until then it is a "
+        },
+        {
+         "t": "i",
+         "v": "zombie"
+        },
+        {
+         "t": "text",
+         "v": ", shown as "
+        },
+        {
+         "t": "code",
+         "v": "Z"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "<defunct>"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "ps"
+        },
+        {
+         "t": "text",
+         "v": ". It uses no memory, but it keeps its PID. A long-running parent that starts children and never waits for them leaks PIDs, and eventually the system can't start new processes. The parent has to wait for each child, directly or from a SIGCHLD handler that sets a flag."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When the parent dies first, the child becomes an "
+        },
+        {
+         "t": "i",
+         "v": "orphan"
+        },
+        {
+         "t": "text",
+         "v": ". PID 1 adopts it, or a \"subreaper\" such as systemd does, and collects its status when it ends. That is harmless, but it means killing a launcher doesn't necessarily stop the processes it started."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A signal can arrive in the middle of any function, including "
+        },
+        {
+         "t": "code",
+         "v": "printf"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "malloc"
+        },
+        {
+         "t": "text",
+         "v": ", which hold internal locks. If the handler then calls one of those functions, the process can deadlock or corrupt its heap. That is why a handler may only call "
+        },
+        {
+         "t": "i",
+         "v": "async-signal-safe"
+        },
+        {
+         "t": "text",
+         "v": " functions, such as "
+        },
+        {
+         "t": "code",
+         "v": "write"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "_exit"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "printf"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "new"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::cout"
+        },
+        {
+         "t": "text",
+         "v": ", locking a mutex and "
+        },
+        {
+         "t": "code",
+         "v": "exit"
+        },
+        {
+         "t": "text",
+         "v": " are all unsafe. This handler is wrong in three ways:"
+        }
        ]
       },
       {
@@ -1096,26 +995,20 @@
        "text": "void on_signal(int) {\n  std::printf(\"stopping\\n\");  // not async-signal-safe: can deadlock inside printf\n  save_everything();          // allocates and locks: the same problem\n  std::exit(0);               // runs static destructors from inside the handler\n}"
       },
       {
-       "t": "ul",
-       "items": [
-        [
-         {
-          "t": "b",
-          "v": "SIGKILL can't be caught"
-         },
-         {
-          "t": "text",
-          "v": ", and neither can SIGSTOP. Clean-up code never runs, so design for it: write results to a temporary file and "
-         },
-         {
-          "t": "code",
-          "v": "rename"
-         },
-         {
-          "t": "text",
-          "v": " it into place, so a killed process never leaves a half-written file."
-         }
-        ]
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "SIGKILL and SIGSTOP can't be caught at all, so no clean-up code runs when they arrive. Design for that. For example, write results to a temporary file and "
+        },
+        {
+         "t": "code",
+         "v": "rename"
+        },
+        {
+         "t": "text",
+         "v": " it into place when it is complete, so a killed process never leaves a half-written file behind."
+        }
        ]
       }
      ]
@@ -1130,37 +1023,8 @@
        "c": [
         {
          "t": "text",
-         "v": "Write 5 to 8 lines without looking. They are the proof for this topic."
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. They should say what a process is and how its exit status reaches the shell. Name the five signals you meet most, with their numbers and what sends them, and give the exit status after SIGINT, SIGTERM and SIGKILL. Say the one thing a handler may safely do, and why."
         }
-       ]
-      },
-      {
-       "t": "ul",
-       "items": [
-        [
-         {
-          "t": "text",
-          "v": "What a process is, and how its exit status reaches the shell."
-         }
-        ],
-        [
-         {
-          "t": "text",
-          "v": "The five signals you meet most, with their numbers and who sends them."
-         }
-        ],
-        [
-         {
-          "t": "text",
-          "v": "The exit status after SIGINT, SIGTERM and SIGKILL."
-         }
-        ],
-        [
-         {
-          "t": "text",
-          "v": "The one thing a handler may safely do, and why."
-         }
-        ]
        ]
       }
      ]
