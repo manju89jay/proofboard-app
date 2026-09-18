@@ -1,0 +1,1125 @@
+{
+ "id": "dsa-complexity",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "For each of the five functions, write down the time and the extra space as Big-O, in terms of the input sizes. Name the variables you use. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <string>\n#include <unordered_set>\n#include <vector>\n\n// 1\nlong sum(const std::vector<int>& v) {\n  long s = 0;\n  for (int x : v) s += x;\n  return s;\n}\n\n// 2\nbool has_duplicate_pairwise(const std::vector<int>& v) {\n  for (std::size_t i = 0; i < v.size(); ++i)\n    for (std::size_t j = i + 1; j < v.size(); ++j)\n      if (v[i] == v[j]) return true;\n  return false;\n}\n\n// 3\nint halvings(int n) {\n  int steps = 0;\n  while (n > 1) {\n    n /= 2;\n    ++steps;\n  }\n  return steps;\n}\n\n// 4\nbool has_duplicate_hashed(const std::vector<int>& v) {\n  std::unordered_set<int> seen;\n  for (int x : v)\n    if (!seen.insert(x).second) return true;\n  return false;\n}\n\n// 5\nstd::string repeat(const std::string& s, int k) {\n  std::string out;\n  for (int i = 0; i < k; ++i) out += s;\n  return out;\n}\n\nint main() {\n  std::vector<int> v{3, 1, 4, 1, 5};\n  bool ok = sum(v) == 14 && has_duplicate_pairwise(v) && halvings(8) == 3 && has_duplicate_hashed(v) &&\n            repeat(\"ab\", 3) == \"ababab\";\n  return ok ? 0 : 1;\n}"
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "With n = "
+     },
+     {
+      "t": "code",
+      "v": "v.size()"
+     },
+     {
+      "t": "text",
+      "v": ":"
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "b",
+       "v": "O(n) time, O(1) extra space."
+      },
+      {
+       "t": "text",
+       "v": " One pass, and one accumulator."
+      }
+     ],
+     [
+      {
+       "t": "b",
+       "v": "O(n²) time in the worst case, O(1) extra space."
+      },
+      {
+       "t": "text",
+       "v": " When there is no duplicate, it makes n(n−1)/2 comparisons."
+      }
+     ],
+     [
+      {
+       "t": "b",
+       "v": "O(log n) time, O(1) extra space."
+      },
+      {
+       "t": "text",
+       "v": " n halves on every step, so it takes about log₂ n steps."
+      }
+     ],
+     [
+      {
+       "t": "b",
+       "v": "O(n) average time, O(n) extra space."
+      },
+      {
+       "t": "text",
+       "v": " Each hash-set insert is O(1) on average. With a bad hash, where everything collides, an insert is O(n), making the whole function O(n²) in the worst case."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "With m = "
+      },
+      {
+       "t": "code",
+       "v": "s.size()"
+      },
+      {
+       "t": "text",
+       "v": ": "
+      },
+      {
+       "t": "b",
+       "v": "O(k·m) time, O(k·m) extra space."
+      },
+      {
+       "t": "text",
+       "v": " Appending m characters to a string costs O(m) amortised, and the result holds k·m characters. Say \"k·m\", not \"n\": interviewers listen for the variables."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "b",
+      "v": "Pass:"
+     },
+     {
+      "t": "text",
+      "v": " all five, including the average versus worst case in 4 and both variables in 5. "
+     },
+     {
+      "t": "b",
+      "v": "Partly:"
+     },
+     {
+      "t": "text",
+      "v": " one or two missed. "
+     },
+     {
+      "t": "b",
+      "v": "Fail:"
+     },
+     {
+      "t": "text",
+      "v": " more."
+     }
+    ]
+   }
+  ]
+ },
+ "subs": [
+  {
+   "id": "big-o",
+   "title": "Big-O for loops, nested loops, halving and extra storage",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Big-O describes how the work grows as the input grows, ignoring constant factors. O(n) means the work is at most a constant times n once n is large. In an interview, always give "
+        },
+        {
+         "t": "b",
+         "v": "both"
+        },
+        {
+         "t": "text",
+         "v": " time and extra space, and name the variables: \"O(n log n) time and O(n) extra space, where n is the number of intervals.\""
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "How to derive it from code:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "b",
+          "v": "Code in sequence: add, then keep the largest term."
+         },
+         {
+          "t": "text",
+          "v": " A loop over n followed by a loop over n is O(n + n) = O(n)."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Nested loops: multiply."
+         },
+         {
+          "t": "text",
+          "v": " A loop over n inside a loop over m is O(n·m). If the inner loop runs i times for i = 0 … n−1, the total is n(n−1)/2, which is O(n²)."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Halving or doubling: logarithm."
+         },
+         {
+          "t": "text",
+          "v": " A loop where i doubles, or n halves, runs about log₂ n times. That's binary search's cost."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Two inputs:"
+         },
+         {
+          "t": "text",
+          "v": " keep both variables. O(n + m) and O(n·m) are different answers; don't collapse them to n."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Extra space"
+         },
+         {
+          "t": "text",
+          "v": " is the memory beyond the input: new containers, the output if you build it, and the recursion stack, whose depth counts."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Costs you should know without thinking:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Growth"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Example"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Feasible for n = 10⁶?"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "O(1)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "read "
+          },
+          {
+           "t": "code",
+           "v": "v[i]"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "unordered_map"
+          },
+          {
+           "t": "text",
+           "v": " lookup on average"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "O(log n)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "binary search, "
+          },
+          {
+           "t": "code",
+           "v": "std::map"
+          },
+          {
+           "t": "text",
+           "v": " lookup"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "one pass"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "O(n log n)"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::sort"
+          },
+          {
+           "t": "text",
+           "v": ", merge sort"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes, about 2·10⁷ steps"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "O(n²)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "all pairs"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no, about 10¹² steps"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "O(2ⁿ)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "all subsets"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "only for n up to about 25"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A rough budget: a simple loop does in the order of 10⁸ to 10⁹ steps per second. When a problem says n ≤ 10⁵, O(n²) is too slow and you need O(n log n) or better."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Standard-library costs that come up constantly:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "vector::push_back"
+         },
+         {
+          "t": "text",
+          "v": ": amortised O(1). Inserting or erasing in the middle: O(n)."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::sort"
+         },
+         {
+          "t": "text",
+          "v": ": O(n log n)."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::map"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "std::set"
+         },
+         {
+          "t": "text",
+          "v": " operations: O(log n)."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::unordered_map"
+         },
+         {
+          "t": "text",
+          "v": " operations: O(1) on average, O(n) worst."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::string"
+         },
+         {
+          "t": "text",
+          "v": " "
+         },
+         {
+          "t": "code",
+          "v": "+="
+         },
+         {
+          "t": "text",
+          "v": ": amortised O(length added). But "
+         },
+         {
+          "t": "code",
+          "v": "s = s + t"
+         },
+         {
+          "t": "text",
+          "v": " copies all of "
+         },
+         {
+          "t": "code",
+          "v": "s"
+         },
+         {
+          "t": "text",
+          "v": " every time."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A loop that looks nested but isn't O(n²): the inner loop runs 1 + 2 + 4 + … + n times in total, which is less than 2n."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n\nint main() {\n  const int n = 1024;\n  long work = 0;\n  for (int i = 1; i < n; i *= 2)   // log n rounds\n    for (int j = 0; j < i; ++j)    // i steps in round i\n      ++work;\n  std::printf(\"n = %d, total inner steps = %ld\\n\", n, work);  // 1 + 2 + ... + 512 = 1023\n}"
+      },
+      {
+       "t": "output",
+       "text": "n = 1024, total inner steps = 1023"
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In 25 minutes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "b",
+         "v": "Part 1."
+        },
+        {
+         "t": "text",
+         "v": " Give the time and extra space of each of these, then check with the solution:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "for (int i = 0; i < n; ++i) for (int j = i; j > 0; j /= 2) ++work;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::string s; for (int i = 0; i < k; ++i) s = s + t;"
+         },
+         {
+          "t": "text",
+          "v": " with m = "
+         },
+         {
+          "t": "code",
+          "v": "t.size()"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a recursive "
+         },
+         {
+          "t": "code",
+          "v": "int depth(int n) { return n == 0 ? 0 : 1 + depth(n - 1); }"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "sorting a vector of n strings, each of length at most L"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "b",
+         "v": "Part 2."
+        },
+        {
+         "t": "text",
+         "v": " Measure growth to train your intuition. Time "
+        },
+        {
+         "t": "code",
+         "v": "has_duplicate_pairwise"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "has_duplicate_hashed"
+        },
+        {
+         "t": "text",
+         "v": " from the cold check on inputs with no duplicates, for n = 1000, 2000, 4000 and 8000. Predict first: when n doubles, the pairwise time should grow about 4 times and the hashed time about 2 times."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "b",
+         "v": "Part 1."
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "b",
+          "v": "O(n log n) time, O(1) extra space."
+         },
+         {
+          "t": "text",
+          "v": " The inner loop halves j, so it runs about log i times."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "O(k²·m) time, O(k·m) space."
+         },
+         {
+          "t": "text",
+          "v": " Each "
+         },
+         {
+          "t": "code",
+          "v": "s + t"
+         },
+         {
+          "t": "text",
+          "v": " builds a new string of the current length, so the copies add up to about m·k²/2. Using "
+         },
+         {
+          "t": "code",
+          "v": "s += t"
+         },
+         {
+          "t": "text",
+          "v": " makes it O(k·m)."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "O(n) time and O(n) extra space"
+         },
+         {
+          "t": "text",
+          "v": ", for the n stack frames of the recursion."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "O(n log n) comparisons, each up to O(L), so O(L·n log n) time."
+         },
+         {
+          "t": "text",
+          "v": " "
+         },
+         {
+          "t": "code",
+          "v": "std::sort"
+         },
+         {
+          "t": "text",
+          "v": " needs O(log n) extra space."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "b",
+         "v": "Part 2."
+        },
+        {
+         "t": "text",
+         "v": " A measuring program. Its timings vary from run to run, so there is no fixed output to compare. Look at the ratios."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdio>\n#include <numeric>\n#include <unordered_set>\n#include <vector>\n\nbool has_duplicate_pairwise(const std::vector<int>& v) {\n  for (std::size_t i = 0; i < v.size(); ++i)\n    for (std::size_t j = i + 1; j < v.size(); ++j)\n      if (v[i] == v[j]) return true;\n  return false;\n}\n\nbool has_duplicate_hashed(const std::vector<int>& v) {\n  std::unordered_set<int> seen;\n  for (int x : v)\n    if (!seen.insert(x).second) return true;\n  return false;\n}\n\ntemplate <class F>\ndouble millis(F f, const std::vector<int>& v) {\n  auto start = std::chrono::steady_clock::now();\n  volatile bool found = f(v);  // volatile: the optimiser must not skip the call\n  (void)found;\n  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();\n}\n\nint main() {\n  for (int n = 1000; n <= 8000; n *= 2) {\n    std::vector<int> v(n);\n    std::iota(v.begin(), v.end(), 0);  // 0, 1, 2, ...: no duplicates, the worst case\n    std::printf(\"n = %5d  pairwise %8.2f ms  hashed %6.2f ms\\n\", n, millis(has_duplicate_pairwise, v),\n                millis(has_duplicate_hashed, v));\n  }\n}"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "amortised",
+   "title": "Amortised cost: vector growth",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " finds the vector full, it allocates a bigger block, moves every element across, and frees the old one. That single push is O(n). But capacity grows by a constant factor: GCC's library doubles it, and Microsoft's grows it by 1.5. So over n pushes the moves add up to less than 2n: 1 + 2 + 4 + … < 2n. Spread over the pushes, that's "
+        },
+        {
+         "t": "b",
+         "v": "amortised O(1)"
+        },
+        {
+         "t": "text",
+         "v": " per push."
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "b",
+          "v": "Amortised"
+         },
+         {
+          "t": "text",
+          "v": " is a guarantee about any sequence of operations: the total is at most n times the amortised cost."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Average"
+         },
+         {
+          "t": "text",
+          "v": " is about typical inputs. A hash table's O(1) is an average, and a bad input can make it worse."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Worst case"
+         },
+         {
+          "t": "text",
+          "v": " is about a single operation. One "
+         },
+         {
+          "t": "code",
+          "v": "push_back"
+         },
+         {
+          "t": "text",
+          "v": " can be O(n)."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "reserve(n)"
+         },
+         {
+          "t": "text",
+          "v": ", when you know the size up front, removes every reallocation."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A reallocation also invalidates every pointer, reference and iterator into the vector. A later topic covers the bugs this causes."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program counts the moves. It uses GCC's doubling:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n#include <vector>\n\nstruct Counted {\n  static inline int moves = 0;\n  int value;\n  explicit Counted(int v) : value(v) {}\n  Counted(Counted&& other) noexcept : value(other.value) { ++moves; }\n};\n\nint main() {\n  std::vector<Counted> v;\n  std::size_t last = v.capacity();\n  for (int i = 1; i <= 20; ++i) {\n    v.emplace_back(i);\n    if (v.capacity() != last) {\n      last = v.capacity();\n      std::printf(\"size %2zu -> capacity %zu\\n\", v.size(), last);\n    }\n  }\n  std::printf(\"20 pushes moved %d elements in total\\n\", Counted::moves);\n}"
+      },
+      {
+       "t": "output",
+       "text": "size  1 -> capacity 1\nsize  2 -> capacity 2\nsize  3 -> capacity 4\nsize  5 -> capacity 8\nsize  9 -> capacity 16\nsize 17 -> capacity 32\n20 pushes moved 31 elements in total"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "31 moves for 20 pushes: 1 + 2 + 4 + 8 + 16, always less than twice the number of pushes."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In 15 minutes:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add "
+         },
+         {
+          "t": "code",
+          "v": "v.reserve(20);"
+         },
+         {
+          "t": "text",
+          "v": " on the line straight after "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<Counted> v;"
+         },
+         {
+          "t": "text",
+          "v": ". Predict the printed lines and the move count, then run it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "About how many reallocations does a vector make while you push one million elements one by one, with doubling?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Remove "
+         },
+         {
+          "t": "code",
+          "v": "noexcept"
+         },
+         {
+          "t": "text",
+          "v": " from the move constructor, and add a copy constructor that counts copies. What does the vector do when it grows now, and why?"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "No capacity lines at all, and 0 moves. The capacity is already 20 when "
+         },
+         {
+          "t": "code",
+          "v": "last"
+         },
+         {
+          "t": "text",
+          "v": " is read, and it never changes inside the loop."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "About 20, because 2²⁰ ≈ 10⁶. That's why reallocation hardly matters for speed. It does matter for invalidated references."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "It "
+         },
+         {
+          "t": "b",
+          "v": "copies"
+         },
+         {
+          "t": "text",
+          "v": " instead of moving. When growing, "
+         },
+         {
+          "t": "code",
+          "v": "std::vector"
+         },
+         {
+          "t": "text",
+          "v": " gives the strong exception guarantee: if moving an element could throw, a failure halfway would leave both blocks broken. So it uses "
+         },
+         {
+          "t": "code",
+          "v": "std::move_if_noexcept"
+         },
+         {
+          "t": "text",
+          "v": ", which only moves when the move constructor is "
+         },
+         {
+          "t": "code",
+          "v": "noexcept"
+         },
+         {
+          "t": "text",
+          "v": ". That's why move constructors should be "
+         },
+         {
+          "t": "code",
+          "v": "noexcept"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n#include <vector>\n\nstruct Counted {\n  static inline int moves = 0;\n  static inline int copies = 0;\n  int value;\n  explicit Counted(int v) : value(v) {}\n  Counted(const Counted& other) : value(other.value) { ++copies; }\n  Counted(Counted&& other) : value(other.value) { ++moves; }  // not noexcept\n};\n\nint main() {\n  std::vector<Counted> v;\n  for (int i = 1; i <= 20; ++i) v.emplace_back(i);\n  std::printf(\"moves %d, copies %d\\n\", Counted::moves, Counted::copies);\n}"
+      },
+      {
+       "t": "output",
+       "text": "moves 0, copies 31"
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write 5 to 8 lines, without looking. They are the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "How you derive Big-O for code in sequence, for nested loops and for halving loops."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What extra space includes."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The difference between average, amortised and worst case, with one example each."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The cost of three standard-library operations."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Time and space: a loop inside a loop where the inner one runs i times; a loop that doubles i; two separate loops over n and m."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " amortised O(1) when one push can move every element?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Average, amortised and worst case: one example of each."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why should a move constructor be "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 10 minutes: does a vector contain a duplicate? Do it in O(n) average time, and state the extra space."
+     }
+    ]
+   ]
+  }
+ ]
+}

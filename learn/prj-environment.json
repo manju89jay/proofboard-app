@@ -1,0 +1,579 @@
+{
+ "id": "prj-environment",
+ "check": null,
+ "subs": [
+  {
+   "id": "install",
+   "title": "Install and verify ROS 2, Gazebo and the compilers",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "b",
+         "v": "Goal of this session:"
+        },
+        {
+         "t": "text",
+         "v": " ROS 2 Jazzy installed on Ubuntu 24.04, with a talker and a listener talking in two fresh terminals."
+        }
+       ]
+      },
+      {
+       "t": "note",
+       "c": [
+        {
+         "t": "text",
+         "v": "Jazzy is the ROS 2 long-term support release for Ubuntu 24.04 (Noble), supported until 2029. The Test Bench uses it throughout. On Windows, use WSL2 with Ubuntu 24.04. On Windows 11, WSLg shows Linux windows such as RViz and the Gazebo GUI without extra setup."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Check the Ubuntu version. It must say 24.04. Then bring the system up to date: ROS packages are built against a current Ubuntu."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "lsb_release -ds\nsudo apt update && sudo apt upgrade"
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Make sure the locale is UTF-8. This is the official sequence:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "locale                                  # look for UTF-8\nsudo apt update && sudo apt install locales\nsudo locale-gen en_US en_US.UTF-8\nsudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8\nexport LANG=en_US.UTF-8"
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Enable the Universe repository and add the ROS 2 apt source. Since 2025 this is done by installing the "
+         },
+         {
+          "t": "code",
+          "v": "ros2-apt-source"
+         },
+         {
+          "t": "text",
+          "v": " package, which also keeps the signing key current:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "sudo apt install software-properties-common\nsudo add-apt-repository universe\nsudo apt update && sudo apt install curl -y\nexport ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F \"tag_name\" | awk -F'\"' '{print $4}')\ncurl -L -o /tmp/ros2-apt-source.deb \"https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb\"\nsudo dpkg -i /tmp/ros2-apt-source.deb"
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Install the development tools (colcon, rosdep and vcstool) and the desktop variant, which includes RViz and the demos:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "sudo apt update && sudo apt install ros-dev-tools\nsudo apt install ros-jazzy-desktop"
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Source ROS in every new terminal, and set up rosdep once:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "echo \"source /opt/ros/jazzy/setup.bash\" >> ~/.bashrc\nsource ~/.bashrc\nsudo rosdep init\nrosdep update"
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Verify. Open two "
+         },
+         {
+          "t": "b",
+          "v": "new"
+         },
+         {
+          "t": "text",
+          "v": " terminals, so you know "
+         },
+         {
+          "t": "code",
+          "v": ".bashrc"
+         },
+         {
+          "t": "text",
+          "v": " works:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run demo_nodes_cpp talker     # terminal 1: prints \"Publishing: 'Hello World: 1'\" ...\nros2 run demo_nodes_py listener    # terminal 2: prints \"I heard: [Hello World: 1]\" ..."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Stop both with Ctrl+C. The C++ and Python demos talking to each other also proves the middleware works across languages."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "b",
+         "v": "Done when:"
+        },
+        {
+         "t": "text",
+         "v": " the listener hears the talker in two fresh terminals. If a command fails, write down the exact error and what fixed it. That note is the start of your debugging record."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The commands above follow the official guide as of September 2026. If a step fails, check the "
+        },
+        {
+         "t": "a",
+         "v": "ROS 2 Jazzy installation guide",
+         "href": "https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html"
+        },
+        {
+         "t": "text",
+         "v": " for changes."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "b",
+         "v": "Goal of this session:"
+        },
+        {
+         "t": "text",
+         "v": " Gazebo runs headless and with its GUI, and the C++ toolchain, the debugger and the sanitizers work."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Install Gazebo through ROS. For Jazzy, the recommended version is Gazebo "
+         },
+         {
+          "t": "b",
+          "v": "Harmonic"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "ros_gz"
+         },
+         {
+          "t": "text",
+          "v": " installs it together with the ROS bridge:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "sudo apt install ros-jazzy-ros-gz\ngz sim --version"
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run an empty world without the GUI for 1000 steps. It should exit by itself:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "gz sim -s -r --iterations 1000 empty.sdf -v 3"
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it with the GUI, and list its topics from a second terminal:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "gz sim empty.sdf        # terminal 1: a window with an empty world\ngz topic -l             # terminal 2: shows /clock, /stats and others"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "If the window stays black or the GUI crashes under WSL, try software rendering with "
+        },
+        {
+         "t": "code",
+         "v": "export LIBGL_ALWAYS_SOFTWARE=1"
+        },
+        {
+         "t": "text",
+         "v": " before "
+        },
+        {
+         "t": "code",
+         "v": "gz sim"
+        },
+        {
+         "t": "text",
+         "v": ", and write down whether it helped."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Install and check the C++ tools:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "sudo apt install build-essential cmake gdb git\ng++ --version | head -1      # 13.x on Ubuntu 24.04\ncmake --version | head -1\ngdb --version | head -1"
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that AddressSanitizer works. Save this as "
+         },
+         {
+          "t": "code",
+          "v": "overflow.cpp"
+         },
+         {
+          "t": "text",
+          "v": ", build it with "
+         },
+         {
+          "t": "code",
+          "v": "g++ -std=c++20 -g -fsanitize=address,undefined overflow.cpp -o overflow"
+         },
+         {
+          "t": "text",
+          "v": " and run "
+         },
+         {
+          "t": "code",
+          "v": "./overflow"
+         },
+         {
+          "t": "text",
+          "v": ". You must see a "
+         },
+         {
+          "t": "code",
+          "v": "heap-buffer-overflow"
+         },
+         {
+          "t": "text",
+          "v": " report that names line 3:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-buffer-overflow",
+       "text": "int main() {\n  int* p = new int[2];\n  p[2] = 1;  // one past the end\n  delete[] p;\n}"
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Set your Git identity if this machine doesn't have it yet: "
+         },
+         {
+          "t": "code",
+          "v": "git config --global user.name \"…\""
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "git config --global user.email \"…\""
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "b",
+         "v": "Done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "the headless run exits cleanly;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the GUI shows the empty world;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "gz topic -l"
+         },
+         {
+          "t": "text",
+          "v": " lists "
+         },
+         {
+          "t": "code",
+          "v": "/clock"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "g++"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "cmake"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "gdb"
+         },
+         {
+          "t": "text",
+          "v": " print their versions;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the sanitizer report appears."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "record",
+   "title": "Write down every version",
+   "steps": [
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Create "
+        },
+        {
+         "t": "code",
+         "v": "docs/environment.md"
+        },
+        {
+         "t": "text",
+         "v": " in the Test Bench repository. It is the proof for this topic, and the first piece of reproducibility: anyone, including you in three months, can rebuild the same setup. Fill it from these commands:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "lsb_release -ds\nuname -r\nprintenv ROS_DISTRO\ngz sim --version\ng++ --version | head -1\ncmake --version | head -1\ngdb --version | head -1\ndpkg-query -W ros-jazzy-desktop ros-jazzy-ros-gz ros-dev-tools"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add three short sections:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "the exact install commands you ran;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "everything that went wrong, and the fix;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "anything special about your machine, such as WSL or the GPU."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null
+}

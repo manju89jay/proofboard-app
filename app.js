@@ -5,6 +5,7 @@
 import { view, seedToState, hexId, openableType, safeExtension, cleanFileName } from "./rules.js";
 import { createClient, apiBaseFor } from "./github.js";
 import { Sync } from "./sync.js";
+import { renderLearnList, renderTopic } from "./learn.js";
 
 const $ = (id) => document.getElementById(id);
 let S = null;             // what the page shows: view() of the synced data
@@ -15,7 +16,10 @@ const ui = {
   sk: { q: "", cat: "", prio: "q1", proof: "", sort: "prio", open: {} },
   lib: { q: "", kind: "", skill: "" },
   schedDraft: null, schedKey: null,
+  learn: { topic: null },
 };
+// The Learn pages ship with the page (learn/*.json) and load when first needed.
+const LEARN = { index: null, loading: false, error: false, bodies: {}, body: {} };
 try { ui.tab = sessionStorage.getItem("pb-tab") || "today"; } catch (e) { /* private mode */ }
 
 const TRACKS = {
@@ -408,6 +412,7 @@ function skillFacts(s) {
 
 function renderSkills() {
   const f = ui.sk;
+  loadLearnIndex(); // for the Learn links in each open skill
   const facts = Object.fromEntries(S.skills.map((s) => [s.id, skillFacts(s)]));
   const withProof = S.skills.filter((s) => facts[s.id].ev.length).length;
   const topGaps = S.skills.filter((s) => s.priority === "P0" && !facts[s.id].ev.length).length;
@@ -448,6 +453,8 @@ function renderSkills() {
     if (open) {
       h += `<div class="skl-body"><p style="margin:10px 0 4px">${esc(s.plain)}</p>`;
       h += `<p class="hint" style="margin:0 0 4px"><b>When:</b> ${esc(s.window)}</p>`;
+      const topics = learnTopicsFor(s.id);
+      if (topics.length) h += `<p class="hint" style="margin:0 0 4px"><b>Learn:</b> ${topics.map((t) => `<button type="button" class="btn link" data-act="learnopen" data-topic="${esc(t.id)}">${esc(t.title)}</button>`).join(", ")}</p>`;
       h += `<div class="grid3"><label class="fld">Status<select data-skf="status">${opts(ladderFor(s), s.status)}</select></label><label class="fld">Priority<select data-skf="priority">${opts(PRIOS, s.priority)}</select></label><label class="fld">Next action or open question<input type="text" data-skf="note" value="${esc(s.note)}" placeholder="Next step"></label></div>`;
       h += `<div class="row" style="justify-content:space-between;margin:6px 0"><h3>Proof (${x.ev.length})</h3><button type="button" class="btn small primary" data-act="addproofskill">Add proof for this skill</button></div>`;
       h += x.ev.length ? x.ev.map((e) => proofCard(e)).join("") : `<p class="empty">No proof yet. Add a repo link, a LeetCode solution, a PDF, a recording or a few paragraphs in your own words.</p>`;
@@ -498,8 +505,61 @@ function renderSchedule() {
   $("p-schedule").innerHTML = h;
 }
 
+/* ---------- LEARN ---------- */
+// After a failure it waits for "Try again" (learnretry), so a render never starts a request loop.
+async function loadLearnIndex() {
+  if (LEARN.index || LEARN.loading || LEARN.error) return;
+  LEARN.loading = true;
+  LEARN.error = false;
+  try {
+    const r = await fetch("learn/index.json", { cache: "no-cache" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    LEARN.index = await r.json();
+  } catch (e) {
+    LEARN.error = true;
+  }
+  LEARN.loading = false;
+  if (ui.tab === "learn" || ui.tab === "skills") render();
+}
+
+// LEARN.body[id] is "loading" or "error" while LEARN.bodies[id] is missing.
+async function loadLearnBody(id) {
+  if (LEARN.bodies[id] || LEARN.body[id] === "loading") return;
+  LEARN.body[id] = "loading";
+  try {
+    const r = await fetch(`learn/${encodeURIComponent(id)}.json`, { cache: "no-cache" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    LEARN.bodies[id] = await r.json();
+    delete LEARN.body[id];
+  } catch (e) {
+    LEARN.body[id] = "error";
+  }
+  if (ui.tab === "learn" && ui.learn.topic === id) render();
+}
+
+const learnTopicsFor = (skillId) => (LEARN.index ? LEARN.index.topics.filter((t) => t.skills.includes(skillId)) : []);
+const retryCard = (what) => `<div class="card"><p>${what} didn't load. Check the connection.</p><button type="button" class="btn small" data-act="learnretry">Try again</button></div>`;
+
+function renderLearn() {
+  const P = $("p-learn");
+  if (!LEARN.index) {
+    P.innerHTML = `<h2>Learn</h2>` + (LEARN.error ? retryCard("The Learn pages") : `<p class="muted">Loading the Learn pages…</p>`);
+    loadLearnIndex();
+    return;
+  }
+  const names = Object.fromEntries(S.skills.map((k) => [k.id, k.name]));
+  const topic = ui.learn.topic ? LEARN.index.topics.find((t) => t.id === ui.learn.topic) : null;
+  if (!topic) { P.innerHTML = renderLearnList(LEARN.index, names); return; }
+  const body = LEARN.bodies[topic.id];
+  if (topic.pending || body) { P.innerHTML = renderTopic(LEARN.index, topic, topic.pending ? null : body, names); return; }
+  const head = `<button type="button" class="btn link" data-act="learnback">All topics</button><h2 class="ltopic">${esc(topic.title)}</h2>`;
+  if (LEARN.body[topic.id] === "error") { P.innerHTML = head + retryCard("This topic"); return; }
+  P.innerHTML = head + `<p class="muted">Loading…</p>`;
+  loadLearnBody(topic.id);
+}
+
 /* ---------- tabs ---------- */
-const RENDER = { today: renderToday, plan: renderPlan, log: renderLog, skills: renderSkills, library: renderLibrary, schedule: renderSchedule };
+const RENDER = { today: renderToday, plan: renderPlan, learn: renderLearn, log: renderLog, skills: renderSkills, library: renderLibrary, schedule: renderSchedule };
 function render() {
   if (!S) return;
   flushTyping(); // a note typed in the last moment is part of what gets drawn
@@ -744,6 +804,12 @@ document.addEventListener("click", async (e) => {
     case "editproof": { const ev = IX.ev[el.dataset.id]; if (ev) openProof({ evidence: ev }); break; }
     case "skillopen": { const id = el.closest("[data-skill]").dataset.skill; ui.sk.open[id] = !ui.sk.open[id]; render(); break; }
     case "addproofskill": openProof({ skill: el.closest("[data-skill]").dataset.skill }); break;
+    case "learnopen":
+      ui.learn.topic = el.dataset.topic;
+      if (ui.tab !== "learn") showTab("learn"); else { render(); window.scrollTo(0, 0); }
+      break;
+    case "learnback": ui.learn.topic = null; render(); window.scrollTo(0, 0); break;
+    case "learnretry": LEARN.error = false; if (ui.learn.topic) delete LEARN.body[ui.learn.topic]; render(); break;
     case "schedview": ui.schedKey = el.dataset.v; render(); break;
     case "schedactivate": ui.schedDraft.active = ui.schedKey; render(); break;
     case "blockday": {

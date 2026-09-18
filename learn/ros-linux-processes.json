@@ -1,0 +1,1214 @@
+{
+ "id": "ros-linux-processes",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Answer in five or six sentences, without notes, in 10 minutes:"
+     }
+    ]
+   },
+   {
+    "t": "ul",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "What happens when you press Ctrl+C in a terminal while a program runs?"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "What does that program do by default?"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "What does "
+      },
+      {
+       "t": "code",
+       "v": "echo $?"
+      },
+      {
+       "t": "text",
+       "v": " print right afterwards, and why that number?"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "What should a program that must save its work do instead?"
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "The terminal sends the signal "
+      },
+      {
+       "t": "b",
+       "v": "SIGINT"
+      },
+      {
+       "t": "text",
+       "v": " (number 2) to every process in the foreground process group."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The default action for SIGINT is to terminate the process."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The shell then reports the exit status as "
+      },
+      {
+       "t": "b",
+       "v": "128 + the signal number"
+      },
+      {
+       "t": "text",
+       "v": ", so "
+      },
+      {
+       "t": "code",
+       "v": "echo $?"
+      },
+      {
+       "t": "text",
+       "v": " prints "
+      },
+      {
+       "t": "b",
+       "v": "130"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A program that must save its work installs a handler that "
+      },
+      {
+       "t": "b",
+       "v": "only sets a flag"
+      },
+      {
+       "t": "text",
+       "v": ". Its main loop checks the flag, stops, cleans up in normal code and returns 0, or whatever status it chooses."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "ROS 2 does exactly this: "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::init"
+     },
+     {
+      "t": "text",
+      "v": " installs a SIGINT handler, and "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::ok()"
+     },
+     {
+      "t": "text",
+      "v": " turns false."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "b",
+      "v": "Pass:"
+     },
+     {
+      "t": "text",
+      "v": " all four points, including 130. "
+     },
+     {
+      "t": "b",
+      "v": "Partly:"
+     },
+     {
+      "t": "text",
+      "v": " you missed 130 or the \"only set a flag\" rule. "
+     },
+     {
+      "t": "b",
+      "v": "Fail:"
+     },
+     {
+      "t": "text",
+      "v": " more."
+     }
+    ]
+   }
+  ]
+ },
+ "subs": [
+  {
+   "id": "processes",
+   "title": "Processes, ps, top, kill, signals, exit status",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "b",
+         "v": "process"
+        },
+        {
+         "t": "text",
+         "v": " is a running program. It has:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "a process id (PID) and a parent (PPID);"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "its own memory;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "open files, including stdin, stdout and stderr;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a state, which "
+         },
+         {
+          "t": "code",
+          "v": "ps"
+         },
+         {
+          "t": "text",
+          "v": " shows as "
+         },
+         {
+          "t": "code",
+          "v": "R"
+         },
+         {
+          "t": "text",
+          "v": " running, "
+         },
+         {
+          "t": "code",
+          "v": "S"
+         },
+         {
+          "t": "text",
+          "v": " sleeping, "
+         },
+         {
+          "t": "code",
+          "v": "T"
+         },
+         {
+          "t": "text",
+          "v": " stopped or "
+         },
+         {
+          "t": "code",
+          "v": "Z"
+         },
+         {
+          "t": "text",
+          "v": " zombie."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every process except PID 1 has a parent. When a process ends, its "
+        },
+        {
+         "t": "b",
+         "v": "exit status"
+        },
+        {
+         "t": "text",
+         "v": " waits until the parent collects it with "
+        },
+        {
+         "t": "code",
+         "v": "wait()"
+        },
+        {
+         "t": "text",
+         "v": ". A shell is such a parent: it collects the status and shows it in "
+        },
+        {
+         "t": "code",
+         "v": "$?"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "b",
+         "v": "Exit status"
+        },
+        {
+         "t": "text",
+         "v": " is a number from 0 to 255. 0 means success, and anything else is a failure whose meaning the program defines. When a signal kills a process, the shell reports 128 + the signal number."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "b",
+         "v": "signal"
+        },
+        {
+         "t": "text",
+         "v": " is an asynchronous notification sent to a process. The ones you will meet:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Signal"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Number"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Sent by"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Default"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Can be caught?"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "SIGINT"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Ctrl+C in the terminal"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "terminate"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "SIGTERM"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "15"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "kill PID"
+          },
+          {
+           "t": "text",
+           "v": ", systemd, "
+          },
+          {
+           "t": "code",
+           "v": "docker stop"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "ros2 launch"
+          },
+          {
+           "t": "text",
+           "v": " escalation"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "terminate"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "SIGKILL"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "9"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "kill -9 PID"
+          },
+          {
+           "t": "text",
+           "v": ", the kernel's out-of-memory killer"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "terminate"
+          }
+         ],
+         [
+          {
+           "t": "b",
+           "v": "no"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "SIGSEGV"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "11"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the kernel, on an invalid memory access"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "terminate with a core dump"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes, but don't"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "SIGABRT"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "6"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "abort()"
+          },
+          {
+           "t": "text",
+           "v": ", a failed "
+          },
+          {
+           "t": "code",
+           "v": "assert"
+          },
+          {
+           "t": "text",
+           "v": ", the sanitizers"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "terminate with a core dump"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes, but don't"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "SIGCHLD"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "17"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the kernel, when a child stops or exits"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "ignore"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "SIGHUP"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the terminal closing"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "terminate"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The shell commands to know:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ps -ef                                   # every process, with PID and PPID\nps -o pid,ppid,stat,rss,cmd -p 1234      # one process: state, resident memory in KB, command\npgrep -a talker                          # find processes by name\ntop                                      # live CPU and memory; press M to sort by memory\nkill -TERM 1234                          # ask a process to stop (the default signal)\nkill -INT 1234                           # the same signal as Ctrl+C\nkill -KILL 1234                          # force: no clean-up is possible\ncat /proc/1234/status                    # the kernel's view: state, threads, memory\njournalctl -k | grep -i \"out of memory\"  # was it killed by the OOM killer?"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A small session that shows exit statuses:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "sleep 100 &                  # run in the background; $! is its PID\nps -o pid,ppid,stat,cmd -p $!\nkill -TERM $!                # ask it to stop\nwait $!; echo $?             # 143 = 128 + 15\nfalse; echo $?               # 1: an ordinary failure"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Why this matters for robotics: every ROS 2 node is a process. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 launch"
+        },
+        {
+         "t": "text",
+         "v": " starts several and, when you press Ctrl+C, sends each of them SIGINT. Then it escalates to SIGTERM and finally SIGKILL for nodes that don't stop in time. A node that ignores shutdown gets killed without cleaning up."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sigint",
+   "title": "C++ program that shuts down cleanly on SIGINT",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "From a blank file, in 25 minutes, write a program that:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "loops doing \"work\": it counts ticks and sleeps 100 ms per tick;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "on SIGINT or SIGTERM, stops the loop;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "then prints how many ticks ran, prints "
+         },
+         {
+          "t": "code",
+          "v": "saved"
+         },
+         {
+          "t": "text",
+          "v": " to stand for clean-up, and exits with status 0."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test it:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it and press Ctrl+C after a second; "
+         },
+         {
+          "t": "code",
+          "v": "echo $?"
+         },
+         {
+          "t": "text",
+          "v": " must print 0."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Start it again, find its PID with "
+         },
+         {
+          "t": "code",
+          "v": "pgrep"
+         },
+         {
+          "t": "text",
+          "v": ", and stop it from a second terminal with "
+         },
+         {
+          "t": "code",
+          "v": "kill -TERM"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Then try "
+         },
+         {
+          "t": "code",
+          "v": "kill -KILL"
+         },
+         {
+          "t": "text",
+          "v": " and see that "
+         },
+         {
+          "t": "code",
+          "v": "saved"
+         },
+         {
+          "t": "text",
+          "v": " never appears."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In this version, the program raises SIGINT itself after three ticks, so it can run unattended. When you run your own, press Ctrl+C instead."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <atomic>\n#include <chrono>\n#include <csignal>\n#include <cstdio>\n#include <thread>\n\nstatic std::atomic<bool> stop_requested{false};\nstatic_assert(std::atomic<bool>::is_always_lock_free, \"a signal handler may only touch lock-free atomics\");\n\n// The only thing the handler does is set a flag: anything else is unsafe here.\nextern \"C\" void on_signal(int) { stop_requested.store(true); }\n\nint main() {\n  std::signal(SIGINT, on_signal);\n  std::signal(SIGTERM, on_signal);\n  int ticks = 0;\n  while (!stop_requested.load()) {\n    ++ticks;\n    std::printf(\"tick %d\\n\", ticks);\n    std::this_thread::sleep_for(std::chrono::milliseconds(100));\n    if (ticks == 3) std::raise(SIGINT);  // stands in for Ctrl+C so the example stops on its own\n  }\n  std::printf(\"stopping after %d ticks\\n\", ticks);\n  std::puts(\"saved\");  // clean-up happens here, in normal code, not in the handler\n  return 0;\n}"
+      },
+      {
+       "t": "output",
+       "text": "tick 1\ntick 2\ntick 3\nstopping after 3 ticks\nsaved"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Points to check in your own version:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "b",
+          "v": "The flag type."
+         },
+         {
+          "t": "text",
+          "v": " It is a lock-free "
+         },
+         {
+          "t": "code",
+          "v": "std::atomic<bool>"
+         },
+         {
+          "t": "text",
+          "v": ", or "
+         },
+         {
+          "t": "code",
+          "v": "volatile std::sig_atomic_t"
+         },
+         {
+          "t": "text",
+          "v": ". A plain "
+         },
+         {
+          "t": "code",
+          "v": "bool"
+         },
+         {
+          "t": "text",
+          "v": " is a data race: the compiler may keep it in a register and never see the change."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "The work in the handler."
+         },
+         {
+          "t": "text",
+          "v": " There is none apart from setting the flag."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "`sleep_for` and signals."
+         },
+         {
+          "t": "text",
+          "v": " A signal ends a sleeping system call early on Linux, but "
+         },
+         {
+          "t": "code",
+          "v": "sleep_for"
+         },
+         {
+          "t": "text",
+          "v": " goes back to sleep for the rest of the time. So the loop may take up to one tick longer to notice the flag. That's fine for 100 ms ticks."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "The better API."
+         },
+         {
+          "t": "text",
+          "v": " "
+         },
+         {
+          "t": "code",
+          "v": "sigaction"
+         },
+         {
+          "t": "text",
+          "v": " is the precise API for installing handlers. "
+         },
+         {
+          "t": "code",
+          "v": "std::signal"
+         },
+         {
+          "t": "text",
+          "v": " is enough on Linux, where the handler stays installed."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Zombie and orphan processes; unsafe work in signal handlers",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "b",
+          "v": "Zombie."
+         },
+         {
+          "t": "text",
+          "v": " A child has exited, but its parent never called "
+         },
+         {
+          "t": "code",
+          "v": "wait()"
+         },
+         {
+          "t": "text",
+          "v": ". It shows as "
+         },
+         {
+          "t": "code",
+          "v": "Z"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "<defunct>"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "ps"
+         },
+         {
+          "t": "text",
+          "v": ". It uses no memory, but it holds its PID. A long-running parent that starts children and never waits for them leaks PIDs until the system can't start processes. The fix is for the parent to wait for its children, or to handle SIGCHLD."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Orphan."
+         },
+         {
+          "t": "text",
+          "v": " The parent died first. The child is adopted by PID 1, or by a \"subreaper\" such as systemd, which waits for it when it ends. That's harmless, but it means that killing a launcher doesn't necessarily stop what it started."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Unsafe work in a handler."
+         },
+         {
+          "t": "text",
+          "v": " A signal can arrive in the middle of any function, including in the middle of "
+         },
+         {
+          "t": "code",
+          "v": "printf"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "malloc"
+         },
+         {
+          "t": "text",
+          "v": ", which hold internal locks. If the handler calls the same function, the process can deadlock or corrupt memory. Only "
+         },
+         {
+          "t": "i",
+          "v": "async-signal-safe"
+         },
+         {
+          "t": "text",
+          "v": " functions are allowed in a handler: "
+         },
+         {
+          "t": "code",
+          "v": "write"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "_exit"
+         },
+         {
+          "t": "text",
+          "v": " and a few others. "
+         },
+         {
+          "t": "code",
+          "v": "printf"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "new"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "std::cout"
+         },
+         {
+          "t": "text",
+          "v": ", locking a mutex and "
+         },
+         {
+          "t": "code",
+          "v": "exit"
+         },
+         {
+          "t": "text",
+          "v": " are not. Set a flag, and do everything else in normal code:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "void on_signal(int) {\n  std::printf(\"stopping\\n\");  // not async-signal-safe: can deadlock inside printf\n  save_everything();          // allocates and locks: the same problem\n  std::exit(0);               // runs static destructors from inside the handler\n}"
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "b",
+          "v": "SIGKILL can't be caught"
+         },
+         {
+          "t": "text",
+          "v": ", and neither can SIGSTOP. Clean-up code never runs, so design for it: write results to a temporary file and "
+         },
+         {
+          "t": "code",
+          "v": "rename"
+         },
+         {
+          "t": "text",
+          "v": " it into place, so a killed process never leaves a half-written file."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write 5 to 8 lines without looking. They are the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "What a process is, and how its exit status reaches the shell."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The five signals you meet most, with their numbers and who sends them."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The exit status after SIGINT, SIGTERM and SIGKILL."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The one thing a handler may safely do, and why."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What exit status does the shell show after SIGINT, after SIGTERM and after SIGKILL?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which signals can't be caught, and what does that mean for clean-up?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why may a signal handler only set a flag? Name three things it must not call."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How do you find a process's PID, its parent, its state and its memory from the shell?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is a zombie process, and how do you prevent one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a loop that stops cleanly on SIGINT and SIGTERM."
+     }
+    ]
+   ]
+  }
+ ]
+}

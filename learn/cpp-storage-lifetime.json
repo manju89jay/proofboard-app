@@ -1,0 +1,1951 @@
+{
+ "id": "cpp-storage-lifetime",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Without running it, write down every line this program prints, in order. Give yourself 10 minutes, then open the answer."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstdio>\n\nstruct Tracer {\n  const char* name;\n  explicit Tracer(const char* n) : name(n) { std::printf(\"make %s\\n\", name); }\n  ~Tracer() { std::printf(\"drop %s\\n\", name); }\n};\n\nTracer global(\"global\");\n\nTracer make(const char* n) { return Tracer(n); }\n\nvoid f() {\n  static Tracer once(\"static in f\");\n  Tracer local(\"local in f\");\n}\n\nint main() {\n  std::puts(\"main starts\");\n  Tracer a(\"a\");\n  f();\n  f();\n  Tracer* heap = new Tracer(\"heap\");\n  make(\"temporary\");\n  const Tracer& kept = make(\"kept by const&\");\n  std::printf(\"using %s\\n\", kept.name);\n  delete heap;\n  std::puts(\"main ends\");\n}"
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstdio>\n\nstruct Tracer {\n  const char* name;\n  explicit Tracer(const char* n) : name(n) { std::printf(\"make %s\\n\", name); }\n  ~Tracer() { std::printf(\"drop %s\\n\", name); }\n};\n\nTracer global(\"global\");\n\nTracer make(const char* n) { return Tracer(n); }\n\nvoid f() {\n  static Tracer once(\"static in f\");\n  Tracer local(\"local in f\");\n}\n\nint main() {\n  std::puts(\"main starts\");\n  Tracer a(\"a\");\n  f();\n  f();\n  Tracer* heap = new Tracer(\"heap\");\n  make(\"temporary\");\n  const Tracer& kept = make(\"kept by const&\");\n  std::printf(\"using %s\\n\", kept.name);\n  delete heap;\n  std::puts(\"main ends\");\n}"
+   },
+   {
+    "t": "output",
+    "text": "make global\nmain starts\nmake a\nmake static in f\nmake local in f\ndrop local in f\nmake local in f\ndrop local in f\nmake heap\nmake temporary\ndrop temporary\nmake kept by const&\nusing kept by const&\ndrop heap\nmain ends\ndrop kept by const&\ndrop a\ndrop static in f\ndrop global"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Why each line comes where it does:"
+     }
+    ]
+   },
+   {
+    "t": "ul",
+    "items": [
+     [
+      {
+       "t": "code",
+       "v": "global"
+      },
+      {
+       "t": "text",
+       "v": " is made before "
+      },
+      {
+       "t": "code",
+       "v": "main"
+      },
+      {
+       "t": "text",
+       "v": " starts and dropped after "
+      },
+      {
+       "t": "code",
+       "v": "main"
+      },
+      {
+       "t": "text",
+       "v": " returns."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "static in f"
+      },
+      {
+       "t": "text",
+       "v": " is made the first time execution reaches it, and only once. The second call to "
+      },
+      {
+       "t": "code",
+       "v": "f"
+      },
+      {
+       "t": "text",
+       "v": " skips it."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "local in f"
+      },
+      {
+       "t": "text",
+       "v": " is made and dropped on every call, at the end of the block."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The unnamed "
+      },
+      {
+       "t": "code",
+       "v": "make(\"temporary\")"
+      },
+      {
+       "t": "text",
+       "v": " result dies at the end of its full-expression, the semicolon."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "kept by const&"
+      },
+      {
+       "t": "text",
+       "v": " lives as long as the reference "
+      },
+      {
+       "t": "code",
+       "v": "kept"
+      },
+      {
+       "t": "text",
+       "v": ". This is const& lifetime extension."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "heap"
+      },
+      {
+       "t": "text",
+       "v": " lives exactly from "
+      },
+      {
+       "t": "code",
+       "v": "new"
+      },
+      {
+       "t": "text",
+       "v": " to "
+      },
+      {
+       "t": "code",
+       "v": "delete"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "At the end of "
+      },
+      {
+       "t": "code",
+       "v": "main"
+      },
+      {
+       "t": "text",
+       "v": ", locals die in reverse order of construction: "
+      },
+      {
+       "t": "code",
+       "v": "kept"
+      },
+      {
+       "t": "text",
+       "v": " was made after "
+      },
+      {
+       "t": "code",
+       "v": "a"
+      },
+      {
+       "t": "text",
+       "v": ", so it goes first. After "
+      },
+      {
+       "t": "code",
+       "v": "main"
+      },
+      {
+       "t": "text",
+       "v": ", statics die in reverse order of construction: "
+      },
+      {
+       "t": "code",
+       "v": "static in f"
+      },
+      {
+       "t": "text",
+       "v": " was made after "
+      },
+      {
+       "t": "code",
+       "v": "global"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "b",
+      "v": "Pass:"
+     },
+     {
+      "t": "text",
+      "v": " every line right, and you could say why for each. "
+     },
+     {
+      "t": "b",
+      "v": "Partly:"
+     },
+     {
+      "t": "text",
+      "v": " one or two lines wrong. "
+     },
+     {
+      "t": "b",
+      "v": "Fail:"
+     },
+     {
+      "t": "text",
+      "v": " more than that."
+     }
+    ]
+   }
+  ]
+ },
+ "subs": [
+  {
+   "id": "storage",
+   "title": "Automatic, static, thread and dynamic storage duration",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every object has a "
+        },
+        {
+         "t": "b",
+         "v": "storage duration"
+        },
+        {
+         "t": "text",
+         "v": ": the rule that decides how long its memory exists. Its "
+        },
+        {
+         "t": "b",
+         "v": "lifetime"
+        },
+        {
+         "t": "text",
+         "v": " sits inside that. It starts when its initialisation finishes, meaning the constructor has returned, and it ends when its destructor starts. Using an object outside its lifetime is undefined behaviour, even when the memory is still there."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Storage"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Object is made"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Object is destroyed"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Examples"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Automatic"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "when execution reaches the definition"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "at the end of the enclosing block, in reverse order"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "local variables, parameters"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Static"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "at namespace scope: before "
+          },
+          {
+           "t": "code",
+           "v": "main"
+          },
+          {
+           "t": "text",
+           "v": ". Local "
+          },
+          {
+           "t": "code",
+           "v": "static"
+          },
+          {
+           "t": "text",
+           "v": ": the first time execution reaches it"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "after "
+          },
+          {
+           "t": "code",
+           "v": "main"
+          },
+          {
+           "t": "text",
+           "v": " returns, in reverse order of construction"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "globals, "
+          },
+          {
+           "t": "code",
+           "v": "static"
+          },
+          {
+           "t": "text",
+           "v": " locals, "
+          },
+          {
+           "t": "code",
+           "v": "static"
+          },
+          {
+           "t": "text",
+           "v": " data members"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Thread"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "once per thread, when that thread first needs it"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "when that thread ends"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "thread_local"
+          },
+          {
+           "t": "text",
+           "v": " variables"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Dynamic"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "at the "
+          },
+          {
+           "t": "code",
+           "v": "new"
+          },
+          {
+           "t": "text",
+           "v": " expression"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "at the matching "
+          },
+          {
+           "t": "code",
+           "v": "delete"
+          },
+          {
+           "t": "text",
+           "v": ", or never, which is a leak"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "new T"
+          },
+          {
+           "t": "text",
+           "v": ", and everything containers and smart pointers allocate"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What interviews probe:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "b",
+          "v": "A local `static` is initialised once"
+         },
+         {
+          "t": "text",
+          "v": ", the first time execution reaches it. Since C++11 that first initialisation is thread-safe: if two threads arrive together, one waits. Only the initialisation is protected. Later reads and writes to the object are not."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "The initialisation order of globals in different source files is unspecified."
+         },
+         {
+          "t": "text",
+          "v": " A global whose constructor uses a global from another file may find it not yet constructed: the "
+         },
+         {
+          "t": "i",
+          "v": "static initialisation order fiasco"
+         },
+         {
+          "t": "text",
+          "v": ". The usual fix is a function that returns a reference to a local "
+         },
+         {
+          "t": "code",
+          "v": "static"
+         },
+         {
+          "t": "text",
+          "v": ", which is built on first use."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "\"Stack\" and \"heap\" are implementation words."
+         },
+         {
+          "t": "text",
+          "v": " The standard says automatic and dynamic storage. Use the everyday words, but know the precise ones."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Dynamic storage is the only kind whose end you control by hand."
+         },
+         {
+          "t": "text",
+          "v": " That is why it causes most lifetime bugs. Modern code gives that job to an owner, a container or a smart pointer, which later topics cover."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here are three of the four durations in one program:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n\nint next_id() {\n  static int counter = 0;  // static storage: one object for the whole program\n  return ++counter;\n}\n\nint main() {\n  for (int i = 0; i < 3; ++i) {\n    int square = i * i;    // automatic: a new object on every iteration\n    std::printf(\"id %d, square %d\\n\", next_id(), square);\n  }\n  int* p = new int(42);    // dynamic: lives until delete\n  std::printf(\"heap value %d\\n\", *p);\n  delete p;\n}"
+      },
+      {
+       "t": "output",
+       "text": "id 1, square 0\nid 2, square 1\nid 3, square 4\nheap value 42"
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "From a blank file and without looking back, in 20 minutes:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "int& counter()"
+         },
+         {
+          "t": "text",
+          "v": " that returns a reference to a function-local "
+         },
+         {
+          "t": "code",
+          "v": "static int"
+         },
+         {
+          "t": "text",
+          "v": ". In "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", call "
+         },
+         {
+          "t": "code",
+          "v": "++counter()"
+         },
+         {
+          "t": "text",
+          "v": " three times and print "
+         },
+         {
+          "t": "code",
+          "v": "counter()"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "int count_call()"
+         },
+         {
+          "t": "text",
+          "v": " with a "
+         },
+         {
+          "t": "code",
+          "v": "thread_local int calls"
+         },
+         {
+          "t": "text",
+          "v": " that it increments and returns. Start two "
+         },
+         {
+          "t": "code",
+          "v": "std::thread"
+         },
+         {
+          "t": "text",
+          "v": "s. The first calls "
+         },
+         {
+          "t": "code",
+          "v": "count_call()"
+         },
+         {
+          "t": "text",
+          "v": " twice and keeps the second result; the second calls it once. After "
+         },
+         {
+          "t": "code",
+          "v": "join"
+         },
+         {
+          "t": "text",
+          "v": ", print both results and one more call from "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "For every object in your program, write down its storage duration and the exact point where it is destroyed."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Say in one sentence why "
+         },
+         {
+          "t": "code",
+          "v": "counter()"
+         },
+         {
+          "t": "text",
+          "v": " avoids the static initialisation order fiasco."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n#include <thread>\n\nint& counter() {\n  static int value = 0;  // made on the first call, lives until after main\n  return value;\n}\n\nint count_call() {\n  thread_local int calls = 0;  // a separate object in every thread\n  return ++calls;\n}\n\nint main() {\n  ++counter();\n  ++counter();\n  ++counter();\n  std::printf(\"counter %d\\n\", counter());\n\n  int seen[2] = {};\n  std::thread a([&] { count_call(); seen[0] = count_call(); });\n  std::thread b([&] { seen[1] = count_call(); });\n  a.join();\n  b.join();\n  std::printf(\"thread a saw %d, thread b saw %d, main sees %d\\n\", seen[0], seen[1], count_call());\n}"
+      },
+      {
+       "t": "output",
+       "text": "counter 3\nthread a saw 2, thread b saw 1, main sees 1"
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "value"
+         },
+         {
+          "t": "text",
+          "v": " is static: it is made on the first call and destroyed after "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " returns."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Each "
+         },
+         {
+          "t": "code",
+          "v": "calls"
+         },
+         {
+          "t": "text",
+          "v": " is per thread: it is destroyed when its thread ends, and main's copy after "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " returns."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "seen"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "a"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "b"
+         },
+         {
+          "t": "text",
+          "v": " are automatic, destroyed at the end of "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " in reverse order: "
+         },
+         {
+          "t": "code",
+          "v": "b"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "a"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "seen"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "counter()"
+         },
+         {
+          "t": "text",
+          "v": " builds its object on first use, so no other global's constructor can run before it exists."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "order",
+   "title": "Construction and destruction order: bases, members, locals, statics",
+   "steps": [
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rules:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "b",
+          "v": "Construction:"
+         },
+         {
+          "t": "text",
+          "v": " base classes first, in the order they are declared. Then the members, in the order they are "
+         },
+         {
+          "t": "i",
+          "v": "declared"
+         },
+         {
+          "t": "text",
+          "v": " in the class, whatever order the constructor's initialiser list names them in. Then the constructor's body."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Destruction"
+         },
+         {
+          "t": "text",
+          "v": " is the exact reverse: the destructor's body, then the members in reverse declaration order, then the bases."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Locals"
+         },
+         {
+          "t": "text",
+          "v": " die at the end of their block, in reverse order of construction."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "Statics"
+         },
+         {
+          "t": "text",
+          "v": " die after "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " returns, in reverse order of when their construction finished."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the program, predict the output, then compare:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n\nstruct Part {\n  const char* name;\n  explicit Part(const char* n) : name(n) { std::printf(\"  make %s\\n\", name); }\n  ~Part() { std::printf(\"  drop %s\\n\", name); }\n};\n\nstruct Base {\n  Part engine{\"Base::engine\"};\n  Base() { std::puts(\"  Base body\"); }\n  ~Base() { std::puts(\"  ~Base body\"); }\n};\n\nstruct Robot : Base {\n  Part left;\n  Part right;\n  Robot() : left(\"Robot::left\"), right(\"Robot::right\") { std::puts(\"  Robot body\"); }\n  ~Robot() { std::puts(\"  ~Robot body\"); }\n};\n\nint main() {\n  std::puts(\"build:\");\n  {\n    Robot r;\n    std::puts(\"destroy:\");\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "build:\n  make Base::engine\n  Base body\n  make Robot::left\n  make Robot::right\n  Robot body\ndestroy:\n  ~Robot body\n  drop Robot::right\n  drop Robot::left\n  ~Base body\n  drop Base::engine"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The step people get wrong is the "
+        },
+        {
+         "t": "b",
+         "v": "declaration-order rule"
+        },
+        {
+         "t": "text",
+         "v": ". Below, "
+        },
+        {
+         "t": "code",
+         "v": "area"
+        },
+        {
+         "t": "text",
+         "v": " is declared first, so it is built first, from "
+        },
+        {
+         "t": "code",
+         "v": "width"
+        },
+        {
+         "t": "text",
+         "v": " before "
+        },
+        {
+         "t": "code",
+         "v": "width"
+        },
+        {
+         "t": "text",
+         "v": " has a value. GCC warns about the mismatch with "
+        },
+        {
+         "t": "code",
+         "v": "-Wreorder"
+        },
+        {
+         "t": "text",
+         "v": ", which is part of "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": ". That is one reason to build with "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Werror"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "struct Window {\n  int area;   // declared first, so initialised first\n  int width;\n  Window(int w) : width(w), area(width * width) {}  // reads width before it is set\n};"
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In 25 minutes, write a small hierarchy from a blank file:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "a class "
+         },
+         {
+          "t": "code",
+          "v": "Sensor"
+         },
+         {
+          "t": "text",
+          "v": " with two "
+         },
+         {
+          "t": "code",
+          "v": "Part"
+         },
+         {
+          "t": "text",
+          "v": "-style members;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a class "
+         },
+         {
+          "t": "code",
+          "v": "Camera"
+         },
+         {
+          "t": "text",
+          "v": " that derives from "
+         },
+         {
+          "t": "code",
+          "v": "Sensor"
+         },
+         {
+          "t": "text",
+          "v": " and has one member whose own class has a member;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "one global "
+         },
+         {
+          "t": "code",
+          "v": "Camera"
+         },
+         {
+          "t": "text",
+          "v": " and one "
+         },
+         {
+          "t": "code",
+          "v": "static"
+         },
+         {
+          "t": "text",
+          "v": " local "
+         },
+         {
+          "t": "code",
+          "v": "Camera"
+         },
+         {
+          "t": "text",
+          "v": " inside a function you call twice."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down the full make and drop order before you run it, then run it and compare. For every line you got wrong, say which rule you missed."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A reference program to compare with. Your class names will differ, but the order rules are the same."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n\nstruct Part {\n  const char* name;\n  explicit Part(const char* n) : name(n) { std::printf(\"make %s\\n\", name); }\n  ~Part() { std::printf(\"drop %s\\n\", name); }\n};\n\nstruct Lens {\n  Part glass{\"glass\"};\n};\n\nstruct Sensor {\n  Part chip{\"chip\"};\n  Part clock{\"clock\"};\n};\n\nstruct Camera : Sensor {\n  Lens lens;\n};\n\nCamera front;\n\nvoid use_back() {\n  static Camera back;\n}\n\nint main() {\n  std::puts(\"main\");\n  use_back();\n  use_back();\n  std::puts(\"main ends\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "make chip\nmake clock\nmake glass\nmain\nmake chip\nmake clock\nmake glass\nmain ends\ndrop glass\ndrop clock\ndrop chip\ndrop glass\ndrop clock\ndrop chip"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The global "
+        },
+        {
+         "t": "code",
+         "v": "front"
+        },
+        {
+         "t": "text",
+         "v": " is built before "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", base members first. "
+        },
+        {
+         "t": "code",
+         "v": "back"
+        },
+        {
+         "t": "text",
+         "v": " is built once, on the first call. After "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "back"
+        },
+        {
+         "t": "text",
+         "v": " is dropped first because it was built last, then "
+        },
+        {
+         "t": "code",
+         "v": "front"
+        },
+        {
+         "t": "text",
+         "v": ", each in the reverse of its build order."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "temporaries",
+   "title": "Temporaries, full-expressions and const& lifetime extension",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "b",
+         "v": "temporary"
+        },
+        {
+         "t": "text",
+         "v": " is an unnamed object, such as the result of a function returning by value or of "
+        },
+        {
+         "t": "code",
+         "v": "std::string(\"x\")"
+        },
+        {
+         "t": "text",
+         "v": ". It lives until the end of the "
+        },
+        {
+         "t": "b",
+         "v": "full-expression"
+        },
+        {
+         "t": "text",
+         "v": " that created it: usually the semicolon, or the end of the condition in an "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "while"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Binding a temporary "
+        },
+        {
+         "t": "b",
+         "v": "directly"
+        },
+        {
+         "t": "text",
+         "v": " to a local "
+        },
+        {
+         "t": "code",
+         "v": "const T&"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " extends its lifetime to that of the reference:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n#include <string>\n\nstd::string make_name() { return \"robot-7\"; }\n\nint main() {\n  const std::string& kept = make_name();  // extended: lives as long as kept\n  std::string&& also_kept = make_name();  // the same rule for rvalue references\n  std::printf(\"%s %s\\n\", kept.c_str(), also_kept.c_str());\n  std::printf(\"%zu\\n\", make_name().size());  // this temporary dies at the semicolon\n}"
+      },
+      {
+       "t": "output",
+       "text": "robot-7 robot-7\n7"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Extension happens only when the temporary is bound directly to a local reference. It does "
+        },
+        {
+         "t": "b",
+         "v": "not"
+        },
+        {
+         "t": "text",
+         "v": " happen:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "b",
+          "v": "through a reference parameter."
+         },
+         {
+          "t": "text",
+          "v": " A temporary passed to a "
+         },
+         {
+          "t": "code",
+          "v": "const T&"
+         },
+         {
+          "t": "text",
+          "v": " parameter lives until the end of the caller's full-expression, and no longer. If the function or constructor stores that reference, for example in a reference member, it dangles from the next statement on. This is the "
+         },
+         {
+          "t": "code",
+          "v": "View"
+         },
+         {
+          "t": "text",
+          "v": " bug in the exercise below, and the most common case in real code;"
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "through a function that returns a reference."
+         },
+         {
+          "t": "text",
+          "v": " "
+         },
+         {
+          "t": "code",
+          "v": "const auto& m = std::min(a(), b());"
+         },
+         {
+          "t": "text",
+          "v": " binds to what "
+         },
+         {
+          "t": "code",
+          "v": "std::min"
+         },
+         {
+          "t": "text",
+          "v": " returns, not to the temporaries, which die at the semicolon;"
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "in a constructor's initialiser list."
+         },
+         {
+          "t": "text",
+          "v": " Binding a temporary straight to a reference member, as in "
+         },
+         {
+          "t": "code",
+          "v": "Label() : text(std::string(\"robot\")) {}"
+         },
+         {
+          "t": "text",
+          "v": ", is ill-formed in current C++ (core issue CWG 1696; see "
+         },
+         {
+          "t": "a",
+          "v": "cppreference",
+          "href": "https://en.cppreference.com/w/cpp/language/reference_initialization"
+         },
+         {
+          "t": "text",
+          "v": "). Clang rejects it. GCC still compiles it, with a "
+         },
+         {
+          "t": "code",
+          "v": "-Wextra"
+         },
+         {
+          "t": "text",
+          "v": " warning that the temporary lives only until the constructor exits;"
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "for the range of a range-based `for` loop, before C++23."
+         },
+         {
+          "t": "text",
+          "v": " In "
+         },
+         {
+          "t": "code",
+          "v": "for (auto x : make().items())"
+         },
+         {
+          "t": "text",
+          "v": " the object from "
+         },
+         {
+          "t": "code",
+          "v": "make()"
+         },
+         {
+          "t": "text",
+          "v": " dies before the loop body runs. C++23 fixed this. This course compiles as C++20."
+         }
+        ],
+        [
+         {
+          "t": "b",
+          "v": "when you return a reference to a local variable."
+         },
+         {
+          "t": "text",
+          "v": " That's not a temporary at all: the local dies when the function returns."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rule to remember: lifetime extension is a narrow exception. When in doubt, hold a value, not a reference."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In 25 minutes:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "struct View { const std::string& name; explicit View(const std::string& n) : name(n) {} };"
+         },
+         {
+          "t": "text",
+          "v": ". Then write "
+         },
+         {
+          "t": "code",
+          "v": "View v(make_name());"
+         },
+         {
+          "t": "text",
+          "v": " where "
+         },
+         {
+          "t": "code",
+          "v": "make_name()"
+         },
+         {
+          "t": "text",
+          "v": " returns a "
+         },
+         {
+          "t": "code",
+          "v": "std::string"
+         },
+         {
+          "t": "text",
+          "v": " by value, and use "
+         },
+         {
+          "t": "code",
+          "v": "v.name"
+         },
+         {
+          "t": "text",
+          "v": ". Build it with "
+         },
+         {
+          "t": "code",
+          "v": "-fsanitize=address -g"
+         },
+         {
+          "t": "text",
+          "v": " and run it. Read the report: which line made the temporary, and which line used it?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Change "
+         },
+         {
+          "t": "code",
+          "v": "View"
+         },
+         {
+          "t": "text",
+          "v": " so that it is safe. Name two fixes and say what each costs."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Predict, then check: is "
+         },
+         {
+          "t": "code",
+          "v": "const std::string& s = std::string(\"a\") + \"b\";"
+         },
+         {
+          "t": "text",
+          "v": " safe to use on the next line? Is "
+         },
+         {
+          "t": "code",
+          "v": "const char* p = std::string(\"hi\").c_str();"
+         },
+         {
+          "t": "text",
+          "v": " safe?"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "AddressSanitizer reports "
+         },
+         {
+          "t": "code",
+          "v": "stack-use-after-scope"
+         },
+         {
+          "t": "text",
+          "v": ". The temporary from "
+         },
+         {
+          "t": "code",
+          "v": "make_name()"
+         },
+         {
+          "t": "text",
+          "v": " died at the end of the line that built "
+         },
+         {
+          "t": "code",
+          "v": "v"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "v.name"
+         },
+         {
+          "t": "text",
+          "v": " still refers to it. The run below shows the report."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "There are two fixes. "
+         },
+         {
+          "t": "b",
+          "v": "Store a `std::string` by value:"
+         },
+         {
+          "t": "text",
+          "v": " it costs one copy or move when constructing, and it is always safe. "
+         },
+         {
+          "t": "b",
+          "v": "Keep the reference, and forbid temporaries"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "View(std::string&&) = delete;"
+         },
+         {
+          "t": "text",
+          "v": ": it costs nothing at run time, but every caller must keep the string alive themselves."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The first is safe: the temporary result of "
+         },
+         {
+          "t": "code",
+          "v": "operator+"
+         },
+         {
+          "t": "text",
+          "v": " is bound directly to "
+         },
+         {
+          "t": "code",
+          "v": "s"
+         },
+         {
+          "t": "text",
+          "v": ", so its life is extended. The second is not safe: "
+         },
+         {
+          "t": "code",
+          "v": "p"
+         },
+         {
+          "t": "text",
+          "v": " points into a temporary string that dies at the semicolon, and a pointer never extends anything."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-use-after-scope",
+       "text": "#include <cstdio>\n#include <string>\n\nstd::string make_name() { return \"robot-7 with a name longer than fifteen\"; }\n\nstruct View {\n  const std::string& name;\n  explicit View(const std::string& n) : name(n) {}\n};\n\nint main() {\n  View v(make_name());  // the temporary dies at the end of this line\n  std::printf(\"%zu\\n\", v.name.size());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The safe version stores the value:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n#include <string>\n#include <utility>\n\nstd::string make_name() { return \"robot-7 with a name longer than fifteen\"; }\n\nstruct View {\n  std::string name;  // owns its copy\n  explicit View(std::string n) : name(std::move(n)) {}\n};\n\nint main() {\n  View v(make_name());\n  std::printf(\"%zu\\n\", v.name.size());\n}"
+      },
+      {
+       "t": "output",
+       "text": "39"
+      }
+     ]
+    },
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four bugs to recognise on sight. In the first, "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Werror"
+        },
+        {
+         "t": "text",
+         "v": " stops it at compile time:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "reference to local variable",
+       "text": "#include <string>\n\nconst std::string& greeting() {\n  std::string text = \"hello\";\n  return text;  // text dies here; the caller gets a dangling reference\n}\n\nint main() { return static_cast<int>(greeting().size()); }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In the second, the range of a range-based "
+        },
+        {
+         "t": "code",
+         "v": "for"
+        },
+        {
+         "t": "text",
+         "v": " loop is a member of a temporary. GCC 13 warns with "
+        },
+        {
+         "t": "code",
+         "v": "-Wdangling-reference"
+        },
+        {
+         "t": "text",
+         "v": ", so it only runs here because undefined-behaviour examples are built without "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": ". AddressSanitizer catches it when it runs:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-use-after-scope",
+       "text": "#include <cstdio>\n#include <vector>\n\nstruct Robot {\n  std::vector<int> ids{1, 2, 3};\n  const std::vector<int>& list() const { return ids; }\n};\n\nRobot make() { return {}; }\n\nint main() {\n  for (int id : make().list())  // C++20: the Robot dies before the loop starts\n    std::printf(\"%d\\n\", id);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third is "
+        },
+        {
+         "t": "code",
+         "v": "std::min"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "std::max"
+        },
+        {
+         "t": "text",
+         "v": " on temporaries. Both return a reference to one of their arguments, and both arguments die at the semicolon:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-use-after-scope",
+       "text": "#include <algorithm>\n#include <cstdio>\n#include <string>\n\nint main() {\n  const std::string& first = std::min(std::string(\"a long temporary string, number one\"),\n                                      std::string(\"a long temporary string, number two\"));\n  std::printf(\"%zu\\n\", first.size());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth binds a temporary straight to a reference member. Current C++ makes this ill-formed, GCC warns with "
+        },
+        {
+         "t": "code",
+         "v": "-Wextra"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " turns that into an error:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "only persists until the constructor exits",
+       "text": "#include <string>\n\nstruct Label {\n  const std::string& text;\n  Label() : text(std::string(\"robot\")) {}  // a temporary bound straight to a reference member\n};\n\nint main() {\n  Label l;\n  return static_cast<int>(l.text.size());\n}"
+      },
+      {
+       "t": "note",
+       "c": [
+        {
+         "t": "text",
+         "v": "Not every dangling reference crashes. Without sanitizers, the ones above that compile often print something plausible. That is why the course builds every example with AddressSanitizer, and why you should too."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write 5 to 8 lines in your own words, without looking. They are the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The four storage durations, and when each object is destroyed."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The construction and destruction order of bases, members and locals."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "When a temporary dies, when const& extends it, and three cases where it doesn't."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Name the four storage durations and say when an object of each is destroyed."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In what order are bases, members and the constructor body run? And in what order destroyed?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why can a global's constructor see another global before it is built, and how do you avoid it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When does a temporary die? When is its life extended? Name three cases where it is not."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a "
+     },
+     {
+      "t": "code",
+      "v": "Tracer"
+     },
+     {
+      "t": "text",
+      "v": " class and a program that shows const& lifetime extension and the end of a temporary's life."
+     }
+    ]
+   ]
+  }
+ ]
+}
