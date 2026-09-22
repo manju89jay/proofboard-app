@@ -1,0 +1,1741 @@
+{
+ "id": "dsa-prefix-sums",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write a class "
+     },
+     {
+      "t": "code",
+      "v": "RangeSums"
+     },
+     {
+      "t": "text",
+      "v": " that takes "
+     },
+     {
+      "t": "code",
+      "v": "std::span<const int>"
+     },
+     {
+      "t": "text",
+      "v": " in its constructor, does O(n) work there, and then answers "
+     },
+     {
+      "t": "code",
+      "v": "sum(range)"
+     },
+     {
+      "t": "text",
+      "v": " in O(1): the sum of the elements whose indices are in the half-open range "
+     },
+     {
+      "t": "code",
+      "v": "[first, last)"
+     },
+     {
+      "t": "text",
+      "v": ". Pass the range as a struct with two "
+     },
+     {
+      "t": "code",
+      "v": "std::ptrdiff_t"
+     },
+     {
+      "t": "text",
+      "v": " fields, so a call can't swap them by accident, and return "
+     },
+     {
+      "t": "code",
+      "v": "std::int64_t"
+     },
+     {
+      "t": "text",
+      "v": ". For "
+     },
+     {
+      "t": "code",
+      "v": "{3, -1, 4, 1, 5}"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "[1, 4)"
+     },
+     {
+      "t": "text",
+      "v": " gives 4, "
+     },
+     {
+      "t": "code",
+      "v": "[0, 5)"
+     },
+     {
+      "t": "text",
+      "v": " gives 12, and "
+     },
+     {
+      "t": "code",
+      "v": "[2, 2)"
+     },
+     {
+      "t": "text",
+      "v": " gives 0. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cassert>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <numeric>\n#include <span>\n#include <vector>\n\nstruct IndexRange {\n  std::ptrdiff_t first = 0;\n  std::ptrdiff_t last = 0;  // one past the end\n};\n\nclass RangeSums {\n public:\n  explicit RangeSums(std::span<const int> nums) : prefix_(nums.size() + 1) {\n    // prefix_[i] is the sum of the first i elements; prefix_[0] stays 0, the empty prefix.\n    std::inclusive_scan(nums.begin(), nums.end(), prefix_.begin() + 1, std::plus<>{}, std::int64_t{0});\n  }\n\n  // Precondition: 0 <= r.first <= r.last <= the number of elements.\n  [[nodiscard]] std::int64_t sum(IndexRange r) const {\n    assert(0 <= r.first && r.first <= r.last && r.last < std::ssize(prefix_));\n    return prefix_[r.last] - prefix_[r.first];\n  }\n\n private:\n  std::vector<std::int64_t> prefix_;\n};\n\nint main() {\n  const std::vector<int> nums{3, -1, 4, 1, 5};\n  const RangeSums sums(nums);\n  std::cout << std::format(\"{} {} {}\\n\", sums.sum({.first = 1, .last = 4}), sums.sum({.first = 0, .last = 5}),\n                           sums.sum({.first = 2, .last = 2}));\n}"
+   },
+   {
+    "t": "output",
+    "text": "4 12 0"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "prefix_[i]"
+     },
+     {
+      "t": "text",
+      "v": " holds the sum of the first i elements, so the elements from "
+     },
+     {
+      "t": "code",
+      "v": "first"
+     },
+     {
+      "t": "text",
+      "v": " up to "
+     },
+     {
+      "t": "code",
+      "v": "last"
+     },
+     {
+      "t": "text",
+      "v": " sum to "
+     },
+     {
+      "t": "code",
+      "v": "prefix_[last] - prefix_[first]"
+     },
+     {
+      "t": "text",
+      "v": ": the longer prefix minus the part the two prefixes share. Building the array is O(n) time and O(n) space, and each query is one subtraction."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The array has n + 1 entries, and its first entry is the sum of no elements. With that "
+     },
+     {
+      "t": "i",
+      "v": "empty prefix"
+     },
+     {
+      "t": "text",
+      "v": ", a range that starts at 0 needs no special case, and neither does the empty range "
+     },
+     {
+      "t": "code",
+      "v": "[2, 2)"
+     },
+     {
+      "t": "text",
+      "v": ". The sums are 64-bit, and "
+     },
+     {
+      "t": "code",
+      "v": "std::inclusive_scan"
+     },
+     {
+      "t": "text",
+      "v": " gets a 64-bit initial value, because it adds in the type of that value; the theory below shows the library call that looks the same and overflows. A range outside the array is a bug in the caller, not an answer that may be missing, so it is a precondition checked by "
+     },
+     {
+      "t": "code",
+      "v": "assert"
+     },
+     {
+      "t": "text",
+      "v": " rather than a "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": ". The "
+     },
+     {
+      "t": "code",
+      "v": "IndexRange"
+     },
+     {
+      "t": "text",
+      "v": " struct with designated initialisers makes "
+     },
+     {
+      "t": "code",
+      "v": "{.first = 1, .last = 4}"
+     },
+     {
+      "t": "text",
+      "v": " impossible to swap unnoticed (Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": ")."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with an O(n) prefix array of 64-bit sums and an O(1) query that is right for the empty range and for ranges that start at 0. An array of n entries with an "
+     },
+     {
+      "t": "code",
+      "v": "if"
+     },
+     {
+      "t": "text",
+      "v": " for ranges that start at 0 also passes, if it's right. "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " sums, or an off-by-one at either end of the range, are a partial pass. Summing the range on each query is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A prefix sum array turns a running total into data you can query instead of recomputing: P[i] is the sum of the first i elements, with P[0] defined as 0, the sum of no elements, the empty prefix. Building it once costs O(n); after that, the sum of any range from a start up to, but not including, an end is one subtraction, P(end) minus P(start), because the difference cancels out everything the two prefixes share."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The shape of problem that signals it is many range-sum queries over data that doesn't change, or a subarray question phrased as \"sum equals k\", \"divisible by m\" or \"as many of one kind as another\". The technique's second use turns that question about a range into one about two single prefixes: a subarray from s up to e sums to k precisely when P(e) minus P(s) equals k, which is Two Sum restated over prefixes. Unlike a sliding window, it works with negative numbers, because it looks up one exact value instead of deciding whether a running sum should grow or shrink."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a hash map built alongside the running prefix, in one pass: for each new prefix, look up the value it would need a partner at, using what the map already holds, and only then record the prefix you have now computed. The map stores either how many times a prefix value has occurred, to count subarrays, or the earliest index it occurred at, to find the longest run. It has to start already holding the empty prefix, because a subarray that begins at index 0 has no earlier prefix to subtract."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake that shows up under pressure is leaving that seed out: every subarray starting at index 0 goes uncounted, and the bug shows only on inputs where such a subarray exists, so a light test can miss it. The other is recording a prefix before looking it up, which can match an empty subarray against itself, and, once negative numbers are involved, trusting C++'s "
+    },
+    {
+     "t": "code",
+     "v": "%"
+    },
+    {
+     "t": "text",
+     "v": ", whose sign follows the dividend, so two prefixes in the same remainder class get different keys unless folded back into range."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: after O(n) setup, answer any range-sum query in O(1), or turn \"how many subarrays sum to k\" into a hash-map lookup over running prefixes, seeded with the one representing nothing yet."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Prefix arrays; prefix sums with a hash map",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the standard library's older way to build a prefix array. It compiles without a warning and overflows:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "ubsan:signed integer overflow",
+       "text": "#include <cstdint>\n#include <iostream>\n#include <numeric>\n#include <vector>\n\nint main() {\n  const std::vector<int> ticks{2'000'000'000, 2'000'000'000};  // each fits in an int; their sum doesn't\n  std::vector<std::int64_t> prefix(ticks.size());\n  std::partial_sum(ticks.begin(), ticks.end(), prefix.begin());\n  std::cout << prefix.back() << '\\n';\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "UndefinedBehaviorSanitizer reports \"signed integer overflow: 2000000000 + 2000000000 cannot be represented in type 'int'\", at a line inside the library header. It stops the program only when built with "
+        },
+        {
+         "t": "code",
+         "v": "-fno-sanitize-recover=undefined"
+        },
+        {
+         "t": "text",
+         "v": ", as the examples on these pages are. With plain "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=undefined"
+        },
+        {
+         "t": "text",
+         "v": " it prints the report, then prints -294967296 and exits with status 0, and without the sanitizer GCC 13 prints -294967296 with no report at all. The 64-bit output vector doesn't help, because "
+        },
+        {
+         "t": "code",
+         "v": "std::partial_sum"
+        },
+        {
+         "t": "text",
+         "v": " keeps its running total in the value type of the "
+        },
+        {
+         "t": "i",
+         "v": "input"
+        },
+        {
+         "t": "text",
+         "v": ", here "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", and only then stores it (cppreference, "
+        },
+        {
+         "t": "a",
+         "v": "partial_sum",
+         "href": "https://en.cppreference.com/cpp/algorithm/partial_sum"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "code",
+         "v": "std::inclusive_scan"
+        },
+        {
+         "t": "text",
+         "v": " (C++17) with an initial value adds in the type of that value instead, which is why the cold check answer passes "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t{0}"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "std::exclusive_scan"
+        },
+        {
+         "t": "text",
+         "v": " is the same with each output leaving out its own element: its first output is the initial value alone. Both are in "
+        },
+        {
+         "t": "code",
+         "v": "<numeric>"
+        },
+        {
+         "t": "text",
+         "v": ", and neither has a "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges"
+        },
+        {
+         "t": "text",
+         "v": " form in C++20."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A prefix array answers range sums on data that doesn't change. Each change to one element moves every prefix after it, so updates cost O(n). When updates and queries mix, a Fenwick tree gives O(log n) for both; for this topic the data stays fixed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second idea turns a question about subarrays into a question about pairs of prefixes. Write P(i) for the sum of the first i elements. A subarray from index s up to, but not including, e sums to k exactly when P(e) − P(s) = k, that is, when P(s) = P(e) − k. So \"how many subarrays sum to k\" becomes \"for each end e, how many earlier prefixes equal P(e) − k\". That is the Two Sum question over prefix sums, and it has the same three steps as in the hash map topic. Decide what the map stores: a prefix value, with either how often it has appeared, to count subarrays, or the first index where it appeared, to find the longest. For each new prefix P(e), look up P(e) − k among the prefixes already recorded. Then record P(e)."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The map starts with the empty prefix already in it: value 0, seen once, at index 0. Without it, every subarray that starts at index 0 is missed, because its matching prefix, the empty one, was never recorded. This is the commonest bug with the technique, and the edges section shows it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This works with negative numbers, where a sliding window doesn't. A window has to decide whether to shrink by looking at its sum, and that needs sums that grow as the window grows. The map never makes that decision: it looks up one exact value. The whole run is one pass, O(n) time on average and O(n) space for the map."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same idea works with other operations. With multiplication, the empty prefix is 1, the product of no elements, and the product of the elements after index i is a suffix product. The second exercise uses both. With XOR, the prefix of the first i elements lets you find subarrays whose XOR is k, because XOR undoes itself: P(e) XOR P(s) is the XOR of the elements between them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "To recognise a prefix-sum problem, look for sums over contiguous ranges asked many times, or \"subarray sum equals k\", \"divisible by m\" or \"balanced\" (as many of one kind as of another), especially when the numbers can be negative."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot's turn log has +1 for each left turn and −1 for each right turn. Find the longest run of consecutive turns whose sum is k; with k = 0 that is a run with as many left turns as right turns. Return no value when no run has that sum. For "
+        },
+        {
+         "t": "code",
+         "v": "{+1, -1, -1, +1, +1, +1}"
+        },
+        {
+         "t": "text",
+         "v": " and k = 0 the answer is 4, the first four turns."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For the longest run, the map stores the first index at which each prefix value appeared, because the earliest start gives the longest run:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <unordered_map>\n#include <vector>\n\n[[nodiscard]] std::optional<std::ptrdiff_t> longest_with_sum(std::span<const int> nums, std::int64_t k) {\n  std::unordered_map<std::int64_t, std::ptrdiff_t> first_index{{0, 0}};  // the empty prefix, at index 0\n  std::optional<std::ptrdiff_t> best;\n  std::int64_t prefix = 0;\n  for (std::ptrdiff_t i = 0; i < std::ssize(nums); ++i) {\n    prefix += nums[i];\n    const std::ptrdiff_t end = i + 1;  // prefix is now P(end), the sum of the first end elements\n    if (const auto it = first_index.find(prefix - k); it != first_index.end()) {\n      const std::ptrdiff_t length = end - it->second;\n      if (!best || length > *best) best = length;\n    }\n    first_index.try_emplace(prefix, end);  // keeps the first index; a later one would give a shorter run\n  }\n  return best;\n}\n\n[[nodiscard]] std::string show(const std::optional<std::ptrdiff_t>& length) {\n  return length ? std::to_string(*length) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> turns{+1, -1, -1, +1, +1, +1};\n  for (const std::int64_t k : {0, 2, 3}) std::cout << std::format(\"k = {}: {}\\n\", k, show(longest_with_sum(turns, k)));\n  std::cout << std::format(\"empty log: {}\\n\", show(longest_with_sum(std::vector<int>{}, 0)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "k = 0: 4\nk = 2: 6\nk = 3: 3\nempty log: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Trace it for k = 0. The map starts as {0: 0}:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "end"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "turn"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "P(end)"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "looks for"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "found at"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "run length"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "best"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "map after"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "+1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [],
+         [],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "0:0, 1:1"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "−1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "unchanged"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "−1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "−1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "−1"
+          }
+         ],
+         [],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "adds −1:3"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "+1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "unchanged"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "5"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "+1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "unchanged"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "6"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "+1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "adds 2:6"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both runs of length 4, the first four turns and the run from index 1 to index 4, are found through prefixes recorded earlier. The rows for end 2 and end 4 find their start at the empty prefix: without the seed {0: 0}, the answer would be the run of length 4 that starts at index 1, and for the log "
+        },
+        {
+         "t": "code",
+         "v": "{+1, -1}"
+        },
+        {
+         "t": "text",
+         "v": " there would be no answer at all. At end 2, 4 and 5 the prefix value is already in the map, and "
+        },
+        {
+         "t": "code",
+         "v": "try_emplace"
+        },
+        {
+         "t": "text",
+         "v": " leaves the earlier index in place. Overwriting it, as "
+        },
+        {
+         "t": "code",
+         "v": "insert_or_assign"
+        },
+        {
+         "t": "text",
+         "v": " would, makes later runs shorter."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time on average and O(n) space. Counting the runs instead of measuring the longest changes the map's value from \"first index\" to \"how many times\", and that is the first exercise."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Subarray sum equals k; product of array except self",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "count_subarrays(nums, k)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns how many contiguous, non-empty subarrays of "
+        },
+        {
+         "t": "code",
+         "v": "nums"
+        },
+        {
+         "t": "text",
+         "v": " sum to exactly "
+        },
+        {
+         "t": "code",
+         "v": "k"
+        },
+        {
+         "t": "text",
+         "v": ". The numbers can be negative. "
+        },
+        {
+         "t": "code",
+         "v": "{1, 1, 1}"
+        },
+        {
+         "t": "text",
+         "v": " with k = 2 gives 2, "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 3}"
+        },
+        {
+         "t": "text",
+         "v": " with k = 3 gives 2, and "
+        },
+        {
+         "t": "code",
+         "v": "{1, -1, 0}"
+        },
+        {
+         "t": "text",
+         "v": " with k = 0 gives 3. Take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const int>"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " k, and return "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": ". Test it against an O(n²) version on a thousand random inputs, with the random generator's seed passed in as an argument so every run is the same."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The map stores how many times each prefix value has appeared, and starts with the empty prefix counted once:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <random>\n#include <span>\n#include <unordered_map>\n#include <vector>\n\n[[nodiscard]] std::int64_t count_subarrays(std::span<const int> nums, std::int64_t k) {\n  std::unordered_map<std::int64_t, std::int64_t> times_seen{{0, 1}};  // prefix value -> how often; the empty prefix once\n  std::int64_t count = 0;\n  std::int64_t prefix = 0;\n  for (const int x : nums) {\n    prefix += x;\n    if (const auto it = times_seen.find(prefix - k); it != times_seen.end()) count += it->second;\n    ++times_seen[prefix];\n  }\n  return count;\n}\n\n// Tries every subarray: O(n²), for testing only.\n[[nodiscard]] std::int64_t count_subarrays_slow(std::span<const int> nums, std::int64_t k) {\n  std::int64_t count = 0;\n  for (std::ptrdiff_t first = 0; first < std::ssize(nums); ++first) {\n    std::int64_t sum = 0;\n    for (std::ptrdiff_t last = first; last < std::ssize(nums); ++last) {\n      sum += nums[last];\n      if (sum == k) ++count;\n    }\n  }\n  return count;\n}\n\n// Returns how many of `cases` random inputs the two versions agree on.\n[[nodiscard]] std::int64_t agreeing_cases(std::uint32_t seed, std::int64_t cases) {\n  std::mt19937 generator{seed};\n  std::uniform_int_distribution<int> length{0, 12};\n  std::uniform_int_distribution<int> value{-3, 3};\n  std::int64_t agree = 0;\n  for (std::int64_t c = 0; c < cases; ++c) {\n    std::vector<int> nums(static_cast<std::size_t>(length(generator)));\n    for (int& x : nums) x = value(generator);\n    const std::int64_t k = value(generator);\n    if (count_subarrays(nums, k) == count_subarrays_slow(nums, k)) ++agree;\n  }\n  return agree;\n}\n\nint main() {\n  const std::vector<int> a{1, 1, 1};\n  const std::vector<int> b{1, 2, 3};\n  const std::vector<int> c{1, -1, 0};\n  std::cout << std::format(\"{} {} {}\\n\", count_subarrays(a, 2), count_subarrays(b, 3), count_subarrays(c, 0));\n  std::cout << std::format(\"{} of 1000 random cases agree\\n\", agreeing_cases(2026, 1000));\n}"
+      },
+      {
+       "t": "output",
+       "text": "2 2 3\n1000 of 1000 random cases agree"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time on average and O(n) space. The order inside the loop matters as much as in Two Sum: look up first, then record, or a subarray could end where it starts and be empty. With k = 0, recording first would count one empty subarray at every position."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The count is a "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " because the number of subarrays grows with n²: an input of 100,000 zeros with k = 0 has 100,000 × 100,001 / 2 = 5,000,050,000 of them, more than an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " holds. The random test uses values from -3 to 3, so zeros, negative numbers and repeated prefix values all occur often, and short lengths, including 0, so the edge cases do too. The seed arrives as an argument, so a failure can be replayed."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "products_except_self(nums)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns a vector whose element i is the product of every element of "
+        },
+        {
+         "t": "code",
+         "v": "nums"
+        },
+        {
+         "t": "text",
+         "v": " except "
+        },
+        {
+         "t": "code",
+         "v": "nums[i]"
+        },
+        {
+         "t": "text",
+         "v": ". Don't divide, use O(n) time, and use O(1) extra space besides the output. "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 3, 4}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "{24, 12, 8, 6}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{0, 2, 3}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "{6, 0, 0}"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "{5}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "{1}"
+        },
+        {
+         "t": "text",
+         "v": ". Take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const int>"
+        },
+        {
+         "t": "text",
+         "v": " and return "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::int64_t>"
+        },
+        {
+         "t": "text",
+         "v": "; you may assume the product of any prefix or suffix of "
+        },
+        {
+         "t": "code",
+         "v": "nums"
+        },
+        {
+         "t": "text",
+         "v": " fits in "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": ". Then say why division is the wrong tool here even where it's allowed."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The product of everything except "
+        },
+        {
+         "t": "code",
+         "v": "nums[i]"
+        },
+        {
+         "t": "text",
+         "v": " is the product of the elements before i times the product of the elements after it. The first pass writes the prefix products into the output with "
+        },
+        {
+         "t": "code",
+         "v": "std::exclusive_scan"
+        },
+        {
+         "t": "text",
+         "v": ", starting from 1, the empty product. The second pass walks back from the end with one running suffix product:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <functional>\n#include <iostream>\n#include <numeric>\n#include <span>\n#include <string_view>\n#include <vector>\n\n[[nodiscard]] std::vector<std::int64_t> products_except_self(std::span<const int> nums) {\n  std::vector<std::int64_t> out(nums.size());\n  // out[i] = product of nums[0..i-1]; out[0] is the empty product, 1. Multiplies in 64 bits.\n  std::exclusive_scan(nums.begin(), nums.end(), out.begin(), std::int64_t{1}, std::multiplies<>{});\n  std::int64_t suffix = 1;  // product of nums[i+1..n-1]\n  for (std::ptrdiff_t i = std::ssize(nums) - 1; i >= 0; --i) {\n    out[i] *= suffix;\n    suffix *= nums[i];\n  }\n  return out;\n}\n\nint main() {\n  const std::vector<std::vector<int>> inputs{{1, 2, 3, 4}, {0, 2, 3}, {0, 0, 5}, {-1, 2, -3}, {5}, {}};\n  for (const std::vector<int>& nums : inputs) {\n    const std::vector<std::int64_t> products = products_except_self(nums);\n    std::string_view separator;\n    for (const std::int64_t p : products) {\n      std::cout << separator << p;\n      separator = \" \";\n    }\n    std::cout << (products.empty() ? \"(empty)\\n\" : \"\\n\");\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "24 12 8 6\n6 0 0\n0 0 0\n-6 3 -2\n1\n(empty)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time, and O(1) extra space besides the output: one running product. The second pass is a hand-written loop because it has to multiply into the output in place; a second "
+        },
+        {
+         "t": "code",
+         "v": "std::exclusive_scan"
+        },
+        {
+         "t": "text",
+         "v": " over the reversed input would need a second vector."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Division is the wrong tool because of zeros. With one zero, every result is 0 except the one at the zero's position, which is the product of the others; with two or more zeros, every result is 0. Dividing the total product by "
+        },
+        {
+         "t": "code",
+         "v": "nums[i]"
+        },
+        {
+         "t": "text",
+         "v": " handles neither: the total is 0, and dividing by the zero is undefined behaviour. The prefix and suffix products handle zeros with no special case, as the "
+        },
+        {
+         "t": "code",
+         "v": "{0, 2, 3}"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "{0, 0, 5}"
+        },
+        {
+         "t": "text",
+         "v": " lines show."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The assumption about prefixes and suffixes is there because the loop computes all of them, including the product of the whole input in its last step, even where no result needs it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Negative numbers and the empty prefix",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Leave the empty prefix out of the map, and every subarray that starts at index 0 goes missing. For "
+        },
+        {
+         "t": "code",
+         "v": "{3, 4, 7}"
+        },
+        {
+         "t": "text",
+         "v": " and k = 7 there are two subarrays, "
+        },
+        {
+         "t": "code",
+         "v": "{3, 4}"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "{7}"
+        },
+        {
+         "t": "text",
+         "v": ", and this version counts one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <iostream>\n#include <span>\n#include <unordered_map>\n#include <vector>\n\n[[nodiscard]] std::int64_t count_subarrays_unseeded(std::span<const int> nums, std::int64_t k) {\n  std::unordered_map<std::int64_t, std::int64_t> times_seen;  // wrong: the empty prefix is missing\n  std::int64_t count = 0;\n  std::int64_t prefix = 0;\n  for (const int x : nums) {\n    prefix += x;\n    if (const auto it = times_seen.find(prefix - k); it != times_seen.end()) count += it->second;\n    ++times_seen[prefix];\n  }\n  return count;\n}\n\nint main() {\n  const std::vector<int> nums{3, 4, 7};\n  std::cout << count_subarrays_unseeded(nums, 7) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "At the second element the prefix is 7, and the code looks for 7 − 7 = 0: the prefix that ends where "
+        },
+        {
+         "t": "code",
+         "v": "{3, 4}"
+        },
+        {
+         "t": "text",
+         "v": " starts, which is the empty prefix. It was never recorded, so "
+        },
+        {
+         "t": "code",
+         "v": "{3, 4}"
+        },
+        {
+         "t": "text",
+         "v": " is missed. Seeding the map with {0: 1} for counting, or {0: 0} for first indices, fixes it. The same slip shows up in prefix arrays as an array of n entries instead of n + 1, where every range that starts at 0 needs its own "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Negative numbers break a second habit: the remainder. To count subarrays whose sum is divisible by m, you look up equal remainders of prefix sums, because P(e) − P(s) is divisible by m exactly when the two prefixes leave the same remainder. But in C++ integer division truncates towards zero, so "
+        },
+        {
+         "t": "code",
+         "v": "-1 % 3"
+        },
+        {
+         "t": "text",
+         "v": " is -1, not 2, and two prefixes in the same class get different keys. For "
+        },
+        {
+         "t": "code",
+         "v": "{2, -3, 1, 4}"
+        },
+        {
+         "t": "text",
+         "v": " and m = 3 there are two such subarrays, "
+        },
+        {
+         "t": "code",
+         "v": "{-3}"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "{2, -3, 1}"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <unordered_map>\n#include <vector>\n\n[[nodiscard]] std::int64_t count_divisible_raw(std::span<const int> nums, std::int64_t m) {\n  std::unordered_map<std::int64_t, std::int64_t> times_seen{{0, 1}};\n  std::int64_t count = 0;\n  std::int64_t prefix = 0;\n  for (const int x : nums) {\n    prefix += x;\n    const std::int64_t remainder = prefix % m;  // wrong: negative for a negative prefix\n    if (const auto it = times_seen.find(remainder); it != times_seen.end()) count += it->second;\n    ++times_seen[remainder];\n  }\n  return count;\n}\n\n[[nodiscard]] std::int64_t count_divisible(std::span<const int> nums, std::int64_t m) {\n  std::unordered_map<std::int64_t, std::int64_t> times_seen{{0, 1}};\n  std::int64_t count = 0;\n  std::int64_t prefix = 0;\n  for (const int x : nums) {\n    prefix += x;\n    const std::int64_t remainder = (prefix % m + m) % m;  // in [0, m) for m > 0\n    if (const auto it = times_seen.find(remainder); it != times_seen.end()) count += it->second;\n    ++times_seen[remainder];\n  }\n  return count;\n}\n\nint main() {\n  const std::vector<int> nums{2, -3, 1, 4};\n  std::cout << std::format(\"raw remainder: {}, normalised: {}\\n\", count_divisible_raw(nums, 3), count_divisible(nums, 3));\n}"
+      },
+      {
+       "t": "output",
+       "text": "raw remainder: 1, normalised: 2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The prefixes are 2, -1, 0 and 4. The raw remainders of 2 and -1 are 2 and -1, so "
+        },
+        {
+         "t": "code",
+         "v": "{-3}"
+        },
+        {
+         "t": "text",
+         "v": ", which lies between those two prefixes, is missed. Normalised, both are 2. The rule comes from the language: since C++11 the quotient truncates towards zero and "
+        },
+        {
+         "t": "code",
+         "v": "(a / b) * b + a % b == a"
+        },
+        {
+         "t": "text",
+         "v": ", so the remainder takes the sign of "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " (cppreference, "
+        },
+        {
+         "t": "a",
+         "v": "arithmetic operators",
+         "href": "https://en.cppreference.com/cpp/language/operator_arithmetic"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last trap is choosing the wrong technique. On "
+        },
+        {
+         "t": "code",
+         "v": "{-1, 4}"
+        },
+        {
+         "t": "text",
+         "v": " with a target sum of 4, a sliding window grows to "
+        },
+        {
+         "t": "code",
+         "v": "{-1, 4}"
+        },
+        {
+         "t": "text",
+         "v": " with sum 3, never has a reason to shrink, and misses "
+        },
+        {
+         "t": "code",
+         "v": "{4}"
+        },
+        {
+         "t": "text",
+         "v": ". Prefix sums with a map don't care about signs. The sliding-window topic's other problem, the shortest subarray with a sum of at least k, needs one more piece when numbers can be negative: for each end e, the latest start s whose prefix is at most P(e) − k. A deque of start indices whose prefix values increase answers that in O(n) for the whole input, and the stacks and queues topic builds that kind of deque."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the formula for a range sum from a prefix array and say why the array has n + 1 entries. Say which library call builds it in 64 bits and which one doesn't. Explain how \"subarray sum equals k\" becomes a hash map lookup, what the map stores for counting and for the longest run, and why it starts with the empty prefix. Name the two traps with negative numbers."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Why does a prefix array have n + 1 entries, and what is in the first one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "std::partial_sum"
+     },
+     {
+      "t": "text",
+      "v": " overflow into a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<std::int64_t>"
+     },
+     {
+      "t": "text",
+      "v": " when the input is "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": ", and what do you call instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In \"count subarrays with sum k\", what does the map store, what does it start with, and why is the lookup before the insert?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "For the longest run with sum k, why does the map keep the first index of each prefix value?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is "
+     },
+     {
+      "t": "code",
+      "v": "-7 % 3"
+     },
+     {
+      "t": "text",
+      "v": " in C++, and how do you get a remainder in "
+     },
+     {
+      "t": "code",
+      "v": "[0, m)"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: product of array except self, without division, with a test that has two zeros."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Naming a loop by its algorithm, here a scan."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " on strongly typed interfaces, "
+     },
+     {
+      "t": "a",
+      "v": "ES.103",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-overflow"
+     },
+     {
+      "t": "text",
+      "v": " on overflow, and "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": " on preferring the standard library."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "partial_sum",
+      "href": "https://en.cppreference.com/cpp/algorithm/partial_sum"
+     },
+     {
+      "t": "text",
+      "v": ", whose accumulator has the input's value type; "
+     },
+     {
+      "t": "a",
+      "v": "inclusive_scan",
+      "href": "https://en.cppreference.com/cpp/algorithm/inclusive_scan"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "exclusive_scan",
+      "href": "https://en.cppreference.com/cpp/algorithm/exclusive_scan"
+     },
+     {
+      "t": "text",
+      "v": "; "
+     },
+     {
+      "t": "a",
+      "v": "try_emplace",
+      "href": "https://en.cppreference.com/cpp/container/unordered_map/try_emplace"
+     },
+     {
+      "t": "text",
+      "v": "; and the "
+     },
+     {
+      "t": "a",
+      "v": "arithmetic operators",
+      "href": "https://en.cppreference.com/cpp/language/operator_arithmetic"
+     },
+     {
+      "t": "text",
+      "v": ", for the sign of "
+     },
+     {
+      "t": "code",
+      "v": "%"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tip "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values, the reason the worked example returns "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

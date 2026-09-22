@@ -1,0 +1,1763 @@
+{
+ "id": "dsa-hash-maps",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "two_sum(nums, target)"
+     },
+     {
+      "t": "text",
+      "v": ", which returns the indices of two different elements that add up to "
+     },
+     {
+      "t": "code",
+      "v": "target"
+     },
+     {
+      "t": "text",
+      "v": ", or no value when there are none. "
+     },
+     {
+      "t": "code",
+      "v": "{2, 7, 11, 15}"
+     },
+     {
+      "t": "text",
+      "v": " with target 9 gives "
+     },
+     {
+      "t": "code",
+      "v": "{0, 1}"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "{3, 3}"
+     },
+     {
+      "t": "text",
+      "v": " with target 6 gives "
+     },
+     {
+      "t": "code",
+      "v": "{0, 1}"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "code",
+      "v": "{1, 2}"
+     },
+     {
+      "t": "text",
+      "v": " with target 7 gives no value. Take the numbers as "
+     },
+     {
+      "t": "code",
+      "v": "std::span<const int>"
+     },
+     {
+      "t": "text",
+      "v": ", return "
+     },
+     {
+      "t": "code",
+      "v": "std::optional<std::pair<std::ptrdiff_t, std::ptrdiff_t>>"
+     },
+     {
+      "t": "text",
+      "v": ", and run in O(n) time. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <optional>\n#include <span>\n#include <string>\n#include <unordered_map>\n#include <utility>\n#include <vector>\n\nusing IndexPair = std::pair<std::ptrdiff_t, std::ptrdiff_t>;\n\n[[nodiscard]] std::optional<IndexPair> two_sum(std::span<const int> nums, int target) {\n  std::unordered_map<std::int64_t, std::ptrdiff_t> seen;  // value -> first index where it was seen\n  for (std::ptrdiff_t i = 0; i < std::ssize(nums); ++i) {\n    const std::int64_t complement = std::int64_t{target} - nums[i];  // can't overflow in 64 bits\n    if (const auto it = seen.find(complement); it != seen.end()) return IndexPair{it->second, i};\n    seen.try_emplace(nums[i], i);\n  }\n  return std::nullopt;\n}\n\n[[nodiscard]] std::string show(const std::optional<IndexPair>& pair) {\n  return pair ? std::format(\"{{{}, {}}}\", pair->first, pair->second) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> a{2, 7, 11, 15};\n  const std::vector<int> b{3, 3};\n  const std::vector<int> c{1, 2};\n  std::cout << show(two_sum(a, 9)) << ' ' << show(two_sum(b, 6)) << ' ' << show(two_sum(c, 7)) << '\\n';\n}"
+   },
+   {
+    "t": "output",
+    "text": "{0, 1} {0, 1} no value"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "For each number, look up its complement among the numbers already seen, and only then record the number. That order is what makes "
+     },
+     {
+      "t": "code",
+      "v": "{3, 3}"
+     },
+     {
+      "t": "text",
+      "v": " work without using one element twice. It is O(n) time on average and O(n) extra space."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Three details make it correct for inputs the examples leave out. The function returns "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": " instead of a made-up pair such as "
+     },
+     {
+      "t": "code",
+      "v": "{-1, -1}"
+     },
+     {
+      "t": "text",
+      "v": ", so \"no answer\" can't be mistaken for an index (Abseil tip "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": "). The complement is computed in 64 bits, because "
+     },
+     {
+      "t": "code",
+      "v": "target - nums[i]"
+     },
+     {
+      "t": "text",
+      "v": " overflows an "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " when the two have opposite signs and their difference passes the limit, such as a target of "
+     },
+     {
+      "t": "code",
+      "v": "INT_MAX"
+     },
+     {
+      "t": "text",
+      "v": " and an element of -1, and signed overflow is undefined behaviour. And the indices are signed, compared with "
+     },
+     {
+      "t": "code",
+      "v": "std::ssize"
+     },
+     {
+      "t": "text",
+      "v": ", so no "
+     },
+     {
+      "t": "code",
+      "v": "static_cast"
+     },
+     {
+      "t": "text",
+      "v": " is needed and nothing wraps around."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with a one-pass or two-pass hash map solution that handles the duplicate case and says \"no answer\" with "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": ". A correct solution with a "
+     },
+     {
+      "t": "code",
+      "v": "{-1, -1}"
+     },
+     {
+      "t": "text",
+      "v": " sentinel, or a correct O(n²) double loop, is a partial pass. Anything less is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A "
+    },
+    {
+     "t": "code",
+     "v": "std::unordered_map"
+    },
+    {
+     "t": "text",
+     "v": " keeps its elements in an array of "
+    },
+    {
+     "t": "i",
+     "v": "buckets"
+    },
+    {
+     "t": "text",
+     "v": ". To look up a key, it hashes the key to a number, reduces that number modulo the bucket count, and searches only the elements in that one bucket, so a lookup touches a small part of the table rather than all of it. A "
+    },
+    {
+     "t": "code",
+     "v": "std::unordered_set"
+    },
+    {
+     "t": "text",
+     "v": " is the same table with no separate value, one you only ask whether a key is present."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is checking membership, or finding what an element pairs with, without a nested loop. Two Sum asks for two elements that add to a target; checking every pair against every other is O(n²), and it repeats work a single pass could remember instead, since once you have seen a value, answering whether you have also seen its complement should cost no more than one more lookup."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is recording each element in the table as you go, and checking the table before you add to it: for element i, compute the value that would complete the pair, look it up among the elements already seen, and only afterwards record the current element itself, so nothing pairs with itself and a repeated value is still found. Each lookup is O(1) on average, because ordinary keys spread across the buckets so each one holds about one element, and the table keeps that average, its "
+    },
+    {
+     "t": "i",
+     "v": "load factor"
+    },
+    {
+     "t": "text",
+     "v": ", at or below 1 by rehashing into more buckets as it grows, which keeps insertion amortised O(1) too."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is the word average: when many keys collide into one bucket, from a poor hash or from keys chosen to attack it, a lookup degrades to O(n) and the whole pass becomes O(n²), a bound the table does not guard against the way a balanced tree's O(log n) does. "
+    },
+    {
+     "t": "code",
+     "v": "operator[]"
+    },
+    {
+     "t": "text",
+     "v": " quietly inserts a missing key with a default value, turning a read into a write; "
+    },
+    {
+     "t": "code",
+     "v": "contains"
+    },
+    {
+     "t": "text",
+     "v": " or "
+    },
+    {
+     "t": "code",
+     "v": "find"
+    },
+    {
+     "t": "text",
+     "v": " avoid that, and a key type of your own needs both a hash and an "
+    },
+    {
+     "t": "code",
+     "v": "operator=="
+    },
+    {
+     "t": "text",
+     "v": ", or the table has no way to tell two keys apart."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: turning Two Sum's nested loop into one pass by looking a value up before adding it to the table. The one thing that goes wrong under pressure is that order, checking the wrong index or reversing lookup and insert quietly pairs an element with itself."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Hashing, collisions, average versus worst case, unordered_map API",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": " keeps its elements in an array of "
+        },
+        {
+         "t": "i",
+         "v": "buckets"
+        },
+        {
+         "t": "text",
+         "v": ". To find a key, it hashes the key to a number, takes that number modulo the bucket count, and searches only that bucket. This program shows what that means in GCC's library:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <unordered_map>\n\nint main() {\n  std::unordered_map<std::int64_t, int> m;\n  m.reserve(100);\n  const auto b = static_cast<std::int64_t>(m.bucket_count());\n  for (std::int64_t k = 0; k < 10; ++k) m[k * b] = 1;  // 0, b, 2b, ...\n  std::cout << std::format(\"buckets {}, hash(42) = {}\\n\", m.bucket_count(), std::hash<std::int64_t>{}(42));\n  const auto bucket = m.bucket(3 * b);\n  std::cout << std::format(\"key {} is in bucket {}, which holds {} keys\\n\", 3 * b, bucket, m.bucket_size(bucket));\n}"
+      },
+      {
+       "t": "output",
+       "text": "buckets 103, hash(42) = 42\nkey 309 is in bucket 0, which holds 10 keys"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In libstdc++, "
+        },
+        {
+         "t": "code",
+         "v": "std::hash"
+        },
+        {
+         "t": "text",
+         "v": " of an integer is the integer itself, and the bucket count is a prime, here 103. Keys that are multiples of 103 therefore all land in bucket 0, and a lookup has to compare against every key in it. With ordinary keys, the elements spread over the buckets, each bucket holds about one element, and a lookup or insert costs O(1) "
+        },
+        {
+         "t": "i",
+         "v": "on average"
+        },
+        {
+         "t": "text",
+         "v": ". When many keys collide, one operation costs O(n). The table also keeps the average number of elements per bucket, its "
+        },
+        {
+         "t": "i",
+         "v": "load factor"
+        },
+        {
+         "t": "text",
+         "v": ", at or below 1 by default, and when an insert would go over that it "
+        },
+        {
+         "t": "i",
+         "v": "rehashes"
+        },
+        {
+         "t": "text",
+         "v": " into more buckets. That makes an insert amortised O(1), on top of the average-case assumption."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In an interview, say both numbers: \"O(1) on average, O(n) in the worst case\". If a worst-case bound matters, "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " gives O(log n) for every operation, and it keeps the keys sorted."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The parts of the API that come up in problems:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "m.contains(k)"
+         },
+         {
+          "t": "text",
+          "v": " (C++20) answers whether "
+         },
+         {
+          "t": "code",
+          "v": "k"
+         },
+         {
+          "t": "text",
+          "v": " is there. "
+         },
+         {
+          "t": "code",
+          "v": "m.find(k)"
+         },
+         {
+          "t": "text",
+          "v": " returns an iterator to it, or "
+         },
+         {
+          "t": "code",
+          "v": "m.end()"
+         },
+         {
+          "t": "text",
+          "v": ", for when you need the value too."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "m[k]"
+         },
+         {
+          "t": "text",
+          "v": " returns a reference to the value, and "
+         },
+         {
+          "t": "i",
+          "v": "inserts"
+         },
+         {
+          "t": "text",
+          "v": " a default value if "
+         },
+         {
+          "t": "code",
+          "v": "k"
+         },
+         {
+          "t": "text",
+          "v": " is absent. It's right for counting, as in "
+         },
+         {
+          "t": "code",
+          "v": "++counts[word]"
+         },
+         {
+          "t": "text",
+          "v": ", and wrong for checking whether a key exists."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "m.try_emplace(k, args...)"
+         },
+         {
+          "t": "text",
+          "v": " (C++17) inserts only if "
+         },
+         {
+          "t": "code",
+          "v": "k"
+         },
+         {
+          "t": "text",
+          "v": " is absent and never overwrites. When "
+         },
+         {
+          "t": "code",
+          "v": "k"
+         },
+         {
+          "t": "text",
+          "v": " is there, it doesn't construct a value at all and doesn't move from its arguments, which "
+         },
+         {
+          "t": "code",
+          "v": "emplace"
+         },
+         {
+          "t": "text",
+          "v": " may do. "
+         },
+         {
+          "t": "code",
+          "v": "m.insert_or_assign(k, v)"
+         },
+         {
+          "t": "text",
+          "v": " inserts or overwrites. Both say which one they did."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "for (const auto& [key, value] : m)"
+         },
+         {
+          "t": "text",
+          "v": " walks the entries with structured bindings, and "
+         },
+         {
+          "t": "code",
+          "v": "m | std::views::values"
+         },
+         {
+          "t": "text",
+          "v": " gives the values alone."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "m.erase(it)"
+         },
+         {
+          "t": "text",
+          "v": " returns the iterator after the erased element, which is what you need when erasing in a loop. "
+         },
+         {
+          "t": "code",
+          "v": "std::erase_if(m, pred)"
+         },
+         {
+          "t": "text",
+          "v": " (C++20) does the loop for you."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Iteration order is unspecified, and it changes when the table rehashes. Sort the output if a test depends on the order."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A rehash invalidates iterators, but references and pointers to the elements stay valid."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "two-sum",
+   "title": "Worked example: Two Sum",
+   "steps": [
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Trace the cold-check solution on "
+        },
+        {
+         "t": "code",
+         "v": "{2, 7, 11, 15}"
+        },
+        {
+         "t": "text",
+         "v": " with target 9. At each step it asks one question: have I already seen the number that completes this one?"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "i"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "nums[i]"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "looks for"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "seen before the step"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "result"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "7"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "empty"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not found, record 2 at 0"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "7"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2 at 0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "found: answer {0, 1}"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now trace "
+        },
+        {
+         "t": "code",
+         "v": "{3, 3}"
+        },
+        {
+         "t": "text",
+         "v": " with target 6. At i = 0 it looks for 3, and the map is empty, so it records 3 at 0. At i = 1 it looks for 3, finds it at index 0, and answers "
+        },
+        {
+         "t": "code",
+         "v": "{0, 1}"
+        },
+        {
+         "t": "text",
+         "v": ". If the code recorded "
+        },
+        {
+         "t": "code",
+         "v": "nums[i]"
+        },
+        {
+         "t": "text",
+         "v": " before looking, then at i = 0 it would find its own 3 and answer "
+        },
+        {
+         "t": "code",
+         "v": "{0, 0}"
+        },
+        {
+         "t": "text",
+         "v": ", using one element twice. The order of the two lines is the whole trick. "
+        },
+        {
+         "t": "code",
+         "v": "try_emplace"
+        },
+        {
+         "t": "text",
+         "v": " keeps the first index of a repeated value. Overwriting with "
+        },
+        {
+         "t": "code",
+         "v": "seen[nums[i]] = i"
+        },
+        {
+         "t": "text",
+         "v": " would be correct too, because any earlier index of the complement makes a valid pair; the difference only decides which of several valid answers you return."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Name the steps of this pattern, because you'll reuse them. First, decide what the map stores: here value to index. Second, for each element, ask the question the problem needs answered about the elements before it. Third, record the current element afterwards. Counting pairs, finding a duplicate within k positions, and subarray sums, which come later, all follow these three steps."
+        }
+       ]
+      }
+     ],
+     "faded": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the same pattern for a different question, with two lines left out. "
+        },
+        {
+         "t": "code",
+         "v": "count_pairs"
+        },
+        {
+         "t": "text",
+         "v": " returns how many pairs "
+        },
+        {
+         "t": "code",
+         "v": "i < j"
+        },
+        {
+         "t": "text",
+         "v": " have "
+        },
+        {
+         "t": "code",
+         "v": "nums[i] + nums[j] == target"
+        },
+        {
+         "t": "text",
+         "v": ". For "
+        },
+        {
+         "t": "code",
+         "v": "{1, 5, 7, -1, 5}"
+        },
+        {
+         "t": "text",
+         "v": " with target 6 the answer is 3: (1, 5), (1, 5) and (7, -1). Fill in the two missing lines, then check with the full version below."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "[[nodiscard]] std::int64_t count_pairs(std::span<const int> nums, int target) {\n  std::unordered_map<std::int64_t, std::int64_t> seen;  // value -> how many times seen so far\n  std::int64_t pairs = 0;\n  for (const int x : nums) {\n    // 1. add the number of earlier elements that complete x\n    // 2. record x\n  }\n  return pairs;\n}"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <iostream>\n#include <span>\n#include <unordered_map>\n#include <vector>\n\n[[nodiscard]] std::int64_t count_pairs(std::span<const int> nums, int target) {\n  std::unordered_map<std::int64_t, std::int64_t> seen;\n  std::int64_t pairs = 0;\n  for (const int x : nums) {\n    if (const auto it = seen.find(std::int64_t{target} - x); it != seen.end()) pairs += it->second;\n    ++seen[x];\n  }\n  return pairs;\n}\n\nint main() {\n  const std::vector<int> nums{1, 5, 7, -1, 5};\n  std::cout << count_pairs(nums, 6) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The count is a "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": ": n equal numbers make n(n-1)/2 pairs, which passes the "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " limit at n = 65,537."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Frequencies; first non-repeating character; group anagrams",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "most_frequent(ids)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the id that appears most often, or no value for an empty input. On a tie it returns the smallest such id: "
+        },
+        {
+         "t": "code",
+         "v": "{4, 1, 4, 2, 1}"
+        },
+        {
+         "t": "text",
+         "v": " gives 1, because 1 and 4 both appear twice. State the time and space."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Count with "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": ", then pick the best entry with "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::max_element"
+        },
+        {
+         "t": "text",
+         "v": ". The map's order can't decide ties, so the tie rule goes into the comparison, which says when one entry is worse than another:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <unordered_map>\n#include <vector>\n\n[[nodiscard]] std::optional<int> most_frequent(std::span<const int> ids) {\n  std::unordered_map<int, std::int64_t> counts;\n  for (const int id : ids) ++counts[id];\n  if (counts.empty()) return std::nullopt;\n  // Worse means less frequent, or as frequent with a larger id; the maximum is the answer.\n  const auto worse = [](const auto& a, const auto& b) {\n    return a.second < b.second || (a.second == b.second && a.first > b.first);\n  };\n  return std::ranges::max_element(counts, worse)->first;\n}\n\nint main() {\n  for (const std::vector<int>& ids : {std::vector<int>{4, 1, 4, 2, 1}, std::vector<int>{7}, std::vector<int>{}}) {\n    const std::optional<int> best = most_frequent(ids);\n    std::cout << (best ? std::to_string(*best) : \"no value\") << '\\n';\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "1\n7\nno value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It's O(n) average time and O(k) space, where k is the number of distinct ids. The comparison has to be a "
+        },
+        {
+         "t": "i",
+         "v": "strict weak ordering"
+        },
+        {
+         "t": "text",
+         "v": ", which comparing the pair (count, then id reversed) is. A comparison that returns "
+        },
+        {
+         "t": "code",
+         "v": "true"
+        },
+        {
+         "t": "text",
+         "v": " for equal elements breaks "
+        },
+        {
+         "t": "code",
+         "v": "max_element"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "sort"
+        },
+        {
+         "t": "text",
+         "v": " in ways no compiler warns about."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "first_unique(s)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the index of the first character that appears exactly once, or no value. "
+        },
+        {
+         "t": "code",
+         "v": "\"leetcode\""
+        },
+        {
+         "t": "text",
+         "v": " gives 0, "
+        },
+        {
+         "t": "code",
+         "v": "\"loveleetcode\""
+        },
+        {
+         "t": "text",
+         "v": " gives 2, and "
+        },
+        {
+         "t": "code",
+         "v": "\"aabb\""
+        },
+        {
+         "t": "text",
+         "v": " gives no value. Then answer: when is a table of 256 counts a better choice than an "
+        },
+        {
+         "t": "code",
+         "v": "unordered_map<char, int>"
+        },
+        {
+         "t": "text",
+         "v": " here?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two passes: count, then find the first character whose count is 1."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <cstddef>\n#include <cstdint>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <string_view>\n\n[[nodiscard]] std::optional<std::ptrdiff_t> first_unique(std::string_view s) {\n  std::array<std::int64_t, 256> counts{};\n  const auto slot = [](char c) { return static_cast<unsigned char>(c); };  // char may be negative\n  for (const char c : s) ++counts[slot(c)];\n  const auto it = std::ranges::find_if(s, [&](char c) { return counts[slot(c)] == 1; });\n  if (it == s.end()) return std::nullopt;\n  return it - s.begin();\n}\n\nint main() {\n  for (const std::string_view s : {\"leetcode\", \"loveleetcode\", \"aabb\"}) {\n    const std::optional<std::ptrdiff_t> index = first_unique(s);\n    std::cout << s << \": \" << (index ? std::to_string(*index) : \"no value\") << '\\n';\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "leetcode: 0\nloveleetcode: 2\naabb: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When the keys are bytes, a fixed table of 256 counts beats a hash map. There is no hashing, no allocation and no collisions, and the table is 2 KB. Use the map when the key space is large or sparse, such as whole words or 64-bit ids. The "
+        },
+        {
+         "t": "code",
+         "v": "unsigned char"
+        },
+        {
+         "t": "text",
+         "v": " conversion matters: "
+        },
+        {
+         "t": "code",
+         "v": "char"
+        },
+        {
+         "t": "text",
+         "v": " is signed on x86, so a byte above 127 would otherwise become a negative index."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "group_anagrams(words)"
+        },
+        {
+         "t": "text",
+         "v": ", which puts words that are anagrams of each other into the same group. For "
+        },
+        {
+         "t": "code",
+         "v": "{\"eat\", \"tea\", \"tan\", \"ate\", \"nat\", \"bat\"}"
+        },
+        {
+         "t": "text",
+         "v": " the groups are "
+        },
+        {
+         "t": "code",
+         "v": "{eat, tea, ate}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{tan, nat}"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "{bat}"
+        },
+        {
+         "t": "text",
+         "v": ". Choose a key that anagrams share, state the complexity, and make your test independent of the map's order."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Sorting a word's letters gives a key that all its anagrams share. Grouping by that key, then sorting the groups, makes the output stable for the test:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <iostream>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <unordered_map>\n#include <utility>\n#include <vector>\n\n[[nodiscard]] std::vector<std::vector<std::string>> group_anagrams(std::span<const std::string> words) {\n  std::unordered_map<std::string, std::vector<std::string>> groups;\n  for (const std::string& word : words) {\n    std::string key = word;\n    std::ranges::sort(key);\n    groups[key].push_back(word);\n  }\n  std::vector<std::vector<std::string>> out;\n  for (auto& group : groups | std::views::values) out.push_back(std::move(group));\n  std::ranges::sort(out);  // the map's order is unspecified; sort for a stable result\n  return out;\n}\n\nint main() {\n  const std::vector<std::string> words{\"eat\", \"tea\", \"tan\", \"ate\", \"nat\", \"bat\"};\n  for (const auto& group : group_anagrams(words)) {\n    std::string_view separator;\n    for (const std::string& word : group) {\n      std::cout << separator << word;\n      separator = \" \";\n    }\n    std::cout << '\\n';\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "bat\neat tea ate\ntan nat"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With n words of length at most k, it's O(n·k log k) time for sorting each word, plus the final sort of the groups, and O(n·k) space. A key made of 26 letter counts avoids sorting each word and brings the grouping to O(n·k), at the cost of a longer key."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "limits",
+   "title": "Worst case and custom hash functions",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": " used for a lookup inserts the key. This check adds a \"sensor\" entry with a count of 0:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <string>\n#include <unordered_map>\n\nint main() {\n  std::unordered_map<std::string, int> stock{{\"wheel\", 4}};\n  if (stock[\"sensor\"] == 0) std::cout << \"no sensors\\n\";\n  std::cout << \"size \" << stock.size() << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "no sensors\nsize 2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Use "
+        },
+        {
+         "t": "code",
+         "v": "contains"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "find"
+        },
+        {
+         "t": "text",
+         "v": " to ask whether a key exists. "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": " doesn't compile on a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " map, which is a hint: declare the map "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " wherever it is only read."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A key type of your own needs both a hash and an equality comparison. Without "
+        },
+        {
+         "t": "code",
+         "v": "operator=="
+        },
+        {
+         "t": "text",
+         "v": ", the error appears deep inside the library header, which is why it confuses people:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "no match for",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <functional>\n#include <unordered_map>\n\nstruct Cell {\n  std::int32_t x;\n  std::int32_t y;\n};\n\nstruct CellHash {\n  std::size_t operator()(const Cell& c) const noexcept {\n    const std::uint64_t high = static_cast<std::uint32_t>(c.x);\n    const std::uint64_t low = static_cast<std::uint32_t>(c.y);\n    return std::hash<std::uint64_t>{}((high << 32) | low);\n  }\n};\n\nint main() {\n  std::unordered_map<Cell, int, CellHash> visits;\n  visits[{1, 2}] = 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Adding "
+        },
+        {
+         "t": "code",
+         "v": "bool operator==(const Cell&) const = default;"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "Cell"
+        },
+        {
+         "t": "text",
+         "v": " fixes it (C++20). The hash packs both 32-bit fields into one 64-bit number, so two different cells never get the same value before the bucket step. The common shortcut "
+        },
+        {
+         "t": "code",
+         "v": "x * 31 + y"
+        },
+        {
+         "t": "text",
+         "v": " is weak: "
+        },
+        {
+         "t": "code",
+         "v": "{0, 31}"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "{1, 0}"
+        },
+        {
+         "t": "text",
+         "v": " collide. For more fields than fit in 64 bits, the hash has to combine them, and Victor Ciura's "
+        },
+        {
+         "t": "a",
+         "v": "talk on hashing",
+         "href": "https://www.youtube.com/watch?v=lNR_AWs0q9w"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) shows how. The hash is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", because nobody expects a hash to throw and the standard library's containers assume it doesn't (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.89",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-hash"
+        },
+        {
+         "t": "text",
+         "v": "). libstdc++ even stores every element's hash code next to it when the hash isn't "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", so that erasing never has to call a hash that might throw."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bucket demo above is also an attack. If the keys come from someone who knows your hash, as with a public service, or with competitive-programming tests written to defeat "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": ", they can send keys that all land in one bucket and turn every operation into O(n). The defences are a hash with a random seed, or "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": ", whose O(log n) holds for any input."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Explain how an unordered map finds a key and why that is O(1) on average and O(n) at worst, and the three steps of the Two Sum pattern. Say what "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": " does when a key is missing, what "
+        },
+        {
+         "t": "code",
+         "v": "contains"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "try_emplace"
+        },
+        {
+         "t": "text",
+         "v": " are for, and what a custom key type needs. Say why the answers return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " instead of -1."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Why does the Two Sum solution look up the complement before recording the current number?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the average and worst-case costs of "
+     },
+     {
+      "t": "code",
+      "v": "unordered_map"
+     },
+     {
+      "t": "text",
+      "v": " operations, and when do you choose "
+     },
+     {
+      "t": "code",
+      "v": "std::map"
+     },
+     {
+      "t": "text",
+      "v": " instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "m[k]"
+     },
+     {
+      "t": "text",
+      "v": " do when "
+     },
+     {
+      "t": "code",
+      "v": "k"
+     },
+     {
+      "t": "text",
+      "v": " is absent, and what do you use to test for a key?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "two_sum"
+     },
+     {
+      "t": "text",
+      "v": " compute the complement in 64 bits and return "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a custom key type need, and why is "
+     },
+     {
+      "t": "code",
+      "v": "x * 31 + y"
+     },
+     {
+      "t": "text",
+      "v": " a weak hash?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: group anagrams, with a test that doesn't depend on the map's order."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Victor Ciura, So You Think You Can Hash, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/So_You_Think_You_Can_Hash.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=lNR_AWs0q9w"
+     },
+     {
+      "t": "text",
+      "v": ". Hashing your own types and combining fields."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Matt Kulukundis, the design of a fast hash table, CppCon 2017: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ncHmEUmJZf4"
+     },
+     {
+      "t": "text",
+      "v": ". What buckets and probing cost."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Standard Library Containers, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ZMUKa2kWtTk"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tips "
+     },
+     {
+      "t": "a",
+      "v": "#136",
+      "href": "https://abseil.io/tips/136"
+     },
+     {
+      "t": "text",
+      "v": " on unordered containers, "
+     },
+     {
+      "t": "a",
+      "v": "#158",
+      "href": "https://abseil.io/tips/158"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "contains"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "C.89",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-hash"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ES.102",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, C++17 The Complete Guide, chapter 1 on structured bindings and chapter 26 on the container additions such as "
+     },
+     {
+      "t": "code",
+      "v": "try_emplace"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "a",
+      "v": "book",
+      "href": "https://leanpub.com/cpp17"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "unordered_map",
+      "href": "https://en.cppreference.com/cpp/container/unordered_map"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "try_emplace",
+      "href": "https://en.cppreference.com/cpp/container/unordered_map/try_emplace"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "contains",
+      "href": "https://en.cppreference.com/cpp/container/unordered_map/contains"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

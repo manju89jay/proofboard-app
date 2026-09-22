@@ -1,0 +1,2933 @@
+{
+ "id": "ros-frames-tf2",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "On paper, draw the frames "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "odom"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": " of a wheeled robot that localises itself against a map, as a tree with an arrow from each parent to its child. Label each arrow with the kind of node that publishes it, and with whether its value changes smoothly or can jump. Then say why the localisation node doesn't publish "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " to "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": " directly. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "text",
+    "tag": "",
+    "expect": "",
+    "text": "map\n └── odom          published by localisation (AMCL, a SLAM node): jumps when a correction arrives\n      └── base_link   published by odometry (wheel odometry, or a filter that fuses it with an IMU): smooth, drifts\n           └── base_scan, imu_link, ...   published by robot_state_publisher from the URDF: fixed"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Odometry integrates wheel and IMU data, so the robot's pose in "
+     },
+     {
+      "t": "code",
+      "v": "odom"
+     },
+     {
+      "t": "text",
+      "v": " changes smoothly and drifts without bound. Localisation compares sensor data with the map, works out "
+     },
+     {
+      "t": "code",
+      "v": "map_from_base"
+     },
+     {
+      "t": "text",
+      "v": ", and publishes the correction "
+     },
+     {
+      "t": "code",
+      "v": "map_from_odom = map_from_base · odom_from_base⁻¹"
+     },
+     {
+      "t": "text",
+      "v": ", which jumps whenever a new estimate arrives. The sensor frames hang below "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": " at fixed offsets, taken from the robot's URDF."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "It doesn't publish "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " to "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": ", because tf2 keeps a tree, and in a tree each frame has exactly one parent. "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": " already has "
+     },
+     {
+      "t": "code",
+      "v": "odom"
+     },
+     {
+      "t": "text",
+      "v": " as its parent, and a second parent would make two answers for every lookup. The split also serves the users of the frames: a controller works in "
+     },
+     {
+      "t": "code",
+      "v": "odom"
+     },
+     {
+      "t": "text",
+      "v": ", where the robot never jumps, and a planner works in "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": ", where it doesn't drift."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with the chain in the right order, the right publisher for each arrow, and the one-parent rule. The right chain with one publisher wrong is a partial pass. "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "odom"
+     },
+     {
+      "t": "text",
+      "v": " both as parents of "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": " is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "tf2 is the library that keeps a robot's frames as a tree: every named frame has at most one parent, and each edge between a parent and its child is a history of stamped transforms rather than one fixed number, published on "
+    },
+    {
+     "t": "code",
+     "v": "/tf"
+    },
+    {
+     "t": "text",
+     "v": " for anything that moves and "
+    },
+    {
+     "t": "code",
+     "v": "/tf_static"
+    },
+    {
+     "t": "text",
+     "v": " for anything that never does. A listener subscribes to both topics and keeps its own buffered history, so any node can ask the tree a question without owning any part of it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that a robot's own position estimate has two different jobs that pull against each other: a controller needs a frame that never jumps so it can steer smoothly, and a planner needs one that never drifts so a saved map stays correct. One frame cannot be both, and a tree with a single parent per frame cannot let two different sources both claim to place the robot at once."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The tree resolves this by splitting the robot's world position into two edges. Odometry publishes "
+    },
+    {
+     "t": "code",
+     "v": "odom"
+    },
+    {
+     "t": "text",
+     "v": " to "
+    },
+    {
+     "t": "code",
+     "v": "base_link"
+    },
+    {
+     "t": "text",
+     "v": ", drifting smoothly as small errors add up. Localisation publishes "
+    },
+    {
+     "t": "code",
+     "v": "map"
+    },
+    {
+     "t": "text",
+     "v": " to "
+    },
+    {
+     "t": "code",
+     "v": "odom"
+    },
+    {
+     "t": "text",
+     "v": ", the correction that makes the chain agree with the map, free to jump whenever a new estimate arrives, because "
+    },
+    {
+     "t": "code",
+     "v": "base_link"
+    },
+    {
+     "t": "text",
+     "v": " already has "
+    },
+    {
+     "t": "code",
+     "v": "odom"
+    },
+    {
+     "t": "text",
+     "v": " as its one parent and cannot take "
+    },
+    {
+     "t": "code",
+     "v": "map"
+    },
+    {
+     "t": "text",
+     "v": " as a second. A lookup asks for one frame's pose in another by walking the tree to their common ancestor and composing the edges along the way, interpolating between stored times for anything in motion, and refusing outright to guess beyond the oldest or newest time it has stored."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What goes wrong under pressure rarely looks like an error naming the real cause. A lookup for the current time can fail complaining about extrapolating into the future when a transform has not arrived yet, or into the past once one side's clock and the other's have drifted decades apart. And the quietest failure throws nothing at all: asking for the newest transform available returns one however old it is, so a broadcaster that has died still answers every query with its last known pose, and only comparing that transform's own timestamp against the current time catches it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: drawing "
+    },
+    {
+     "t": "code",
+     "v": "map"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "odom"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "base_link"
+    },
+    {
+     "t": "text",
+     "v": " as a tree with the right publisher on each edge, and explaining that "
+    },
+    {
+     "t": "code",
+     "v": "map"
+    },
+    {
+     "t": "text",
+     "v": " cannot go straight to "
+    },
+    {
+     "t": "code",
+     "v": "base_link"
+    },
+    {
+     "t": "text",
+     "v": " because a tree allows only one parent, and "
+    },
+    {
+     "t": "code",
+     "v": "base_link"
+    },
+    {
+     "t": "text",
+     "v": " already has one."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "frames",
+   "title": "tf2, the frame tree, map, odom, base_link",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start the bench simulation from the robot world project, and ask tf2 for its tree:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim world.launch.py     # terminal 1\nros2 run tf2_tools view_frames            # terminal 2: listens for 5 s, then writes frames_<date>.gv and frames_<date>.pdf"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The PDF shows one tree. "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " is at the top, with "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": " below it, then "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": ", and under "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " the lidar frame "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "imu_link"
+        },
+        {
+         "t": "text",
+         "v": ", the camera frames, the two wheels and the two casters. There is no "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ", because nothing localises the robot yet. Each arrow carries five labels: the broadcaster, the average rate, the length of the stored history, and the times of the newest and oldest stored transforms. The broadcaster reads "
+        },
+        {
+         "t": "code",
+         "v": "default_authority"
+        },
+        {
+         "t": "text",
+         "v": " on every arrow: a ROS 2 listener can't see which node sent a message, so it records a placeholder ("
+        },
+        {
+         "t": "a",
+         "v": "view_frames.py",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_tools/tf2_tools/view_frames.py"
+        },
+        {
+         "t": "text",
+         "v": "). The fixed parts show an average rate of 10000 and times of 0. tf2 keeps a single copy of a static transform, valid at every time, and the rate is its count of one divided by a floor of 100 µs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That tree is what "
+        },
+        {
+         "t": "i",
+         "v": "tf2"
+        },
+        {
+         "t": "text",
+         "v": " is: a set of named frames, each with at most one parent, and for every edge a history of "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/TransformStamped"
+        },
+        {
+         "t": "text",
+         "v": " messages. A message's "
+        },
+        {
+         "t": "code",
+         "v": "header.frame_id"
+        },
+        {
+         "t": "text",
+         "v": " is the parent, "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " is the child, and "
+        },
+        {
+         "t": "code",
+         "v": "header.stamp"
+        },
+        {
+         "t": "text",
+         "v": " is the time at which the transform was true. In the naming of the topic on poses, the message from "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " holds "
+        },
+        {
+         "t": "code",
+         "v": "odom_from_base"
+        },
+        {
+         "t": "text",
+         "v": ". Nodes send transforms on two topics. "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": " carries transforms that change, and every one of them is valid only near its stamp. "
+        },
+        {
+         "t": "code",
+         "v": "/tf_static"
+        },
+        {
+         "t": "text",
+         "v": " carries transforms that never change, and each is valid at every time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nobody owns the tree. Every node that needs transforms runs a "
+        },
+        {
+         "t": "i",
+         "v": "listener"
+        },
+        {
+         "t": "text",
+         "v": ", which subscribes to both topics and keeps its own "
+        },
+        {
+         "t": "i",
+         "v": "buffer"
+        },
+        {
+         "t": "text",
+         "v": ", 10 s of history by default. A query walks from both frames up to their common ancestor and composes the edges on the way, which is the chain multiplication from the topic on poses. For a time between two stored stamps, tf2 interpolates: linearly for the translation and with slerp for the rotation, as in the topic on rotations. It never extrapolates. A query for a time after the newest stamp, or before the oldest one, fails."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Who publishes what"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In the bench, three nodes build the tree:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Gazebo's DiffDrive system publishes "
+         },
+         {
+          "t": "code",
+          "v": "odom"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": "base_footprint"
+         },
+         {
+          "t": "text",
+          "v": " together with the odometry, and the bridge carries it to "
+         },
+         {
+          "t": "code",
+          "v": "/tf"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "robot_state_publisher"
+         },
+         {
+          "t": "text",
+          "v": " reads the URDF. It publishes each fixed joint once, on "
+         },
+         {
+          "t": "code",
+          "v": "/tf_static"
+         },
+         {
+          "t": "text",
+          "v": ", and each movable joint, such as a wheel, on "
+         },
+         {
+          "t": "code",
+          "v": "/tf"
+         },
+         {
+          "t": "text",
+          "v": " whenever "
+         },
+         {
+          "t": "code",
+          "v": "/joint_states"
+         },
+         {
+          "t": "text",
+          "v": " reports a new angle."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Nothing publishes "
+         },
+         {
+          "t": "code",
+          "v": "map"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": "odom"
+         },
+         {
+          "t": "text",
+          "v": " until a localisation node runs, such as Nav2's AMCL."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": " is the TurtleBot3's point on the ground under "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": ", 1 cm below it. REP 105 fixes the order of the upper frames: "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": ", then the robot. Localisation computes "
+        },
+        {
+         "t": "code",
+         "v": "map_from_base"
+        },
+        {
+         "t": "text",
+         "v": " from its sensors and publishes "
+        },
+        {
+         "t": "code",
+         "v": "map_from_odom"
+        },
+        {
+         "t": "text",
+         "v": ", the correction you worked out in the topic on poses. Odometry publishes "
+        },
+        {
+         "t": "code",
+         "v": "odom_from_base"
+        },
+        {
+         "t": "text",
+         "v": ". A lookup from "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": " composes all of them."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Static and dynamic broadcasters"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "tf2_ros::StaticTransformBroadcaster"
+        },
+        {
+         "t": "text",
+         "v": " publishes on "
+        },
+        {
+         "t": "code",
+         "v": "/tf_static"
+        },
+        {
+         "t": "text",
+         "v": " with the durability "
+        },
+        {
+         "t": "i",
+         "v": "transient local"
+        },
+        {
+         "t": "text",
+         "v": " and a history depth of 1 ("
+        },
+        {
+         "t": "a",
+         "v": "qos.hpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/include/tf2_ros/qos.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). It keeps every transform it has been given and republishes the whole set in each message ("
+        },
+        {
+         "t": "a",
+         "v": "static_transform_broadcaster.cpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/src/static_transform_broadcaster.cpp"
+        },
+        {
+         "t": "text",
+         "v": "), so a listener that starts an hour later still receives all of them. That works only while the broadcasting node is alive. The DDS middleware keeps the message in the publisher, and when the node exits, late listeners get nothing. The stamp of a static transform doesn't matter for lookups."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "tf2_ros::TransformBroadcaster"
+        },
+        {
+         "t": "text",
+         "v": " publishes on "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": ", and a moving frame has to be sent again and again, each time with the stamp at which the pose was measured. Here is the part of an odometry node that sends one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// Member of the node: tf2_ros::TransformBroadcaster broadcaster_{this};\nvoid send(const bench::PlanarPose& odom_from_base, const rclcpp::Time& measured_at) {\n  geometry_msgs::msg::TransformStamped t;\n  t.header.stamp = measured_at;  // when the pose was true, not when it is sent\n  t.header.frame_id = \"odom\";\n  t.child_frame_id = \"base_link\";\n  t.transform.translation.x = odom_from_base.x_m;\n  t.transform.translation.y = odom_from_base.y_m;\n  tf2::Quaternion q;\n  q.setRPY(0.0, 0.0, odom_from_base.yaw_rad);\n  t.transform.rotation = tf2::toMsg(q);\n  broadcaster_.sendTransform(t);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rate matters. A listener can only answer for times up to the newest stamp it has, so a transform sent at 10 Hz is up to 100 ms old when a 20 Hz lidar scan asks for it. And a stamp taken from the wrong clock, such as the wall clock in a simulation, puts the transform where no query will find it."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Looking up a transform"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "tf2_ros::Buffer::lookupTransform(target, source, time)"
+        },
+        {
+         "t": "text",
+         "v": " returns the pose of "
+        },
+        {
+         "t": "code",
+         "v": "source"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "target"
+        },
+        {
+         "t": "text",
+         "v": ", which converts coordinates from "
+        },
+        {
+         "t": "code",
+         "v": "source"
+        },
+        {
+         "t": "text",
+         "v": " into "
+        },
+        {
+         "t": "code",
+         "v": "target"
+        },
+        {
+         "t": "text",
+         "v": ". The first argument is where the data should end up, and the result, in the naming of the topic on poses, is "
+        },
+        {
+         "t": "code",
+         "v": "target_from_source"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "lookupTransform(\"odom\", \"base_link\", t)"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "odom_from_base"
+        },
+        {
+         "t": "text",
+         "v": ", with "
+        },
+        {
+         "t": "code",
+         "v": "header.frame_id"
+        },
+        {
+         "t": "text",
+         "v": " "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": ". Swapping the two arguments gives the inverse, which composes without an error and is wrong."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The time argument decides which data is used. "
+        },
+        {
+         "t": "code",
+         "v": "tf2::TimePointZero"
+        },
+        {
+         "t": "text",
+         "v": " asks for the newest transform the whole chain can provide, and it is the right choice when you need \"where is the robot now\" and don't have a stamped measurement. A stamp, usually the "
+        },
+        {
+         "t": "code",
+         "v": "header.stamp"
+        },
+        {
+         "t": "text",
+         "v": " of the scan or image being transformed, asks for the transform at the moment of that measurement, and that is the right choice for sensor data, because the robot moved while the data travelled. A fourth argument, a timeout, makes the call wait until the data for that time has arrived, checking every 10 ms, and throw when the time runs out ("
+        },
+        {
+         "t": "a",
+         "v": "buffer.cpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/src/buffer.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). The wait needs the listener to fill the buffer on another thread, and the default "
+        },
+        {
+         "t": "code",
+         "v": "TransformListener"
+        },
+        {
+         "t": "text",
+         "v": " has a thread of its own for that. Every failure arrives as an exception derived from "
+        },
+        {
+         "t": "code",
+         "v": "tf2::TransformException"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "tf2_ros::TransformListener(buffer)"
+        },
+        {
+         "t": "text",
+         "v": " creates a hidden node of its own, named "
+        },
+        {
+         "t": "code",
+         "v": "transform_listener_impl_"
+        },
+        {
+         "t": "text",
+         "v": " followed by a number, which you see in "
+        },
+        {
+         "t": "code",
+         "v": "ros2 node list"
+        },
+        {
+         "t": "text",
+         "v": ", and spins it on that thread. It subscribes to "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "/tf_static"
+        },
+        {
+         "t": "text",
+         "v": " with absolute names ("
+        },
+        {
+         "t": "a",
+         "v": "transform_listener.hpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/include/tf2_ros/transform_listener.hpp"
+        },
+        {
+         "t": "text",
+         "v": "), so a node's namespace doesn't apply to them. Two robots on one network share the same tree unless their frames get prefixes, such as "
+        },
+        {
+         "t": "code",
+         "v": "robot_state_publisher"
+        },
+        {
+         "t": "text",
+         "v": "'s "
+        },
+        {
+         "t": "code",
+         "v": "frame_prefix"
+        },
+        {
+         "t": "text",
+         "v": " parameter, or the topics are remapped."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The Jazzy tutorials include tf2 headers with the older "
+        },
+        {
+         "t": "code",
+         "v": ".h"
+        },
+        {
+         "t": "text",
+         "v": " names. Jazzy has shipped "
+        },
+        {
+         "t": "code",
+         "v": ".hpp"
+        },
+        {
+         "t": "text",
+         "v": " names too since its 2025 updates, and Rolling has dropped "
+        },
+        {
+         "t": "code",
+         "v": "tf2/LinearMath/*.h"
+        },
+        {
+         "t": "text",
+         "v": ", so the code on this page uses "
+        },
+        {
+         "t": "code",
+         "v": ".hpp"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This example builds two nodes in a scratch package: one that publishes the mounting positions of two parts that aren't in the URDF, and one that reports where the robot is. Create the package next to "
+        },
+        {
+         "t": "code",
+         "v": "bench_count"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/bench_ws/src\nros2 pkg create --build-type ament_cmake tf_demo --dependencies rclcpp geometry_msgs tf2 tf2_ros tf2_geometry_msgs"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first node publishes a bumper 0.20 m ahead of "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " and a rear camera 0.15 m behind it, turned to face backwards. The conversion from a mount to a message is a plain function, so a test can call it without a node:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <iterator>\n#include <memory>\n#include <numbers>\n#include <string>\n#include <vector>\n\n#include <geometry_msgs/msg/transform_stamped.hpp>\n#include <rclcpp/rclcpp.hpp>\n#include <tf2/LinearMath/Quaternion.hpp>\n#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>\n#include <tf2_ros/static_transform_broadcaster.hpp>\n\nnamespace bench {\n\n// Where a part sits on the robot: metres, and roll, pitch and yaw in radians about the parent's fixed axes.\nstruct Mount {\n  std::string parent;\n  std::string child;\n  double x = 0.0;\n  double y = 0.0;\n  double z = 0.0;\n  double roll = 0.0;\n  double pitch = 0.0;\n  double yaw = 0.0;\n};\n\n[[nodiscard]] geometry_msgs::msg::TransformStamped to_message(const Mount& m, const rclcpp::Time& stamp) {\n  geometry_msgs::msg::TransformStamped t;\n  t.header.stamp = stamp;\n  t.header.frame_id = m.parent;\n  t.child_frame_id = m.child;\n  t.transform.translation.x = m.x;\n  t.transform.translation.y = m.y;\n  t.transform.translation.z = m.z;\n  tf2::Quaternion q;  // uninitialised until setRPY\n  q.setRPY(m.roll, m.pitch, m.yaw);\n  t.transform.rotation = tf2::toMsg(q);\n  return t;\n}\n\n}  // namespace bench\n\nclass StaticFrames : public rclcpp::Node {\n public:\n  explicit StaticFrames(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"static_frames\", options), broadcaster_(this) {\n    const std::vector<bench::Mount> mounts{\n        {.parent = \"base_link\", .child = \"bumper\", .x = 0.20, .z = 0.05},\n        {.parent = \"base_link\", .child = \"rear_camera\", .x = -0.15, .z = 0.30, .yaw = std::numbers::pi},\n    };\n    std::vector<geometry_msgs::msg::TransformStamped> transforms;\n    std::ranges::transform(mounts, std::back_inserter(transforms),\n                           [stamp = now()](const bench::Mount& m) { return bench::to_message(m, stamp); });\n    broadcaster_.sendTransform(transforms);\n    RCLCPP_INFO(get_logger(), \"published %zu static transforms\", transforms.size());\n  }\n\n private:\n  tf2_ros::StaticTransformBroadcaster broadcaster_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<StaticFrames>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The node publishes once, in its constructor, and then spins only to stay alive, because the transient local message lives in its publisher. The designated initialisers name each offset, so a z of 0.30 can't slide into y. The same two transforms need no code at all: "
+        },
+        {
+         "t": "code",
+         "v": "ros2 run tf2_ros static_transform_publisher --x 0.2 --z 0.05 --frame-id base_link --child-frame-id bumper"
+        },
+        {
+         "t": "text",
+         "v": " publishes the first one, and launch files often start that executable once per fixed part."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second node looks up "
+        },
+        {
+         "t": "code",
+         "v": "odom_from_base"
+        },
+        {
+         "t": "text",
+         "v": " once per second on the node's clock and logs the planar pose and how old the transform is:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cmath>\n#include <memory>\n\n#include <geometry_msgs/msg/transform.hpp>\n#include <geometry_msgs/msg/transform_stamped.hpp>\n#include <rclcpp/rclcpp.hpp>\n#include <tf2/exceptions.hpp>\n#include <tf2_ros/buffer.hpp>\n#include <tf2_ros/transform_listener.hpp>\n\nusing namespace std::chrono_literals;\n\nnamespace bench {\n\nstruct PlanarPose {\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double yaw_rad = 0.0;\n};\n\n// The child's pose in the parent's plane: the yaw formula from the topic on rotations.\n[[nodiscard]] PlanarPose planar(const geometry_msgs::msg::Transform& t) {\n  const geometry_msgs::msg::Quaternion& q = t.rotation;\n  return {.x_m = t.translation.x,\n          .y_m = t.translation.y,\n          .yaw_rad = std::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))};\n}\n\n}  // namespace bench\n\nclass FrameWatch : public rclcpp::Node {\n public:\n  explicit FrameWatch(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"frame_watch\", options), buffer_(get_clock()), listener_(buffer_) {\n    timer_ = create_timer(1s, [this] { report(); });\n  }\n\n private:\n  void report() {\n    try {\n      // Target \"odom\", source \"base_link\": the result converts base_link coordinates into odom.\n      const geometry_msgs::msg::TransformStamped odom_from_base =\n          buffer_.lookupTransform(\"odom\", \"base_link\", tf2::TimePointZero);\n      const bench::PlanarPose p = bench::planar(odom_from_base.transform);\n      const double age_s = (now() - rclcpp::Time(odom_from_base.header.stamp)).seconds();\n      RCLCPP_INFO(get_logger(), \"base_link in odom: x %.3f m, y %.3f m, yaw %.3f rad, %.3f s old\", p.x_m, p.y_m,\n                  p.yaw_rad, age_s);\n    } catch (const tf2::TransformException& e) {\n      RCLCPP_WARN(get_logger(), \"no odom -> base_link yet: %s\", e.what());\n    }\n  }\n\n  tf2_ros::Buffer buffer_;               // declared before the listener, which fills it\n  tf2_ros::TransformListener listener_;  // subscribes to /tf and /tf_static on a thread of its own\n  rclcpp::TimerBase::SharedPtr timer_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<FrameWatch>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Notice three things. The buffer uses the node's clock, so with "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": " its timeouts and the age both count simulated time. The members are declared in the order they depend on each other: the listener holds a reference to the buffer, so the buffer is constructed first and destroyed last. And the lookup crosses two edges, "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": " from Gazebo and "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " from the URDF. With "
+        },
+        {
+         "t": "code",
+         "v": "TimePointZero"
+        },
+        {
+         "t": "text",
+         "v": ", the static edge fits any time, so the stamp of the result is the stamp of the newest odometry transform."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add the two executables to "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", before "
+        },
+        {
+         "t": "code",
+         "v": "ament_package()"
+        },
+        {
+         "t": "text",
+         "v": ". The code uses designated initialisers and ranges, so the package needs C++20, which "
+        },
+        {
+         "t": "code",
+         "v": "ros2 pkg create"
+        },
+        {
+         "t": "text",
+         "v": " doesn't set:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "set(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\nadd_executable(static_frames src/static_frames.cpp)\nament_target_dependencies(static_frames rclcpp geometry_msgs tf2 tf2_ros tf2_geometry_msgs)\nadd_executable(frame_watch src/frame_watch.cpp)\nament_target_dependencies(frame_watch rclcpp geometry_msgs tf2 tf2_ros)\ninstall(TARGETS static_frames frame_watch DESTINATION lib/${PROJECT_NAME})"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build, then run both against the bench simulation:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/bench_ws && colcon build --packages-select tf_demo && source install/setup.bash\nros2 run tf_demo static_frames\nros2 run tf_demo frame_watch --ros-args -p use_sim_time:=true\nros2 run tf2_ros tf2_echo base_link rear_camera\nros2 run tf2_tools view_frames"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " logs the robot's pose once per simulated second, with an age below a tenth of a second. Start it without "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": " and the age becomes about 1.79 billion seconds: the node's clock is then the wall clock, which counts from 1970, while the stamps count from the start of the simulation. The lookup itself still succeeds, because "
+        },
+        {
+         "t": "code",
+         "v": "TimePointZero"
+        },
+        {
+         "t": "text",
+         "v": " compares no times. A lookup at "
+        },
+        {
+         "t": "code",
+         "v": "now()"
+        },
+        {
+         "t": "text",
+         "v": " would fail."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "tf2_echo base_link rear_camera"
+        },
+        {
+         "t": "text",
+         "v": " prints, once a second, the translation of "
+        },
+        {
+         "t": "code",
+         "v": "rear_camera"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": ", which should be (−0.150, 0.000, 0.300); the rotation as a quaternion, (0, 0, 1, 0) for a half turn about z; the same rotation as roll, pitch and yaw in radians and in degrees, with a yaw of 3.142 rad or 180°; and the 4 × 4 matrix. Its two arguments follow "
+        },
+        {
+         "t": "code",
+         "v": "lookupTransform"
+        },
+        {
+         "t": "text",
+         "v": ": the pose of the second frame in the first ("
+        },
+        {
+         "t": "a",
+         "v": "tf2_echo.cpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/src/tf2_echo.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). While a frame is missing, it logs "
+        },
+        {
+         "t": "code",
+         "v": "Waiting for transform"
+        },
+        {
+         "t": "text",
+         "v": " with tf2's reason instead. "
+        },
+        {
+         "t": "code",
+         "v": "view_frames"
+        },
+        {
+         "t": "text",
+         "v": " now shows "
+        },
+        {
+         "t": "code",
+         "v": "bumper"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "rear_camera"
+        },
+        {
+         "t": "text",
+         "v": " as two more children of "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": ", with the rate of 10000 that marks static transforms."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lookup",
+   "title": "Broadcast and look up transforms in C++; read a URDF",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. These are four joints from the URDF that the bench's "
+        },
+        {
+         "t": "code",
+         "v": "robot_state_publisher"
+        },
+        {
+         "t": "text",
+         "v": " loads, "
+        },
+        {
+         "t": "code",
+         "v": "turtlebot3_waffle.urdf"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "a",
+         "v": "nav2_minimal_tb3_sim",
+         "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/jazzy/nav2_minimal_tb3_sim/urdf/turtlebot3_waffle.urdf"
+        },
+        {
+         "t": "text",
+         "v": ", with the link elements left out:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<joint name=\"base_joint\" type=\"fixed\">\n  <parent link=\"base_footprint\"/>\n  <child link=\"base_link\"/>\n  <origin xyz=\"0 0 0.010\" rpy=\"0 0 0\"/>\n</joint>\n<joint name=\"wheel_left_joint\" type=\"continuous\">\n  <parent link=\"base_link\"/>\n  <child link=\"wheel_left_link\"/>\n  <origin xyz=\"0.0 0.144 0.023\" rpy=\"-1.57 0 0\"/>\n  <axis xyz=\"0 0 1\"/>\n</joint>\n<joint name=\"imu_joint\" type=\"fixed\">\n  <parent link=\"base_link\"/>\n  <child link=\"imu_link\"/>\n  <origin xyz=\"0.0 0 0.068\" rpy=\"0 0 0\"/>\n</joint>\n<joint name=\"scan_joint\" type=\"fixed\">\n  <parent link=\"base_link\"/>\n  <child link=\"base_scan\"/>\n  <origin xyz=\"-0.064 0 0.122\" rpy=\"0 0 0\"/>\n</joint>"
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Draw the part of the tree these joints make. For each edge, say whether "
+         },
+         {
+          "t": "code",
+          "v": "robot_state_publisher"
+         },
+         {
+          "t": "text",
+          "v": " sends it on "
+         },
+         {
+          "t": "code",
+          "v": "/tf_static"
+         },
+         {
+          "t": "text",
+          "v": " or on "
+         },
+         {
+          "t": "code",
+          "v": "/tf"
+         },
+         {
+          "t": "text",
+          "v": ", and what the "
+         },
+         {
+          "t": "code",
+          "v": "/tf"
+         },
+         {
+          "t": "text",
+          "v": " ones need as input. Then add the edge above "
+         },
+         {
+          "t": "code",
+          "v": "base_footprint"
+         },
+         {
+          "t": "text",
+          "v": " and say who publishes it in the bench."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "By hand, find the position of "
+         },
+         {
+          "t": "code",
+          "v": "base_scan"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "base_footprint"
+         },
+         {
+          "t": "text",
+          "v": ", and the positions in "
+         },
+         {
+          "t": "code",
+          "v": "base_footprint"
+         },
+         {
+          "t": "text",
+          "v": " of two lidar returns: 2 m at a bearing of 0, and 1 m at a bearing of +90°."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write a node "
+         },
+         {
+          "t": "code",
+          "v": "lidar_check"
+         },
+         {
+          "t": "text",
+          "v": " that once a second logs the position of "
+         },
+         {
+          "t": "code",
+          "v": "base_scan"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "base_footprint"
+         },
+         {
+          "t": "text",
+          "v": ", and converts the 2 m return into "
+         },
+         {
+          "t": "code",
+          "v": "base_footprint"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "tf2_ros::Buffer::transform"
+         },
+         {
+          "t": "text",
+          "v": ". Keep the conversion from a range and a bearing to a "
+         },
+         {
+          "t": "code",
+          "v": "geometry_msgs::msg::PointStamped"
+         },
+         {
+          "t": "text",
+          "v": " in a plain function."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Run it against the bench simulation and compare with part 2, and with "
+         },
+         {
+          "t": "code",
+          "v": "tf2_echo base_footprint base_scan"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A joint in a URDF is an edge of the tree. Its "
+        },
+        {
+         "t": "code",
+         "v": "origin"
+        },
+        {
+         "t": "text",
+         "v": " is the pose of the child in the parent, "
+        },
+        {
+         "t": "code",
+         "v": "xyz"
+        },
+        {
+         "t": "text",
+         "v": " in metres and "
+        },
+        {
+         "t": "code",
+         "v": "rpy"
+        },
+        {
+         "t": "text",
+         "v": " in the fixed-axis convention from the topic on rotations. Its "
+        },
+        {
+         "t": "code",
+         "v": "type"
+        },
+        {
+         "t": "text",
+         "v": " decides the topic:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "odom                     Gazebo DiffDrive, through the bridge, on /tf\n └── base_footprint\n      └── base_link      base_joint, fixed: /tf_static, once\n           ├── wheel_left_link   wheel_left_joint, continuous: /tf, whenever /joint_states reports its angle\n           ├── imu_link          imu_joint, fixed: /tf_static\n           └── base_scan         scan_joint, fixed: /tf_static"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A continuous joint is a wheel or anything else that turns without limits, so its transform depends on the joint's angle, and "
+        },
+        {
+         "t": "code",
+         "v": "robot_state_publisher"
+        },
+        {
+         "t": "text",
+         "v": " sends it on "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": " each time "
+        },
+        {
+         "t": "code",
+         "v": "/joint_states"
+        },
+        {
+         "t": "text",
+         "v": " reports a new angle. In the bench those messages come from Gazebo's JointStatePublisher system through the bridge. The "
+        },
+        {
+         "t": "code",
+         "v": "rpy=\"-1.57 0 0\""
+        },
+        {
+         "t": "text",
+         "v": " turns the wheel frame so that its z axis, the "
+        },
+        {
+         "t": "code",
+         "v": "axis"
+        },
+        {
+         "t": "text",
+         "v": " of the joint, lies along the axle. "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": " isn't in the URDF at all: the robot's motion is not part of its description."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fixed joints have no rotation, so their offsets add. "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": " sits at (−0.064, 0, 0.010 + 0.122) = (−0.064, 0, 0.132) in "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": ". The return 2 m straight ahead is (2, 0, 0) in "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": " and (1.936, 0, 0.132) in "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": ". The return 1 m to the left is (0, 1, 0) in "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": " and (−0.064, 1.000, 0.132) in "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cmath>\n#include <memory>\n#include <string>\n\n#include <geometry_msgs/msg/point_stamped.hpp>\n#include <geometry_msgs/msg/transform_stamped.hpp>\n#include <rclcpp/rclcpp.hpp>\n#include <tf2/exceptions.hpp>\n#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>\n#include <tf2_ros/buffer.hpp>\n#include <tf2_ros/transform_listener.hpp>\n\nusing namespace std::chrono_literals;\n\nnamespace bench {\n\nstruct Reading {\n  double range_m = 0.0;\n  double bearing_rad = 0.0;  // counterclockwise from the lidar's x axis\n};\n\n// A lidar return as a point in the lidar's frame. The stamp stays 0, which asks tf2 for the newest transform.\n[[nodiscard]] geometry_msgs::msg::PointStamped to_point(const Reading& r, const std::string& lidar_frame) {\n  geometry_msgs::msg::PointStamped p;\n  p.header.frame_id = lidar_frame;\n  p.point.x = r.range_m * std::cos(r.bearing_rad);\n  p.point.y = r.range_m * std::sin(r.bearing_rad);\n  return p;\n}\n\n}  // namespace bench\n\nclass LidarCheck : public rclcpp::Node {\n public:\n  explicit LidarCheck(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"lidar_check\", options), buffer_(get_clock()), listener_(buffer_) {\n    timer_ = create_timer(1s, [this] { report(); });\n  }\n\n private:\n  void report() {\n    try {\n      const geometry_msgs::msg::TransformStamped footprint_from_scan =\n          buffer_.lookupTransform(\"base_footprint\", \"base_scan\", tf2::TimePointZero);\n      const geometry_msgs::msg::Vector3& mount = footprint_from_scan.transform.translation;\n      RCLCPP_INFO(get_logger(), \"base_scan in base_footprint: (%.3f, %.3f, %.3f)\", mount.x, mount.y, mount.z);\n\n      const geometry_msgs::msg::PointStamped ahead =\n          buffer_.transform(bench::to_point({.range_m = 2.0}, \"base_scan\"), \"base_footprint\");\n      RCLCPP_INFO(get_logger(), \"2 m ahead of the lidar: (%.3f, %.3f, %.3f) in %s\", ahead.point.x, ahead.point.y,\n                  ahead.point.z, ahead.header.frame_id.c_str());\n    } catch (const tf2::TransformException& e) {\n      RCLCPP_WARN(get_logger(), \"%s\", e.what());\n    }\n  }\n\n  tf2_ros::Buffer buffer_;\n  tf2_ros::TransformListener listener_;\n  rclcpp::TimerBase::SharedPtr timer_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<LidarCheck>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Buffer::transform"
+        },
+        {
+         "t": "text",
+         "v": " reads the frame and the stamp from the message's header, looks up the transform into the target frame at that stamp, and applies it with the "
+        },
+        {
+         "t": "code",
+         "v": "doTransform"
+        },
+        {
+         "t": "text",
+         "v": " that "
+        },
+        {
+         "t": "code",
+         "v": "tf2_geometry_msgs"
+        },
+        {
+         "t": "text",
+         "v": " provides for "
+        },
+        {
+         "t": "code",
+         "v": "PointStamped"
+        },
+        {
+         "t": "text",
+         "v": ", which moves a point and doesn't only turn it ("
+        },
+        {
+         "t": "a",
+         "v": "buffer_interface.hpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/include/tf2_ros/buffer_interface.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). A real scan callback would put the scan's "
+        },
+        {
+         "t": "code",
+         "v": "header.stamp"
+        },
+        {
+         "t": "text",
+         "v": " into the point and pass a timeout, so that the point is placed with the transform from the moment of the scan."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build it like the worked example and run it with "
+        },
+        {
+         "t": "code",
+         "v": "--ros-args -p use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": " next to the bench. It should log (−0.064, 0.000, 0.132) and (1.936, 0.000, 0.132) in "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": ", the numbers from part 2, and "
+        },
+        {
+         "t": "code",
+         "v": "tf2_echo base_footprint base_scan"
+        },
+        {
+         "t": "text",
+         "v": " shows the same translation. Only the first two edges were static, so the result doesn't depend on where the robot is."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One more thing to see in the files. tf2 builds "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": " from the URDF alone: "
+        },
+        {
+         "t": "code",
+         "v": "base_joint"
+        },
+        {
+         "t": "text",
+         "v": " lifts "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " 0.010 above "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "scan_joint"
+        },
+        {
+         "t": "text",
+         "v": " adds 0.122, so tf2 puts the frame 0.132 above the ground. The Gazebo model of the same robot, "
+        },
+        {
+         "t": "code",
+         "v": "gz_waffle.sdf.xacro"
+        },
+        {
+         "t": "text",
+         "v": " in the same package, is written differently. No link on the way to "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": " carries a "
+        },
+        {
+         "t": "code",
+         "v": "<pose>"
+        },
+        {
+         "t": "text",
+         "v": ", only the two back casters do, so those link frames sit at the model's origin and each piece of geometry brings its own offset. The rays come from the sensor's own pose, "
+        },
+        {
+         "t": "code",
+         "v": "-0.064 0 0.15"
+        },
+        {
+         "t": "text",
+         "v": ", and the scans are stamped with the frame "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": ". So the measurements start about 18 mm above the frame that anything reading them will use. tf2 knows only what the URDF says, so when a sensor seems slightly off, compare the description with the model, or with the real robot, before you blame the algorithm."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "stale",
+   "title": "Stale and missing transforms; extrapolation errors",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every tf2 failure reaches your code as an exception from "
+        },
+        {
+         "t": "code",
+         "v": "lookupTransform"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "transform"
+        },
+        {
+         "t": "text",
+         "v": ", and the text names the cause. These are the four you will meet most, as tf2's source on the jazzy branch builds them, with the varying parts in angle brackets ("
+        },
+        {
+         "t": "a",
+         "v": "buffer_core.cpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/src/buffer_core.cpp"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "a",
+         "v": "cache.cpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/src/cache.cpp"
+        },
+        {
+         "t": "text",
+         "v": "):"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "\"<frame>\" passed to lookupTransform argument target_frame does not exist.\nCould not find a connection between '<target>' and '<source>' because they are not part of the same tree.Tf has two or more unconnected trees.\nLookup would require extrapolation into the future.  Requested time <t> but the latest data is at time <t_latest>, when looking up transform from frame [<source>] to frame [<target>]\nLookup would require extrapolation into the past.  Requested time <t> but the earliest data is at time <t_earliest>, when looking up transform from frame [<source>] to frame [<target>]"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Does not exist"
+        },
+        {
+         "t": "text",
+         "v": " means no transform in this buffer has ever named that frame. Check the spelling first, then whether the broadcaster runs. A name with a leading slash, a habit from ROS 1, is refused with its own message: in tf2, frame ids can't start with a '/'. On the bench, "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " doesn't exist until a localisation node runs. A node that looks up a transform right after it starts can also see this for a moment, before the first message arrives, so treat a few failures at startup as normal and retry."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Not part of the same tree"
+        },
+        {
+         "t": "text",
+         "v": " means both frames exist but no chain of edges joins them. A camera driver that publishes "
+        },
+        {
+         "t": "code",
+         "v": "camera_link"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "camera_optical_frame"
+        },
+        {
+         "t": "text",
+         "v": ", on a robot whose URDF has no "
+        },
+        {
+         "t": "code",
+         "v": "camera_link"
+        },
+        {
+         "t": "text",
+         "v": ", makes a second tree. "
+        },
+        {
+         "t": "code",
+         "v": "view_frames"
+        },
+        {
+         "t": "text",
+         "v": " draws two separate trees. The fix is one missing edge, in the URDF or from a static broadcaster."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Extrapolation into the future"
+        },
+        {
+         "t": "text",
+         "v": " means you asked for a time after the newest data. The size of the gap tells you why:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A few milliseconds: you asked for "
+         },
+         {
+          "t": "code",
+          "v": "now()"
+         },
+         {
+          "t": "text",
+          "v": ", and the newest transform is a little older, because it travelled over the network. Ask for the stamp of the data you are transforming, with a timeout of 50 to 100 ms, or use "
+         },
+         {
+          "t": "code",
+          "v": "TimePointZero"
+         },
+         {
+          "t": "text",
+          "v": " when the newest transform is what you want. "
+         },
+         {
+          "t": "code",
+          "v": "tf2_ros::MessageFilter"
+         },
+         {
+          "t": "text",
+          "v": " holds incoming messages until their transforms are available."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A gap that grows by one second every second: the broadcaster has stopped."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A gap of about 1.79 billion seconds, or the same amount into the past: one side uses simulation time and the other the wall clock. A node started without "
+         },
+         {
+          "t": "code",
+          "v": "use_sim_time:=true"
+         },
+         {
+          "t": "text",
+          "v": " in a simulation is the usual cause."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nav2's AMCL avoids the first case for "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " on purpose: it stamps "
+        },
+        {
+         "t": "code",
+         "v": "map_from_odom"
+        },
+        {
+         "t": "text",
+         "v": " with the scan time plus "
+        },
+        {
+         "t": "code",
+         "v": "transform_tolerance"
+        },
+        {
+         "t": "text",
+         "v": ", 1 s by default, so lookups at the current time find data between its corrections ("
+        },
+        {
+         "t": "a",
+         "v": "amcl_node.cpp",
+         "href": "https://github.com/ros-navigation/navigation2/blob/jazzy/nav2_amcl/src/amcl_node.cpp"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Extrapolation into the past"
+        },
+        {
+         "t": "text",
+         "v": " means you asked for a time older than the buffer holds, 10 s by default. A callback that processes a scan from a long queue, or a node that stalls, sees it. After a jump back in time, such as a bag that loops, the buffer is also cleared, and "
+        },
+        {
+         "t": "code",
+         "v": "tf2_ros"
+        },
+        {
+         "t": "text",
+         "v": " logs "
+        },
+        {
+         "t": "code",
+         "v": "Detected jump back in time. Clearing TF buffer."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three failures don't throw at all:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A stale transform. "
+         },
+         {
+          "t": "code",
+          "v": "TimePointZero"
+         },
+         {
+          "t": "text",
+          "v": " returns the newest transform however old it is, because the buffer drops old data relative to the newest entry of the same edge, so the last one never expires ("
+         },
+         {
+          "t": "a",
+          "v": "cache.cpp",
+          "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/src/cache.cpp"
+         },
+         {
+          "t": "text",
+          "v": "). When the odometry node dies, a lookup at time zero keeps returning its last pose. Compare the result's "
+         },
+         {
+          "t": "code",
+          "v": "header.stamp"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "now()"
+         },
+         {
+          "t": "text",
+          "v": ", as "
+         },
+         {
+          "t": "code",
+          "v": "frame_watch"
+         },
+         {
+          "t": "text",
+          "v": " does, and treat a transform older than your limit as missing."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A timeout that never ends. The timeout is measured on the buffer's clock. With "
+         },
+         {
+          "t": "code",
+          "v": "use_sim_time:=true"
+         },
+         {
+          "t": "text",
+          "v": " and nothing on "
+         },
+         {
+          "t": "code",
+          "v": "/clock"
+         },
+         {
+          "t": "text",
+          "v": ", that clock stands at zero, so a lookup with a timeout waits forever and blocks the callback that called it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Two broadcasters for one child frame. A frame has one parent at a time, and each new message replaces the last. Two odometry sources that both publish "
+         },
+         {
+          "t": "code",
+          "v": "odom"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": "base_link"
+         },
+         {
+          "t": "text",
+          "v": ", such as a base controller and a filter, make the robot jitter between two poses. One broadcaster on sim time and one on wall time also produce "
+         },
+         {
+          "t": "code",
+          "v": "TF_OLD_DATA ignoring data from the past"
+         },
+         {
+          "t": "text",
+          "v": " warnings. "
+         },
+         {
+          "t": "code",
+          "v": "view_frames"
+         },
+         {
+          "t": "text",
+          "v": " can't show this, because every edge reads "
+         },
+         {
+          "t": "code",
+          "v": "default_authority"
+         },
+         {
+          "t": "text",
+          "v": ". "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic info -v /tf"
+         },
+         {
+          "t": "text",
+          "v": " lists every publishing node."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The tools, in the order you usually reach for them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run tf2_ros tf2_echo odom base_link      # the transform once a second, or the reason it fails\nros2 run tf2_tools view_frames                # the whole tree, with rates and the newest stamp per edge\nros2 run tf2_ros tf2_monitor odom base_link   # the chain between the frames, with the delay of each edge\nros2 topic info -v /tf                        # every node that publishes transforms"
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Draw "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " with the publisher of each edge, and say what "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "/tf_static"
+        },
+        {
+         "t": "text",
+         "v": " carry and why a static broadcaster must keep running. Explain what "
+        },
+        {
+         "t": "code",
+         "v": "lookupTransform(target, source, time)"
+        },
+        {
+         "t": "text",
+         "v": " returns, what "
+        },
+        {
+         "t": "code",
+         "v": "TimePointZero"
+        },
+        {
+         "t": "text",
+         "v": " asks for, and what a timeout does. For each of the four error messages, give one cause, and name one failure that throws nothing."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Why does localisation publish "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " to "
+     },
+     {
+      "t": "code",
+      "v": "odom"
+     },
+     {
+      "t": "text",
+      "v": " instead of "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " to "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "code",
+      "v": "lookupTransform(\"map\", \"base_scan\", t)"
+     },
+     {
+      "t": "text",
+      "v": ": which frame's coordinates go in, which come out, and what are "
+     },
+     {
+      "t": "code",
+      "v": "header.frame_id"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "child_frame_id"
+     },
+     {
+      "t": "text",
+      "v": " of the result?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What QoS does "
+     },
+     {
+      "t": "code",
+      "v": "/tf_static"
+     },
+     {
+      "t": "text",
+      "v": " use, and what happens to a late listener after the static broadcaster exits?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which joints in a URDF does "
+     },
+     {
+      "t": "code",
+      "v": "robot_state_publisher"
+     },
+     {
+      "t": "text",
+      "v": " send on "
+     },
+     {
+      "t": "code",
+      "v": "/tf"
+     },
+     {
+      "t": "text",
+      "v": ", and what input does it need for them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A lookup at "
+     },
+     {
+      "t": "code",
+      "v": "now()"
+     },
+     {
+      "t": "text",
+      "v": " fails with extrapolation into the future by 4 ms. What do you change?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The gap in the extrapolation error is about 1.79 billion seconds. What is wrong?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why can a lookup at "
+     },
+     {
+      "t": "code",
+      "v": "TimePointZero"
+     },
+     {
+      "t": "text",
+      "v": " return a pose from a minute ago, and how do you notice?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a node with a buffer and a listener that logs the pose of "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": " in "
+     },
+     {
+      "t": "code",
+      "v": "odom"
+     },
+     {
+      "t": "text",
+      "v": " once a second."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The Jazzy tf2 tutorials: "
+     },
+     {
+      "t": "a",
+      "v": "introducing tf2",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Introduction-To-Tf2.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "view_frames"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "tf2_echo"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "a static broadcaster in C++",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Writing-A-Tf2-Static-Broadcaster-Cpp.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "a listener in C++",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Writing-A-Tf2-Listener-Cpp.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "using time",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Learning-About-Tf2-And-Time-Cpp.html"
+     },
+     {
+      "t": "text",
+      "v": " for timeouts, and "
+     },
+     {
+      "t": "a",
+      "v": "debugging",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Debugging-Tf2-Problems.html"
+     },
+     {
+      "t": "text",
+      "v": " for the error messages and "
+     },
+     {
+      "t": "code",
+      "v": "tf2_monitor"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "tf2_ros on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "buffer.hpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/include/tf2_ros/buffer.hpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "buffer.cpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/src/buffer.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for lookups and timeouts, "
+     },
+     {
+      "t": "a",
+      "v": "transform_listener.hpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/include/tf2_ros/transform_listener.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the listener's thread, and "
+     },
+     {
+      "t": "a",
+      "v": "qos.hpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/include/tf2_ros/qos.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the QoS of both topics."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "tf2 on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "buffer_core.cpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/src/buffer_core.cpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "cache.cpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/src/cache.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", where the error texts, the interpolation and the 10 s history live."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "REP 105",
+      "href": "https://www.ros.org/reps/rep-0105.html"
+     },
+     {
+      "t": "text",
+      "v": ", on the frames of mobile robots and which component publishes each transform."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Tully Foote, tf: The transform library, TePRA 2013: "
+     },
+     {
+      "t": "a",
+      "v": "paper",
+      "href": "https://doi.org/10.1109/TePRA.2013.6556373"
+     },
+     {
+      "t": "text",
+      "v": ". The design of the tree, the buffer and the time handling."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "robot_state_publisher README",
+      "href": "https://github.com/ros/robot_state_publisher/blob/jazzy/README.md"
+     },
+     {
+      "t": "text",
+      "v": " on the jazzy branch: fixed joints on "
+     },
+     {
+      "t": "code",
+      "v": "/tf_static"
+     },
+     {
+      "t": "text",
+      "v": ", movable joints on "
+     },
+     {
+      "t": "code",
+      "v": "/tf"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot3 description in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_tb3_sim",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/tree/jazzy/nav2_minimal_tb3_sim"
+     },
+     {
+      "t": "text",
+      "v": ", with the URDF and the Gazebo model the bench uses."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". The conversions live in plain functions outside the nodes."
+     }
+    ]
+   ]
+  }
+ ]
+}

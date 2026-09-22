@@ -1,0 +1,1758 @@
+{
+ "id": "ros-launch-params",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "In a few sentences each and without notes: what is a launch file for, and what is a node parameter for? Give one example of each from a robot or a demo you know. Then say three ways a parameter's value can reach a node when it starts, and how you change it while the node runs. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A launch file describes a set of processes to start together: which executables, with which node names, namespaces, topic remappings and parameters. It declares arguments that the caller can override, and it can include other launch files, so a robot starts with one command and stops with one Ctrl+C. The bench's "
+     },
+     {
+      "t": "code",
+      "v": "world.launch.py"
+     },
+     {
+      "t": "text",
+      "v": " is one: it starts Gazebo, the bridge and "
+     },
+     {
+      "t": "code",
+      "v": "robot_state_publisher"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "code",
+      "v": "headless"
+     },
+     {
+      "t": "text",
+      "v": " argument chooses whether the window opens."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A parameter is a named, typed value that belongs to one node and configures it without a rebuild, such as "
+     },
+     {
+      "t": "code",
+      "v": "robot_state_publisher"
+     },
+     {
+      "t": "text",
+      "v": "'s "
+     },
+     {
+      "t": "code",
+      "v": "robot_description"
+     },
+     {
+      "t": "text",
+      "v": " or any node's "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": ". A node declares each parameter with a type and a default, and can attach a description, a range and callbacks that check and apply changes. At startup the value comes from the default, from "
+     },
+     {
+      "t": "code",
+      "v": "--ros-args -p name:=value"
+     },
+     {
+      "t": "text",
+      "v": " on the command line, from a YAML file passed with "
+     },
+     {
+      "t": "code",
+      "v": "--params-file"
+     },
+     {
+      "t": "text",
+      "v": ", or from a launch file. While the node runs, "
+     },
+     {
+      "t": "code",
+      "v": "ros2 param set"
+     },
+     {
+      "t": "text",
+      "v": " changes it through the parameter services every node offers, and the node can refuse the change."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with both purposes, two of the startup sources and "
+     },
+     {
+      "t": "code",
+      "v": "ros2 param set"
+     },
+     {
+      "t": "text",
+      "v": ". Missing the run-time change, or saying that parameters are global like ROS 1's parameter server, is a partial pass. Confusing launch arguments with node parameters is a fail: an argument exists only while the launch file is read, and a parameter lives in the node."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A launch file describes a set of processes to start together, which executables, under which names and namespaces, with which topics remapped and which parameters, and it declares arguments the caller can override; a robot then starts with one command and stops with one Ctrl+C. A parameter is a named, typed value that belongs to one running node and configures it without a rebuild, declared with a default that also fixes its type."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that a real robot is many processes that must start together with consistent settings, and each of those processes needs to be configured differently for a bench test, a simulation or the field without recompiling anything. A launch file solves the first problem, orchestrating what starts and how; a parameter solves the second, letting one node's behaviour change from outside it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A parameter's starting value comes from whichever of several sources is present when the node declares it, a command-line override, a YAML file, a launch file, or the declared default otherwise. Changing it afterwards runs through checks in a fixed order, whether the parameter is read-only, its type, the range on its descriptor, and any callback the node registered to check the value itself, and the change only takes effect once every one of those succeeds; only then do the node's own reactions to the new value run, in a second, separate callback, because an earlier one might still have refused the change."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake under pressure is treating a parameter's type as a formality. A value read from the command line, a YAML file or a launch argument is read as YAML, so an unmarked whole number destined for a double parameter arrives as an integer and is refused outright, aborting that one node at startup while the rest of the launch keeps running as if nothing were wrong. A numeric range on its own has the same kind of hole: every comparison with NaN is false, so a range check alone lets a not-a-number value through, and only a callback that tests for it explicitly closes that gap."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This is the interview question itself: saying what a launch file and a parameter are each for, naming the different places a parameter's starting value can come from, and not confusing a launch argument, which exists only while the launch file is read, with a parameter, which lives in the node long after."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "launch",
+   "title": "Python launch files; parameters and parameter files",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start with parameters, on the counter from the topics exercise. The version below declares a parameter "
+        },
+        {
+         "t": "code",
+         "v": "rate_hz"
+        },
+        {
+         "t": "text",
+         "v": ". Run it and look at it from outside:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run bench_count counter --ros-args -p rate_hz:=5.0    # terminal 1\nros2 param list /counter                # terminal 2: rate_hz, use_sim_time, and a few that every node has\nros2 param describe /counter rate_hz    # Type: double, the description, Min value: 0.5, Max value: 20.0\nros2 param get /counter rate_hz         # Double value is: 5.0\nros2 param set /counter rate_hz 10.0    # Set parameter successful\nros2 param set /counter rate_hz 50.0    # Setting parameter failed: Parameter {rate_hz} doesn't comply with floating point range.\nros2 param set /counter rate_hz 10      # Setting parameter failed: Wrong parameter type, parameter {rate_hz} is of type {double}, setting it to {integer} is not allowed."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The expected lines in the comments are the messages that "
+        },
+        {
+         "t": "code",
+         "v": "ros2param"
+        },
+        {
+         "t": "text",
+         "v": " and rclcpp print for these cases ("
+        },
+        {
+         "t": "a",
+         "v": "set.py",
+         "href": "https://github.com/ros2/ros2cli/blob/jazzy/ros2param/ros2param/verb/set.py"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "a",
+         "v": "node_parameters.cpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/node_interfaces/node_parameters.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). A "
+        },
+        {
+         "t": "i",
+         "v": "parameter"
+        },
+        {
+         "t": "text",
+         "v": " in ROS 2 belongs to one node. There is no central server: every node offers six services, such as "
+        },
+        {
+         "t": "code",
+         "v": "/counter/set_parameters"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "/counter/describe_parameters"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 param"
+        },
+        {
+         "t": "text",
+         "v": " is a client of them ("
+        },
+        {
+         "t": "a",
+         "v": "about parameters",
+         "href": "https://docs.ros.org/en/jazzy/Concepts/Basic/About-Parameters.html"
+        },
+        {
+         "t": "text",
+         "v": "). Each parameter has one of nine types, from "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "string[]"
+        },
+        {
+         "t": "text",
+         "v": ", and keeps it. The last command failed because "
+        },
+        {
+         "t": "code",
+         "v": "ros2 param set"
+        },
+        {
+         "t": "text",
+         "v": " reads its value as YAML, and YAML reads "
+        },
+        {
+         "t": "code",
+         "v": "10"
+        },
+        {
+         "t": "text",
+         "v": " as an integer. Write "
+        },
+        {
+         "t": "code",
+         "v": "10.0"
+        },
+        {
+         "t": "text",
+         "v": " for a double."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The node decides what it accepts. It declares each parameter with a default, which also fixes the type, and a "
+        },
+        {
+         "t": "i",
+         "v": "descriptor"
+        },
+        {
+         "t": "text",
+         "v": " with a description and a range. A callback can refuse what the range can't express:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cmath>\n#include <cstdint>\n#include <memory>\n#include <optional>\n#include <string>\n#include <vector>\n\n#include <rcl_interfaces/msg/floating_point_range.hpp>\n#include <rcl_interfaces/msg/parameter_descriptor.hpp>\n#include <rcl_interfaces/msg/set_parameters_result.hpp>\n#include <rclcpp/rclcpp.hpp>\n#include <std_msgs/msg/int64.hpp>\n\nnamespace bench {\n\n// Why a rate is refused, or nothing when it is usable. The descriptor's range refuses values\n// outside [0.5, 20], but a NaN passes that check, because every comparison with NaN is false.\n[[nodiscard]] std::optional<std::string> rate_problem(double hz) {\n  if (!std::isfinite(hz)) return \"rate_hz must be a finite number\";\n  return std::nullopt;\n}\n\n[[nodiscard]] std::chrono::nanoseconds period_of(double hz) {\n  return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(1.0 / hz));\n}\n\n[[nodiscard]] rcl_interfaces::msg::ParameterDescriptor rate_descriptor() {\n  rcl_interfaces::msg::FloatingPointRange range;\n  range.from_value = 0.5;\n  range.to_value = 20.0;\n  rcl_interfaces::msg::ParameterDescriptor descriptor;\n  descriptor.description = \"messages per second\";\n  descriptor.floating_point_range.push_back(range);\n  return descriptor;\n}\n\n}  // namespace bench\n\nclass Counter : public rclcpp::Node {\n public:\n  explicit Counter(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"counter\", options) {\n    publisher_ = create_publisher<std_msgs::msg::Int64>(\"count\", rclcpp::QoS(rclcpp::KeepLast(10)));\n\n    // Registered before the declaration, so it also checks a value from the command line, a YAML file or a launch file.\n    validate_ = add_on_set_parameters_callback([](const std::vector<rclcpp::Parameter>& changes) {\n      rcl_interfaces::msg::SetParametersResult result;\n      result.successful = true;\n      for (const rclcpp::Parameter& p : changes) {\n        if (p.get_name() != \"rate_hz\") continue;\n        if (const std::optional<std::string> problem = bench::rate_problem(p.as_double())) {\n          result.successful = false;\n          result.reason = *problem;\n        }\n      }\n      return result;\n    });\n\n    start(declare_parameter(\"rate_hz\", 2.0, bench::rate_descriptor()));\n\n    // Registered after the declaration, so it reacts only to changes made while the node runs.\n    apply_ = add_post_set_parameters_callback([this](const std::vector<rclcpp::Parameter>& changes) {\n      for (const rclcpp::Parameter& p : changes) {\n        if (p.get_name() == \"rate_hz\") start(p.as_double());\n      }\n    });\n  }\n\n private:\n  void start(double hz) {\n    timer_ = create_timer(bench::period_of(hz), [this] {\n      std_msgs::msg::Int64 msg;\n      msg.data = next_++;\n      publisher_->publish(msg);\n    });\n    RCLCPP_INFO(get_logger(), \"publishing at %.1f Hz\", hz);\n  }\n\n  rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr publisher_;\n  rclcpp::TimerBase::SharedPtr timer_;\n  OnSetParametersCallbackHandle::SharedPtr validate_;\n  PostSetParametersCallbackHandle::SharedPtr apply_;\n  std::int64_t next_ = 0;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<Counter>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "declare_parameter(\"rate_hz\", 2.0, descriptor)"
+        },
+        {
+         "t": "text",
+         "v": " returns the value the node starts with: the override from the command line, a YAML file or a launch file if there is one, and the default otherwise. Later reads use "
+        },
+        {
+         "t": "code",
+         "v": "get_parameter(\"rate_hz\").as_double()"
+        },
+        {
+         "t": "text",
+         "v": ". A change then passes these checks in order: that the parameter isn't read-only, its type, the range from the descriptor, and every "
+        },
+        {
+         "t": "i",
+         "v": "set parameters callback"
+        },
+        {
+         "t": "text",
+         "v": ", which returns a "
+        },
+        {
+         "t": "code",
+         "v": "SetParametersResult"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "successful"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "reason"
+        },
+        {
+         "t": "text",
+         "v": ". The first check that fails stops the change, and the reason goes back to the caller, which is how "
+        },
+        {
+         "t": "code",
+         "v": "ros2 param set"
+        },
+        {
+         "t": "text",
+         "v": " printed it above. After a successful change, the "
+        },
+        {
+         "t": "i",
+         "v": "post set callbacks"
+        },
+        {
+         "t": "text",
+         "v": " run, and that is where the node acts on the new value. The Jazzy concept page asks for this split: a set callback must not change the node, because a later callback may still refuse the change ("
+        },
+        {
+         "t": "a",
+         "v": "about parameters",
+         "href": "https://docs.ros.org/en/jazzy/Concepts/Basic/About-Parameters.html"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The range check has a hole that the callback closes. It tests "
+        },
+        {
+         "t": "code",
+         "v": "v < from || v > to"
+        },
+        {
+         "t": "text",
+         "v": ", and every comparison with NaN is false, so "
+        },
+        {
+         "t": "code",
+         "v": "ros2 param set /counter rate_hz .nan"
+        },
+        {
+         "t": "text",
+         "v": " passes the range and would turn into a timer period of NaN. "
+        },
+        {
+         "t": "code",
+         "v": "rate_problem"
+        },
+        {
+         "t": "text",
+         "v": " refuses it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The order of registration matters too. "
+        },
+        {
+         "t": "code",
+         "v": "declare_parameter"
+        },
+        {
+         "t": "text",
+         "v": " runs the set callbacks that exist at that moment on the starting value, and throws "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::exceptions::InvalidParameterValueException"
+        },
+        {
+         "t": "text",
+         "v": " if one refuses it ("
+        },
+        {
+         "t": "a",
+         "v": "node.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/node.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). So the check is registered first, and it guards the value from a YAML file as well, and the post set callback afterwards, so "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": " doesn't run twice at startup. Both handles live in members, for the same reason as the subscription in the topics topic: a handle that dies unregisters its callback without a word. Both functions carry the attribute that warns about an unused result, so with "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " a dropped handle doesn't compile. The callbacks run on the executor's thread, as timer callbacks do, so "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": " replaces the timer without racing it in this single-threaded node."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Parameter files"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A YAML file holds values for many parameters and many nodes. The top level names the node by its full name, or "
+        },
+        {
+         "t": "code",
+         "v": "/**"
+        },
+        {
+         "t": "text",
+         "v": " for every node, and "
+        },
+        {
+         "t": "code",
+         "v": "ros__parameters"
+        },
+        {
+         "t": "text",
+         "v": " opens its values:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "/counter:\n  ros__parameters:\n    rate_hz: 5.0\n/**:\n  ros__parameters:\n    use_sim_time: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "--ros-args --params-file counter.yaml"
+        },
+        {
+         "t": "text",
+         "v": " loads it at startup, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 param load /counter counter.yaml"
+        },
+        {
+         "t": "text",
+         "v": " applies it to a running node, and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 param dump /counter"
+        },
+        {
+         "t": "text",
+         "v": " prints the current values in this format. The typing rule applies here too: "
+        },
+        {
+         "t": "code",
+         "v": "rate_hz: 5"
+        },
+        {
+         "t": "text",
+         "v": " is an integer, and the counter then refuses to start."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Launch files"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A Python launch file is a module with a function "
+        },
+        {
+         "t": "code",
+         "v": "generate_launch_description()"
+        },
+        {
+         "t": "text",
+         "v": " that returns a "
+        },
+        {
+         "t": "code",
+         "v": "LaunchDescription"
+        },
+        {
+         "t": "text",
+         "v": ", a list of "
+        },
+        {
+         "t": "i",
+         "v": "actions"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "ros2 launch"
+        },
+        {
+         "t": "text",
+         "v": " calls the function once, then executes the actions: it starts processes, sets up event handlers and resolves "
+        },
+        {
+         "t": "i",
+         "v": "substitutions"
+        },
+        {
+         "t": "text",
+         "v": ". A substitution, such as "
+        },
+        {
+         "t": "code",
+         "v": "LaunchConfiguration('rate')"
+        },
+        {
+         "t": "text",
+         "v": ", is a placeholder that gets its value when the action runs, not when the Python code builds the list, so printing it inside the function shows an object. This launch file starts one counter and gives callers a "
+        },
+        {
+         "t": "code",
+         "v": "rate"
+        },
+        {
+         "t": "text",
+         "v": " argument:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "# bench_count/launch/counter.launch.py\nfrom launch import LaunchDescription\nfrom launch.actions import DeclareLaunchArgument\nfrom launch.substitutions import LaunchConfiguration\nfrom launch_ros.actions import Node\nfrom launch_ros.parameter_descriptions import ParameterValue\n\n\ndef generate_launch_description():\n    return LaunchDescription([\n        DeclareLaunchArgument('rate', default_value='2.0', description='messages per second'),\n        Node(\n            package='bench_count',\n            executable='counter',\n            parameters=[{'rate_hz': ParameterValue(LaunchConfiguration('rate'), value_type=float)}],\n            output='screen',\n        ),\n    ])"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every launch argument is a string. When a substitution becomes a parameter value, launch_ros reads the string as YAML ("
+        },
+        {
+         "t": "a",
+         "v": "evaluate_parameters.py",
+         "href": "https://github.com/ros2/launch_ros/blob/jazzy/launch_ros/launch_ros/utilities/evaluate_parameters.py"
+        },
+        {
+         "t": "text",
+         "v": "), so "
+        },
+        {
+         "t": "code",
+         "v": "rate:=5"
+        },
+        {
+         "t": "text",
+         "v": " would arrive as the integer 5 and stop the counter at startup with a type error. "
+        },
+        {
+         "t": "code",
+         "v": "ParameterValue(..., value_type=float)"
+        },
+        {
+         "t": "text",
+         "v": " converts it to a double first. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 launch bench_count counter.launch.py --show-args"
+        },
+        {
+         "t": "text",
+         "v": " lists the arguments with their descriptions and defaults, and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 launch bench_count counter.launch.py rate:=5.0"
+        },
+        {
+         "t": "text",
+         "v": " sets one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A second launch file starts this one twice, once per namespace, with two lines per copy, taking "
+        },
+        {
+         "t": "code",
+         "v": "GroupAction"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "IncludeLaunchDescription"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "launch.actions"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "PushROSNamespace"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "launch_ros.actions"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "GroupAction(actions=[PushROSNamespace('slow'),\n                     IncludeLaunchDescription(counter, launch_arguments={'rate': '1.0'}.items())])"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With "
+        },
+        {
+         "t": "code",
+         "v": "counter"
+        },
+        {
+         "t": "text",
+         "v": " a "
+        },
+        {
+         "t": "code",
+         "v": "PathJoinSubstitution([FindPackageShare('bench_count'), 'launch', 'counter.launch.py'])"
+        },
+        {
+         "t": "text",
+         "v": ", that group starts "
+        },
+        {
+         "t": "code",
+         "v": "/slow/counter"
+        },
+        {
+         "t": "text",
+         "v": " publishing on "
+        },
+        {
+         "t": "code",
+         "v": "/slow/count"
+        },
+        {
+         "t": "text",
+         "v": ", and a second group with "
+        },
+        {
+         "t": "code",
+         "v": "fast"
+        },
+        {
+         "t": "text",
+         "v": " and 10.0 starts the other. "
+        },
+        {
+         "t": "code",
+         "v": "IncludeLaunchDescription"
+        },
+        {
+         "t": "text",
+         "v": " in Jazzy takes the path directly and picks the format from the file. A "
+        },
+        {
+         "t": "code",
+         "v": "GroupAction"
+        },
+        {
+         "t": "text",
+         "v": " is scoped, so the namespace it pushes and the argument it passes end with the group. "
+        },
+        {
+         "t": "code",
+         "v": "IfCondition"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "UnlessCondition"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "launch.conditions"
+        },
+        {
+         "t": "text",
+         "v": " switch any action on an argument, as the bench's world file does with "
+        },
+        {
+         "t": "code",
+         "v": "headless"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "FindPackageShare"
+        },
+        {
+         "t": "text",
+         "v": " finds the installed "
+        },
+        {
+         "t": "code",
+         "v": "share/bench_count"
+        },
+        {
+         "t": "text",
+         "v": " folder, so launch files have to be installed: "
+        },
+        {
+         "t": "code",
+         "v": "install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "<exec_depend>ros2launch</exec_depend>"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "package.xml"
+        },
+        {
+         "t": "text",
+         "v": ", as the Jazzy tutorial on "
+        },
+        {
+         "t": "a",
+         "v": "launch files",
+         "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Creating-Launch-Files.html"
+        },
+        {
+         "t": "text",
+         "v": " recommends. The tutorials on "
+        },
+        {
+         "t": "a",
+         "v": "substitutions",
+         "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Using-Substitutions.html"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "large projects",
+         "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Using-ROS2-Launch-For-Large-Projects.html"
+        },
+        {
+         "t": "text",
+         "v": " show the rest. Launch files can also be written in XML or YAML; the bench uses Python, because its world file computes paths and deletes a temporary file."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "two-nodes",
+   "title": "Launch two nodes with parameters",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes, in "
+        },
+        {
+         "t": "code",
+         "v": "bench_count"
+        },
+        {
+         "t": "text",
+         "v": " from the topics exercise."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Replace the counter with the version from the theory above."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Give the watcher an integer parameter "
+         },
+         {
+          "t": "code",
+          "v": "report_every"
+         },
+         {
+          "t": "text",
+          "v": ", from 1 to 1000 with a default of 1. The watcher logs only every n-th number it hears, still warns about every gap, and takes a new value while it runs. Keep the choice of which numbers to log in a plain class."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "config/watcher.yaml"
+         },
+         {
+          "t": "text",
+          "v": ", which sets "
+         },
+         {
+          "t": "code",
+          "v": "report_every"
+         },
+         {
+          "t": "text",
+          "v": " to 5."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "launch/pair.launch.py"
+         },
+         {
+          "t": "text",
+          "v": ", which starts both nodes. The counter's rate comes from a launch argument "
+         },
+         {
+          "t": "code",
+          "v": "rate"
+         },
+         {
+          "t": "text",
+          "v": " with a default of 2.0, and the watcher's parameters come from the YAML file. Install both folders."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Launch the pair with "
+         },
+         {
+          "t": "code",
+          "v": "rate:=4.0"
+         },
+         {
+          "t": "text",
+          "v": " and check the rate with "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic hz /count"
+         },
+         {
+          "t": "text",
+          "v": ". Then, while it runs, set the watcher's "
+         },
+         {
+          "t": "code",
+          "v": "report_every"
+         },
+         {
+          "t": "text",
+          "v": " to 20, set the counter's rate to 1.0, and try a rate of 0.1 and one of "
+         },
+         {
+          "t": "code",
+          "v": ".nan"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Before you try it: what happens if "
+         },
+         {
+          "t": "code",
+          "v": "pair.launch.py"
+         },
+         {
+          "t": "text",
+          "v": " passes "
+         },
+         {
+          "t": "code",
+          "v": "LaunchConfiguration('rate')"
+         },
+         {
+          "t": "text",
+          "v": " without "
+         },
+         {
+          "t": "code",
+          "v": "ParameterValue"
+         },
+         {
+          "t": "text",
+          "v": ", and you launch with "
+         },
+         {
+          "t": "code",
+          "v": "rate:=4"
+         },
+         {
+          "t": "text",
+          "v": "?"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The watcher keeps "
+        },
+        {
+         "t": "code",
+         "v": "SequenceCheck"
+        },
+        {
+         "t": "text",
+         "v": " from the topics exercise and adds a small class that picks the numbers to log:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cinttypes>\n#include <cstdint>\n#include <memory>\n#include <optional>\n#include <vector>\n\n#include <rcl_interfaces/msg/integer_range.hpp>\n#include <rcl_interfaces/msg/parameter_descriptor.hpp>\n#include <rclcpp/rclcpp.hpp>\n#include <std_msgs/msg/int64.hpp>\n\n// The gap check from the topics exercise.\nclass SequenceCheck {\n public:\n  [[nodiscard]] std::optional<std::int64_t> observe(std::int64_t value) {\n    std::optional<std::int64_t> expected;\n    if (last_ && value != *last_ + 1) expected = *last_ + 1;\n    last_ = value;\n    return expected;\n  }\n\n private:\n  std::optional<std::int64_t> last_;\n};\n\n// Picks every n-th message to log. Plain C++, so a test drives it without ROS.\nclass Sampler {\n public:\n  void set_every(std::int64_t every) {\n    every_ = std::max<std::int64_t>(every, 1);  // the descriptor allows 1 to 1000; never divide by 0\n    seen_ = 0;\n  }\n  [[nodiscard]] bool take() { return seen_++ % every_ == 0; }\n\n private:\n  std::int64_t every_ = 1;\n  std::int64_t seen_ = 0;\n};\n\n[[nodiscard]] rcl_interfaces::msg::ParameterDescriptor report_every_descriptor() {\n  rcl_interfaces::msg::IntegerRange range;\n  range.from_value = 1;\n  range.to_value = 1000;\n  rcl_interfaces::msg::ParameterDescriptor descriptor;\n  descriptor.description = \"log every n-th number; gaps are always logged\";\n  descriptor.integer_range.push_back(range);\n  return descriptor;\n}\n\nclass Watcher : public rclcpp::Node {\n public:\n  explicit Watcher(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"watcher\", options) {\n    sampler_.set_every(declare_parameter<std::int64_t>(\"report_every\", 1, report_every_descriptor()));\n    apply_ = add_post_set_parameters_callback([this](const std::vector<rclcpp::Parameter>& changes) {\n      for (const rclcpp::Parameter& p : changes) {\n        if (p.get_name() == \"report_every\") sampler_.set_every(p.as_int());\n      }\n    });\n    subscription_ = create_subscription<std_msgs::msg::Int64>(\n        \"count\", rclcpp::QoS(rclcpp::KeepLast(10)), [this](const std_msgs::msg::Int64& msg) { on_count(msg.data); });\n  }\n\n private:\n  void on_count(std::int64_t value) {\n    if (sampler_.take()) RCLCPP_INFO(get_logger(), \"heard %\" PRId64, value);\n    if (const std::optional<std::int64_t> expected = check_.observe(value)) {\n      RCLCPP_WARN(get_logger(), \"expected %\" PRId64 \", got %\" PRId64, *expected, value);\n    }\n  }\n\n  SequenceCheck check_;\n  Sampler sampler_;\n  PostSetParametersCallbackHandle::SharedPtr apply_;\n  rclcpp::Subscription<std_msgs::msg::Int64>::SharedPtr subscription_;  // last: its callback uses the members above\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<Watcher>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The range in the descriptor is the whole validation here, because an integer can't be NaN, so the watcher needs only a post set callback. "
+        },
+        {
+         "t": "code",
+         "v": "Sampler::set_every"
+        },
+        {
+         "t": "text",
+         "v": " still refuses 0 on its own: the class shouldn't depend on the node for its invariant."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The parameter file and the launch file:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "# bench_count/config/watcher.yaml\n/watcher:\n  ros__parameters:\n    report_every: 5"
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "# bench_count/launch/pair.launch.py\nfrom launch import LaunchDescription\nfrom launch.actions import DeclareLaunchArgument\nfrom launch.substitutions import LaunchConfiguration, PathJoinSubstitution\nfrom launch_ros.actions import Node\nfrom launch_ros.parameter_descriptions import ParameterValue\nfrom launch_ros.substitutions import FindPackageShare\n\n\ndef generate_launch_description():\n    rate = LaunchConfiguration('rate')\n    watcher_params = PathJoinSubstitution([FindPackageShare('bench_count'), 'config', 'watcher.yaml'])\n    return LaunchDescription([\n        DeclareLaunchArgument('rate', default_value='2.0', description='counter messages per second'),\n        Node(package='bench_count', executable='counter', output='screen',\n             parameters=[{'rate_hz': ParameterValue(rate, value_type=float)}]),\n        Node(package='bench_count', executable='watcher', output='screen',\n             parameters=[watcher_params]),\n    ])"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A path in the "
+        },
+        {
+         "t": "code",
+         "v": "parameters"
+        },
+        {
+         "t": "text",
+         "v": " list is read as a parameter file, and a dictionary as values. Both folders are installed with one line in "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", before "
+        },
+        {
+         "t": "code",
+         "v": "ament_package()"
+        },
+        {
+         "t": "text",
+         "v": ", and the launch tools with one line in "
+        },
+        {
+         "t": "code",
+         "v": "package.xml"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})"
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<exec_depend>ros2launch</exec_depend>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then build, launch and change the values while it runs:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/bench_ws && colcon build --packages-select bench_count && source install/setup.bash\nros2 launch bench_count pair.launch.py rate:=4.0\nros2 topic hz /count                         # terminal 2: average rate: 4.000\nros2 param set /watcher report_every 20      # Set parameter successful\nros2 param set /counter rate_hz 1.0          # Set parameter successful\nros2 param set /counter rate_hz 0.1          # Setting parameter failed: Parameter {rate_hz} doesn't comply with floating point range.\nros2 param set /counter rate_hz .nan         # Setting parameter failed: rate_hz must be a finite number"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "After the first "
+        },
+        {
+         "t": "code",
+         "v": "set"
+        },
+        {
+         "t": "text",
+         "v": ", the watcher logs every 20th number, and after the second, the counter logs "
+        },
+        {
+         "t": "code",
+         "v": "publishing at 1.0 Hz"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic hz"
+        },
+        {
+         "t": "text",
+         "v": " falls to 1. The refused values leave the running rate alone. The last refusal comes from "
+        },
+        {
+         "t": "code",
+         "v": "rate_problem"
+        },
+        {
+         "t": "text",
+         "v": ", not from the range, which is the hole the callback closes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Without "
+        },
+        {
+         "t": "code",
+         "v": "ParameterValue"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "rate:=4"
+        },
+        {
+         "t": "text",
+         "v": " reaches the counter as the integer 4. The type check in "
+        },
+        {
+         "t": "code",
+         "v": "declare_parameter"
+        },
+        {
+         "t": "text",
+         "v": " refuses it and throws "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::exceptions::InvalidParameterTypeException"
+        },
+        {
+         "t": "text",
+         "v": ", whose message reads "
+        },
+        {
+         "t": "code",
+         "v": "parameter 'rate_hz' has invalid type:"
+        },
+        {
+         "t": "text",
+         "v": " followed by the same \"Wrong parameter type\" reason as above. Nothing catches it, so the counter aborts during startup, and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 launch"
+        },
+        {
+         "t": "text",
+         "v": " reports that the process died while the watcher keeps running. "
+        },
+        {
+         "t": "code",
+         "v": "rate:=4.0"
+        },
+        {
+         "t": "text",
+         "v": " would have worked, which is exactly why the conversion belongs in the launch file and not in every caller's memory."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say where a parameter lives and the four places its starting value can come from. Give the order in which rclcpp checks a change, what a set callback returns, and why the reaction belongs in a post set callback. Write the YAML layout of a parameter file, and explain what a launch argument, a substitution and an include are. Name the typing trap that turns "
+        },
+        {
+         "t": "code",
+         "v": "5"
+        },
+        {
+         "t": "text",
+         "v": " into an integer, and its fix in a launch file."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Where does a ROS 2 parameter live, and which services does "
+     },
+     {
+      "t": "code",
+      "v": "ros2 param set"
+     },
+     {
+      "t": "text",
+      "v": " call?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In which order does rclcpp check a new value, and what does a set parameters callback return?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why must a set parameters callback not change the node, and where does the change go instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a value of NaN pass a floating point range, and how do you refuse it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What happens to the callback when the handle from "
+     },
+     {
+      "t": "code",
+      "v": "add_on_set_parameters_callback"
+     },
+     {
+      "t": "text",
+      "v": " isn't stored?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "LaunchConfiguration('rate')"
+     },
+     {
+      "t": "text",
+      "v": " contain when "
+     },
+     {
+      "t": "code",
+      "v": "generate_launch_description"
+     },
+     {
+      "t": "text",
+      "v": " runs, and when does it get its value?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A launch argument "
+     },
+     {
+      "t": "code",
+      "v": "rate:=5"
+     },
+     {
+      "t": "text",
+      "v": " makes a node with a double parameter die at startup. Why, and what is the fix?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a launch file that starts two nodes, one with a parameter from a launch argument and one with a YAML file."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The Jazzy concept page "
+     },
+     {
+      "t": "a",
+      "v": "about parameters",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Basic/About-Parameters.html"
+     },
+     {
+      "t": "text",
+      "v": ": declaration, types, the parameter services, and the three kinds of callbacks."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The Jazzy how-to on "
+     },
+     {
+      "t": "a",
+      "v": "ros2 param",
+      "href": "https://docs.ros.org/en/jazzy/How-To-Guides/Using-ros2-param.html"
+     },
+     {
+      "t": "text",
+      "v": ", with the YAML reading of values, and the tutorial on "
+     },
+     {
+      "t": "a",
+      "v": "understanding parameters",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Parameters/Understanding-ROS2-Parameters.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "dump"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "load"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "--params-file"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The Jazzy launch tutorials: "
+     },
+     {
+      "t": "a",
+      "v": "creating launch files",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Creating-Launch-Files.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "substitutions",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Using-Substitutions.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "large projects",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Using-ROS2-Launch-For-Large-Projects.html"
+     },
+     {
+      "t": "text",
+      "v": ", for includes, YAML files, wildcards and "
+     },
+     {
+      "t": "code",
+      "v": "PushROSNamespace"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The demo node "
+     },
+     {
+      "t": "a",
+      "v": "set_parameters_callback.cpp",
+      "href": "https://github.com/ros2/demos/blob/jazzy/demo_nodes_cpp/src/parameters/set_parameters_callback.cpp"
+     },
+     {
+      "t": "text",
+      "v": " on the jazzy branch, with all three callbacks and their stored handles."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "node_parameters.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/node_interfaces/node_parameters.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for the order of the checks and the range test, and "
+     },
+     {
+      "t": "a",
+      "v": "node.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/node.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "declare_parameter"
+     },
+     {
+      "t": "text",
+      "v": " and the callback functions."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "launch_ros on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "evaluate_parameters.py",
+      "href": "https://github.com/ros2/launch_ros/blob/jazzy/launch_ros/launch_ros/utilities/evaluate_parameters.py"
+     },
+     {
+      "t": "text",
+      "v": ": how a substitution becomes a typed parameter value."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "rate_problem"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "period_of"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "Sampler"
+     },
+     {
+      "t": "text",
+      "v": " are plain C++ for that reason."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tip "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values, the reason "
+     },
+     {
+      "t": "code",
+      "v": "rate_problem"
+     },
+     {
+      "t": "text",
+      "v": " returns "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

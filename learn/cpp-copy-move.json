@@ -1,0 +1,3553 @@
+{
+ "id": "cpp-copy-move",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Say for each numbered line whether its initialiser is an lvalue, an xvalue or a prvalue, and whether "
+     },
+     {
+      "t": "code",
+      "v": "Tracer"
+     },
+     {
+      "t": "text",
+      "v": "'s copy constructor, its move constructor or neither runs. "
+     },
+     {
+      "t": "code",
+      "v": "Tracer"
+     },
+     {
+      "t": "text",
+      "v": " declares all five special members, and its copy and move constructors each print a word. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "Tracer make_tracer() { return Tracer{}; }\nTracer pass_through(Tracer t) { return t; }\n\nTracer a;\nconst Tracer frozen;\nTracer b = a;                          // 1\nTracer c = std::move(a);               // 2\nTracer d = make_tracer();              // 3\nTracer e = std::move(frozen);          // 4\nTracer&& r = std::move(b);\nTracer f = r;                          // 5\nTracer g = pass_through(Tracer{});     // 6"
+   }
+  ],
+  "answer": [
+   {
+    "t": "table",
+    "head": [
+     [
+      {
+       "t": "text",
+       "v": "Line"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Initialiser"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Category"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Runs"
+      }
+     ]
+    ],
+    "rows": [
+     [
+      [
+       {
+        "t": "text",
+        "v": "1"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "a"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "lvalue"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "copy"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "2"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "std::move(a)"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "xvalue"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "move"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "3"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "make_tracer()"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "prvalue"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "neither"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "4"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "std::move(frozen)"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "xvalue of type "
+       },
+       {
+        "t": "code",
+        "v": "const Tracer"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "copy"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "5"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "r"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "lvalue, although it is declared "
+       },
+       {
+        "t": "code",
+        "v": "Tracer&&"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "copy"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "6"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "pass_through(Tracer{})"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "prvalue"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "one move, inside "
+       },
+       {
+        "t": "code",
+        "v": "pass_through"
+       }
+      ]
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "This program runs the six lines and prints what each one cost:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <iostream>\n#include <utility>\n\n// Prints a word from each constructor it runs, so each line shows what it cost.\nstruct Tracer {\n  Tracer() = default;\n  Tracer(const Tracer&) { std::cout << \" copy\"; }\n  Tracer(Tracer&&) noexcept { std::cout << \" move\"; }\n  Tracer& operator=(const Tracer&) = default;\n  Tracer& operator=(Tracer&&) noexcept = default;\n  ~Tracer() = default;\n};\n\n[[nodiscard]] Tracer make_tracer() { return Tracer{}; }\n[[nodiscard]] Tracer pass_through(Tracer t) { return t; }\n\nint main() {\n  Tracer a;\n  const Tracer frozen;\n  std::cout << \"1:\";\n  Tracer b = a;\n  std::cout << \"\\n2:\";\n  const Tracer c = std::move(a);\n  std::cout << \"\\n3:\";\n  const Tracer d = make_tracer();\n  std::cout << \"\\n4:\";\n  const Tracer e = std::move(frozen);\n  Tracer&& r = std::move(b);\n  std::cout << \"\\n5:\";\n  const Tracer f = r;\n  std::cout << \"\\n6:\";\n  const Tracer g = pass_through(Tracer{});\n  std::cout << '\\n';\n}"
+   },
+   {
+    "t": "output",
+    "text": "1: copy\n2: move\n3:\n4: copy\n5: copy\n6: move"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Line 3 prints nothing: since C++17, a prvalue of the same type initialises "
+     },
+     {
+      "t": "code",
+      "v": "d"
+     },
+     {
+      "t": "text",
+      "v": " directly, so the default constructor inside "
+     },
+     {
+      "t": "code",
+      "v": "make_tracer"
+     },
+     {
+      "t": "text",
+      "v": " builds "
+     },
+     {
+      "t": "code",
+      "v": "d"
+     },
+     {
+      "t": "text",
+      "v": " and no copy or move constructor runs. Line 4 copies because "
+     },
+     {
+      "t": "code",
+      "v": "std::move(frozen)"
+     },
+     {
+      "t": "text",
+      "v": " is an xvalue of type "
+     },
+     {
+      "t": "code",
+      "v": "const Tracer"
+     },
+     {
+      "t": "text",
+      "v": " ("
+     },
+     {
+      "t": "code",
+      "v": "decltype"
+     },
+     {
+      "t": "text",
+      "v": " gives "
+     },
+     {
+      "t": "code",
+      "v": "const Tracer&&"
+     },
+     {
+      "t": "text",
+      "v": "), which can't bind to the move constructor's "
+     },
+     {
+      "t": "code",
+      "v": "Tracer&&"
+     },
+     {
+      "t": "text",
+      "v": ", so overload resolution takes the copy constructor's "
+     },
+     {
+      "t": "code",
+      "v": "const Tracer&"
+     },
+     {
+      "t": "text",
+      "v": ". Line 5 copies because "
+     },
+     {
+      "t": "code",
+      "v": "r"
+     },
+     {
+      "t": "text",
+      "v": " is the name of a variable, and a variable's name is an lvalue whatever its declared type. On line 6, "
+     },
+     {
+      "t": "code",
+      "v": "Tracer{}"
+     },
+     {
+      "t": "text",
+      "v": " initialises the parameter "
+     },
+     {
+      "t": "code",
+      "v": "t"
+     },
+     {
+      "t": "text",
+      "v": " directly, "
+     },
+     {
+      "t": "code",
+      "v": "return t;"
+     },
+     {
+      "t": "text",
+      "v": " moves "
+     },
+     {
+      "t": "code",
+      "v": "t"
+     },
+     {
+      "t": "text",
+      "v": " into the result, because a parameter can't be built in the caller's object, and that result initialises "
+     },
+     {
+      "t": "code",
+      "v": "g"
+     },
+     {
+      "t": "text",
+      "v": " directly: one move in total."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with all six right and a reason for lines 3 to 6. Lines 1 to 3 right with one or two of lines 4 to 6 wrong is a partial pass. Saying that line 2 moves because "
+     },
+     {
+      "t": "code",
+      "v": "std::move"
+     },
+     {
+      "t": "text",
+      "v": " moves, or that line 3 copies or moves, is a fail: both come from the first section below."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Every expression has a value category, and since C++17 there are three. An lvalue names an object that already exists, such as a variable. A prvalue, pure rvalue, computes a value or initialises an object and has no object of its own until it needs one, such as "
+    },
+    {
+     "t": "code",
+     "v": "42"
+    },
+    {
+     "t": "text",
+     "v": " or a call that returns by value. An xvalue, expiring value, refers to an object that already exists but whose resources may be taken, the result of "
+    },
+    {
+     "t": "code",
+     "v": "std::move"
+    },
+    {
+     "t": "text",
+     "v": " among others. "
+    },
+    {
+     "t": "code",
+     "v": "std::move"
+    },
+    {
+     "t": "text",
+     "v": " casts its argument to an xvalue. It moves nothing by itself."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is the copy nobody can read again. Before C++11, a function that returned a large container by value built the result in a temporary, copied it element by element into the caller's variable, and destroyed the temporary, so returning a container of thousands of entries paid for a full copy on the way out, and again on assignment, for a value nothing could see afterwards."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is overload resolution reading the source's value category. A copy constructor takes "
+    },
+    {
+     "t": "code",
+     "v": "const T&"
+    },
+    {
+     "t": "text",
+     "v": " and a move constructor takes "
+    },
+    {
+     "t": "code",
+     "v": "T&&"
+    },
+    {
+     "t": "text",
+     "v": ". An rvalue, a prvalue or an xvalue, binds to "
+    },
+    {
+     "t": "code",
+     "v": "T&&"
+    },
+    {
+     "t": "text",
+     "v": " and selects the move constructor, which is free to take the source's internal state, because nothing can look at the source afterwards. Since C++17, when a prvalue initialises an object of the same type, copy elision is guaranteed: the object is built directly, with no copy or move constructor called at all."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is mistaking the name of a thing for the thing. A local variable named on its own in a "
+    },
+    {
+     "t": "code",
+     "v": "return"
+    },
+    {
+     "t": "text",
+     "v": " is treated as an rvalue and moved, so wrapping it in "
+    },
+    {
+     "t": "code",
+     "v": "std::move"
+    },
+    {
+     "t": "text",
+     "v": " yourself adds nothing and can defeat the compiler's own named return value optimisation, costing a move you didn't need. "
+    },
+    {
+     "t": "code",
+     "v": "std::move"
+    },
+    {
+     "t": "text",
+     "v": " on a "
+    },
+    {
+     "t": "code",
+     "v": "const"
+    },
+    {
+     "t": "text",
+     "v": " object compiles but silently picks the copy constructor, because a "
+    },
+    {
+     "t": "code",
+     "v": "const T&&"
+    },
+    {
+     "t": "text",
+     "v": " can't bind to "
+    },
+    {
+     "t": "code",
+     "v": "T&&"
+    },
+    {
+     "t": "text",
+     "v": ". And a moved-from object still exists: you may destroy it, assign to it, or call anything without a precondition, but its value tells you nothing on its own."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in every container and message the robot's nodes pass between callbacks, and it is the interview question itself: naming the value category of an expression and saying which constructor, if any, runs from it."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "categories",
+   "title": "lvalues, prvalues and xvalues; std::move is only a cast",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The compiler will classify any expression for you. For a parenthesised expression, "
+        },
+        {
+         "t": "code",
+         "v": "decltype((e))"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "T&"
+        },
+        {
+         "t": "text",
+         "v": " when "
+        },
+        {
+         "t": "code",
+         "v": "e"
+        },
+        {
+         "t": "text",
+         "v": " is an lvalue, "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " when it is an xvalue, and plain "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " when it is a prvalue ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference on decltype",
+         "href": "https://en.cppreference.com/cpp/language/decltype"
+        },
+        {
+         "t": "text",
+         "v": "). Josuttis uses this trick in chapter 8 of his book on move semantics. This program asks about ten expressions:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <type_traits>\n#include <utility>\n\n// For a parenthesised expression, decltype gives T& for an lvalue, T&& for an xvalue and T for a prvalue.\ntemplate <typename T>\n[[nodiscard]] constexpr std::string_view category() {\n  if constexpr (std::is_lvalue_reference_v<T>) {\n    return \"lvalue\";\n  } else if constexpr (std::is_rvalue_reference_v<T>) {\n    return \"xvalue\";\n  } else {\n    return \"prvalue\";\n  }\n}\n\nstruct Reading {\n  std::string frame;\n};\n\n[[nodiscard]] std::string make_frame() { return \"lidar_link\"; }\n\nvoid show(std::string_view expression, std::string_view category) {\n  std::cout << std::format(\"{:<18}{}\\n\", expression, category);\n}\n\nint main() {\n  std::string frame = \"imu_link\";\n  std::string&& kept = make_frame();  // the temporary lives as long as the reference\n  int count = 0;\n  show(\"frame\", category<decltype((frame))>());\n  show(\"kept\", category<decltype((kept))>());\n  show(\"\\\"imu_link\\\"\", category<decltype((\"imu_link\"))>());\n  show(\"42\", category<decltype((42))>());\n  show(\"count + 1\", category<decltype((count + 1))>());\n  show(\"++count\", category<decltype((++count))>());\n  show(\"count++\", category<decltype((count++))>());\n  show(\"make_frame()\", category<decltype((make_frame()))>());\n  show(\"std::move(frame)\", category<decltype((std::move(frame)))>());\n  show(\"Reading{}.frame\", category<decltype((Reading{}.frame))>());\n}"
+      },
+      {
+       "t": "output",
+       "text": "frame             lvalue\nkept              lvalue\n\"imu_link\"        lvalue\n42                prvalue\ncount + 1         prvalue\n++count           lvalue\ncount++           prvalue\nmake_frame()      prvalue\nstd::move(frame)  xvalue\nReading{}.frame   xvalue"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The categories exist because containers are values. A "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " copy allocates and copies every element, so that the two vectors are independent. Before C++11, "
+        },
+        {
+         "t": "code",
+         "v": "v = make_vector();"
+        },
+        {
+         "t": "text",
+         "v": " built the result in a temporary, copied it element by element into "
+        },
+        {
+         "t": "code",
+         "v": "v"
+        },
+        {
+         "t": "text",
+         "v": ", and destroyed the temporary, which nobody could see any more. David Olsen opens his talk on move semantics with this cost, a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " of thousands of entries copied on return and again on assignment. The copy was waste, because nothing could ever read the temporary again. C++11 gave functions a way to tell such an argument apart from one the caller still uses, and the value category is that way."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every expression has a type and a "
+        },
+        {
+         "t": "i",
+         "v": "value category"
+        },
+        {
+         "t": "text",
+         "v": ", and since C++17 there are three categories ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference on value categories",
+         "href": "https://en.cppreference.com/cpp/language/value_category"
+        },
+        {
+         "t": "text",
+         "v": "):"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "i",
+          "v": "prvalue"
+         },
+         {
+          "t": "text",
+          "v": ", pure rvalue, computes a value or initialises an object: "
+         },
+         {
+          "t": "code",
+          "v": "42"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "count + 1"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "count++"
+         },
+         {
+          "t": "text",
+          "v": ", and a call that returns by value, such as "
+         },
+         {
+          "t": "code",
+          "v": "make_frame()"
+         },
+         {
+          "t": "text",
+          "v": ". It has no object of its own until it needs one."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "An "
+         },
+         {
+          "t": "i",
+          "v": "xvalue"
+         },
+         {
+          "t": "text",
+          "v": ", expiring value, refers to an object whose resources may be taken: "
+         },
+         {
+          "t": "code",
+          "v": "std::move(frame)"
+         },
+         {
+          "t": "text",
+          "v": ", a call to any function that returns "
+         },
+         {
+          "t": "code",
+          "v": "T&&"
+         },
+         {
+          "t": "text",
+          "v": ", and a member of an rvalue, such as "
+         },
+         {
+          "t": "code",
+          "v": "Reading{}.frame"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "An "
+         },
+         {
+          "t": "i",
+          "v": "lvalue"
+         },
+         {
+          "t": "text",
+          "v": " refers to an object or a function that you can come back to: the name of a variable, "
+         },
+         {
+          "t": "code",
+          "v": "++count"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "*p"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "v[i]"
+         },
+         {
+          "t": "text",
+          "v": ", and a string literal, which is an array that exists for the whole run."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two words you hear more often are unions of these. An "
+        },
+        {
+         "t": "i",
+         "v": "rvalue"
+        },
+        {
+         "t": "text",
+         "v": " is a prvalue or an xvalue, and it is what an rvalue reference "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " binds to. A "
+        },
+        {
+         "t": "i",
+         "v": "glvalue"
+        },
+        {
+         "t": "text",
+         "v": " is an lvalue or an xvalue: an expression that refers to an object that already exists. Ben Saks gives a test in his 2025 talk on move semantics: you can take the address of an lvalue with the built-in "
+        },
+        {
+         "t": "code",
+         "v": "&"
+        },
+        {
+         "t": "text",
+         "v": ", and you can't take the address of an rvalue. "
+        },
+        {
+         "t": "code",
+         "v": "&frame"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "&\"imu_link\""
+        },
+        {
+         "t": "text",
+         "v": " compile; "
+        },
+        {
+         "t": "code",
+         "v": "&42"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "&std::move(frame)"
+        },
+        {
+         "t": "text",
+         "v": " don't."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two rows of the output surprise people. The first is "
+        },
+        {
+         "t": "code",
+         "v": "kept"
+        },
+        {
+         "t": "text",
+         "v": ". It is declared "
+        },
+        {
+         "t": "code",
+         "v": "std::string&&"
+        },
+        {
+         "t": "text",
+         "v": ", and it is still an lvalue, because it has a name. Every variable's name is an lvalue, whatever its declared type: the next line can use the name again, so the compiler must not hand it to a move constructor without being told. Enumerators and non-type template parameters are prvalues. Amir Kirsh's 2024 talk teaches the rule for variables as the one to remember: if it has a name, it is an lvalue. The second is "
+        },
+        {
+         "t": "code",
+         "v": "Reading{}.frame"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "Reading{}"
+        },
+        {
+         "t": "text",
+         "v": " is a prvalue, and to reach a member of it the compiler has to create the object, which the standard calls "
+        },
+        {
+         "t": "i",
+         "v": "temporary materialisation"
+        },
+        {
+         "t": "text",
+         "v": ". The member of that temporary is an xvalue: it belongs to an object that dies at the end of the full-expression, so taking its resources harms nobody."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The category decides which reference a parameter can bind, and so which overload runs. With two overloads "
+        },
+        {
+         "t": "code",
+         "v": "f(const T&)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "f(T&&)"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Argument"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Category"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Chosen"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "t"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "lvalue"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "f(const T&)"
+          },
+          {
+           "t": "text",
+           "v": ": "
+          },
+          {
+           "t": "code",
+           "v": "T&&"
+          },
+          {
+           "t": "text",
+           "v": " can't bind an lvalue"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "T{}"
+          },
+          {
+           "t": "text",
+           "v": " or "
+          },
+          {
+           "t": "code",
+           "v": "make()"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "prvalue"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "f(T&&)"
+          },
+          {
+           "t": "text",
+           "v": ": both could bind, and "
+          },
+          {
+           "t": "code",
+           "v": "T&&"
+          },
+          {
+           "t": "text",
+           "v": " is the better match"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::move(t)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "xvalue"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "f(T&&)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::move(ct)"
+          },
+          {
+           "t": "text",
+           "v": ", with "
+          },
+          {
+           "t": "code",
+           "v": "const T ct"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "xvalue of type "
+          },
+          {
+           "t": "code",
+           "v": "const T"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "f(const T&)"
+          },
+          {
+           "t": "text",
+           "v": ": "
+          },
+          {
+           "t": "code",
+           "v": "T&&"
+          },
+          {
+           "t": "text",
+           "v": " can't drop the "
+          },
+          {
+           "t": "code",
+           "v": "const"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That table is the whole mechanism of move semantics. A copy constructor takes "
+        },
+        {
+         "t": "code",
+         "v": "const T&"
+        },
+        {
+         "t": "text",
+         "v": " and a move constructor takes "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": ", so an rvalue argument selects the move constructor, and the move constructor may take the argument's resources, because nobody can look at the argument afterwards: a prvalue has no name, and an xvalue is an object somebody has declared expendable."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " is how you declare that, and it is a cast and nothing else. GCC 13's library defines it in "
+        },
+        {
+         "t": "code",
+         "v": "bits/move.h"
+        },
+        {
+         "t": "text",
+         "v": " as a function template whose body is one "
+        },
+        {
+         "t": "code",
+         "v": "static_cast"
+        },
+        {
+         "t": "text",
+         "v": " of its argument to "
+        },
+        {
+         "t": "code",
+         "v": "std::remove_reference<T>::type&&"
+        },
+        {
+         "t": "text",
+         "v": ", marked "
+        },
+        {
+         "t": "code",
+         "v": "constexpr"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference on std::move",
+         "href": "https://en.cppreference.com/cpp/utility/move"
+        },
+        {
+         "t": "text",
+         "v": "). It turns an lvalue into an xvalue, and that changes which overload is chosen. The move itself happens later, inside a move constructor or a move assignment operator, and only if overload resolution picks one. Iglberger and Olsen both make this point in their talks, and Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.56",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-move"
+        },
+        {
+         "t": "text",
+         "v": " describes "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " as a cast to "
+        },
+        {
+         "t": "code",
+         "v": "&&"
+        },
+        {
+         "t": "text",
+         "v": " in disguise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two consequences follow from the cast. "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " on a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " object compiles and copies, because the result is an xvalue of type "
+        },
+        {
+         "t": "code",
+         "v": "const T"
+        },
+        {
+         "t": "text",
+         "v": ", the last row of the table; ES.56 warns against it for that reason. And "
+        },
+        {
+         "t": "code",
+         "v": "std::move(x);"
+        },
+        {
+         "t": "text",
+         "v": " as a statement of its own changes nothing, which the worked example shows."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program runs six lines, four of them with "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": ", and prints the special member each line runs. Predict each line before you read the output."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <utility>\n\n// Prints the special member that runs.\nstruct Tracer {\n  Tracer() = default;\n  Tracer(const Tracer&) { std::cout << \" copy constructor\"; }\n  Tracer(Tracer&&) noexcept { std::cout << \" move constructor\"; }\n  Tracer& operator=(const Tracer&) {\n    std::cout << \" copy assignment\";\n    return *this;\n  }\n  Tracer& operator=(Tracer&&) noexcept {\n    std::cout << \" move assignment\";\n    return *this;\n  }\n  ~Tracer() = default;\n};\n\nvoid inspect(const Tracer&) { std::cout << \" inspect(const Tracer&)\"; }\nvoid inspect(Tracer&&) { std::cout << \" inspect(Tracer&&)\"; }\nvoid keep(Tracer) {}\n\nint main() {\n  Tracer t;\n  const Tracer frozen;\n\n  std::cout << \"a:\";\n  Tracer&& alias = std::move(t);  // binds a reference to t\n  std::cout << \"\\nb:\";\n  inspect(std::move(t));  // picks the && overload, which only looks\n  std::cout << \"\\nc:\";\n  inspect(alias);  // alias has a name, so it is an lvalue\n  std::cout << \"\\nd:\";\n  keep(std::move(t));  // the parameter is a new object: its move constructor runs\n  std::cout << \"\\ne:\";\n  keep(std::move(frozen));  // const Tracer&& can't bind to Tracer&&: the copy constructor runs\n  std::cout << \"\\nf:\";\n  Tracer target;\n  target = Tracer{};  // an existing object: move assignment\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "a:\nb: inspect(Tracer&&)\nc: inspect(const Tracer&)\nd: move constructor\ne: copy constructor\nf: move assignment"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Lines a and b run no special member. On line a, "
+         },
+         {
+          "t": "code",
+          "v": "std::move(t)"
+         },
+         {
+          "t": "text",
+          "v": " produces an xvalue and the reference "
+         },
+         {
+          "t": "code",
+          "v": "alias"
+         },
+         {
+          "t": "text",
+          "v": " binds to it; "
+         },
+         {
+          "t": "code",
+          "v": "t"
+         },
+         {
+          "t": "text",
+          "v": " is untouched. On line b, the "
+         },
+         {
+          "t": "code",
+          "v": "&&"
+         },
+         {
+          "t": "text",
+          "v": " overload of "
+         },
+         {
+          "t": "code",
+          "v": "inspect"
+         },
+         {
+          "t": "text",
+          "v": " is chosen and only reads its argument. A "
+         },
+         {
+          "t": "code",
+          "v": "Tracer&&"
+         },
+         {
+          "t": "text",
+          "v": " parameter gives a function permission to take the object's resources, and nothing more."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Line c goes back to "
+         },
+         {
+          "t": "code",
+          "v": "const Tracer&"
+         },
+         {
+          "t": "text",
+          "v": ": "
+         },
+         {
+          "t": "code",
+          "v": "alias"
+         },
+         {
+          "t": "text",
+          "v": " is declared "
+         },
+         {
+          "t": "code",
+          "v": "Tracer&&"
+         },
+         {
+          "t": "text",
+          "v": ", but it is a name. A function that receives a "
+         },
+         {
+          "t": "code",
+          "v": "T&&"
+         },
+         {
+          "t": "text",
+          "v": " and wants to pass it on as an rvalue has to write "
+         },
+         {
+          "t": "code",
+          "v": "std::move"
+         },
+         {
+          "t": "text",
+          "v": " again, which is what Core Guidelines "
+         },
+         {
+          "t": "a",
+          "v": "F.18",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-consume"
+         },
+         {
+          "t": "text",
+          "v": " asks of a function whose parameter will be moved from."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Line d is the first move. The by-value parameter of "
+         },
+         {
+          "t": "code",
+          "v": "keep"
+         },
+         {
+          "t": "text",
+          "v": " is a new object, and its move constructor runs with "
+         },
+         {
+          "t": "code",
+          "v": "t"
+         },
+         {
+          "t": "text",
+          "v": " as the source. From here on, "
+         },
+         {
+          "t": "code",
+          "v": "t"
+         },
+         {
+          "t": "text",
+          "v": " is a moved-from object, the subject of the last section."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Line e copies: "
+         },
+         {
+          "t": "code",
+          "v": "std::move(frozen)"
+         },
+         {
+          "t": "text",
+          "v": " is an xvalue of type "
+         },
+         {
+          "t": "code",
+          "v": "const Tracer"
+         },
+         {
+          "t": "text",
+          "v": ", and the move constructor's "
+         },
+         {
+          "t": "code",
+          "v": "Tracer&&"
+         },
+         {
+          "t": "text",
+          "v": " can't bind to it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Line f is assignment, not initialisation, so nothing can be elided. The prvalue "
+         },
+         {
+          "t": "code",
+          "v": "Tracer{}"
+         },
+         {
+          "t": "text",
+          "v": " is materialised as a temporary, and "
+         },
+         {
+          "t": "code",
+          "v": "target"
+         },
+         {
+          "t": "text",
+          "v": "'s move assignment operator takes from it."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Because GCC 13's library marks "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " whose result nobody uses is a warning, and an error with "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "ignoring return value",
+       "text": "#include <string>\n#include <utility>\n\nint main() {\n  std::string route = \"dock, aisle 3, charger\";\n  std::move(route);  // a cast whose result is thrown away\n  return route.empty() ? 1 : 0;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The message names "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " and the "
+        },
+        {
+         "t": "code",
+         "v": "nodiscard"
+        },
+        {
+         "t": "text",
+         "v": " attribute. Without the attribute the line would compile, and "
+        },
+        {
+         "t": "code",
+         "v": "route"
+        },
+        {
+         "t": "text",
+         "v": " would keep its value."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "members",
+   "title": "Copy and move constructors and assignment; copy elision and RVO",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each function below returns a "
+        },
+        {
+         "t": "code",
+         "v": "Tracer"
+        },
+        {
+         "t": "text",
+         "v": " in a different way, and "
+        },
+        {
+         "t": "code",
+         "v": "Tracer"
+        },
+        {
+         "t": "text",
+         "v": " prints a word when its copy or move constructor runs. "
+        },
+        {
+         "t": "code",
+         "v": "Pinned"
+        },
+        {
+         "t": "text",
+         "v": " can be neither copied nor moved:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <string_view>\n#include <utility>\n\nstruct Tracer {\n  Tracer() = default;\n  Tracer(const Tracer&) { std::cout << \" copy\"; }\n  Tracer(Tracer&&) noexcept { std::cout << \" move\"; }\n  Tracer& operator=(const Tracer&) = default;\n  Tracer& operator=(Tracer&&) noexcept = default;\n  ~Tracer() = default;\n};\n\nstruct Pinned {\n  Pinned() = default;\n  Pinned(const Pinned&) = delete;\n  Pinned& operator=(const Pinned&) = delete;\n  Pinned(Pinned&&) = delete;\n  Pinned& operator=(Pinned&&) = delete;\n  ~Pinned() = default;\n};\n\n// Compiles: the prvalue initialises the caller's object directly.\n[[nodiscard]] Pinned make_pinned() { return Pinned{}; }\n\n[[nodiscard]] Tracer unnamed() { return Tracer{}; }\n\n[[nodiscard]] Tracer named() {\n  Tracer result;\n  return result;\n}\n\n[[nodiscard]] Tracer parse(std::string_view text) {\n  Tracer fallback;\n  Tracer parsed;\n  if (text.empty()) return fallback;\n  return parsed;\n}\n\n[[nodiscard]] Tracer from_parameter(Tracer t) { return t; }\n\n#pragma GCC diagnostic push\n#pragma GCC diagnostic ignored \"-Wpessimizing-move\"  // silenced here only to measure what the warning prevents\n[[nodiscard]] Tracer moved_out() {\n  Tracer result;\n  return std::move(result);\n}\n#pragma GCC diagnostic pop\n\nint main() {\n  [[maybe_unused]] const Pinned pinned = make_pinned();\n  std::cout << \"unnamed:\";\n  const Tracer a = unnamed();\n  std::cout << \"\\nnamed:\";\n  const Tracer b = named();\n  std::cout << \"\\nparse:\";\n  const Tracer c = parse(\"12.5\");\n  std::cout << \"\\nfrom_parameter:\";\n  const Tracer d = from_parameter(Tracer{});\n  std::cout << \"\\nmoved_out:\";\n  const Tracer e = moved_out();\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "unnamed:\nnamed:\nparse: move\nfrom_parameter: move\nmoved_out: move"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A class has four special members that transfer a value: the copy constructor "
+        },
+        {
+         "t": "code",
+         "v": "T(const T&)"
+        },
+        {
+         "t": "text",
+         "v": ", the move constructor "
+        },
+        {
+         "t": "code",
+         "v": "T(T&&)"
+        },
+        {
+         "t": "text",
+         "v": ", the copy assignment operator "
+        },
+        {
+         "t": "code",
+         "v": "T& operator=(const T&)"
+        },
+        {
+         "t": "text",
+         "v": " and the move assignment operator "
+        },
+        {
+         "t": "code",
+         "v": "T& operator=(T&&)"
+        },
+        {
+         "t": "text",
+         "v": ". A constructor runs when an object is created, and "
+        },
+        {
+         "t": "code",
+         "v": "T b = a;"
+        },
+        {
+         "t": "text",
+         "v": " creates one: the "
+        },
+        {
+         "t": "code",
+         "v": "="
+        },
+        {
+         "t": "text",
+         "v": " in a declaration is initialisation, not assignment. An assignment operator runs on an object that already exists and has a value to replace. In both cases the value category of the source picks copy or move, by the overload table of the first section."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "unnamed"
+        },
+        {
+         "t": "text",
+         "v": " prints nothing, and neither does "
+        },
+        {
+         "t": "code",
+         "v": "make_pinned"
+        },
+        {
+         "t": "text",
+         "v": ", although "
+        },
+        {
+         "t": "code",
+         "v": "Pinned"
+        },
+        {
+         "t": "text",
+         "v": " has no copy or move constructor at all. Since C++17, "
+        },
+        {
+         "t": "i",
+         "v": "copy elision"
+        },
+        {
+         "t": "text",
+         "v": " is guaranteed when a prvalue initialises an object of the same type: "
+        },
+        {
+         "t": "code",
+         "v": "return Tracer{};"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "const Tracer a = unnamed();"
+        },
+        {
+         "t": "text",
+         "v": " together build one object, directly in "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": ", and the language doesn't even require a copy or move constructor to exist ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference on copy elision",
+         "href": "https://en.cppreference.com/cpp/language/copy_elision"
+        },
+        {
+         "t": "text",
+         "v": "). Abseil's "
+        },
+        {
+         "t": "a",
+         "v": "tip #166",
+         "href": "https://abseil.io/tips/166"
+        },
+        {
+         "t": "text",
+         "v": " sums the rule up: a value is not copied until it has a name."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "named"
+        },
+        {
+         "t": "text",
+         "v": " returns a local by name, and it prints nothing too. This is the "
+        },
+        {
+         "t": "i",
+         "v": "named return value optimisation"
+        },
+        {
+         "t": "text",
+         "v": ", NRVO: the compiler constructs "
+        },
+        {
+         "t": "code",
+         "v": "result"
+        },
+        {
+         "t": "text",
+         "v": " in the caller's object from the start, so returning it costs nothing. The standard allows it but doesn't require it. GCC does it even without optimisation, and this program is built without "
+        },
+        {
+         "t": "code",
+         "v": "-O"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "parse"
+        },
+        {
+         "t": "text",
+         "v": " has two locals and returns one of them, chosen at run time. Both can't live in the caller's object, so NRVO is out, and the return statement falls back to an "
+        },
+        {
+         "t": "i",
+         "v": "implicit move"
+        },
+        {
+         "t": "text",
+         "v": ": a local variable or a parameter named on its own in a "
+        },
+        {
+         "t": "code",
+         "v": "return"
+        },
+        {
+         "t": "text",
+         "v": " is treated as an rvalue first, so the move constructor is chosen. C++11 introduced this, C++20 extended it to local rvalue references, and C++23 makes such a name an xvalue outright ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference on return",
+         "href": "https://en.cppreference.com/cpp/language/return"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "code",
+         "v": "from_parameter"
+        },
+        {
+         "t": "text",
+         "v": " moves for the same reason: the caller constructs the parameter, so it can't also be the caller's result, but the implicit move still applies."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "moved_out"
+        },
+        {
+         "t": "text",
+         "v": " moves where "
+        },
+        {
+         "t": "code",
+         "v": "named"
+        },
+        {
+         "t": "text",
+         "v": " didn't. "
+        },
+        {
+         "t": "code",
+         "v": "std::move(result)"
+        },
+        {
+         "t": "text",
+         "v": " is no longer the plain name of a local, so NRVO can't apply, and all that is left is a move. The explicit move made the function slower. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "F.48",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-return-move-local"
+        },
+        {
+         "t": "text",
+         "v": " says not to write "
+        },
+        {
+         "t": "code",
+         "v": "return std::move(local)"
+        },
+        {
+         "t": "text",
+         "v": ", and Iglberger's second talk on move semantics lists the same mistake with a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " among the pitfalls. GCC's "
+        },
+        {
+         "t": "code",
+         "v": "-Wpessimizing-move"
+        },
+        {
+         "t": "text",
+         "v": ", part of "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": ", catches it, which is why the program above had to silence it. Without the pragma:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "moving a local object in a return statement prevents copy elision",
+       "text": "#include <string>\n#include <utility>\n\n[[nodiscard]] std::string make_route() {\n  std::string route = \"dock, aisle 3, charger\";\n  return std::move(route);\n}\n\nint main() { return make_route().empty() ? 1 : 0; }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For a parameter, "
+        },
+        {
+         "t": "code",
+         "v": "return std::move(param);"
+        },
+        {
+         "t": "text",
+         "v": " costs nothing extra, because a parameter never gets NRVO, but it adds nothing either: "
+        },
+        {
+         "t": "code",
+         "v": "-Wextra"
+        },
+        {
+         "t": "text",
+         "v": " turns on "
+        },
+        {
+         "t": "code",
+         "v": "-Wredundant-move"
+        },
+        {
+         "t": "text",
+         "v": ", and GCC 13 reports \"redundant move in return statement\". So write "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " where you hand a named object to something that will keep it, a member, a container or a sink parameter, and never in a "
+        },
+        {
+         "t": "code",
+         "v": "return"
+        },
+        {
+         "t": "text",
+         "v": " of a local or a parameter. That is ES.56's rule."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Write a class "
+        },
+        {
+         "t": "code",
+         "v": "Counted"
+        },
+        {
+         "t": "text",
+         "v": " that counts its copies and its moves, constructions and assignments both, in a "
+        },
+        {
+         "t": "code",
+         "v": "Counts"
+        },
+        {
+         "t": "text",
+         "v": " struct it holds a pointer to, so the program needs no global counters. Write "
+        },
+        {
+         "t": "code",
+         "v": "build(Counts&)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns a named local "
+        },
+        {
+         "t": "code",
+         "v": "Counted"
+        },
+        {
+         "t": "text",
+         "v": ", and a class "
+        },
+        {
+         "t": "code",
+         "v": "Route"
+        },
+        {
+         "t": "text",
+         "v": " whose constructor "
+        },
+        {
+         "t": "code",
+         "v": "explicit Route(Counted leg)"
+        },
+        {
+         "t": "text",
+         "v": " moves "
+        },
+        {
+         "t": "code",
+         "v": "leg"
+        },
+        {
+         "t": "text",
+         "v": " into a member. Reserve space in a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Counted>"
+        },
+        {
+         "t": "text",
+         "v": " first, so that growth adds no moves of its own."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then write down, before running anything, how many copies and moves each of these ten lines costs, and measure:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "v.push_back(c);"
+         },
+         {
+          "t": "text",
+          "v": " with an lvalue "
+         },
+         {
+          "t": "code",
+          "v": "c"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "v.push_back(std::move(c));"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "v.push_back(Counted{counts});"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "v.emplace_back(counts);"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Counted x = build(counts);"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "x = build(counts);"
+         },
+         {
+          "t": "text",
+          "v": " with an existing "
+         },
+         {
+          "t": "code",
+          "v": "x"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Route r(c);"
+         },
+         {
+          "t": "text",
+          "v": " with an lvalue "
+         },
+         {
+          "t": "code",
+          "v": "c"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Route r(std::move(c));"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Route r{Counted{counts}};"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Counted y = std::move(k);"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "const Counted k"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <concepts>\n#include <format>\n#include <iostream>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Counts {\n  int copies = 0;\n  int moves = 0;\n};\n\n// Counts its copies and moves in a Counts object that outlives it.\nclass Counted {\n public:\n  explicit Counted(Counts& counts) : counts_(&counts) {}\n  Counted(const Counted& other) : counts_(other.counts_) { ++counts_->copies; }\n  Counted(Counted&& other) noexcept : counts_(other.counts_) { ++counts_->moves; }\n  Counted& operator=(const Counted& other) {\n    counts_ = other.counts_;\n    ++counts_->copies;\n    return *this;\n  }\n  Counted& operator=(Counted&& other) noexcept {\n    counts_ = other.counts_;\n    ++counts_->moves;\n    return *this;\n  }\n  ~Counted() = default;\n\n private:\n  Counts* counts_;\n};\n\n[[nodiscard]] Counted build(Counts& counts) {\n  Counted result(counts);\n  return result;\n}\n\nclass Route {\n public:\n  explicit Route(Counted leg) : leg_(std::move(leg)) {}  // a sink: by value, then moved into place\n\n private:\n  Counted leg_;\n};\n\n// The alternative for comparison: one overload for lvalues and one for rvalues.\nclass RouteByOverloads {\n public:\n  explicit RouteByOverloads(const Counted& leg) : leg_(leg) {}\n  explicit RouteByOverloads(Counted&& leg) : leg_(std::move(leg)) {}\n\n private:\n  Counted leg_;\n};\n\nvoid measure(Counts& counts, std::string_view label, std::invocable auto step) {\n  const Counts before = counts;\n  step();\n  std::cout << std::format(\"{:<32}copies {}, moves {}\\n\", label, counts.copies - before.copies,\n                           counts.moves - before.moves);\n}\n\nint main() {\n  Counts counts;\n  std::vector<Counted> v;\n  v.reserve(8);\n\n  measure(counts, \"1 push_back(c)\", [&] {\n    const Counted c(counts);\n    v.push_back(c);\n  });\n  measure(counts, \"2 push_back(std::move(c))\", [&] {\n    Counted c(counts);\n    v.push_back(std::move(c));\n  });\n  measure(counts, \"3 push_back(Counted{counts})\", [&] { v.push_back(Counted{counts}); });\n  measure(counts, \"4 emplace_back(counts)\", [&] { v.emplace_back(counts); });\n  measure(counts, \"5 Counted x = build(counts)\", [&] { const Counted x = build(counts); });\n  measure(counts, \"6 x = build(counts)\", [&] {\n    Counted x(counts);\n    x = build(counts);\n  });\n  measure(counts, \"7 Route r(c)\", [&] {\n    const Counted c(counts);\n    const Route r(c);\n  });\n  measure(counts, \"8 Route r(std::move(c))\", [&] {\n    Counted c(counts);\n    const Route r(std::move(c));\n  });\n  measure(counts, \"9 Route r{Counted{counts}}\", [&] { const Route r{Counted{counts}}; });\n  measure(counts, \"10 Counted y = std::move(k)\", [&] {\n    const Counted k(counts);\n    const Counted y = std::move(k);\n  });\n  measure(counts, \"11 overloads r(c)\", [&] {\n    const Counted c(counts);\n    const RouteByOverloads r(c);\n  });\n  measure(counts, \"12 overloads r(std::move(c))\", [&] {\n    Counted c(counts);\n    const RouteByOverloads r(std::move(c));\n  });\n  measure(counts, \"13 overloads r{Counted{counts}}\", [&] { const RouteByOverloads r{Counted{counts}}; });\n}"
+      },
+      {
+       "t": "output",
+       "text": "1 push_back(c)                  copies 1, moves 0\n2 push_back(std::move(c))       copies 0, moves 1\n3 push_back(Counted{counts})    copies 0, moves 1\n4 emplace_back(counts)          copies 0, moves 0\n5 Counted x = build(counts)     copies 0, moves 0\n6 x = build(counts)             copies 0, moves 1\n7 Route r(c)                    copies 1, moves 1\n8 Route r(std::move(c))         copies 0, moves 2\n9 Route r{Counted{counts}}      copies 0, moves 1\n10 Counted y = std::move(k)     copies 1, moves 0\n11 overloads r(c)               copies 1, moves 0\n12 overloads r(std::move(c))    copies 0, moves 1\n13 overloads r{Counted{counts}} copies 0, moves 1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Line 3 moves once although nothing in it has a name. "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " takes a reference, and a reference needs an object, so the prvalue is materialised as a temporary, and "
+        },
+        {
+         "t": "code",
+         "v": "push_back(T&&)"
+        },
+        {
+         "t": "text",
+         "v": " moves it into the vector. "
+        },
+        {
+         "t": "code",
+         "v": "emplace_back"
+        },
+        {
+         "t": "text",
+         "v": " passes "
+        },
+        {
+         "t": "code",
+         "v": "counts"
+        },
+        {
+         "t": "text",
+         "v": " on to the constructor, which builds the element where it will live, so line 4 costs nothing. Line 5 is NRVO. Line 6 is assignment, so the result of "
+        },
+        {
+         "t": "code",
+         "v": "build"
+        },
+        {
+         "t": "text",
+         "v": " becomes a temporary, and "
+        },
+        {
+         "t": "code",
+         "v": "x"
+        },
+        {
+         "t": "text",
+         "v": "'s move assignment takes from it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Lines 7 to 9 show what a by-value sink costs. An lvalue costs a copy into the parameter and a move into the member, an xvalue two moves, and a prvalue one, because the prvalue initialises the parameter directly. Lines 11 to 13 measure the alternative the solution adds for comparison: a "
+        },
+        {
+         "t": "code",
+         "v": "const Counted&"
+        },
+        {
+         "t": "text",
+         "v": " overload plus a "
+        },
+        {
+         "t": "code",
+         "v": "Counted&&"
+        },
+        {
+         "t": "text",
+         "v": " overload, the form the note under Core Guidelines F.16 describes for a value the function keeps, with F.18 covering the "
+        },
+        {
+         "t": "code",
+         "v": "&&"
+        },
+        {
+         "t": "text",
+         "v": " half. It costs 1 copy, 1 move and 1 move. So the by-value sink costs one move more for an lvalue or an xvalue, and the same for a prvalue. F.18's own exception allows by value for move-only owners that are cheap to move, such as "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ". For a copyable type that is cheap to move, such as "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ", the choice is the one this exercise measured: one extra move, against a second overload. Line 10 copies for the same reason as line 4 of the cold check."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "moved-from",
+   "title": "Moved-from state: valid but unspecified; self-move",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "After "
+        },
+        {
+         "t": "code",
+         "v": "std::move(x)"
+        },
+        {
+         "t": "text",
+         "v": " has handed "
+        },
+        {
+         "t": "code",
+         "v": "x"
+        },
+        {
+         "t": "text",
+         "v": " to a move constructor, "
+        },
+        {
+         "t": "code",
+         "v": "x"
+        },
+        {
+         "t": "text",
+         "v": " still exists, and its destructor still runs at the end of its scope. For the types of the standard library, the standard says what state it is in: a moved-from object is in a "
+        },
+        {
+         "t": "i",
+         "v": "valid but unspecified"
+        },
+        {
+         "t": "text",
+         "v": " state, unless a type says more ("
+        },
+        {
+         "t": "a",
+         "v": "lib.types.movedfrom",
+         "href": "https://eel.is/c++draft/lib.types.movedfrom"
+        },
+        {
+         "t": "text",
+         "v": "). Valid means its invariants hold and every operation behaves as specified; unspecified means you don't know the value. The standard's definition ("
+        },
+        {
+         "t": "a",
+         "v": "defns.valid",
+         "href": "https://eel.is/c++draft/defns.valid"
+        },
+        {
+         "t": "text",
+         "v": ") gives the example: on a moved-from "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<int>"
+        },
+        {
+         "t": "text",
+         "v": " you may call "
+        },
+        {
+         "t": "code",
+         "v": "empty()"
+        },
+        {
+         "t": "text",
+         "v": " at any time, and "
+        },
+        {
+         "t": "code",
+         "v": "front()"
+        },
+        {
+         "t": "text",
+         "v": " only after "
+        },
+        {
+         "t": "code",
+         "v": "empty()"
+        },
+        {
+         "t": "text",
+         "v": " returned false. So destroying, assigning, "
+        },
+        {
+         "t": "code",
+         "v": "clear()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "empty()"
+        },
+        {
+         "t": "text",
+         "v": " are fine, anything with a precondition needs a check first, and the value itself tells you nothing you can rely on. Josuttis goes through the same list for a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " in his 2021 talk."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The usual assumption is that a moved-from "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " is empty. It isn't:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <optional>\n#include <string>\n#include <utility>\n\nint main() {\n  std::optional<std::string> cached = \"maps/warehouse_2026_09.yaml\";\n  const std::optional<std::string> taken = std::move(cached);\n  if (cached) {  // true: the optional still holds a string, a moved-from one\n    std::cout << \"cached holds a value: \\\"\" << *cached << \"\\\"\\n\";\n  }\n  std::cout << \"taken holds \\\"\" << *taken << \"\\\"\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "cached holds a value: \"\"\ntaken holds \"maps/warehouse_2026_09.yaml\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": "'s move constructor moves the contained value and leaves the source engaged ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/utility/optional/optional"
+        },
+        {
+         "t": "text",
+         "v": "). Code that uses "
+        },
+        {
+         "t": "code",
+         "v": "if (cached)"
+        },
+        {
+         "t": "text",
+         "v": " to decide whether a map was loaded reads an empty file name instead. That the string came out empty is GCC 13's choice, not a promise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A class of your own gets whatever its move operations leave behind, and the defaulted ones move each member in turn. Here the vector is moved and the integer is copied, and the moved-from route breaks its own invariant:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Leg {\n  std::string name;\n  std::int64_t length_mm;\n};\n\n// Invariant: total_mm_ is the sum of the legs' lengths.\nclass Route {\n public:\n  void add(Leg leg) {\n    legs_.push_back(std::move(leg));\n    total_mm_ += legs_.back().length_mm;\n  }\n  [[nodiscard]] std::ptrdiff_t leg_count() const { return std::ssize(legs_); }\n  [[nodiscard]] std::int64_t total_mm() const { return total_mm_; }\n\n private:\n  std::vector<Leg> legs_;\n  std::int64_t total_mm_ = 0;\n};\n\nint main() {\n  Route route;\n  route.add({.name = \"dock to aisle 3\", .length_mm = 4200});\n  route.add({.name = \"aisle 3 to charger\", .length_mm = 2800});\n  const Route taken = std::move(route);\n  std::cout << std::format(\"taken: {} legs, {} mm\\n\", taken.leg_count(), taken.total_mm());\n  std::cout << std::format(\"route: {} legs, {} mm\\n\", route.leg_count(), route.total_mm());\n}"
+      },
+      {
+       "t": "output",
+       "text": "taken: 2 legs, 7000 mm\nroute: 0 legs, 7000 mm"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A route with no legs and 7000 mm isn't valid, and if the code reuses "
+        },
+        {
+         "t": "code",
+         "v": "route"
+        },
+        {
+         "t": "text",
+         "v": ", every total it reports from then on is 7000 mm too high. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.64",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-semantic"
+        },
+        {
+         "t": "text",
+         "v": " asks a move to leave its source in a valid state, ideally the default value. Olsen shows the same failure in his talk with a string and a cached length. A class that caches something derived from a member is the case to look for, and the exercise below fixes this one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third case is "
+        },
+        {
+         "t": "i",
+         "v": "self-move"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "x = std::move(x)"
+        },
+        {
+         "t": "text",
+         "v": ". Written directly, GCC catches it with "
+        },
+        {
+         "t": "code",
+         "v": "-Wself-move"
+        },
+        {
+         "t": "text",
+         "v": ", a warning added in GCC 13 and part of "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "to itself",
+       "text": "#include <string>\n#include <utility>\n\nint main() {\n  std::string frame = \"base_link\";\n  frame = std::move(frame);\n  return frame.empty() ? 1 : 0;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In real code, self-move arrives through two references that happen to name the same object, and no warning sees it. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.65",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-self"
+        },
+        {
+         "t": "text",
+         "v": " names "
+        },
+        {
+         "t": "code",
+         "v": "std::swap(a, b)"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " the same object as one way in. For standard library types, self-move assignment leaves the object valid but unspecified (the second paragraph of lib.types.movedfrom), and GCC 13's library empties both containers here:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <string>\n#include <utility>\n#include <vector>\n\n// Moves through two references; nothing at the call site looks like a self-move.\ntemplate <typename T>\nvoid move_into(T& target, T& source) {\n  target = std::move(source);\n}\n\nint main() {\n  std::string frame = \"base_link of the mobile robot\";\n  std::vector<int> ranges_mm{812, 790, 1204};\n  move_into(frame, frame);\n  move_into(ranges_mm, ranges_mm);\n  std::cout << \"frame holds \" << frame.size() << \" chars, ranges_mm \" << ranges_mm.size() << \" values\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "frame holds 0 chars, ranges_mm 0 values"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The value is lost, but the objects are still valid and nothing crashes. A hand-written move assignment can do worse. This "
+        },
+        {
+         "t": "code",
+         "v": "File"
+        },
+        {
+         "t": "text",
+         "v": " is the owner from the RAII topic with its self-check left out, and a log rotation that runs with only one log moves that log onto itself:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:attempting double-free",
+       "text": "#include <cstdio>\n#include <filesystem>\n#include <stdexcept>\n#include <utility>\n#include <vector>\n\nclass File {\n public:\n  explicit File(const std::filesystem::path& path) : f_(std::fopen(path.c_str(), \"w\")) {\n    if (f_ == nullptr) throw std::runtime_error(\"cannot open \" + path.string());\n  }\n  ~File() { close(); }\n  File(const File&) = delete;\n  File& operator=(const File&) = delete;\n  File(File&& other) noexcept : f_(std::exchange(other.f_, nullptr)) {}\n  File& operator=(File&& other) noexcept {\n    close();\n    f_ = std::exchange(other.f_, nullptr);  // when other is *this, f_ gets the closed FILE* back\n    return *this;\n  }\n\n private:\n  void close() noexcept {\n    if (f_ != nullptr) std::fclose(f_);\n  }\n  std::FILE* f_;\n};\n\n// Replaces the oldest log with the newest. With one log, both are the same object.\nvoid rotate(std::vector<File>& logs) { logs.front() = std::move(logs.back()); }\n\nint main() {\n  std::vector<File> logs;\n  logs.emplace_back(\"run.log\");\n  rotate(logs);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "close()"
+        },
+        {
+         "t": "text",
+         "v": " closes the file, then "
+        },
+        {
+         "t": "code",
+         "v": "std::exchange"
+        },
+        {
+         "t": "text",
+         "v": " reads "
+        },
+        {
+         "t": "code",
+         "v": "other.f_"
+        },
+        {
+         "t": "text",
+         "v": ", which is "
+        },
+        {
+         "t": "code",
+         "v": "f_"
+        },
+        {
+         "t": "text",
+         "v": ", sets it to "
+        },
+        {
+         "t": "code",
+         "v": "nullptr"
+        },
+        {
+         "t": "text",
+         "v": " and returns the closed pointer, which the assignment stores back in "
+        },
+        {
+         "t": "code",
+         "v": "f_"
+        },
+        {
+         "t": "text",
+         "v": ". The vector's destructor then closes it a second time, and AddressSanitizer reports the double free inside "
+        },
+        {
+         "t": "code",
+         "v": "fclose"
+        },
+        {
+         "t": "text",
+         "v": ". Olsen's slides show this exact sequence with "
+        },
+        {
+         "t": "code",
+         "v": "delete[]"
+        },
+        {
+         "t": "text",
+         "v": ". There are two fixes. One is the test the RAII exercise had, "
+        },
+        {
+         "t": "code",
+         "v": "if (this != &other)"
+        },
+        {
+         "t": "text",
+         "v": ". The other takes the incoming handle before releasing the old one, the order C.65 shows, and then a self-move gives the handle back to the object that had it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "File& operator=(File&& other) noexcept {\n  std::FILE* incoming = std::exchange(other.f_, nullptr);\n  close();  // on a self-move, f_ is already nullptr here, so nothing is closed\n  f_ = incoming;\n  return *this;\n}"
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes. Give "
+        },
+        {
+         "t": "code",
+         "v": "Route"
+        },
+        {
+         "t": "text",
+         "v": " from the failure cases move operations that keep its invariant: a moved-from route has no legs and a total of 0, the same as a new "
+        },
+        {
+         "t": "code",
+         "v": "Route"
+        },
+        {
+         "t": "text",
+         "v": ". Moving a route onto itself through two references must leave it unchanged, and both moves must be "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", checked with a "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": ". Copying must still work, so declare the other special members too (the rule of five from the RAII topic, Core Guidelines C.21). Then test four things in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ": a move, reusing the moved-from route by adding a leg, a self-move through a function that takes two references, and a copy."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <type_traits>\n#include <utility>\n#include <vector>\n\nstruct Leg {\n  std::string name;\n  std::int64_t length_mm;\n};\n\n// Invariant: total_mm_ is the sum of the legs' lengths, in every state, moved-from included.\nclass Route {\n public:\n  Route() = default;\n  Route(const Route&) = default;\n  Route& operator=(const Route&) = default;\n  Route(Route&& other) noexcept\n      : legs_(std::exchange(other.legs_, {})), total_mm_(std::exchange(other.total_mm_, 0)) {}\n  Route& operator=(Route&& other) noexcept {\n    Route taken(std::move(other));  // empties other, even when other is *this\n    swap(taken);                    // *this gets the value, and taken leaves with the old one\n    return *this;\n  }\n  ~Route() = default;\n\n  void swap(Route& other) noexcept {\n    legs_.swap(other.legs_);\n    std::swap(total_mm_, other.total_mm_);\n  }\n  void add(Leg leg) {\n    legs_.push_back(std::move(leg));\n    total_mm_ += legs_.back().length_mm;\n  }\n  [[nodiscard]] std::string describe() const {\n    return std::format(\"{} mm in {} {}\", total_mm_, legs_.size(), legs_.size() == 1 ? \"leg\" : \"legs\");\n  }\n\n private:\n  std::vector<Leg> legs_;\n  std::int64_t total_mm_ = 0;\n};\n\nstatic_assert(std::is_nothrow_move_constructible_v<Route> && std::is_nothrow_move_assignable_v<Route>);\n\n// Moves through two references, the way an algorithm or a container does.\nvoid move_into(Route& target, Route& source) { target = std::move(source); }\n\nvoid show(std::string_view label, const Route& route) { std::cout << std::format(\"{:<19}{}\\n\", label, route.describe()); }\n\nint main() {\n  Route route;\n  route.add({.name = \"dock to aisle 3\", .length_mm = 4200});\n  route.add({.name = \"aisle 3 to charger\", .length_mm = 2800});\n\n  Route taken = std::move(route);\n  show(\"taken:\", taken);\n  show(\"route, moved from:\", route);\n\n  route.add({.name = \"charger to dock\", .length_mm = 1500});\n  show(\"route, reused:\", route);\n\n  move_into(taken, taken);\n  show(\"taken, self-move:\", taken);\n\n  const Route copy = taken;\n  show(\"copy of taken:\", copy);\n}"
+      },
+      {
+       "t": "output",
+       "text": "taken:             7000 mm in 2 legs\nroute, moved from: 0 mm in 0 legs\nroute, reused:     1500 mm in 1 leg\ntaken, self-move:  7000 mm in 2 legs\ncopy of taken:     7000 mm in 2 legs"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The move constructor uses "
+        },
+        {
+         "t": "code",
+         "v": "std::exchange"
+        },
+        {
+         "t": "text",
+         "v": " to take each member and put the default value back in one step, so the source ends up equal to a new "
+        },
+        {
+         "t": "code",
+         "v": "Route"
+        },
+        {
+         "t": "text",
+         "v": ". It doesn't rely on what a moved-from vector holds. The move assignment has no "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": ": it moves "
+        },
+        {
+         "t": "code",
+         "v": "other"
+        },
+        {
+         "t": "text",
+         "v": " into a local first, which leaves "
+        },
+        {
+         "t": "code",
+         "v": "other"
+        },
+        {
+         "t": "text",
+         "v": " empty, then swaps the local's value into "
+        },
+        {
+         "t": "code",
+         "v": "*this"
+        },
+        {
+         "t": "text",
+         "v": ". When "
+        },
+        {
+         "t": "code",
+         "v": "other"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "*this"
+        },
+        {
+         "t": "text",
+         "v": ", the first step empties "
+        },
+        {
+         "t": "code",
+         "v": "*this"
+        },
+        {
+         "t": "text",
+         "v": " and the swap gives the value straight back, and when it isn't, "
+        },
+        {
+         "t": "code",
+         "v": "taken"
+        },
+        {
+         "t": "text",
+         "v": "'s destructor frees the old legs. The cost is one extra move of two members. Declaring the moves would have deleted the copy operations, and the implicit default constructor disappears once any constructor is declared, so both are brought back with "
+        },
+        {
+         "t": "code",
+         "v": "= default"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "There is a simpler fix: drop the cache and compute "
+        },
+        {
+         "t": "code",
+         "v": "total_mm()"
+        },
+        {
+         "t": "text",
+         "v": " from the legs when it is asked for. Then the class has nothing to keep in step, and the defaulted moves are right, because any vector of legs, the moved-from one included, is a valid route. That is the Rule of Zero, and the next topic is about it."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the three value categories with an example of each and the address test, and say why a named "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " is an lvalue. Say what "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " does, where the move really happens, and why "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " on a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " object copies. Say when copy elision is guaranteed, when NRVO and the implicit move in "
+        },
+        {
+         "t": "code",
+         "v": "return"
+        },
+        {
+         "t": "text",
+         "v": " apply, and why "
+        },
+        {
+         "t": "code",
+         "v": "return std::move(local);"
+        },
+        {
+         "t": "text",
+         "v": " costs a move. Finish with what you may do with a moved-from object and what a move assignment must do on a self-move."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What are the three value categories? Classify "
+     },
+     {
+      "t": "code",
+      "v": "x++"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "++x"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "\"abc\""
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "std::move(x)"
+     },
+     {
+      "t": "text",
+      "v": " and a named "
+     },
+     {
+      "t": "code",
+      "v": "T&&"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::move"
+     },
+     {
+      "t": "text",
+      "v": " do, and where does the move actually happen?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "std::move"
+     },
+     {
+      "t": "text",
+      "v": " on a "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " object compile, and which constructor runs?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When is copy elision guaranteed, and when does a "
+     },
+     {
+      "t": "code",
+      "v": "return"
+     },
+     {
+      "t": "text",
+      "v": " statement move instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is "
+     },
+     {
+      "t": "code",
+      "v": "return std::move(local);"
+     },
+     {
+      "t": "text",
+      "v": " slower than "
+     },
+     {
+      "t": "code",
+      "v": "return local;"
+     },
+     {
+      "t": "text",
+      "v": ", and what does GCC say about it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What may you do with a moved-from "
+     },
+     {
+      "t": "code",
+      "v": "std::string"
+     },
+     {
+      "t": "text",
+      "v": "? Why is a moved-from "
+     },
+     {
+      "t": "code",
+      "v": "std::optional<std::string>"
+     },
+     {
+      "t": "text",
+      "v": " still engaged?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How does a defaulted move constructor break a class that caches a total, and what are the two fixes?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How can a move assignment survive a self-move without an "
+     },
+     {
+      "t": "code",
+      "v": "if"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: Move Semantics, CppCon 2019, "
+     },
+     {
+      "t": "a",
+      "v": "part 1 slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_move_semantics_part_1/back_to_basics_move_semantics_part_1__klaus_iglberger__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=St0MNEU5b0o"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "part 2 slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_move_semantics_part_2/back_to_basics_move_semantics_part_2__klaus_iglberger__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=pIzaZbKUw2s"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "std::move"
+     },
+     {
+      "t": "text",
+      "v": " as a cast, the move constructor's steps, and "
+     },
+     {
+      "t": "code",
+      "v": "return std::move"
+     },
+     {
+      "t": "text",
+      "v": " among the pitfalls."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: Move Semantics, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_move_semantics/back_to_basics_move_semantics__david_olsen__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ZG59Bqo7qX4"
+     },
+     {
+      "t": "text",
+      "v": ". The cost of copies before C++11, the moved-from invariant with a cached length, and self-move with "
+     },
+     {
+      "t": "code",
+      "v": "delete[]"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, Back to Basics: Move Semantics, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/BackToBasics_MoveSemantics.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=Bt3zcJZIalk"
+     },
+     {
+      "t": "text",
+      "v": ". What you may do with a moved-from string."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh, Back to Basics: Rvalues and Move Semantics, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Rvalues_and_Move_Semantics.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=i_Z_o9T2fNE"
+     },
+     {
+      "t": "text",
+      "v": ". Overload resolution by reference kind, and names as lvalues."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Ben Saks, Back to Basics: Move Semantics, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Back_To_Basics_Move_Semantics.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=szU5b972F7E"
+     },
+     {
+      "t": "text",
+      "v": ". Lvalues and rvalues from their history, the address test, and temporary materialisation."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Ben Saks, Back to Basics: Understanding Value Categories, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=XS2JddPq7GQ"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "C.64",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-semantic"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.65",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-self"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.56",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-move"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.48",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-return-move-local"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "F.18",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-consume"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, C++ Move Semantics: The Complete Guide, chapter 6 on moved-from states and chapter 8 on value categories: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://leanpub.com/cppmove"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tips "
+     },
+     {
+      "t": "a",
+      "v": "#77 on temporaries, moves and copies",
+      "href": "https://abseil.io/tips/77"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "#166 on when a copy is not a copy",
+      "href": "https://abseil.io/tips/166"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The C++ standard draft on the "
+     },
+     {
+      "t": "a",
+      "v": "moved-from state of library types",
+      "href": "https://eel.is/c++draft/lib.types.movedfrom"
+     },
+     {
+      "t": "text",
+      "v": " and the definition of "
+     },
+     {
+      "t": "a",
+      "v": "valid but unspecified",
+      "href": "https://eel.is/c++draft/defns.valid"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "value categories",
+      "href": "https://en.cppreference.com/cpp/language/value_category"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "copy elision",
+      "href": "https://en.cppreference.com/cpp/language/copy_elision"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "the return statement",
+      "href": "https://en.cppreference.com/cpp/language/return"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::move",
+      "href": "https://en.cppreference.com/cpp/utility/move"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

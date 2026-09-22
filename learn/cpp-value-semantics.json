@@ -1,0 +1,2383 @@
+{
+ "id": "cpp-value-semantics",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write a value type "
+     },
+     {
+      "t": "code",
+      "v": "Path"
+     },
+     {
+      "t": "text",
+      "v": ": a frame name and a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " of points in millimetres, where two paths are equal when their frames and their points are equal. In "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": ", copy a path and show that the copy is equal; then change the copy and show that the original is unchanged and the two are no longer equal. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstdint>\n#include <iostream>\n#include <string>\n#include <vector>\n\nstruct Point {\n  std::int64_t x_mm = 0;\n  std::int64_t y_mm = 0;\n  friend bool operator==(const Point&, const Point&) = default;\n};\n\n// A value type: its members are values, so copies are independent and == compares contents.\nstruct Path {\n  std::string frame;\n  std::vector<Point> points;\n  friend bool operator==(const Path&, const Path&) = default;\n};\n\nint main() {\n  const Path original{.frame = \"map\", .points = {{.x_mm = 0, .y_mm = 0}, {.x_mm = 1500, .y_mm = 0}}};\n  Path copy = original;\n  std::cout << std::boolalpha << \"equal after the copy: \" << (copy == original) << '\\n';\n  copy.points.push_back({.x_mm = 1500, .y_mm = 900});\n  copy.frame = \"odom\";\n  std::cout << \"equal after changing the copy: \" << (copy == original) << '\\n';\n  std::cout << \"original: \" << original.frame << \", \" << original.points.size() << \" points\\n\";\n}"
+   },
+   {
+    "t": "output",
+    "text": "equal after the copy: true\nequal after changing the copy: false\noriginal: map, 2 points"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "Path"
+     },
+     {
+      "t": "text",
+      "v": " declares no special members and no comparison logic. Its members are values, so the compiler-generated copy is deep: "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " copies its elements and "
+     },
+     {
+      "t": "code",
+      "v": "std::string"
+     },
+     {
+      "t": "text",
+      "v": " its characters. The defaulted "
+     },
+     {
+      "t": "code",
+      "v": "operator=="
+     },
+     {
+      "t": "text",
+      "v": ", new in C++20, compares the members in declaration order, and it needs "
+     },
+     {
+      "t": "code",
+      "v": "Point"
+     },
+     {
+      "t": "text",
+      "v": " to have an "
+     },
+     {
+      "t": "code",
+      "v": "=="
+     },
+     {
+      "t": "text",
+      "v": " of its own, which is also defaulted. Declared as a "
+     },
+     {
+      "t": "code",
+      "v": "friend"
+     },
+     {
+      "t": "text",
+      "v": " inside the class, it is found only through its arguments, and its two parameters are the same type, which is the symmetric form Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "C.86",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-eq"
+     },
+     {
+      "t": "text",
+      "v": " asks for."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the copy compares equal, the change to the copy leaves the original as it was, and "
+     },
+     {
+      "t": "code",
+      "v": "=="
+     },
+     {
+      "t": "text",
+      "v": " compares every member. A hand-written "
+     },
+     {
+      "t": "code",
+      "v": "=="
+     },
+     {
+      "t": "text",
+      "v": " that compares all members also passes. Forgetting "
+     },
+     {
+      "t": "code",
+      "v": "Point"
+     },
+     {
+      "t": "text",
+      "v": "'s "
+     },
+     {
+      "t": "code",
+      "v": "=="
+     },
+     {
+      "t": "text",
+      "v": " is a compile error you fix in a minute. A "
+     },
+     {
+      "t": "code",
+      "v": "Path"
+     },
+     {
+      "t": "text",
+      "v": " that holds its points through a pointer or a "
+     },
+     {
+      "t": "code",
+      "v": "std::shared_ptr<std::vector<Point>>"
+     },
+     {
+      "t": "text",
+      "v": " fails: its copies share the points, so changing one changes the other."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A type has value semantics when a variable holds its value outright: copying it produces a second, independent value, changing one never changes the other, and "
+    },
+    {
+     "t": "code",
+     "v": "const"
+    },
+    {
+     "t": "text",
+     "v": " on it means that value cannot change. "
+    },
+    {
+     "t": "code",
+     "v": "int"
+    },
+    {
+     "t": "text",
+     "v": " works this way, and so does every class built only from values, such as "
+    },
+    {
+     "t": "code",
+     "v": "std::string"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": ". The opposite is reference semantics, where a variable refers to an object someone else holds, through a pointer, a reference or a "
+    },
+    {
+     "t": "code",
+     "v": "std::shared_ptr"
+    },
+    {
+     "t": "text",
+     "v": ". Two of these can name the same object, so a change made through one is visible through the other, and whether that object is still alive is somebody else's concern."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is code that expects an independent value and gets a reference to shared state instead. A reference into a container follows the object it names, so if an operation on the container moves elements around while you still hold that reference, it ends up naming a different element, and every access still looks legal, because the object at that address is alive. Taking a value, a copy, before anything changes removes this failure instead of chasing each place it can appear."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is designing the type to be "
+    },
+    {
+     "t": "i",
+     "v": "regular"
+    },
+    {
+     "t": "text",
+     "v": ": it can be default-constructed, copied, assigned and compared with "
+    },
+    {
+     "t": "code",
+     "v": "=="
+    },
+    {
+     "t": "text",
+     "v": ", and after "
+    },
+    {
+     "t": "code",
+     "v": "b = a"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "a == b"
+    },
+    {
+     "t": "text",
+     "v": " holds while changing "
+    },
+    {
+     "t": "code",
+     "v": "b"
+    },
+    {
+     "t": "text",
+     "v": " afterwards leaves "
+    },
+    {
+     "t": "code",
+     "v": "a"
+    },
+    {
+     "t": "text",
+     "v": " alone. Since C++20, "
+    },
+    {
+     "t": "code",
+     "v": "operator=="
+    },
+    {
+     "t": "text",
+     "v": " can be defaulted to compare every base and member in declaration order, and the compiler derives "
+    },
+    {
+     "t": "code",
+     "v": "!="
+    },
+    {
+     "t": "text",
+     "v": " and the reversed comparison from it, so a member function is as symmetric as the free function older guidance asked for. A "
+    },
+    {
+     "t": "code",
+     "v": "const"
+    },
+    {
+     "t": "text",
+     "v": " or reference data member breaks regularity, because it makes the whole object unassignable."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that a value copies. "
+    },
+    {
+     "t": "code",
+     "v": "auto"
+    },
+    {
+     "t": "text",
+     "v": " drops a reference and copies a value type, a by-value parameter copies its argument, and a lambda capture by value copies once, so a large value paid for on one of these lines is paid for again on every one like it. The guideline is to pass anything but a cheap type by "
+    },
+    {
+     "t": "code",
+     "v": "const&"
+    },
+    {
+     "t": "text",
+     "v": " when a function only reads it, and to share a large value that is built once and never changed, such as a shared map, through a "
+    },
+    {
+     "t": "code",
+     "v": "std::shared_ptr<const T>"
+    },
+    {
+     "t": "text",
+     "v": " instead of copying it into every holder."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You design the robot's own types this way, holding a pose or a path as a value with independent copies, and the interview question itself turns on the same distinction: a copy stays independent, a shared handle does not."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "values",
+   "title": "Value versus reference semantics; regular types",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program removes every range reading equal to the largest one, twice. The first call passes the largest reading by reference, the second by value:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <iostream>\n#include <span>\n#include <string_view>\n#include <vector>\n\nvoid show(std::string_view label, std::span<const int> values) {\n  std::cout << label << ':';\n  for (const int v : values) std::cout << ' ' << v;\n  std::cout << '\\n';\n}\n\nint main() {\n  std::vector<int> ranges_cm{120, 400, 70, 400, 70, 30};\n  std::vector<int> copy = ranges_cm;\n\n  // Remove every reading equal to the largest one.\n  std::erase(ranges_cm, *std::ranges::max_element(ranges_cm));  // passes a reference into the vector\n  show(\"by reference\", ranges_cm);\n\n  const int largest = *std::ranges::max_element(copy);  // a value of its own\n  std::erase(copy, largest);\n  show(\"by value    \", copy);\n}"
+      },
+      {
+       "t": "output",
+       "text": "by reference: 120 70 400 30\nby value    : 120 70 70 30"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first call kept a 400 and removed a 70. "
+        },
+        {
+         "t": "code",
+         "v": "std::erase"
+        },
+        {
+         "t": "text",
+         "v": " takes the value to remove as "
+        },
+        {
+         "t": "code",
+         "v": "const T&"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "*max_element(...)"
+        },
+        {
+         "t": "text",
+         "v": " is a reference to the first 400 inside the vector. As "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " shifts the later elements down, the next one, 70, is written over that position, and from then on the function removes 70s. The sanitizers stay quiet, because every access is to a live element: the reference did what references do and followed the object it refers to. Klaus Iglberger uses this example, written with "
+        },
+        {
+         "t": "code",
+         "v": "std::remove"
+        },
+        {
+         "t": "text",
+         "v": ", in his 2022 talk on value semantics to show what reference semantics costs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With "
+        },
+        {
+         "t": "i",
+         "v": "value semantics"
+        },
+        {
+         "t": "text",
+         "v": ", a variable holds its own value. Copying it gives a second, independent value, and changing one never changes the other; "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " on it means the value can't change. "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " works this way, and so do "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " and every class built from them. Iglberger lists the standard library's design as the main example: containers are values, a copy is a deep copy, and a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " container can't be modified. With "
+        },
+        {
+         "t": "i",
+         "v": "reference semantics"
+        },
+        {
+         "t": "text",
+         "v": ", a variable refers to an object someone else holds: a pointer, a reference, an iterator, a "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ". Two of them can refer to the same object, a change through one is visible through the other, and whether the object is still alive is somebody else's responsibility. His "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": " example shows the split: a "
+        },
+        {
+         "t": "code",
+         "v": "const std::span<int>"
+        },
+        {
+         "t": "text",
+         "v": " still lets you write the elements, because the "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " applies to the view, not to the data it refers to."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Reference semantics has its place. A function parameter that only reads borrows its argument for one call, and "
+        },
+        {
+         "t": "code",
+         "v": "const T&"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " are the right tools for that, as the topic on borrowing showed. Values are the right default for everything that is kept: data members, containers, return values. The example above failed because a borrowed reference met code that changed what it referred to, and taking a copy first, one "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", removed the problem."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A value type is easiest to reason about when it is "
+        },
+        {
+         "t": "i",
+         "v": "regular"
+        },
+        {
+         "t": "text",
+         "v": ": it can be default-constructed, copied and assigned, and compared with "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": ", and after "
+        },
+        {
+         "t": "code",
+         "v": "b = a"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "a == b"
+        },
+        {
+         "t": "text",
+         "v": " holds and changing "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " leaves "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " alone. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.11",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-regular"
+        },
+        {
+         "t": "text",
+         "v": " asks for concrete types to be regular, and Phil Nash's 2024 talk sums it up with the old advice to do as the ints do. C++20 names the idea as a concept, "
+        },
+        {
+         "t": "code",
+         "v": "std::regular"
+        },
+        {
+         "t": "text",
+         "v": ", which combines "
+        },
+        {
+         "t": "code",
+         "v": "std::semiregular"
+        },
+        {
+         "t": "text",
+         "v": " (copyable and default-constructible) with "
+        },
+        {
+         "t": "code",
+         "v": "std::equality_comparable"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/concepts/regular"
+        },
+        {
+         "t": "text",
+         "v": "). A "
+        },
+        {
+         "t": "code",
+         "v": "static_assert(std::regular<T>)"
+        },
+        {
+         "t": "text",
+         "v": " checks that the operations exist; that they mean what a reader expects is still the author's job."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Equality used to be the tedious part, and C++20 made it one line. A defaulted "
+        },
+        {
+         "t": "code",
+         "v": "operator=="
+        },
+        {
+         "t": "text",
+         "v": " compares base classes, then members, in declaration order, and stops at the first difference ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference on default comparisons",
+         "href": "https://en.cppreference.com/cpp/language/default_comparisons"
+        },
+        {
+         "t": "text",
+         "v": "). The compiler also rewrites "
+        },
+        {
+         "t": "code",
+         "v": "a != b"
+        },
+        {
+         "t": "text",
+         "v": " as "
+        },
+        {
+         "t": "code",
+         "v": "!(a == b)"
+        },
+        {
+         "t": "text",
+         "v": ", and considers "
+        },
+        {
+         "t": "code",
+         "v": "b == a"
+        },
+        {
+         "t": "text",
+         "v": " with the operands reversed, so a member "
+        },
+        {
+         "t": "code",
+         "v": "operator=="
+        },
+        {
+         "t": "text",
+         "v": " is as symmetric as a friend one; the asymmetry C.86 warns about predates C++20. The one thing a defaulted "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " doesn't give you is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ": it is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " only if every member comparison is, and "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": "'s isn't marked, so C.86's "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " has to be written by hand."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The quickest way to lose regularity is a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " or reference data member. It looks like a promise that the frame of a sensor never changes, and it removes assignment:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "use of deleted function",
+       "text": "#include <string>\n\nstruct Sensor {\n  const std::string frame;  // \"a sensor never changes its frame\"\n  double gain = 1.0;\n};\n\nint main() {\n  Sensor front{.frame = \"front_lidar\"};\n  const Sensor rear{.frame = \"rear_lidar\", .gain = 0.8};\n  front = rear;\n  return front.gain > 0.0 ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 explains that the copy assignment operator is implicitly deleted, because a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " member can't be assigned. The class can still be copied, but no longer assigned. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.12",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-constref"
+        },
+        {
+         "t": "text",
+         "v": " says not to make data members "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " or references in a copyable or movable type, and Iglberger's second 2021 talk on designing classes makes the same point. Keep the member private and non-"
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " behind a getter, and make the whole object "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " where it shouldn't change. For a reference member, store a pointer, or a "
+        },
+        {
+         "t": "code",
+         "v": "std::reference_wrapper"
+        },
+        {
+         "t": "text",
+         "v": ", which can be reassigned."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "matrix",
+   "title": "Matrix value type with independent copies and defaulted operator==",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write a "
+        },
+        {
+         "t": "code",
+         "v": "Matrix"
+        },
+        {
+         "t": "text",
+         "v": " of "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " with value semantics:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "Shape{.rows, .cols}"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "Cell{.row, .col}"
+         },
+         {
+          "t": "text",
+          "v": " structs, so that a call can't swap rows and columns;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a default constructor for a 0×0 matrix, an "
+         },
+         {
+          "t": "code",
+          "v": "explicit"
+         },
+         {
+          "t": "text",
+          "v": " constructor from a "
+         },
+         {
+          "t": "code",
+          "v": "Shape"
+         },
+         {
+          "t": "text",
+          "v": " that fills with zeros and throws "
+         },
+         {
+          "t": "code",
+          "v": "std::invalid_argument"
+         },
+         {
+          "t": "text",
+          "v": " for a negative size, and a static "
+         },
+         {
+          "t": "code",
+          "v": "identity(n)"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "operator[](Cell)"
+         },
+         {
+          "t": "text",
+          "v": " in a "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": " and a non-"
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": " version, and "
+         },
+         {
+          "t": "code",
+          "v": "shape()"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "transposed()"
+         },
+         {
+          "t": "text",
+          "v": ", returning a new matrix, and a free "
+         },
+         {
+          "t": "code",
+          "v": "operator*"
+         },
+         {
+          "t": "text",
+          "v": " for the product, which throws when the shapes don't fit;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a defaulted "
+         },
+         {
+          "t": "code",
+          "v": "operator=="
+         },
+         {
+          "t": "text",
+          "v": " that is "
+         },
+         {
+          "t": "code",
+          "v": "noexcept"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write none of the five special members, and check with "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": "s that "
+        },
+        {
+         "t": "code",
+         "v": "Matrix"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "std::regular"
+        },
+        {
+         "t": "text",
+         "v": " and that "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ". Then test in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A copy compares equal to the original."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Changing the copy leaves the original unchanged."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A 2×3 matrix of zeros and a 3×2 matrix of zeros are not equal."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "After "
+         },
+         {
+          "t": "code",
+          "v": "b = a"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "b == a"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Transposing twice gives the original, and multiplying by the identity gives the original."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Before you write "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": ", answer two questions: why must the shape take part in the comparison, and which order of the data members makes the comparison cheaper?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <concepts>\n#include <cstddef>\n#include <iostream>\n#include <stdexcept>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Shape {\n  std::ptrdiff_t rows = 0;\n  std::ptrdiff_t cols = 0;\n  friend bool operator==(const Shape&, const Shape&) = default;\n};\n\nstruct Cell {\n  std::ptrdiff_t row = 0;\n  std::ptrdiff_t col = 0;\n};\n\n// A dense matrix of doubles with value semantics: copies are independent, and == compares shape and contents.\nclass Matrix {\n public:\n  Matrix() = default;\n  explicit Matrix(Shape shape) : shape_(shape), cells_(cell_count(shape)) {}\n\n  [[nodiscard]] static Matrix identity(std::ptrdiff_t n) {\n    Matrix m({.rows = n, .cols = n});\n    for (std::ptrdiff_t i = 0; i < n; ++i) m[{.row = i, .col = i}] = 1.0;\n    return m;\n  }\n\n  [[nodiscard]] Shape shape() const { return shape_; }\n  [[nodiscard]] double& operator[](Cell c) { return cells_[index(c)]; }\n  [[nodiscard]] double operator[](Cell c) const { return cells_[index(c)]; }\n\n  [[nodiscard]] Matrix transposed() const {\n    Matrix t({.rows = shape_.cols, .cols = shape_.rows});\n    for (std::ptrdiff_t r = 0; r < shape_.rows; ++r) {\n      for (std::ptrdiff_t c = 0; c < shape_.cols; ++c) t[{.row = c, .col = r}] = (*this)[{.row = r, .col = c}];\n    }\n    return t;\n  }\n\n  // Compares shape_ first, then cells_: the declaration order below.\n  friend bool operator==(const Matrix&, const Matrix&) noexcept = default;\n\n private:\n  [[nodiscard]] static std::size_t cell_count(Shape s) {\n    if (s.rows < 0 || s.cols < 0) throw std::invalid_argument(\"negative matrix shape\");\n    return static_cast<std::size_t>(s.rows * s.cols);\n  }\n  [[nodiscard]] std::size_t index(Cell c) const { return static_cast<std::size_t>(c.row * shape_.cols + c.col); }\n\n  Shape shape_;\n  std::vector<double> cells_;\n};\n\n[[nodiscard]] Matrix operator*(const Matrix& a, const Matrix& b) {\n  if (a.shape().cols != b.shape().rows) throw std::invalid_argument(\"shapes don't match for a product\");\n  Matrix product({.rows = a.shape().rows, .cols = b.shape().cols});\n  for (std::ptrdiff_t r = 0; r < a.shape().rows; ++r) {\n    for (std::ptrdiff_t c = 0; c < b.shape().cols; ++c) {\n      double sum = 0.0;\n      for (std::ptrdiff_t k = 0; k < a.shape().cols; ++k) sum += a[{.row = r, .col = k}] * b[{.row = k, .col = c}];\n      product[{.row = r, .col = c}] = sum;\n    }\n  }\n  return product;\n}\n\nstatic_assert(std::regular<Matrix>);\nstatic_assert(noexcept(std::declval<const Matrix&>() == std::declval<const Matrix&>()));\n\nvoid show(std::string_view label, const Matrix& m) {\n  std::cout << label << \" (\" << m.shape().rows << 'x' << m.shape().cols << \"):\";\n  for (std::ptrdiff_t r = 0; r < m.shape().rows; ++r) {\n    std::cout << \" [\";\n    for (std::ptrdiff_t c = 0; c < m.shape().cols; ++c) std::cout << (c == 0 ? \"\" : \" \") << m[{.row = r, .col = c}];\n    std::cout << ']';\n  }\n  std::cout << '\\n';\n}\n\nint main() {\n  Matrix a({.rows = 2, .cols = 3});\n  a[{.row = 0, .col = 0}] = 1.0;\n  a[{.row = 0, .col = 2}] = 2.5;\n  a[{.row = 1, .col = 1}] = -1.0;\n\n  Matrix copy = a;\n  std::cout << std::boolalpha << \"1 copy == a: \" << (copy == a) << '\\n';\n  copy[{.row = 1, .col = 2}] = 4.0;\n  std::cout << \"2 after changing the copy: \" << (copy == a) << '\\n';\n  show(\"  a\", a);\n  show(\"  copy\", copy);\n\n  const Matrix wide({.rows = 2, .cols = 3});\n  const Matrix tall({.rows = 3, .cols = 2});\n  std::cout << \"3 2x3 zeros == 3x2 zeros: \" << (wide == tall) << '\\n';\n\n  Matrix assigned;\n  assigned = a;\n  std::cout << \"4 after assigned = a: \" << (assigned == a) << '\\n';\n\n  std::cout << \"5 a transposed twice == a: \" << (a.transposed().transposed() == a) << '\\n';\n  std::cout << \"5 a * identity == a: \" << (a * Matrix::identity(3) == a) << '\\n';\n  show(\"  a * a transposed\", a * a.transposed());\n}"
+      },
+      {
+       "t": "output",
+       "text": "1 copy == a: true\n2 after changing the copy: false\n  a (2x3): [1 0 2.5] [0 -1 0]\n  copy (2x3): [1 0 2.5] [0 -1 4]\n3 2x3 zeros == 3x2 zeros: false\n4 after assigned = a: true\n5 a transposed twice == a: true\n5 a * identity == a: true\n  a * a transposed (2x2): [7.25 0] [0 1]"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The shape must take part in "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " because the cells alone don't identify a matrix: a 2×3 and a 3×2 matrix of zeros both store six zeros, and test 3 shows the defaulted comparison telling them apart only because "
+        },
+        {
+         "t": "code",
+         "v": "shape_"
+        },
+        {
+         "t": "text",
+         "v": " is a member. The order of the members decides the order of the comparison, so "
+        },
+        {
+         "t": "code",
+         "v": "shape_"
+        },
+        {
+         "t": "text",
+         "v": " comes first: comparing two pairs of integers is cheap, and when the shapes differ the comparison stops before it reads a single cell. With "
+        },
+        {
+         "t": "code",
+         "v": "cells_"
+        },
+        {
+         "t": "text",
+         "v": " first, a 1000×2000 and a 2000×1000 matrix would compare up to two million cells before looking at the shapes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Matrix"
+        },
+        {
+         "t": "text",
+         "v": " follows the Rule of Zero from the previous topic. The vector makes copies deep and moves cheap, so the class writes none of the five and is regular anyway, which the "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": " checks. The "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " is written by hand: without it, the defaulted comparison isn't "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", because "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": "'s "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " isn't marked, and C.86 asks for a comparison that can be used without fear of an exception. "
+        },
+        {
+         "t": "code",
+         "v": "transposed()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "operator*"
+        },
+        {
+         "t": "text",
+         "v": " return new matrices by value, and that never copies: each returns a named local, which GCC builds in the caller's object (NRVO, measured in the topic on copy and move), and without NRVO the return would move. Returning values is how a value type stays simple to use; it needs no output parameters and no ownership rules."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "Shape"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Cell"
+        },
+        {
+         "t": "text",
+         "v": " structs cost a little typing at each call and remove a class of bug: "
+        },
+        {
+         "t": "code",
+         "v": "Matrix({.rows = 2, .cols = 3})"
+        },
+        {
+         "t": "text",
+         "v": " can't be read the wrong way round, and neither can "
+        },
+        {
+         "t": "code",
+         "v": "m[{.row = 1, .col = 2}]"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": " doesn't check its bounds, like "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": "'s. A checked "
+        },
+        {
+         "t": "code",
+         "v": "at(Cell)"
+        },
+        {
+         "t": "text",
+         "v": " that throws "
+        },
+        {
+         "t": "code",
+         "v": "std::out_of_range"
+        },
+        {
+         "t": "text",
+         "v": " is a small addition if callers need it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "costs",
+   "title": "Cost of copies, sharing immutable data, when to pass by reference",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Value semantics has one cost: a copy of a large value is a large copy, and C++ makes copies without being asked. This program counts the copies of a scan's payload in eight lines of ordinary code, four that copy and four that don't:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <concepts>\n#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Counts {\n  int copies = 0;\n};\n\n// Stands in for a scan's heavy payload, and counts how often it is copied.\nclass Payload {\n public:\n  explicit Payload(Counts& counts) : counts_(&counts) {}\n  Payload(const Payload& other) : counts_(other.counts_) { ++counts_->copies; }\n  Payload(Payload&&) noexcept = default;\n  Payload& operator=(const Payload& other) {\n    counts_ = other.counts_;\n    ++counts_->copies;\n    return *this;\n  }\n  Payload& operator=(Payload&&) noexcept = default;\n  ~Payload() = default;\n\n private:\n  Counts* counts_;\n};\n\nstruct Scan {\n  std::string frame;\n  Payload ranges;\n};\n\nclass ScanLog {\n public:\n  void add(Scan scan) { scans_.push_back(std::move(scan)); }\n  [[nodiscard]] const Scan& latest() const { return scans_.back(); }\n  [[nodiscard]] const std::vector<Scan>& all() const { return scans_; }\n\n private:\n  std::vector<Scan> scans_;\n};\n\n[[nodiscard]] std::size_t frame_length_by_value(Scan scan) { return scan.frame.size(); }\n[[nodiscard]] std::size_t frame_length_by_ref(const Scan& scan) { return scan.frame.size(); }\n\nvoid measure(Counts& counts, std::string_view label, std::invocable auto step) {\n  const int before = counts.copies;\n  step();\n  std::cout << std::format(\"{:<34}copies {}\\n\", label, counts.copies - before);\n}\n\nint main() {\n  Counts counts;\n  ScanLog log;\n  log.add({.frame = \"front_lidar\", .ranges = Payload(counts)});\n  log.add({.frame = \"rear_lidar\", .ranges = Payload(counts)});\n  log.add({.frame = \"front_lidar\", .ranges = Payload(counts)});\n\n  std::size_t total = 0;\n  measure(counts, \"for (auto scan : all())\", [&] {\n    for (auto scan : log.all()) total += scan.frame.size();\n  });\n  measure(counts, \"for (const auto& scan : all())\", [&] {\n    for (const auto& scan : log.all()) total += scan.frame.size();\n  });\n  measure(counts, \"const auto latest = log.latest()\", [&] {\n    const auto latest = log.latest();\n    total += latest.frame.size();\n  });\n  measure(counts, \"const auto& latest = log.latest()\", [&] {\n    const auto& latest = log.latest();\n    total += latest.frame.size();\n  });\n  measure(counts, \"frame_length_by_value(latest)\", [&] { total += frame_length_by_value(log.latest()); });\n  measure(counts, \"frame_length_by_ref(latest)\", [&] { total += frame_length_by_ref(log.latest()); });\n  measure(counts, \"[scan] capture\", [&] {\n    const auto size_of = [scan = log.latest()] { return scan.frame.size(); };\n    total += size_of();\n  });\n  measure(counts, \"[&scan] capture\", [&] {\n    const Scan& scan = log.latest();\n    const auto size_of = [&scan] { return scan.frame.size(); };\n    total += size_of();\n  });\n  std::cout << \"characters counted: \" << total << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "for (auto scan : all())           copies 3\nfor (const auto& scan : all())    copies 0\nconst auto latest = log.latest()  copies 1\nconst auto& latest = log.latest() copies 0\nframe_length_by_value(latest)     copies 1\nframe_length_by_ref(latest)       copies 0\n[scan] capture                    copies 1\n[&scan] capture                   copies 0\ncharacters counted: 130"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "auto"
+        },
+        {
+         "t": "text",
+         "v": " deduces a value type and drops the reference, so "
+        },
+        {
+         "t": "code",
+         "v": "auto latest = log.latest()"
+        },
+        {
+         "t": "text",
+         "v": " copies although "
+        },
+        {
+         "t": "code",
+         "v": "latest()"
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "const Scan&"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "for (auto scan : ...)"
+        },
+        {
+         "t": "text",
+         "v": " copies every element. A by-value parameter copies an lvalue argument, and a lambda capture by value copies once when the lambda is created. None of these is a bug in a small type; for a scan with thousands of ranges, a loop that copies each one allocates for each one. GCC catches one of the four: with the loop variable declared "
+        },
+        {
+         "t": "code",
+         "v": "const auto"
+        },
+        {
+         "t": "text",
+         "v": ", a copy can't be what you meant, and "
+        },
+        {
+         "t": "code",
+         "v": "-Wrange-loop-construct"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": " refuses it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "creates a copy from type",
+       "text": "#include <string>\n#include <vector>\n\nstruct Scan {\n  std::string frame;\n  std::vector<int> ranges_mm;\n};\n\nint main() {\n  const std::vector<Scan> scans{{.frame = \"front_lidar\", .ranges_mm = {812, 790}}};\n  std::size_t total = 0;\n  for (const auto scan : scans) total += scan.ranges_mm.size();\n  return total == 2 ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The Core Guidelines' parameter rules decide when to take a reference instead. Pass cheap types by value and everything else that is only read by "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "F.16",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-in"
+        },
+        {
+         "t": "text",
+         "v": "); F.16 counts two or three words, such as a pointer, a "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " or a small struct, as cheap. The whole table:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "The function"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Pass"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "only reads a cheap type: "
+          },
+          {
+           "t": "code",
+           "v": "int"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "double"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "Shape"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "std::string_view"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "std::span"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "by value"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "only reads anything else: "
+          },
+          {
+           "t": "code",
+           "v": "Scan"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "Matrix"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "std::string"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "const T&"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "keeps its own copy"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "by value and "
+          },
+          {
+           "t": "code",
+           "v": "std::move"
+          },
+          {
+           "t": "text",
+           "v": " it into place ("
+          },
+          {
+           "t": "a",
+           "v": "Abseil #234",
+           "href": "https://abseil.io/tips/234"
+          },
+          {
+           "t": "text",
+           "v": "), or "
+          },
+          {
+           "t": "code",
+           "v": "const T&"
+          },
+          {
+           "t": "text",
+           "v": " plus "
+          },
+          {
+           "t": "code",
+           "v": "T&&"
+          },
+          {
+           "t": "text",
+           "v": " overloads (F.16's note, "
+          },
+          {
+           "t": "a",
+           "v": "F.18",
+           "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-consume"
+          },
+          {
+           "t": "text",
+           "v": ")"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "changes the caller's object"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "T&"
+          },
+          {
+           "t": "text",
+           "v": " ("
+          },
+          {
+           "t": "a",
+           "v": "F.17",
+           "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-inout"
+          },
+          {
+           "t": "text",
+           "v": ")"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "produces a result"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "return it by value ("
+          },
+          {
+           "t": "a",
+           "v": "F.20",
+           "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-out"
+          },
+          {
+           "t": "text",
+           "v": ")"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Some data is large, copied into many values, and never changed after it is built, such as a map of the building shared by every robot's state. Copying it into each robot is the value-semantics answer, and it costs one full copy per robot. A "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<const T>"
+        },
+        {
+         "t": "text",
+         "v": " shares one copy instead. Reference semantics is safe here for one reason: the "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " means nobody can change the shared object, so no holder can see another holder's change, which was the problem in the theory's example. Each "
+        },
+        {
+         "t": "code",
+         "v": "Robot"
+        },
+        {
+         "t": "text",
+         "v": " stays a value, and its own members stay independent:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Counts {\n  int copies = 0;\n};\n\n// A large map, loaded once and never changed. It counts how often it is copied.\nclass OccupancyMap {\n public:\n  OccupancyMap(Counts& counts, std::int64_t cells)\n      : counts_(&counts), cells_(static_cast<std::size_t>(cells)) {}\n  OccupancyMap(const OccupancyMap& other) : counts_(other.counts_), cells_(other.cells_) { ++counts_->copies; }\n  OccupancyMap& operator=(const OccupancyMap& other) {\n    counts_ = other.counts_;\n    cells_ = other.cells_;\n    ++counts_->copies;\n    return *this;\n  }\n  OccupancyMap(OccupancyMap&&) noexcept = default;\n  OccupancyMap& operator=(OccupancyMap&&) noexcept = default;\n  ~OccupancyMap() = default;\n  [[nodiscard]] std::int64_t cell_count() const { return std::ssize(cells_); }\n\n private:\n  Counts* counts_;\n  std::vector<std::int8_t> cells_;\n};\n\n// Every robot carries its own copy of the map.\nstruct RobotOwningMap {\n  std::string name;\n  std::int64_t x_mm = 0;\n  OccupancyMap map;\n};\n\n// Every robot is still a value, and the map is shared. Nobody can change it, so sharing it is safe.\nstruct Robot {\n  std::string name;\n  std::int64_t x_mm = 0;\n  std::shared_ptr<const OccupancyMap> map;\n};\n\nint main() {\n  constexpr std::int64_t cells = 1'000'000;\n\n  Counts owning_counts;\n  const RobotOwningMap prototype{.name = \"amr\", .map = OccupancyMap(owning_counts, cells)};\n  const std::vector<RobotOwningMap> heavy_fleet(20, prototype);\n  std::cout << std::format(\"map by value:      {} map copies for {} robots\\n\", owning_counts.copies,\n                           heavy_fleet.size());\n\n  Counts shared_counts;\n  const auto map = std::make_shared<const OccupancyMap>(shared_counts, cells);\n  std::vector<Robot> fleet(20, Robot{.name = \"amr\", .map = map});\n  std::cout << std::format(\"map by shared_ptr: {} map copies for {} robots, {} owners of the map\\n\",\n                           shared_counts.copies, fleet.size(), map.use_count());\n\n  fleet[1].name = \"amr_2\";\n  fleet[1].x_mm = 1500;\n  std::cout << std::format(\"{} at {} mm, {} at {} mm, both seeing {} cells\\n\", fleet[0].name, fleet[0].x_mm,\n                           fleet[1].name, fleet[1].x_mm, fleet[1].map->cell_count());\n}"
+      },
+      {
+       "t": "output",
+       "text": "map by value:      20 map copies for 20 robots\nmap by shared_ptr: 0 map copies for 20 robots, 21 owners of the map\namr at 0 mm, amr_2 at 1500 mm, both seeing 1000000 cells"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The 20 copies of a million cells became none, and the 21 owners are the 20 robots and the local "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ". Two things decide whether sharing is right. The shared object must be "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " through every handle, or the robots are back to reference semantics with all its surprises. And the handle's copy isn't free either: copying a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " increments a reference count shared by all its copies, which is cheap next to a million-cell copy and not next to copying an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ". The topic on smart pointers comes back to this."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last failure is in "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " itself. A defaulted "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " on a "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " member inherits the "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": "'s rule that NaN equals nothing, itself included, so a copy of a value that holds NaN doesn't compare equal to its original:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <limits>\n\nstruct Reading {\n  double range_m = 0.0;\n  friend bool operator==(const Reading&, const Reading&) = default;\n};\n\nint main() {\n  const Reading nothing_seen{.range_m = std::numeric_limits<double>::quiet_NaN()};\n  const Reading copy = nothing_seen;\n  std::cout << std::boolalpha << \"copy == original: \" << (copy == nothing_seen) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "copy == original: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Reading"
+        },
+        {
+         "t": "text",
+         "v": " satisfies "
+        },
+        {
+         "t": "code",
+         "v": "std::regular"
+        },
+        {
+         "t": "text",
+         "v": ", which checks only that the operations compile, and still breaks \"after "
+        },
+        {
+         "t": "code",
+         "v": "b = a"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "a == b"
+        },
+        {
+         "t": "text",
+         "v": "\". Code that detects a change by comparing with a saved copy then sees a change on every cycle while the sensor reports NaN. C.86 notes the problem for types with a failure state like NaN. The cleaner fix is to keep NaN out of the type: store "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<double>"
+        },
+        {
+         "t": "text",
+         "v": ", with "
+        },
+        {
+         "t": "code",
+         "v": "std::nullopt"
+        },
+        {
+         "t": "text",
+         "v": " for \"nothing seen\", and the defaulted "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " is right again."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what value and reference semantics mean, with an example of each from the standard library, and how a borrowed reference changed the result of "
+        },
+        {
+         "t": "code",
+         "v": "std::erase"
+        },
+        {
+         "t": "text",
+         "v": " in the theory's example. Say what makes a type regular, how C++20's defaulted "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " works and why it isn't "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " by itself, and why a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " member breaks regularity. Name the copies that "
+        },
+        {
+         "t": "code",
+         "v": "auto"
+        },
+        {
+         "t": "text",
+         "v": ", range-"
+        },
+        {
+         "t": "code",
+         "v": "for"
+        },
+        {
+         "t": "text",
+         "v": ", by-value parameters and lambda captures make, the parameter rules that avoid them, and when a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<const T>"
+        },
+        {
+         "t": "text",
+         "v": " is a safe way to share."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What went wrong in "
+     },
+     {
+      "t": "code",
+      "v": "std::erase(v, *std::ranges::max_element(v))"
+     },
+     {
+      "t": "text",
+      "v": ", and what is the one-line fix?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between value and reference semantics? Name three types of each from the standard library."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What makes a type regular, and what does "
+     },
+     {
+      "t": "code",
+      "v": "static_assert(std::regular<T>)"
+     },
+     {
+      "t": "text",
+      "v": " check and not check?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a defaulted "
+     },
+     {
+      "t": "code",
+      "v": "operator=="
+     },
+     {
+      "t": "text",
+      "v": " compare, in which order, and when is it "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a "
+     },
+     {
+      "t": "code",
+      "v": "const std::string"
+     },
+     {
+      "t": "text",
+      "v": " data member stop a class from being assigned, and what do you write instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a "
+     },
+     {
+      "t": "code",
+      "v": "Matrix"
+     },
+     {
+      "t": "text",
+      "v": " value type with a "
+     },
+     {
+      "t": "code",
+      "v": "Shape"
+     },
+     {
+      "t": "text",
+      "v": ", element access by "
+     },
+     {
+      "t": "code",
+      "v": "Cell"
+     },
+     {
+      "t": "text",
+      "v": ", a product, and a defaulted "
+     },
+     {
+      "t": "code",
+      "v": "=="
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which four ordinary lines of code copy a large value without being asked, and which one does GCC catch?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When is sharing an object between values through "
+     },
+     {
+      "t": "code",
+      "v": "std::shared_ptr<const T>"
+     },
+     {
+      "t": "text",
+      "v": " safe, and what does it still cost?"
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: Value Semantics, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/Back-to-Basics-Value-Semantics-Klaus-Iglberger-CppCon-2022.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=G9MxNwUoSt0"
+     },
+     {
+      "t": "text",
+      "v": ". The removal of the maximum through a reference parameter, "
+     },
+     {
+      "t": "code",
+      "v": "std::span"
+     },
+     {
+      "t": "text",
+      "v": " as reference semantics, and the standard library as the example of value semantics."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: Designing Classes, CppCon 2021, "
+     },
+     {
+      "t": "a",
+      "v": "part 1 slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Designing_Classes_part_1.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=motLOioLJfg"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "part 2 slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Designing_Classes_part_2.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=O65lEiYkkbc"
+     },
+     {
+      "t": "text",
+      "v": ". The Rule of Zero, and "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " and reference data members."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Phil Nash, Back to Basics: Lifetime Management, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Lifetime_Management.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=aMvIv6blzBs"
+     },
+     {
+      "t": "text",
+      "v": ". C++ as a value-based language, and doing as the ints do."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "C.11",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-regular"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.12",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-constref"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.86",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-eq"
+     },
+     {
+      "t": "text",
+      "v": ", and the parameter rules "
+     },
+     {
+      "t": "a",
+      "v": "F.16",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-in"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.17",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-inout"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.18",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-consume"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "F.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-out"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil "
+     },
+     {
+      "t": "a",
+      "v": "tip #234 on passing by value, by pointer or by reference",
+      "href": "https://abseil.io/tips/234"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "default comparisons",
+      "href": "https://en.cppreference.com/cpp/language/default_comparisons"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::regular",
+      "href": "https://en.cppreference.com/cpp/concepts/regular"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

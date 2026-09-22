@@ -1,0 +1,1200 @@
+{
+ "id": "prj-missing-input",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage gives the bench a second scenario, one that cuts the supervisor's own input mid-route and judges how it responds. The relay's drop service fires while the robot is driving, and five checks decide what counts as a good reaction: that the cue actually went out, that the robot was really driving beforehand, how long and how far it took to come to rest, and that it was moving again once odometry returned."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is that no single check is enough. A robot already standing still, or turning on the spot with zero forward speed, would pass a bare stop check for the wrong reason, and a cue that never fired at all would leave every later check unmeasured, which has to fail loudly rather than pass quietly. Checking that the robot was driving before the cue is what rules the first two cases out."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: "
+    },
+    {
+     "t": "code",
+     "v": "./run_scenario.sh missing_odom"
+    },
+    {
+     "t": "text",
+     "v": " passes five times in a row, with its stop and distance limits tightened from those runs against the supervisor's own predicted numbers. And it fails two different ways on purpose, each naming a different cause: a drop shorter than the supervisor's timeout correctly changes nothing, while raising that timeout past the drop length makes the robot drive straight through, failing the stop checks while the route's own checks still pass."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "scenario",
+   "title": "Missing-odometry scenario and its checks",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " can judge a run in which odometry went away and came back, with GoogleTest tests that you wrote first and saw fail."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pieces are all here. The relay drops "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " for a stretch of time when its service is called, the supervisor stops the robot when odometry is stale, and the runner watches the robot on "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", which the relay never touches. What is missing is the rule that says whether the bench behaved, and it has to be more careful than it first looks."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The obvious check is that the robot stopped. On its own it passes for the wrong reasons. A robot that was already standing still when the cue went out stops trivially. A robot turning on the spot has a forward speed of zero, so it reads as stopped while it is still moving. And a robot that stops and never starts again has also failed, in the other direction: the point of a drop with a length is that the bench recovers. So the scenario asks five things:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "the cue went out at all, with the simulated time it went out at;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the robot was driving in the second before the cue, above "
+         },
+         {
+          "t": "code",
+          "v": "driving_mps"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it was at rest within "
+         },
+         {
+          "t": "code",
+          "v": "to_rest"
+         },
+         {
+          "t": "text",
+          "v": " of the cue;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it travelled no more than "
+         },
+         {
+          "t": "code",
+          "v": "creep_m"
+         },
+         {
+          "t": "text",
+          "v": " in that time;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it was driving again after the drop ended."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third and fourth are the same event measured two ways, and both are worth having. The time is the one to compare with the supervisor's arithmetic, and the distance is the one a person cares about: a robot that takes an extra 200 ms to stop matters because of the extra 4 cm."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The numbers come from the supervisor topic. After the last odometry message the supervisor's 20 Hz timer notices within 250 to 300 ms, the DiffDrive system brakes at 1 m/s² which takes 0.2 s from 0.2 m/s, and "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " shows it up to one odometry period of 33 ms later: about 0.53 s, and about 8 cm at 0.2 m/s. The limits below are 1.50 s and 0.25 m, roughly three times each, so a busy machine doesn't turn a pass into a failure. Build 3 measures the real numbers and tightens them."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the tests first, in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/test/scenario_test.cpp"
+         },
+         {
+          "t": "text",
+          "v": ", next to the ones already there. Start with the measurement that decides everything else:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "TEST(FirstRest, NeedsTheStillnessToLastLongEnough) {\n  const auto run = *bench::parse_samples(\"0 0.2\\n1 0.0\\n2 0.2\\n3 0.0\\n4 0.0\\n5 0.0\\n\");\n  // The still moment at 1 s is one sample long; the stretch from 3 s lasts two seconds.\n  EXPECT_EQ(bench::first_rest(run, 0.01, std::chrono::seconds(2)), bench::Time{std::chrono::seconds(3)});\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write "
+        },
+        {
+         "t": "code",
+         "v": "parse_samples"
+        },
+        {
+         "t": "text",
+         "v": " as a small helper in the test file, turning \"seconds speed\" lines into samples, so that each case reads as the shape of a run rather than as ten lines of braces. Add one case each for: a run that is still moving at the end has no first rest; "
+        },
+        {
+         "t": "code",
+         "v": "between"
+        },
+        {
+         "t": "text",
+         "v": " returns the samples inside its two times and nothing when they cross; a "
+        },
+        {
+         "t": "code",
+         "v": "Cue"
+        },
+        {
+         "t": "text",
+         "v": " is due once and never again; and "
+        },
+        {
+         "t": "code",
+         "v": "missing_odom_checks"
+        },
+        {
+         "t": "text",
+         "v": " with no cue leaves every check unmeasured. Run "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and watch it fail to compile."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the measurements to "
+         },
+         {
+          "t": "code",
+          "v": "bench/scenario.hpp"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "src/scenario.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". Here they are with a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that judges three made-up runs:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <chrono>\n#include <cmath>\n#include <compare>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nnamespace bench {\n\n// From bench/time.hpp and bench/scenario.hpp, as the earlier topics left them.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\nstruct Sample {\n  Time at;\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double speed_mps = 0.0;\n};\n\nenum class Compare { at_least, at_most };\n\nstruct Check {\n  std::string what;\n  std::string unit;\n  Compare compare;\n  double limit;\n  std::optional<double> measured;\n};\n\n[[nodiscard]] bool met(const Check& check) {\n  if (!check.measured) return false;\n  return check.compare == Compare::at_least ? *check.measured >= check.limit : *check.measured <= check.limit;\n}\n\nstruct Verdict {\n  std::string scenario;\n  std::int64_t samples;\n  bool passed;\n  std::vector<Check> checks;\n};\n\n[[nodiscard]] Verdict judge(std::string scenario, std::int64_t samples, std::vector<Check> checks) {\n  const bool passed = std::ranges::all_of(checks, met);\n  return {.scenario = std::move(scenario), .samples = samples, .passed = passed, .checks = std::move(checks)};\n}\n\nnamespace {\n\n[[nodiscard]] double seconds(std::chrono::nanoseconds d) { return std::chrono::duration<double>(d).count(); }\n\n[[nodiscard]] std::string with_unit(double value, std::string_view unit) {\n  return unit.empty() ? std::format(\"{:.2f}\", value) : std::format(\"{:.2f} {}\", value, unit);\n}\n\n[[nodiscard]] std::string line(const Check& check) {\n  const std::string measured = check.measured ? with_unit(*check.measured, check.unit) : std::string(\"not measured\");\n  return std::format(\"{:<6} {}: {}, {} {}\\n\", met(check) ? \"ok\" : \"failed\", check.what, measured,\n                     check.compare == Compare::at_least ? \"at least\" : \"at most\", with_unit(check.limit, check.unit));\n}\n\n}  // namespace\n\n[[nodiscard]] std::string describe(const Verdict& verdict) {\n  std::string text = std::format(\"{}\\nscenario: {}\\nsamples: {}\\n\", verdict.passed ? \"pass\" : \"fail\",\n                                 verdict.scenario, verdict.samples);\n  for (const Check& check : verdict.checks) text += line(check);\n  return text;\n}\n\n[[nodiscard]] std::optional<double> top_speed_mps(std::span<const Sample> run) {\n  if (run.empty()) return std::nullopt;\n  return std::ranges::max(run | std::views::transform([](const Sample& s) { return std::abs(s.speed_mps); }));\n}\n\n[[nodiscard]] std::span<const Sample> since(std::span<const Sample> run, Time from) {\n  return {std::ranges::lower_bound(run, from, {}, &Sample::at), run.end()};\n}\n\n// New in this topic.\n\n// The samples whose time lies in [from, to]. Two binary searches, as the run is in time order.\n[[nodiscard]] std::span<const Sample> between(std::span<const Sample> run, Time from, Time to) {\n  const auto first = std::ranges::lower_bound(run, from, {}, &Sample::at);\n  const auto last = std::ranges::upper_bound(run, to, {}, &Sample::at);\n  if (first >= last) return {};\n  return {first, last};\n}\n\n// The first time from which the robot stayed within speed_limit_mps for at least for_at_least.\n// Nothing when it never did. The loop is the rule: no standard algorithm names \"the first\n// stretch of values long enough\", and writing it out keeps the boundary exact.\n[[nodiscard]] std::optional<Time> first_rest(std::span<const Sample> run, double speed_limit_mps,\n                                             std::chrono::nanoseconds for_at_least) {\n  std::optional<Time> start;\n  for (const Sample& sample : run) {\n    if (std::abs(sample.speed_mps) > speed_limit_mps) {\n      start.reset();\n      continue;\n    }\n    if (!start) start = sample.at;\n    if (sample.at.since_epoch - start->since_epoch >= for_at_least) return start;\n  }\n  return std::nullopt;\n}\n\n// A one-off cue at a moment of the run: due once, when the time has come.\nclass Cue {\n public:\n  explicit Cue(std::chrono::nanoseconds at) : at_(at) {}\n\n  [[nodiscard]] bool due(std::chrono::nanoseconds since_start) {\n    if (fired_ || since_start < at_) return false;\n    fired_ = true;\n    return true;\n  }\n\n  [[nodiscard]] bool fired() const { return fired_; }\n\n private:\n  std::chrono::nanoseconds at_;\n  bool fired_ = false;\n};\n\n// What the missing-odometry scenario requires once the supervisor's input is cut.\nstruct StopLimits {\n  std::chrono::nanoseconds before;   // the window before the cue in which the robot must be driving\n  double driving_mps;                // the speed that proves it was driving when the cue went out\n  std::chrono::nanoseconds to_rest;  // from the cue until the robot is at rest\n  double creep_m;                    // how far it may travel in that time\n  double resume_mps;                 // the speed that counts as driving again\n};\n\n// What makes this scenario different from normal operation. The runner appends these to the\n// route's own checks, so one verdict covers both.\n[[nodiscard]] std::vector<Check> missing_odom_checks(std::span<const Sample> run, std::optional<Time> cue,\n                                                     std::chrono::nanoseconds drop_length,\n                                                     const StopLimits& limits) {\n  using namespace std::chrono_literals;\n  const std::optional<Time> rest = cue ? first_rest(since(run, *cue), 0.01, 300ms) : std::nullopt;\n  const auto to_rest = [&]() -> std::optional<double> {\n    if (!rest || !cue) return std::nullopt;\n    return seconds(rest->since_epoch - cue->since_epoch);\n  };\n  const auto creep = [&]() -> std::optional<double> {\n    if (!rest || !cue) return std::nullopt;\n    const std::span<const Sample> stopping = between(run, *cue, *rest);\n    if (stopping.empty()) return std::nullopt;\n    return std::hypot(stopping.back().x_m - stopping.front().x_m, stopping.back().y_m - stopping.front().y_m);\n  };\n  const auto resumed = [&]() -> std::optional<double> {\n    if (!cue) return std::nullopt;\n    return top_speed_mps(since(run, {cue->since_epoch + drop_length}));\n  };\n  // Without this one the scenario could pass for the wrong reason: a cue that lands while the\n  // robot is turning on the spot finds it already at rest, and the stop proves nothing.\n  const auto was_driving = [&]() -> std::optional<double> {\n    if (!cue) return std::nullopt;\n    return top_speed_mps(between(run, {cue->since_epoch - limits.before}, *cue));\n  };\n  return {{.what = \"the drop cue went out at\",\n           .unit = \"s\",\n           .compare = Compare::at_least,\n           .limit = 0.0,\n           .measured = cue ? std::optional<double>(seconds(cue->since_epoch)) : std::nullopt},\n          {.what = \"top speed in the second before the cue\",\n           .unit = \"m/s\",\n           .compare = Compare::at_least,\n           .limit = limits.driving_mps,\n           .measured = was_driving()},\n          {.what = \"time from the cue to the robot at rest\",\n           .unit = \"s\",\n           .compare = Compare::at_most,\n           .limit = seconds(limits.to_rest),\n           .measured = to_rest()},\n          {.what = \"distance travelled after the cue\",\n           .unit = \"m\",\n           .compare = Compare::at_most,\n           .limit = limits.creep_m,\n           .measured = creep()},\n          {.what = \"top speed after odometry returned\",\n           .unit = \"m/s\",\n           .compare = Compare::at_least,\n           .limit = limits.resume_mps,\n           .measured = resumed()}};\n}\n\n}  // namespace bench\n\n// One odometry message of a made-up run, half a second of simulated time apart.\nstruct Moment {\n  std::chrono::milliseconds t;\n  double x_m;\n  double speed_mps;\n};\n\n[[nodiscard]] std::vector<bench::Sample> samples(std::span<const Moment> moments) {\n  std::vector<bench::Sample> run;\n  for (const Moment& moment : moments) {\n    run.push_back({.at = {moment.t}, .x_m = moment.x_m, .y_m = 0.0, .speed_mps = moment.speed_mps});\n  }\n  return run;\n}\n\nint main() {\n  using namespace std::chrono_literals;\n  const std::optional<bench::Time> cue{bench::Time{5000ms}};\n  constexpr auto drop = 2000ms;\n  constexpr bench::StopLimits limits{\n      .before = 1000ms, .driving_mps = 0.10, .to_rest = 1200ms, .creep_m = 0.25, .resume_mps = 0.05};\n\n  // The supervisor doing its job: the cue at 5.0 s, the stop out at about 5.3 s, the robot at\n  // rest from 6.0 s, and driving again once odometry returns at 7.0 s.\n  constexpr std::array<Moment, 11> stopped{{{.t = 4000ms, .x_m = 0.40, .speed_mps = 0.20},\n                                            {.t = 4500ms, .x_m = 0.50, .speed_mps = 0.20},\n                                            {.t = 5000ms, .x_m = 0.60, .speed_mps = 0.20},\n                                            {.t = 5500ms, .x_m = 0.69, .speed_mps = 0.13},\n                                            {.t = 6000ms, .x_m = 0.72, .speed_mps = 0.00},\n                                            {.t = 6500ms, .x_m = 0.72, .speed_mps = 0.00},\n                                            {.t = 7000ms, .x_m = 0.72, .speed_mps = 0.00},\n                                            {.t = 7500ms, .x_m = 0.74, .speed_mps = 0.10},\n                                            {.t = 8000ms, .x_m = 0.78, .speed_mps = 0.20},\n                                            {.t = 8500ms, .x_m = 0.88, .speed_mps = 0.20},\n                                            {.t = 9000ms, .x_m = 0.98, .speed_mps = 0.20}}};\n  const auto reacted = samples(stopped);\n  std::cout << bench::describe(bench::judge(\"missing_odom\", std::ssize(reacted),\n                                            bench::missing_odom_checks(reacted, cue, drop, limits)));\n  std::cout << '\\n';\n\n  // A supervisor whose odometry timeout was raised past the drop: nothing stops the robot.\n  std::array<Moment, 11> ignored = stopped;\n  double x_m = 0.40;\n  for (Moment& moment : ignored) {\n    moment.x_m = x_m;\n    moment.speed_mps = 0.20;\n    x_m += 0.10;\n  }\n  const auto drove_on = samples(ignored);\n  std::cout << bench::describe(bench::judge(\"missing_odom\", std::ssize(drove_on),\n                                            bench::missing_odom_checks(drove_on, cue, drop, limits)));\n  std::cout << '\\n';\n\n  // The relay never answered, so the cue never went out and nothing after it can be judged.\n  std::cout << bench::describe(bench::judge(\"missing_odom\", std::ssize(reacted),\n                                            bench::missing_odom_checks(reacted, std::nullopt, drop, limits)));\n  std::cout << '\\n';\n\n  bench::Cue at_six{6s};\n  const bool early = at_six.due(5s);\n  const bool on_time = at_six.due(6s);\n  const bool again = at_six.due(7s);\n  std::cout << std::format(\"a cue at 6 s: due at 5 s {}, at 6 s {}, again at 7 s {}\\n\", early, on_time, again);\n}"
+      },
+      {
+       "t": "output",
+       "text": "pass\nscenario: missing_odom\nsamples: 11\nok     the drop cue went out at: 5.00 s, at least 0.00 s\nok     top speed in the second before the cue: 0.20 m/s, at least 0.10 m/s\nok     time from the cue to the robot at rest: 1.00 s, at most 1.20 s\nok     distance travelled after the cue: 0.12 m, at most 0.25 m\nok     top speed after odometry returned: 0.20 m/s, at least 0.05 m/s\n\nfail\nscenario: missing_odom\nsamples: 11\nok     the drop cue went out at: 5.00 s, at least 0.00 s\nok     top speed in the second before the cue: 0.20 m/s, at least 0.10 m/s\nfailed time from the cue to the robot at rest: not measured, at most 1.20 s\nfailed distance travelled after the cue: not measured, at most 0.25 m\nok     top speed after odometry returned: 0.20 m/s, at least 0.05 m/s\n\nfail\nscenario: missing_odom\nsamples: 11\nfailed the drop cue went out at: not measured, at least 0.00 s\nfailed top speed in the second before the cue: not measured, at least 0.10 m/s\nfailed time from the cue to the robot at rest: not measured, at most 1.20 s\nfailed distance travelled after the cue: not measured, at most 0.25 m\nfailed top speed after odometry returned: not measured, at least 0.05 m/s\n\na cue at 6 s: due at 5 s false, at 6 s true, again at 7 s false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three verdicts are the three outcomes worth telling apart. The first is the bench working. The second is a supervisor that never noticed, and it fails on the two checks that describe the stop while the others pass, so the report names the supervisor rather than the run. The third is a cue that never went out, where every check is unmeasured: nothing was tested, and a scenario that tested nothing must fail rather than pass quietly."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "first_rest"
+        },
+        {
+         "t": "text",
+         "v": " is a forward search and "
+        },
+        {
+         "t": "code",
+         "v": "at_rest_since"
+        },
+        {
+         "t": "text",
+         "v": " from the smoke scenario is a backward one, and the difference is the question each answers. The smoke scenario asks whether the robot ended the run at rest, so it looks at the trailing stretch. Here the robot stops in the middle and drives on, so the question is when it first came to rest after the cue, and the trailing search would find the end of the run or nothing at all. Both are in "
+        },
+        {
+         "t": "code",
+         "v": "bench/scenario.hpp"
+        },
+        {
+         "t": "text",
+         "v": " with names that say which is which."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the remaining test cases, run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " until it is green, and commit on a branch."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the new cases pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, you saw them fail before the functions existed, and you can say why the check on the second before the cue is there."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "./run_scenario.sh missing_odom"
+        },
+        {
+         "t": "text",
+         "v": " drives the route, cuts odometry partway through, and writes a verdict that covers both the route and the stop."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The runner gains one job: it fires the relay's drop service at a chosen moment and records the simulated time it went out. Three details in that sentence do the work."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The cue's time is measured from the first odometry message, the same zero the plan uses, so the scenario's timetable and its cue are on one clock. The cue is spent only when the relay's service is actually there, checked with "
+        },
+        {
+         "t": "code",
+         "v": "service_is_ready()"
+        },
+        {
+         "t": "text",
+         "v": " before "
+        },
+        {
+         "t": "code",
+         "v": "due()"
+        },
+        {
+         "t": "text",
+         "v": " is asked: a cue thrown at a service that discovery hasn't found yet would be lost, and the run would report a stop that never had a chance to happen. And the request is sent with "
+        },
+        {
+         "t": "code",
+         "v": "async_send_request"
+        },
+        {
+         "t": "text",
+         "v": " and a callback. Waiting for the reply inside the timer callback would deadlock, because the executor that has to deliver the reply is the one stuck in the wait."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Change "
+         },
+         {
+          "t": "code",
+          "v": "ScenarioRunner"
+         },
+         {
+          "t": "text",
+          "v": ". The new members are "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<bench::Cue> cue_"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<bench::Time> drop_cue_"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "std::chrono::nanoseconds drop_"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "bench::StopLimits stop_limits_"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::Client<Trigger>::SharedPtr drop_client_"
+         },
+         {
+          "t": "text",
+          "v": ", with "
+         },
+         {
+          "t": "code",
+          "v": "using Trigger = example_interfaces::srv::Trigger;"
+         },
+         {
+          "t": "text",
+          "v": " as in the relay:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In the constructor, after the plan. Only this scenario has a cue, so only it gets a client.\ndrop_ = std::chrono::milliseconds(declare_parameter<std::int64_t>(\"drop_ms\", 2000));\nstop_limits_ = {.before = std::chrono::milliseconds(declare_parameter<std::int64_t>(\"before_ms\", 1000)),\n                .driving_mps = declare_parameter<double>(\"driving_mps\", 0.10),\n                .to_rest = std::chrono::milliseconds(declare_parameter<std::int64_t>(\"to_rest_ms\", 1500)),\n                .creep_m = declare_parameter<double>(\"creep_m\", 0.25),\n                .resume_mps = declare_parameter<double>(\"resume_mps\", 0.05)};\nif (scenario_ == \"missing_odom\") {\n  cue_.emplace(std::chrono::milliseconds(declare_parameter<std::int64_t>(\"drop_at_ms\", 6000)));\n  drop_client_ = create_client<Trigger>(\"/odom_relay/drop\");\n}"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In on_tick(), before the phase is acted on. Asking whether the service is ready first means\n// the cue is never spent on a relay that discovery hasn't found yet.\nif (cue_ && drop_client_->service_is_ready() && cue_->due(now_time.since_epoch - started_->since_epoch)) {\n  drop_cue_ = now_time;\n  drop_client_->async_send_request(std::make_shared<Trigger::Request>(),\n                                   [this](rclcpp::Client<Trigger>::SharedFuture reply) {\n                                     RCLCPP_WARN(get_logger(), \"drop cue: %s\", reply.get()->message.c_str());\n                                   });\n}"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In finish(), after the route's checks are built:\nif (scenario_ == \"missing_odom\") {\n  const std::vector<bench::Check> stopping =\n      bench::missing_odom_checks(run_, drop_cue_, drop_, stop_limits_);\n  checks.insert(checks.end(), stopping.begin(), stopping.end());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The route's own checks come first and the stop's are appended, so one verdict says both whether the bench recovered and whether it finished the job. That is the reason "
+        },
+        {
+         "t": "code",
+         "v": "judge"
+        },
+        {
+         "t": "text",
+         "v": " took a list of checks rather than a fixed set: a scenario is the route plus whatever else it does to the robot."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "scenario_runner"
+        },
+        {
+         "t": "text",
+         "v": " now uses a service interface, so it leaves the shared "
+        },
+        {
+         "t": "code",
+         "v": "foreach"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_nodes/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": " the way the relay did. The loop carried two lines, not one, so both come with it; the "
+        },
+        {
+         "t": "code",
+         "v": "target_link_libraries"
+        },
+        {
+         "t": "text",
+         "v": " line it already had stays where it is:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "foreach(node supervisor route_follower)   # scenario_runner has left this list too\n  target_include_directories(${node} PRIVATE include)\n  ament_target_dependencies(${node} rclcpp geometry_msgs nav_msgs)\nendforeach()\n\ntarget_include_directories(scenario_runner PRIVATE include)\nament_target_dependencies(scenario_runner rclcpp geometry_msgs nav_msgs example_interfaces)\ntarget_link_libraries(scenario_runner bench_core::bench_core)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Forget the include line and the build stops at "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes/scenario_runner.hpp"
+        },
+        {
+         "t": "text",
+         "v": ", which is a short mystery: the file is there, and the target that needs it no longer knows where to look."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the scenario's parameter file, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_sim/config/missing_odom.yaml"
+         },
+         {
+          "t": "text",
+          "v": ". It is "
+         },
+         {
+          "t": "code",
+          "v": "normal.yaml"
+         },
+         {
+          "t": "text",
+          "v": " with the drop added:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "/**:\n  ros__parameters:\n    use_sim_time: true\n    goals_x: [0.8, 0.8]\n    goals_y: [0.0, 0.5]\n    tolerance_m: 0.1\n    drop_ms: 2000\nroute_follower:\n  ros__parameters:\n    start_after_ms: 2000\n    speed_mps: 0.2\nscenario_runner:\n  ros__parameters:\n    warmup_ms: 1000\n    drive_ms: 30000\n    settle_ms: 3000\n    time_limit_ms: 25000\n    speed_limit_mps: 0.3\n    drop_at_ms: 6000\n    before_ms: 1000\n    driving_mps: 0.1\n    to_rest_ms: 1500\n    creep_m: 0.25\n    resume_mps: 0.05"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "drop_ms"
+        },
+        {
+         "t": "text",
+         "v": " sits in the "
+        },
+        {
+         "t": "code",
+         "v": "/**"
+        },
+        {
+         "t": "text",
+         "v": " block because two nodes need the same value: the relay to know how long to drop, and the runner to know when odometry comes back. Written twice they could drift apart and the last check would measure the wrong stretch. "
+        },
+        {
+         "t": "code",
+         "v": "drive_ms"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "time_limit_ms"
+        },
+        {
+         "t": "text",
+         "v": " are longer than in "
+        },
+        {
+         "t": "code",
+         "v": "normal.yaml"
+        },
+        {
+         "t": "text",
+         "v": " because the robot now stands still for two seconds in the middle of its route, and the tolerance has to hold the route plus the drop."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Pick the cue's moment so that it lands while the robot is driving straight. With the follower starting at 2 s and the first leg taking about four seconds, a cue at 6 s falls near the first goal or in the turn after it, and a turn on the spot has a forward speed of zero, which is the trap the second check exists for. Run it once and read the log and the verdict:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh\n./run_scenario.sh missing_odom; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "If the check on the second before the cue fails or the time to rest comes out near zero, the cue landed during the turn. Move "
+        },
+        {
+         "t": "code",
+         "v": "drop_at_ms"
+        },
+        {
+         "t": "text",
+         "v": " to a moment in the middle of a straight leg, run it again, and write down which moment you chose and why."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Watch it once with the window open, which is worth the minute it costs:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim scenario.launch.py scenario:=missing_odom verdict_file:=/tmp/missing.txt headless:=False"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The robot drives, stops on its own partway through, stands for two seconds, and carries on to the last goal. In the log the relay's warning about the drop comes first, the supervisor's stale odometry follows about a quarter of a second later, and the supervisor's line about forwarding commands again comes two seconds after the cue."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when "
+        },
+        {
+         "t": "code",
+         "v": "./run_scenario.sh missing_odom"
+        },
+        {
+         "t": "text",
+         "v": " writes a verdict with the route's four checks and the stop's five, the robot visibly stops and resumes, and the cue lands while it is driving straight."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 3",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the scenario's limits come from five measured runs, and you have watched it fail for two different causes, each named by a single line of the verdict."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it five times and collect the numbers that matter:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "for i in 1 2 3 4 5; do ./run_scenario.sh missing_odom; echo \"run $i exit $?\"; cp results/missing_odom.txt results/missing_odom_$i.txt; done\ngrep -h \"to the robot at rest\" results/missing_odom_[1-5].txt\ngrep -h \"distance travelled after the cue\" results/missing_odom_[1-5].txt"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Hold the largest of each against the arithmetic from Build 1: about 0.53 s and about 8 cm. A measured 0.6 s is the bench behaving as designed. A measured 1.4 s against a limit of 1.5 s is a limit about to fail on a busy machine, and it is also a number to explain, because nothing in the design accounts for the extra 0.8 s. Write down both the range and the gap to the arithmetic, and tighten the two limits to about twice the largest value you saw."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that the scenario reports a failure, first from the scenario's own side. Set "
+         },
+         {
+          "t": "code",
+          "v": "drop_ms"
+         },
+         {
+          "t": "text",
+          "v": " to 200 in "
+         },
+         {
+          "t": "code",
+          "v": "missing_odom.yaml"
+         },
+         {
+          "t": "text",
+          "v": " and run it again:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./run_scenario.sh missing_odom; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The robot never stops, and the verdict fails on the time to rest and the distance. That is correct and it is not a bug in the supervisor: a 200 ms gap is shorter than the 250 ms odometry timeout, so the supervisor is built to ride it out, and a scenario that demands a stop for it is asking for the wrong thing. This is the relationship to write down: a drop that tests the supervisor has to be several timeouts long, and 2 s is eight of them. Put "
+        },
+        {
+         "t": "code",
+         "v": "drop_ms"
+        },
+        {
+         "t": "text",
+         "v": " back."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Now prove it from the supervisor's side, which is the failure the scenario exists to catch. In "
+         },
+         {
+          "t": "code",
+          "v": "include/bench_nodes/supervisor.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", change the default of "
+         },
+         {
+          "t": "code",
+          "v": "odom_timeout_ms"
+         },
+         {
+          "t": "text",
+          "v": " from 250 to 5000, rebuild with "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " and run the scenario again. The robot drives through the whole drop without stopping, and the verdict fails on the time to rest and the distance while the route's own checks still pass: the robot did its job and the safety rule did not. Put the default back and run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " once more to confirm it passes again."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That pair is the point of the topic. The scenario is only worth running if it can tell a working supervisor from a broken one, and the two runs above are the evidence that it can."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Check what the scenario costs and where it can run:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "time ./run_scenario.sh missing_odom"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down the wall time next to the smoke and normal figures. The run holds a two second drop and a longer route, so it is the most expensive scenario the bench has so far, and prj-ci decides how often that is worth paying."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "five runs in a row pass, and the time to rest and the distance are written down with their range and their gap to the arithmetic;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a 200 ms drop gives a "
+         },
+         {
+          "t": "code",
+          "v": "fail"
+         },
+         {
+          "t": "text",
+          "v": " that you can explain without changing any code;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "an odometry timeout of 5000 ms gives a "
+         },
+         {
+          "t": "code",
+          "v": "fail"
+         },
+         {
+          "t": "text",
+          "v": " on the stop while the route's checks still pass, and the default is back at 250 ms with "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " green."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add the missing-odometry scenario to the \"Scenarios\" section of "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic, and the stop-verification topic will start from it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the shape of the run in four lines: the route from the normal scenario, the cue at its chosen moment with the reason for that moment, the drop of two seconds, and the recovery. Then the five checks with their limits, and under each the number you measured over five runs. Put the supervisor's arithmetic next to the two stop limits, so the page shows the predicted 0.53 s and about 8 cm beside what the bench really does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then two short paragraphs. The first says why the scenario checks that the robot was driving in the second before the cue, and what would pass without it. The second records the two failures you produced, the 200 ms drop and the 5000 ms timeout, each with the verdict line that named it and one sentence on what it proves about the scenario rather than about the robot."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "services",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-Client-Libraries/Writing-A-Simple-Cpp-Service-And-Client.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "asynchronous client example",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/services/async_client/main.cpp"
+     },
+     {
+      "t": "text",
+      "v": " on the jazzy branch, which sends a request from a callback without waiting for the reply there."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "Client::service_is_ready and async_send_request",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/client.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", for asking whether a service exists before spending a cue on it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article on "
+     },
+     {
+      "t": "a",
+      "v": "clock and time",
+      "href": "https://design.ros2.org/articles/clock_and_time.html"
+     },
+     {
+      "t": "text",
+      "v": ", for measuring the cue and the drop on the simulation clock."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot 3 model in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_turtlebot_simulation 1.3.0",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/1.3.0/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+     },
+     {
+      "t": "text",
+      "v": ": odometry at 30 Hz and the braking limit of 1 m/s², which give the 0.53 s and the 8 cm this scenario is judged against."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "lower_bound"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "upper_bound"
+     },
+     {
+      "t": "text",
+      "v": " with a projection cut the two stretches out of the run."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": ", which is how a check that was never measured stays apart from one that measured zero."
+     }
+    ]
+   ]
+  }
+ ]
+}

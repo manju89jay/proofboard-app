@@ -1,0 +1,1678 @@
+{
+ "id": "prj-normal-scenario",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage turns the runner's smoke test into a scenario about the robot doing something. The route is two goals, in front and then to the side, driven by a follower that turns on the spot before it drives whenever the heading error is large, so a small walled world doesn't turn a wide arc into a wall. Four checks judge the run: every goal reached in order, the robot inside the last goal's tolerance at the end, the time from its first movement to the last goal, and its top speed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is that the judge never asks the follower how it did. Every check comes from the samples the runner collected on "
+    },
+    {
+     "t": "code",
+     "v": "/odom_raw"
+    },
+    {
+     "t": "text",
+     "v": ", so a follower reporting success while the robot sits still fails anyway, and reaching a goal alone is not enough: a robot that clips the goal circle at speed and drives into a wall has technically arrived, which is why the end position is checked too."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: "
+    },
+    {
+     "t": "code",
+     "v": "./run_scenario.sh normal"
+    },
+    {
+     "t": "text",
+     "v": " prints "
+    },
+    {
+     "t": "code",
+     "v": "pass"
+    },
+    {
+     "t": "text",
+     "v": " and exits 0 five times running, with tolerances set above the largest of those five measured runs rather than guessed. And it fails in the ways we asked it to: cutting the relay leaves the robot unmoved with the speed check still met, and a tightened time tolerance on the same run gives exactly one failed line."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "scenario",
+   "title": "Motion task and its tolerance checks",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " holds the bench's motion task, a route of goals and the commands that reach them, with GoogleTest tests that you wrote first and saw fail."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The smoke scenario drove forward for three seconds. That proved the runner and nothing about the robot: a robot with one wheel locked passes it. Normal operation has to mean that the robot got somewhere, so the task is a list of goals, each with a position tolerance, and the verdict comes from where the robot actually stood."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two goals, in front and then to the side, so that one run covers driving straight, turning and driving again. In the odometry frame the robot starts at the origin facing along x, so (0.80, 0.00) and then (0.80, 0.50) with a tolerance of 0.10 m keep it inside about one metre of where it spawned. The sandbox world is small; open it in RViz from the frames topic, look at where the walls are, and move the goals closer in if a wall is nearer than a metre. Whatever you choose, write the numbers down: they are the scenario's definition from now on."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rules of the follower are four sentences:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "a goal counts as reached the first time the robot stands inside its tolerance, and then the next goal starts;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "while the goal lies more than "
+         },
+         {
+          "t": "code",
+          "v": "turn_first_rad"
+         },
+         {
+          "t": "text",
+          "v": " off the robot's heading, turn on the spot and don't drive;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "otherwise drive forward at "
+         },
+         {
+          "t": "code",
+          "v": "speed_mps"
+         },
+         {
+          "t": "text",
+          "v": " and turn at "
+         },
+         {
+          "t": "code",
+          "v": "turn_gain_hz"
+         },
+         {
+          "t": "text",
+          "v": " per radian of heading error, clamped to "
+         },
+         {
+          "t": "code",
+          "v": "turn_rps"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "when every goal is reached, send nothing."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Turning on the spot first is the part worth arguing about. A differential-drive robot that drives and turns at once follows an arc, and with a large heading error that arc is long and swings wide, which in a small walled world means a wall. Turning first costs a second and keeps the path close to the straight line between the goals, so the position tolerance is about the robot's accuracy rather than about the shape of its approach."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The heading error has to wrap. The difference of two angles can come out as 6.14 rad when the honest answer is 0.14 rad the other way, and a follower that believes the first one turns almost all the way round. "
+        },
+        {
+         "t": "code",
+         "v": "std::remainder(angle, 2π)"
+        },
+        {
+         "t": "text",
+         "v": " returns the value between -π and π, which is the wrapped angle, and it does it without a loop."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the tests first, in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/test/drive_test.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The first case is the wrap:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <numbers>\n\n#include <gtest/gtest.h>\n\n#include \"bench/drive.hpp\"\n\nTEST(HeadingError, TurnsTheShortWayRound) {\n  constexpr bench::Goal behind{.x_m = -1.0, .y_m = 0.0};\n  constexpr bench::Pose facing_away{.x_m = 0.0, .y_m = 0.0, .yaw_rad = -3.0};\n  // The goal lies at pi. From -3.0 rad the short way is 0.14 rad clockwise, not 6.14 the other way.\n  EXPECT_NEAR(bench::heading_error_rad(facing_away, behind), 3.0 - std::numbers::pi, 1e-12);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add one case each for: a robot inside the tolerance has arrived, and one a millimetre outside it has not; a heading error above "
+        },
+        {
+         "t": "code",
+         "v": "turn_first_rad"
+        },
+        {
+         "t": "text",
+         "v": " gives a command with no forward speed and the turn rate at its limit, with the sign of the error; a heading error below it gives the full forward speed; the turn rate is clamped to "
+        },
+        {
+         "t": "code",
+         "v": "turn_rps"
+        },
+        {
+         "t": "text",
+         "v": "; a "
+        },
+        {
+         "t": "code",
+         "v": "Route"
+        },
+        {
+         "t": "text",
+         "v": " whose goals are all reached sends zeros and reports its count; and "
+        },
+        {
+         "t": "code",
+         "v": "goals_from"
+        },
+        {
+         "t": "text",
+         "v": " refuses two arrays of different lengths. Add "
+        },
+        {
+         "t": "code",
+         "v": "drive"
+        },
+        {
+         "t": "text",
+         "v": " to the list in the test part of "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_core/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", which becomes "
+        },
+        {
+         "t": "code",
+         "v": "foreach(name drive odometry replay scenario supervisor)"
+        },
+        {
+         "t": "text",
+         "v": ". Run "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": ": it fails to compile, because "
+        },
+        {
+         "t": "code",
+         "v": "bench/drive.hpp"
+        },
+        {
+         "t": "text",
+         "v": " doesn't exist yet."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/include/bench/drive.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", with the definitions in "
+         },
+         {
+          "t": "code",
+          "v": "src/drive.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". Here is all of it as one program, with a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that drives the route against a toy robot:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <cmath>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numbers>\n#include <optional>\n#include <span>\n#include <utility>\n#include <vector>\n\nnamespace bench {\n\n// bench/drive.hpp: the motion task, with no clock and no ROS.\n\n// A planar pose in the odometry frame.\nstruct Pose {\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double yaw_rad = 0.0;\n};\n\n// Where the robot has to get to, and how close counts as arrived.\nstruct Goal {\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double tolerance_m = 0.10;\n};\n\n// What the follower is allowed to ask for.\nstruct Limits {\n  double speed_mps;       // forward speed while driving\n  double turn_rps;        // largest turn rate\n  double turn_first_rad;  // above this heading error, turn on the spot instead of driving\n  double turn_gain_hz;    // turn rate per radian of heading error while driving\n};\n\n// One command for /cmd_vel_nav.\nstruct Drive {\n  double forward_mps = 0.0;\n  double turn_rps = 0.0;\n};\n\n// The angle from -pi to pi that points the same way.\n[[nodiscard]] double wrapped_rad(double angle_rad) {\n  return std::remainder(angle_rad, 2 * std::numbers::pi);\n}\n\n[[nodiscard]] double range_m(const Pose& pose, const Goal& goal) {\n  return std::hypot(goal.x_m - pose.x_m, goal.y_m - pose.y_m);\n}\n\n// Where the goal lies, seen from the robot's own heading.\n[[nodiscard]] double heading_error_rad(const Pose& pose, const Goal& goal) {\n  return wrapped_rad(std::atan2(goal.y_m - pose.y_m, goal.x_m - pose.x_m) - pose.yaw_rad);\n}\n\n[[nodiscard]] bool arrived(const Pose& pose, const Goal& goal) {\n  return range_m(pose, goal) <= goal.tolerance_m;\n}\n\n[[nodiscard]] Drive drive_towards(const Pose& pose, const Goal& goal, const Limits& limits) {\n  if (arrived(pose, goal)) return {};\n  const double error = heading_error_rad(pose, goal);\n  if (std::abs(error) > limits.turn_first_rad) {\n    return {.forward_mps = 0.0, .turn_rps = std::copysign(limits.turn_rps, error)};\n  }\n  return {.forward_mps = limits.speed_mps,\n          .turn_rps = std::clamp(limits.turn_gain_hz * error, -limits.turn_rps, limits.turn_rps)};\n}\n\n// The route from two parameter arrays. Nothing when they aren't the same length: a ROS parameter\n// can't hold a list of pairs, and a mismatch would silently shorten or lengthen the route.\n[[nodiscard]] std::optional<std::vector<Goal>> goals_from(std::span<const double> x_m, std::span<const double> y_m,\n                                                          double tolerance_m) {\n  if (x_m.size() != y_m.size() || x_m.empty()) return std::nullopt;\n  std::vector<Goal> goals;\n  for (std::int64_t i = 0; i < std::ssize(x_m); ++i) {\n    const auto k = static_cast<std::size_t>(i);\n    goals.push_back({.x_m = x_m[k], .y_m = y_m[k], .tolerance_m = tolerance_m});\n  }\n  return goals;\n}\n\n// Drives a list of goals in order and stops at the last one. It reads nothing but the pose.\nclass Route {\n public:\n  Route(std::vector<Goal> goals, Limits limits) : goals_(std::move(goals)), limits_(limits) {}\n\n  // The command for this pose. A goal counts as reached the first time the robot is inside it.\n  [[nodiscard]] Drive on_pose(const Pose& pose) {\n    while (!done() && arrived(pose, goals_[static_cast<std::size_t>(reached_)])) ++reached_;\n    if (done()) return {};\n    return drive_towards(pose, goals_[static_cast<std::size_t>(reached_)], limits_);\n  }\n\n  [[nodiscard]] std::int64_t reached() const { return reached_; }\n  [[nodiscard]] bool done() const { return reached_ == std::ssize(goals_); }\n\n private:\n  std::vector<Goal> goals_;\n  Limits limits_;\n  std::int64_t reached_ = 0;\n};\n\n}  // namespace bench\n\n// A differential-drive robot with no slip, no delay and no acceleration limit. It is not the\n// simulator: it is enough to show that the route's own logic converges.\nstruct Wheelbase {\n  bench::Pose pose;\n\n  void step(const bench::Drive& drive, double dt_s) {\n    pose.x_m += drive.forward_mps * std::cos(pose.yaw_rad) * dt_s;\n    pose.y_m += drive.forward_mps * std::sin(pose.yaw_rad) * dt_s;\n    pose.yaw_rad = bench::wrapped_rad(pose.yaw_rad + drive.turn_rps * dt_s);\n  }\n};\n\nint main() {\n  constexpr double dt_s = 0.05;\n  constexpr bench::Limits limits{\n      .speed_mps = 0.20, .turn_rps = 0.60, .turn_first_rad = 0.20, .turn_gain_hz = 1.5};\n  constexpr std::array<double, 2> x_m{0.80, 0.80};\n  constexpr std::array<double, 2> y_m{0.00, 0.50};\n  const std::optional<std::vector<bench::Goal>> goals = bench::goals_from(x_m, y_m, 0.10);\n  if (!goals) return 1;\n  bench::Route route(*goals, limits);\n  Wheelbase robot;\n  std::int64_t reached = 0;\n  std::int64_t tick = 0;\n  for (; tick <= 400 && !route.done(); ++tick) {\n    const bench::Drive drive = route.on_pose(robot.pose);\n    if (route.reached() != reached) {\n      reached = route.reached();\n      std::cout << std::format(\"{:5.2f} s: goal {} reached at ({:.2f}, {:.2f})\\n\", static_cast<double>(tick) * dt_s,\n                               reached, robot.pose.x_m, robot.pose.y_m);\n    }\n    if (tick % 40 == 0) {\n      std::cout << std::format(\"{:5.2f} s: at ({:5.2f}, {:5.2f}) facing {:5.2f} rad, forward {:.2f} m/s, turn {:5.2f} rad/s\\n\",\n                               static_cast<double>(tick) * dt_s, robot.pose.x_m, robot.pose.y_m, robot.pose.yaw_rad,\n                               drive.forward_mps, drive.turn_rps);\n    }\n    robot.step(drive, dt_s);\n  }\n  std::cout << std::format(\"finished after {:.2f} s, {} goals reached, at ({:.2f}, {:.2f})\\n\",\n                           static_cast<double>(tick) * dt_s, route.reached(), robot.pose.x_m, robot.pose.y_m);\n  constexpr std::array<double, 1> one_y{0.00};\n  std::cout << std::format(\"two x and one y make a route: {}\\n\", bench::goals_from(x_m, one_y, 0.10).has_value());\n}"
+      },
+      {
+       "t": "output",
+       "text": " 0.00 s: at ( 0.00,  0.00) facing  0.00 rad, forward 0.20 m/s, turn  0.00 rad/s\n 2.00 s: at ( 0.40,  0.00) facing  0.00 rad, forward 0.20 m/s, turn  0.00 rad/s\n 3.50 s: goal 1 reached at (0.70, 0.00)\n 4.00 s: at ( 0.70,  0.00) facing  0.30 rad, forward 0.00 m/s, turn  0.60 rad/s\n 6.00 s: at ( 0.73,  0.09) facing  1.30 rad, forward 0.20 m/s, turn  0.15 rad/s\n 7.60 s: goal 2 reached at (0.79, 0.41)\nfinished after 7.65 s, 2 goals reached, at (0.79, 0.41)\ntwo x and one y make a route: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the run rather than the code. The robot drives straight to (0.70, 0.00), which is the first goal's edge and not its centre: "
+        },
+        {
+         "t": "code",
+         "v": "arrived"
+        },
+        {
+         "t": "text",
+         "v": " is a tolerance, so the route moves on as soon as the robot is inside the circle. At 4.00 s it is turning on the spot at the full 0.60 rad/s with no forward speed, because the second goal is then about 1.07 rad off its heading, more than five times "
+        },
+        {
+         "t": "code",
+         "v": "turn_first_rad"
+        },
+        {
+         "t": "text",
+         "v": ". That number comes out of the run: from (0.70, 0.00) the goal at (0.80, 0.50) lies at 1.37 rad in the odometry frame, and the robot is already facing 0.30 rad after turning for half a second. By 6.00 s the heading error is under "
+        },
+        {
+         "t": "code",
+         "v": "turn_first_rad"
+        },
+        {
+         "t": "text",
+         "v": " and it drives with a small correcting turn. The whole route takes 7.65 s on a robot with no acceleration limit, which is the floor: the real one accelerates, and Build 3 measures what it costs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That toy robot is worth its ten lines. It is not the simulator and it proves nothing about Gazebo, but it does answer the one question the unit tests can't: put the rules in a loop and does the robot converge, or does it circle the goal forever? Circling is the usual way a follower like this fails, and it shows up here in a millisecond rather than in a 30 second scenario run."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A few details carry the rest. "
+         },
+         {
+          "t": "code",
+          "v": "Limits"
+         },
+         {
+          "t": "text",
+          "v": " keeps the four numbers together so a call names each one, and none of them is written twice. "
+         },
+         {
+          "t": "code",
+          "v": "Drive"
+         },
+         {
+          "t": "text",
+          "v": " is a pair of velocities, not a ROS message, so "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " stays free of ROS and the node does the conversion. "
+         },
+         {
+          "t": "code",
+          "v": "goals_from"
+         },
+         {
+          "t": "text",
+          "v": " exists because a ROS parameter can hold a list of doubles but not a list of pairs, so the route arrives as two arrays that could get out of step; it returns "
+         },
+         {
+          "t": "code",
+          "v": "std::optional"
+         },
+         {
+          "t": "text",
+          "v": " rather than trusting them, and the node refuses to start on a mismatch. "
+         },
+         {
+          "t": "code",
+          "v": "Route::on_pose"
+         },
+         {
+          "t": "text",
+          "v": " advances with a "
+         },
+         {
+          "t": "code",
+          "v": "while"
+         },
+         {
+          "t": "text",
+          "v": " and not an "
+         },
+         {
+          "t": "code",
+          "v": "if"
+         },
+         {
+          "t": "text",
+          "v": ", so a robot that is already inside two goals at once counts both, which happens when goals are closer together than their tolerance."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the rest of the test cases, run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " until it is green, and commit on a branch."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the drive tests pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, you saw them fail before the header existed, and the run above converges on your machine too."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes"
+        },
+        {
+         "t": "text",
+         "v": " has a "
+        },
+        {
+         "t": "code",
+         "v": "route_follower"
+        },
+        {
+         "t": "text",
+         "v": " that drives the route in the world, and you have watched the robot run it from end to end."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The architecture topic put a controller between the mission and the supervisor: it reads odometry as feedback and publishes "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel_nav"
+        },
+        {
+         "t": "text",
+         "v": ". This is that node. It reads "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", the relay's output, and not "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", and the difference matters in two topics' time: when the relay cuts "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", the follower loses its feedback exactly as the supervisor does, which is what a real controller would experience. The runner keeps reading "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", upstream of the relay, because the judge has to see the robot whatever the bench does to itself."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The follower waits before it drives. It starts counting at its first odometry message and holds still for "
+        },
+        {
+         "t": "code",
+         "v": "start_after_ms"
+        },
+        {
+         "t": "text",
+         "v": " of simulated time, 2 s by default. The reason is the runner: its own warm-up is shorter, 1 s, so by the time the robot first moves the runner is already collecting samples. If the robot moved first, the run would be judged from the middle of an acceleration and the time it took would come out short."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the node, "
+         },
+         {
+          "t": "code",
+          "v": "include/bench_nodes/route_follower.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", with its "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "src/route_follower_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The fence has "
+         },
+         {
+          "t": "code",
+          "v": "bench/drive.hpp"
+         },
+         {
+          "t": "text",
+          "v": " copied in, so that it builds on its own:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <chrono>\n#include <cinttypes>\n#include <cmath>\n#include <cstdint>\n#include <memory>\n#include <numbers>\n#include <optional>\n#include <span>\n#include <stdexcept>\n#include <string>\n#include <utility>\n#include <vector>\n\n#include <geometry_msgs/msg/quaternion.hpp>\n#include <geometry_msgs/msg/twist_stamped.hpp>\n#include <nav_msgs/msg/odometry.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nnamespace bench {\n\n// In the bench this is bench/drive.hpp from Build 1.\nstruct Pose {\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double yaw_rad = 0.0;\n};\n\nstruct Goal {\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double tolerance_m = 0.10;\n};\n\nstruct Limits {\n  double speed_mps;\n  double turn_rps;\n  double turn_first_rad;\n  double turn_gain_hz;\n};\n\nstruct Drive {\n  double forward_mps = 0.0;\n  double turn_rps = 0.0;\n};\n\n[[nodiscard]] double wrapped_rad(double angle_rad) {\n  return std::remainder(angle_rad, 2 * std::numbers::pi);\n}\n\n[[nodiscard]] double range_m(const Pose& pose, const Goal& goal) {\n  return std::hypot(goal.x_m - pose.x_m, goal.y_m - pose.y_m);\n}\n\n[[nodiscard]] double heading_error_rad(const Pose& pose, const Goal& goal) {\n  return wrapped_rad(std::atan2(goal.y_m - pose.y_m, goal.x_m - pose.x_m) - pose.yaw_rad);\n}\n\n[[nodiscard]] bool arrived(const Pose& pose, const Goal& goal) {\n  return range_m(pose, goal) <= goal.tolerance_m;\n}\n\n[[nodiscard]] Drive drive_towards(const Pose& pose, const Goal& goal, const Limits& limits) {\n  if (arrived(pose, goal)) return {};\n  const double error = heading_error_rad(pose, goal);\n  if (std::abs(error) > limits.turn_first_rad) {\n    return {.forward_mps = 0.0, .turn_rps = std::copysign(limits.turn_rps, error)};\n  }\n  return {.forward_mps = limits.speed_mps,\n          .turn_rps = std::clamp(limits.turn_gain_hz * error, -limits.turn_rps, limits.turn_rps)};\n}\n\n[[nodiscard]] std::optional<std::vector<Goal>> goals_from(std::span<const double> x_m, std::span<const double> y_m,\n                                                          double tolerance_m) {\n  if (x_m.size() != y_m.size() || x_m.empty()) return std::nullopt;\n  std::vector<Goal> goals;\n  for (std::int64_t i = 0; i < std::ssize(x_m); ++i) {\n    const auto k = static_cast<std::size_t>(i);\n    goals.push_back({.x_m = x_m[k], .y_m = y_m[k], .tolerance_m = tolerance_m});\n  }\n  return goals;\n}\n\nclass Route {\n public:\n  Route(std::vector<Goal> goals, Limits limits) : goals_(std::move(goals)), limits_(limits) {}\n\n  [[nodiscard]] Drive on_pose(const Pose& pose) {\n    while (!done() && arrived(pose, goals_[static_cast<std::size_t>(reached_)])) ++reached_;\n    if (done()) return {};\n    return drive_towards(pose, goals_[static_cast<std::size_t>(reached_)], limits_);\n  }\n\n  [[nodiscard]] std::int64_t reached() const { return reached_; }\n  [[nodiscard]] bool done() const { return reached_ == std::ssize(goals_); }\n\n private:\n  std::vector<Goal> goals_;\n  Limits limits_;\n  std::int64_t reached_ = 0;\n};\n\n}  // namespace bench\n\nnamespace bench_nodes {\n\nusing Command = geometry_msgs::msg::TwistStamped;\n\n// The yaw about z, the formula from the rotations topic. bench_core knows no ROS types, so the\n// conversion from a message lives here.\n[[nodiscard]] double yaw_of(const geometry_msgs::msg::Quaternion& q) {\n  return std::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));\n}\n\n// Drives the scenario's route: /odom is its feedback, /cmd_vel_nav its output. Every rule is in\n// bench::Route; this node converts messages and holds the clock.\nclass RouteFollower : public rclcpp::Node {\n public:\n  explicit RouteFollower(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"route_follower\", options),\n        start_after_(std::chrono::milliseconds(declare_parameter<std::int64_t>(\"start_after_ms\", 2000))),\n        route_(declare_route()) {\n    const rclcpp::QoS qos(rclcpp::KeepLast(10));\n    commands_ = create_publisher<Command>(\"cmd_vel_nav\", qos);\n    odometry_ = create_subscription<nav_msgs::msg::Odometry>(\n        \"odom\", qos, [this](const nav_msgs::msg::Odometry& message) { on_odometry(message); });\n  }\n\n private:\n  [[nodiscard]] bench::Route declare_route() {\n    const auto x_m = declare_parameter<std::vector<double>>(\"goals_x\", std::vector<double>{});\n    const auto y_m = declare_parameter<std::vector<double>>(\"goals_y\", std::vector<double>{});\n    const double tolerance_m = declare_parameter<double>(\"tolerance_m\", 0.10);\n    const bench::Limits limits{.speed_mps = declare_parameter<double>(\"speed_mps\", 0.20),\n                               .turn_rps = declare_parameter<double>(\"turn_rps\", 0.60),\n                               .turn_first_rad = declare_parameter<double>(\"turn_first_rad\", 0.20),\n                               .turn_gain_hz = declare_parameter<double>(\"turn_gain_hz\", 1.5)};\n    if (x_m.size() != y_m.size()) throw std::runtime_error(\"goals_x and goals_y have different lengths\");\n    return {bench::goals_from(x_m, y_m, tolerance_m).value_or(std::vector<bench::Goal>{}), limits};\n  }\n\n  void on_odometry(const nav_msgs::msg::Odometry& message) {\n    const rclcpp::Time stamp(message.header.stamp);\n    if (!first_) {\n      first_ = stamp;\n      return;\n    }\n    if (std::chrono::nanoseconds((stamp - *first_).nanoseconds()) < start_after_) return;\n\n    const bench::Pose pose{.x_m = message.pose.pose.position.x,\n                           .y_m = message.pose.pose.position.y,\n                           .yaw_rad = yaw_of(message.pose.pose.orientation)};\n    const bench::Drive drive = route_.on_pose(pose);\n    if (route_.done()) {\n      if (!announced_) {\n        announced_ = true;\n        RCLCPP_INFO(get_logger(), \"route done: %\" PRId64 \" goals reached\", route_.reached());\n      }\n      return;\n    }\n    Command command;\n    command.header.stamp = stamp;\n    command.header.frame_id = \"base_link\";\n    command.twist.linear.x = drive.forward_mps;\n    command.twist.angular.z = drive.turn_rps;\n    commands_->publish(command);\n  }\n\n  std::chrono::nanoseconds start_after_;\n  bench::Route route_;\n  std::optional<rclcpp::Time> first_;\n  bool announced_ = false;\n  rclcpp::Publisher<Command>::SharedPtr commands_;\n  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_;\n};\n\n}  // namespace bench_nodes\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<bench_nodes::RouteFollower>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The node has no timer. A command goes out for every odometry message, so the follower runs at the rate of its feedback, about 30 Hz from the TurtleBot's DiffDrive system, and it stops sending the moment the feedback stops. That is the behaviour the missing-odometry scenario wants: a controller starved of feedback should go quiet, and then the supervisor's command timeout is what stops the robot. The stamp on the command is the stamp of the odometry it answers, which makes a recorded run say which measurement produced which command. When every goal is reached the node logs once and sends nothing more, and the supervisor takes over with its stops half a second later."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add it to "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": " by adding its name to the "
+         },
+         {
+          "t": "code",
+          "v": "foreach"
+         },
+         {
+          "t": "text",
+          "v": " that the supervisor, the relay and the runner already share, and to the "
+         },
+         {
+          "t": "code",
+          "v": "install(TARGETS ...)"
+         },
+         {
+          "t": "text",
+          "v": " line:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "add_executable(route_follower src/route_follower_node.cpp)\nforeach(node supervisor odom_relay scenario_runner route_follower)   # the fourth name is the new one\n  target_include_directories(${node} PRIVATE include)\n  ament_target_dependencies(${node} rclcpp geometry_msgs nav_msgs)\nendforeach()\ntarget_link_libraries(route_follower bench_core::bench_core)"
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the wiring test, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/test/test_route_follower.cpp"
+         },
+         {
+          "t": "text",
+          "v": ", with "
+         },
+         {
+          "t": "code",
+          "v": "ament_add_ros_isolated_gtest"
+         },
+         {
+          "t": "text",
+          "v": ". The rules are tested in "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " already; this one checks that the node reads the right topic, converts the message correctly and publishes a command of the right type. The fake publishes one pose over and over and collects what comes back:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In the fixture: a fake that holds the robot at the origin facing along x.\nnav_msgs::msg::Odometry at_origin() {\n  nav_msgs::msg::Odometry message;\n  message.header.stamp = fake->now();\n  message.pose.pose.orientation.w = 1.0;  // the identity rotation, not a zero quaternion\n  return message;\n}"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "TEST_F(RouteFollowerTest, DrivesTowardsAGoalStraightAhead) {\n  // start_after_ms is 0 here: without /clock the node's clock is the wall clock.\n  ASSERT_TRUE(spin_until([&] { return !commands.empty(); }));\n  EXPECT_DOUBLE_EQ(commands.front().twist.linear.x, 0.2);\n  EXPECT_NEAR(commands.front().twist.angular.z, 0.0, 1e-9);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build the fixture as the supervisor's test does: "
+        },
+        {
+         "t": "code",
+         "v": "SetUpTestSuite"
+        },
+        {
+         "t": "text",
+         "v": " starts ROS, one executor holds both nodes, "
+        },
+        {
+         "t": "code",
+         "v": "spin_until"
+        },
+        {
+         "t": "text",
+         "v": " waits for a condition with a five second deadline, and the follower is constructed with "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::NodeOptions().append_parameter_override(\"start_after_ms\", 0)"
+        },
+        {
+         "t": "text",
+         "v": " and the two goal arrays. Add a second case with the fake pose inside the last goal, where the follower sends nothing and logs that the route is done. A quaternion of all zeros is not a rotation, and "
+        },
+        {
+         "t": "code",
+         "v": "yaw_of"
+        },
+        {
+         "t": "text",
+         "v": " on it returns 0 rather than failing, so the fake sets "
+        },
+        {
+         "t": "code",
+         "v": "w"
+        },
+        {
+         "t": "text",
+         "v": " to 1.0 and the test would pass for the wrong reason without that line."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", then drive the route in the world:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim bench.launch.py headless:=False        # terminal 1\nros2 run bench_nodes odom_relay                              # terminal 2\nros2 run bench_nodes route_follower --ros-args -p use_sim_time:=true \\\n  -p goals_x:=\"[0.8, 0.8]\" -p goals_y:=\"[0.0, 0.5]\"          # terminal 3\nros2 topic echo /odom_raw --field pose.pose.position         # terminal 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The robot waits two simulated seconds, drives to about (0.7, 0.0), turns on the spot, drives to the second goal and stops. Terminal 4 gives the position it actually reached; compare it with (0.80, 0.50) and note the error, which is the number Build 3 turns into a tolerance. Then try it with the goal arrays of different lengths and check that the node refuses to start with the message from "
+        },
+        {
+         "t": "code",
+         "v": "declare_route"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the robot drives both goals in the world, the wiring test passes in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, and a mismatched pair of goal arrays stops the node with a message that says what is wrong."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 3",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "./run_scenario.sh normal"
+        },
+        {
+         "t": "text",
+         "v": " runs the motion task headless and writes pass or fail, with tolerances you took from five measured runs rather than from a guess."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The judge never asks the follower how it did. Every check is computed from the samples the runner collected on "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", so a follower that reports success while the robot sits still fails the scenario. Four checks say what normal operation means:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "every goal was reached, in order;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "at the end of the run the robot stood within the last goal's tolerance, so it stopped there rather than driving through;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the time from the robot's first movement to the last goal was inside the time tolerance;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "no sample exceeded the speed limit."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third one is measured from the robot's first movement and not from the start of a phase, which keeps the scenario independent of when the follower happens to begin. The second exists because the first alone is weak: a robot that clips the goal circle at speed and carries on into a wall has reached the goal."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the measurements to "
+         },
+         {
+          "t": "code",
+          "v": "bench/scenario.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", tests first. Here they are with a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that judges two made-up runs:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <chrono>\n#include <cmath>\n#include <compare>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nnamespace bench {\n\n// From bench/time.hpp, bench/drive.hpp and bench/scenario.hpp, as the earlier topics left them.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\nstruct Goal {\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double tolerance_m = 0.10;\n};\n\nstruct Sample {\n  Time at;\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double speed_mps = 0.0;\n};\n\nenum class Compare { at_least, at_most };\n\nstruct Check {\n  std::string what;\n  std::string unit;\n  Compare compare;\n  double limit;\n  std::optional<double> measured;\n};\n\n[[nodiscard]] bool met(const Check& check) {\n  if (!check.measured) return false;\n  return check.compare == Compare::at_least ? *check.measured >= check.limit : *check.measured <= check.limit;\n}\n\nstruct Verdict {\n  std::string scenario;\n  std::int64_t samples;\n  bool passed;\n  std::vector<Check> checks;\n};\n\n[[nodiscard]] Verdict judge(std::string scenario, std::int64_t samples, std::vector<Check> checks) {\n  const bool passed = std::ranges::all_of(checks, met);\n  return {.scenario = std::move(scenario), .samples = samples, .passed = passed, .checks = std::move(checks)};\n}\n\nnamespace {\n\n[[nodiscard]] double seconds(std::chrono::nanoseconds d) { return std::chrono::duration<double>(d).count(); }\n\n[[nodiscard]] std::string with_unit(double value, std::string_view unit) {\n  return unit.empty() ? std::format(\"{:.2f}\", value) : std::format(\"{:.2f} {}\", value, unit);\n}\n\n[[nodiscard]] std::string line(const Check& check) {\n  const std::string measured = check.measured ? with_unit(*check.measured, check.unit) : std::string(\"not measured\");\n  return std::format(\"{:<6} {}: {}, {} {}\\n\", met(check) ? \"ok\" : \"failed\", check.what, measured,\n                     check.compare == Compare::at_least ? \"at least\" : \"at most\", with_unit(check.limit, check.unit));\n}\n\n}  // namespace\n\n[[nodiscard]] std::string describe(const Verdict& verdict) {\n  std::string text = std::format(\"{}\\nscenario: {}\\nsamples: {}\\n\", verdict.passed ? \"pass\" : \"fail\",\n                                 verdict.scenario, verdict.samples);\n  for (const Check& check : verdict.checks) text += line(check);\n  return text;\n}\n\n[[nodiscard]] std::optional<double> top_speed_mps(std::span<const Sample> run) {\n  if (run.empty()) return std::nullopt;\n  return std::ranges::max(run | std::views::transform([](const Sample& s) { return std::abs(s.speed_mps); }));\n}\n\n// New in this topic.\n\n[[nodiscard]] double range_m(const Sample& sample, const Goal& goal) {\n  return std::hypot(goal.x_m - sample.x_m, goal.y_m - sample.y_m);\n}\n\n// The samples at or after `from`. The run is in time order, so this is one binary search.\n[[nodiscard]] std::span<const Sample> since(std::span<const Sample> run, Time from) {\n  return {std::ranges::lower_bound(run, from, {}, &Sample::at), run.end()};\n}\n\n[[nodiscard]] std::optional<Time> reached_at(std::span<const Sample> run, const Goal& goal) {\n  const auto inside =\n      std::ranges::find_if(run, [&goal](const Sample& s) { return range_m(s, goal) <= goal.tolerance_m; });\n  if (inside == run.end()) return std::nullopt;\n  return inside->at;\n}\n\n[[nodiscard]] std::optional<Time> first_moved(std::span<const Sample> run, double speed_limit_mps) {\n  const auto moving = std::ranges::find_if(\n      run, [speed_limit_mps](const Sample& s) { return std::abs(s.speed_mps) > speed_limit_mps; });\n  if (moving == run.end()) return std::nullopt;\n  return moving->at;\n}\n\n// When each goal was reached, in order. It stops at the first goal the robot never reached, so a\n// robot that passed goal 2 before goal 1 gets no credit for it.\n[[nodiscard]] std::vector<Time> goal_times(std::span<const Sample> run, std::span<const Goal> goals) {\n  std::vector<Time> times;\n  std::span<const Sample> rest = run;\n  for (const Goal& goal : goals) {\n    const std::optional<Time> at = reached_at(rest, goal);\n    if (!at) break;\n    times.push_back(*at);\n    rest = since(rest, *at);\n  }\n  return times;\n}\n\n// What normal operation requires: every goal in order, a stop near the last one, inside the time\n// tolerance measured from the robot's first movement, and no speed above the limit.\n[[nodiscard]] std::vector<Check> normal_checks(std::span<const Sample> run, std::span<const Goal> goals,\n                                               std::chrono::nanoseconds time_limit, double speed_limit_mps) {\n  const std::vector<Time> times = goal_times(run, goals);\n  const std::optional<Time> moved = first_moved(run, 0.05);\n  const auto took = [&]() -> std::optional<double> {\n    if (times.size() != goals.size() || !moved) return std::nullopt;\n    return seconds(times.back().since_epoch - moved->since_epoch);\n  };\n  const auto stopped_near = [&]() -> std::optional<double> {\n    if (run.empty() || goals.empty()) return std::nullopt;\n    return range_m(run.back(), goals.back());\n  };\n  return {{.what = \"goals reached in order\",\n           .unit = \"\",\n           .compare = Compare::at_least,\n           .limit = static_cast<double>(std::ssize(goals)),\n           .measured = static_cast<double>(std::ssize(times))},\n          {.what = \"distance from the last goal at the end\",\n           .unit = \"m\",\n           .compare = Compare::at_most,\n           .limit = goals.empty() ? 0.0 : goals.back().tolerance_m,\n           .measured = stopped_near()},\n          {.what = \"time from the first movement to the last goal\",\n           .unit = \"s\",\n           .compare = Compare::at_most,\n           .limit = seconds(time_limit),\n           .measured = took()},\n          {.what = \"top speed\",\n           .unit = \"m/s\",\n           .compare = Compare::at_most,\n           .limit = speed_limit_mps,\n           .measured = top_speed_mps(run)}};\n}\n\n}  // namespace bench\n\n// One odometry message of a made-up run, one second of simulated time apart.\nstruct Moment {\n  std::chrono::seconds t;\n  double x_m;\n  double y_m;\n  double speed_mps;\n};\n\n[[nodiscard]] std::vector<bench::Sample> samples(std::span<const Moment> moments) {\n  std::vector<bench::Sample> run;\n  for (const Moment& moment : moments) {\n    run.push_back({.at = {moment.t}, .x_m = moment.x_m, .y_m = moment.y_m, .speed_mps = moment.speed_mps});\n  }\n  return run;\n}\n\nint main() {\n  using namespace std::chrono_literals;\n  constexpr std::array<bench::Goal, 2> goals{{{.x_m = 0.80, .y_m = 0.00, .tolerance_m = 0.10},\n                                              {.x_m = 0.80, .y_m = 0.50, .tolerance_m = 0.10}}};\n\n  // The route as it goes: the follower starts at 2 s, reaches the first goal, turns, and stops\n  // inside the second one.\n  constexpr std::array<Moment, 13> good{{{.t = 0s, .x_m = 0.00, .y_m = 0.00, .speed_mps = 0.00},\n                                         {.t = 1s, .x_m = 0.00, .y_m = 0.00, .speed_mps = 0.00},\n                                         {.t = 2s, .x_m = 0.00, .y_m = 0.00, .speed_mps = 0.00},\n                                         {.t = 3s, .x_m = 0.20, .y_m = 0.00, .speed_mps = 0.20},\n                                         {.t = 4s, .x_m = 0.40, .y_m = 0.00, .speed_mps = 0.20},\n                                         {.t = 5s, .x_m = 0.60, .y_m = 0.00, .speed_mps = 0.20},\n                                         {.t = 6s, .x_m = 0.72, .y_m = 0.00, .speed_mps = 0.00},\n                                         {.t = 7s, .x_m = 0.72, .y_m = 0.02, .speed_mps = 0.00},\n                                         {.t = 8s, .x_m = 0.75, .y_m = 0.20, .speed_mps = 0.20},\n                                         {.t = 9s, .x_m = 0.78, .y_m = 0.40, .speed_mps = 0.20},\n                                         {.t = 10s, .x_m = 0.79, .y_m = 0.45, .speed_mps = 0.05},\n                                         {.t = 11s, .x_m = 0.79, .y_m = 0.45, .speed_mps = 0.00},\n                                         {.t = 12s, .x_m = 0.79, .y_m = 0.45, .speed_mps = 0.00}}};\n  const auto run = samples(good);\n  std::cout << bench::describe(\n      bench::judge(\"normal\", std::ssize(run), bench::normal_checks(run, goals, 20s, 0.30)));\n  std::cout << '\\n';\n\n  // The same run with the follower stalled after the first goal.\n  std::array<Moment, 13> stalled = good;\n  for (std::size_t i = 7; i < stalled.size(); ++i) {\n    stalled[i] = {.t = stalled[i].t, .x_m = 0.72, .y_m = 0.00, .speed_mps = 0.00};\n  }\n  const auto stuck = samples(stalled);\n  std::cout << bench::describe(\n      bench::judge(\"normal\", std::ssize(stuck), bench::normal_checks(stuck, goals, 20s, 0.30)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "pass\nscenario: normal\nsamples: 13\nok     goals reached in order: 2.00, at least 2.00\nok     distance from the last goal at the end: 0.05 m, at most 0.10 m\nok     time from the first movement to the last goal: 7.00 s, at most 20.00 s\nok     top speed: 0.20 m/s, at most 0.30 m/s\n\nfail\nscenario: normal\nsamples: 13\nfailed goals reached in order: 1.00, at least 2.00\nfailed distance from the last goal at the end: 0.51 m, at most 0.10 m\nfailed time from the first movement to the last goal: not measured, at most 20.00 s\nok     top speed: 0.20 m/s, at most 0.30 m/s"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "goal_times"
+        },
+        {
+         "t": "text",
+         "v": " is the piece to read twice. It searches for each goal only in the samples at or after the one before it, so the goals have to be reached in order; a robot that wandered through goal 2 on its way to goal 1 gets no credit. When a goal is never reached it stops there, which is why the stalled run reports one goal and leaves the time unmeasured rather than reporting a wrong number. Add a test for each line of both verdicts, and one for a run whose robot never moved."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Teach the runner the new scenario. In "
+         },
+         {
+          "t": "code",
+          "v": "ScenarioRunner"
+         },
+         {
+          "t": "text",
+          "v": ", the checks are chosen by name and the drive phase publishes only for the smoke scenario, which now has a follower to do the driving. The runner throws on a mismatched pair of goal arrays, so add "
+         },
+         {
+          "t": "code",
+          "v": "<stdexcept>"
+         },
+         {
+          "t": "text",
+          "v": " to its includes, as the follower's header already has it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In on_tick(), the drive phase. For every other scenario the follower drives.\nif (phase == bench::Phase::drive && scenario_ == \"smoke\") {\n  Command command;\n  command.header.stamp = now();\n  command.header.frame_id = \"base_link\";\n  command.twist.linear.x = speed_mps_;\n  commands_->publish(command);\n  last_command_ = now_time;\n} else if (phase == bench::Phase::done) {\n  finish();\n}"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In finish(), in place of the single call to smoke_checks:\nstd::vector<bench::Check> checks =\n    scenario_ == \"smoke\" ? bench::smoke_checks(plan_, elapsed, run_, last_command_.value_or(bench::Time{}))\n                         : bench::normal_checks(run_, goals_, time_limit_, speed_limit_mps_);\nverdict_ = bench::judge(scenario_, std::ssize(run_), std::move(checks));"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// New members, read from the scenario's parameter file, and the helper that builds them:\n[[nodiscard]] std::vector<bench::Goal> declare_goals() {\n  const auto x_m = declare_parameter<std::vector<double>>(\"goals_x\", std::vector<double>{});\n  const auto y_m = declare_parameter<std::vector<double>>(\"goals_y\", std::vector<double>{});\n  if (x_m.size() != y_m.size()) throw std::runtime_error(\"goals_x and goals_y have different lengths\");\n  return bench::goals_from(x_m, y_m, declare_parameter<double>(\"tolerance_m\", 0.10))\n      .value_or(std::vector<bench::Goal>{});\n}\nstd::vector<bench::Goal> goals_;\nstd::chrono::nanoseconds time_limit_;\ndouble speed_limit_mps_;"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The runner and the follower read the same three parameters, "
+        },
+        {
+         "t": "code",
+         "v": "goals_x"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "goals_y"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "tolerance_m"
+        },
+        {
+         "t": "text",
+         "v": ", out of the same file, and both throw on a pair of different lengths. That is on purpose: the goals are the scenario's definition, so the node that drives them and the node that judges them must not be able to disagree. The judge is the one where a soft failure would be worst. A runner that shrugged and judged against an empty route would find that nought goals out of nought were reached in order, and write "
+        },
+        {
+         "t": "code",
+         "v": "pass"
+        },
+        {
+         "t": "text",
+         "v": " on a run in which the robot never moved. Two arrays that are both empty are a different thing, a scenario with no route, and both nodes accept that: the smoke scenario is one."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Give each scenario a parameter file, which is where its numbers live from now on. Create "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_sim/config/normal.yaml"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "/**:\n  ros__parameters:\n    use_sim_time: true\n    goals_x: [0.8, 0.8]\n    goals_y: [0.0, 0.5]\n    tolerance_m: 0.1\nroute_follower:\n  ros__parameters:\n    start_after_ms: 2000\n    speed_mps: 0.2\nscenario_runner:\n  ros__parameters:\n    warmup_ms: 1000\n    drive_ms: 25000\n    settle_ms: 3000\n    time_limit_ms: 20000\n    speed_limit_mps: 0.3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "/**"
+        },
+        {
+         "t": "text",
+         "v": " block sets a parameter on every node in the launch, which is how the goals and simulated time reach both readers. "
+        },
+        {
+         "t": "code",
+         "v": "drive_ms"
+        },
+        {
+         "t": "text",
+         "v": " is the window the run gives the task and "
+        },
+        {
+         "t": "code",
+         "v": "time_limit_ms"
+        },
+        {
+         "t": "text",
+         "v": " is the tolerance the task is judged against, and the window is longer on purpose: a run that is 2 s late has to be judged and reported as late, not cut off at the deadline and reported as unfinished. Copy the file to "
+        },
+        {
+         "t": "code",
+         "v": "smoke.yaml"
+        },
+        {
+         "t": "text",
+         "v": " with the goal arrays left out and "
+        },
+        {
+         "t": "code",
+         "v": "warmup_ms: 2000"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "drive_ms: 3000"
+        },
+        {
+         "t": "text",
+         "v": ", so that the smoke scenario keeps its old numbers and the follower, seeing no goals, stays quiet."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Load it from "
+         },
+         {
+          "t": "code",
+          "v": "scenario.launch.py"
+         },
+         {
+          "t": "text",
+          "v": ", which needs "
+         },
+         {
+          "t": "code",
+          "v": "PathJoinSubstitution"
+         },
+         {
+          "t": "text",
+          "v": " from "
+         },
+         {
+          "t": "code",
+          "v": "launch.substitutions"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "FindPackageShare"
+         },
+         {
+          "t": "text",
+          "v": " from "
+         },
+         {
+          "t": "code",
+          "v": "launch_ros.substitutions"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "    scenario_parameters = PathJoinSubstitution(\n        [FindPackageShare('bench_sim'), 'config', [LaunchConfiguration('scenario'), '.yaml']])\n    follower = Node(package='bench_nodes', executable='route_follower', output='screen',\n                    parameters=[scenario_parameters])\n    runner = Node(package='bench_nodes', executable='scenario_runner', output='screen',\n                  parameters=[scenario_parameters, {'scenario': LaunchConfiguration('scenario'),\n                                                    'verdict_file': LaunchConfiguration('verdict_file')}])"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add "
+        },
+        {
+         "t": "code",
+         "v": "follower"
+        },
+        {
+         "t": "text",
+         "v": " to the "
+        },
+        {
+         "t": "code",
+         "v": "LaunchDescription"
+        },
+        {
+         "t": "text",
+         "v": " list next to the relay, and install the new folder: "
+        },
+        {
+         "t": "code",
+         "v": "install(DIRECTORY config launch rviz DESTINATION share/${PROJECT_NAME})"
+        },
+        {
+         "t": "text",
+         "v": ". A substitution built from a list joins its parts, so "
+        },
+        {
+         "t": "code",
+         "v": "scenario:=normal"
+        },
+        {
+         "t": "text",
+         "v": " names "
+        },
+        {
+         "t": "code",
+         "v": "config/normal.yaml"
+        },
+        {
+         "t": "text",
+         "v": ". The dict after the file still wins for the two values the script provides."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it five times and set the tolerances from what you measure:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh\nfor i in 1 2 3 4 5; do ./run_scenario.sh normal; echo \"run $i exit $?\"; cp results/normal.txt results/normal_$i.txt; done\ngrep -h \"time from the first movement\" results/normal_[1-5].txt\ngrep -h \"distance from the last goal\" results/normal_[1-5].txt"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down the largest time and the largest distance. The time tolerance goes above the largest you saw with room to spare, and 20 s is a starting point rather than an answer: the toy robot in Build 1 took 7.65 s, and the real one accelerates, brakes at every goal and turns at whatever rate the DiffDrive system gives it. If your largest run is 14 s, a tolerance of 20 s says the scenario fails when something is wrong rather than when the machine is busy. If it is 19 s, raise the tolerance and write down why. The same for the position: the tolerance in the goal decides when the follower stops, so the distance at the end is usually a little under it, and a run that lands within a millimetre of the tolerance means the follower is barely arriving."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that the scenario reports a failure. First with the odometry path broken, which needs no rebuild:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./run_scenario.sh normal relay:=False; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The follower gets no "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", so it never drives, and the supervisor holds the robot anyway. The verdict is "
+        },
+        {
+         "t": "code",
+         "v": "fail"
+        },
+        {
+         "t": "text",
+         "v": " with three failed lines and the top speed still met, which tells you the robot never moved rather than that it moved wrongly. Then set "
+        },
+        {
+         "t": "code",
+         "v": "time_limit_ms"
+        },
+        {
+         "t": "text",
+         "v": " to 5000 in "
+        },
+        {
+         "t": "code",
+         "v": "normal.yaml"
+        },
+        {
+         "t": "text",
+         "v": ", run it again, and read the one failed line: the same run, judged against a tolerance it can't meet. Undo that change."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "./run_scenario.sh normal"
+         },
+         {
+          "t": "text",
+          "v": " prints "
+         },
+         {
+          "t": "code",
+          "v": "pass"
+         },
+         {
+          "t": "text",
+          "v": " and exits 0, five times in a row;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the time and position tolerances in "
+         },
+         {
+          "t": "code",
+          "v": "normal.yaml"
+         },
+         {
+          "t": "text",
+          "v": " are above the largest values of those five runs, and you wrote down both the measurements and the room you left;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "relay:=False"
+         },
+         {
+          "t": "text",
+          "v": " gives a "
+         },
+         {
+          "t": "code",
+          "v": "fail"
+         },
+         {
+          "t": "text",
+          "v": " naming the goals, the distance and the time;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a time tolerance below the measured time gives a "
+         },
+         {
+          "t": "code",
+          "v": "fail"
+         },
+         {
+          "t": "text",
+          "v": " with exactly one failed line."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add the normal scenario to the \"Scenarios\" section of "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the route as it is defined: the goal coordinates, the tolerance, and where the numbers came from, including anything you moved because of a wall. Describe the three nodes in the loop in one line each, and say which topic each one reads and writes, with the one sentence that matters later: the follower reads "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " and the runner reads "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", so the runner still sees the robot when the bench cuts its own odometry."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then the four checks with their limits, and under each the measurement you took from the five runs: the largest value, and how much room the limit leaves above it. End with the two failures you produced, each with the line of the verdict that named it, and one sentence on why the checks are computed from "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " rather than from anything the follower says about itself."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "parameters in a class",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-Client-Libraries/Using-Parameters-In-A-Class-CPP.html"
+     },
+     {
+      "t": "text",
+      "v": " and on "
+     },
+     {
+      "t": "a",
+      "v": "parameter files in launch",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Using-ROS2-Launch-For-Large-Projects.html"
+     },
+     {
+      "t": "text",
+      "v": ", for the "
+     },
+     {
+      "t": "code",
+      "v": "/**"
+     },
+     {
+      "t": "text",
+      "v": " wildcard block and per-scenario configuration."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The launch substitutions on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "PathJoinSubstitution",
+      "href": "https://github.com/ros2/launch/blob/jazzy/launch/launch/substitutions/path_join_substitution.py"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "FindPackageShare",
+      "href": "https://github.com/ros2/launch_ros/blob/jazzy/launch_ros/launch_ros/substitutions/find_package.py"
+     },
+     {
+      "t": "text",
+      "v": ", which build the file name from the scenario."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "REP 103",
+      "href": "https://www.ros.org/reps/rep-0103.html"
+     },
+     {
+      "t": "text",
+      "v": " on units and axes: metres, radians, and x forward with z up, which is why the goals are in metres in the odometry frame."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot 3 model in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_turtlebot_simulation 1.3.0",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/1.3.0/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+     },
+     {
+      "t": "text",
+      "v": ": the odometry rate and the acceleration limits that decide how long the route really takes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::remainder",
+      "href": "https://en.cppreference.com/cpp/numeric/math/remainder"
+     },
+     {
+      "t": "text",
+      "v": ", which wraps an angle to the range from -pi to pi, and on "
+     },
+     {
+      "t": "a",
+      "v": "std::clamp",
+      "href": "https://en.cppreference.com/cpp/algorithm/clamp"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". The follower's rules stay in a plain class that the toy robot and the tests drive without ROS."
+     }
+    ]
+   ]
+  }
+ ]
+}

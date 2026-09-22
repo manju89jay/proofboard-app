@@ -1,0 +1,1076 @@
+{
+ "id": "prj-skeleton",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage is the repository itself: a colcon workspace on GitHub where one command, "
+    },
+    {
+     "t": "code",
+     "v": "./check.sh"
+    },
+    {
+     "t": "text",
+     "v": ", builds every package and runs every test. The first package it holds, "
+    },
+    {
+     "t": "code",
+     "v": "bench_core"
+    },
+    {
+     "t": "text",
+     "v": ", has no dependency on ROS at all: it is the odometry maths, and later the scenario checks and the supervisor's rules, built and tested with plain CMake and GoogleTest."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is keeping that logic out of ROS entirely. Its tests run in milliseconds with no ROS process to start, so the nodes we add next stay thin wrappers around code that is already proven, and the workspace is a colcon workspace from the start even though nothing in it talks to ROS yet, because colcon builds plain CMake packages the same way it builds ROS ones, and the ROS packages will sit right next to this one."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: a fresh clone passes "
+    },
+    {
+     "t": "code",
+     "v": "./check.sh"
+    },
+    {
+     "t": "text",
+     "v": " on its own, a broken test makes that command exit with a non-zero status instead of a quiet pass, CI is green on "
+    },
+    {
+     "t": "code",
+     "v": "main"
+    },
+    {
+     "t": "text",
+     "v": " and turns red on a pull request we broke on purpose, and a separate project finds and links "
+    },
+    {
+     "t": "code",
+     "v": "bench_core"
+    },
+    {
+     "t": "text",
+     "v": " through nothing more than "
+    },
+    {
+     "t": "code",
+     "v": "find_package"
+    },
+    {
+     "t": "text",
+     "v": "."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "repo",
+   "title": "Repository, CMake or colcon layout, first test",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the Test Bench repository is on GitHub, and a fresh clone builds its first package and runs its tests with "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "First, the layout. The bench will hold ROS 2 nodes, from the next topic on, and logic that doesn't need ROS: odometry maths, the checks that decide whether a scenario passed, the rules of the supervisor. Put that logic in a plain CMake package with no ROS dependency. Its tests then run in milliseconds without starting any ROS process, and the nodes stay thin wrappers around code that is already tested. colcon builds plain CMake packages as well as ROS 2 ones, so the repository is a colcon workspace from the start:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "test_bench/                  the repository, and the colcon workspace\n  .gitignore                 build/ install/ log/\n  check.sh                   the one command: build everything, run every test\n  README.md\n  src/\n    bench_core/              plain CMake, no ROS: the library and its GoogleTest tests\n      package.xml\n      CMakeLists.txt\n      include/bench/odometry.hpp\n      src/odometry.cpp\n      test/odometry_test.cpp"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The ROS 2 packages will go next to "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "src/"
+        },
+        {
+         "t": "text",
+         "v": ". The folder is called "
+        },
+        {
+         "t": "code",
+         "v": "test/"
+        },
+        {
+         "t": "text",
+         "v": " rather than "
+        },
+        {
+         "t": "code",
+         "v": "tests/"
+        },
+        {
+         "t": "text",
+         "v": " because ROS 2 packages use that name."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Create an empty repository named "
+         },
+         {
+          "t": "code",
+          "v": "test_bench"
+         },
+         {
+          "t": "text",
+          "v": " on GitHub, clone it to "
+         },
+         {
+          "t": "code",
+          "v": "~/test_bench"
+         },
+         {
+          "t": "text",
+          "v": ", and add the "
+         },
+         {
+          "t": "code",
+          "v": ".gitignore"
+         },
+         {
+          "t": "text",
+          "v": ". colcon writes "
+         },
+         {
+          "t": "code",
+          "v": "build/"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "install/"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "log/"
+         },
+         {
+          "t": "text",
+          "v": " at the top of the workspace, and none of them belong in Git. Then move the notes from the environment topic into the repository: "
+         },
+         {
+          "t": "code",
+          "v": "mkdir docs && mv ~/bench-notes/environment.md docs/"
+         },
+         {
+          "t": "text",
+          "v": ". They stayed outside until now because "
+         },
+         {
+          "t": "code",
+          "v": "git clone"
+         },
+         {
+          "t": "text",
+          "v": " refuses a folder that already has files in it."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Move the library, the header and the tests from the CMake and GoogleTest topic into "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core"
+         },
+         {
+          "t": "text",
+          "v": ", in the layout above."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/package.xml"
+         },
+         {
+          "t": "text",
+          "v": ". It is what makes colcon and rosdep see the folder as a package. "
+         },
+         {
+          "t": "code",
+          "v": "build_type"
+         },
+         {
+          "t": "text",
+          "v": " tells colcon to build it with plain CMake, and the "
+         },
+         {
+          "t": "code",
+          "v": "gtest"
+         },
+         {
+          "t": "text",
+          "v": " key tells rosdep to install "
+         },
+         {
+          "t": "code",
+          "v": "libgtest-dev"
+         },
+         {
+          "t": "text",
+          "v": " on Ubuntu:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<?xml version=\"1.0\"?>\n<package format=\"3\">\n  <name>bench_core</name>\n  <version>0.1.0</version>\n  <description>Test Bench logic that doesn't depend on ROS.</description>\n  <maintainer email=\"you@example.com\">Your Name</maintainer>\n  <license>Apache-2.0</license>\n\n  <buildtool_depend>cmake</buildtool_depend>\n  <test_depend>gtest</test_depend>\n\n  <export>\n    <build_type>cmake</build_type>\n  </export>\n</package>"
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": ". It is the file from the CMake topic with one change: "
+         },
+         {
+          "t": "code",
+          "v": "include(CTest)"
+         },
+         {
+          "t": "text",
+          "v": " replaces "
+         },
+         {
+          "t": "code",
+          "v": "enable_testing()"
+         },
+         {
+          "t": "text",
+          "v": ". It calls "
+         },
+         {
+          "t": "code",
+          "v": "enable_testing()"
+         },
+         {
+          "t": "text",
+          "v": " and also adds the option "
+         },
+         {
+          "t": "code",
+          "v": "BUILD_TESTING"
+         },
+         {
+          "t": "text",
+          "v": ", which is on by default and is the same switch that colcon and ament packages use:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "cmake_minimum_required(VERSION 3.22)\nproject(bench_core LANGUAGES CXX)\nset(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\nset(CMAKE_CXX_EXTENSIONS OFF)\n\nadd_library(bench_core src/odometry.cpp)\ntarget_include_directories(bench_core PUBLIC include)\ntarget_compile_options(bench_core PRIVATE -Wall -Wextra -Werror)\n\ninclude(CTest)\nif(BUILD_TESTING)\n  find_package(GTest REQUIRED)\n  include(GoogleTest)\n  add_executable(odometry_test test/odometry_test.cpp)\n  target_link_libraries(odometry_test PRIVATE bench_core GTest::gtest_main)\n  gtest_discover_tests(odometry_test)\nendif()"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With "
+        },
+        {
+         "t": "code",
+         "v": "-DBUILD_TESTING=OFF"
+        },
+        {
+         "t": "text",
+         "v": ", the library builds on a machine without GoogleTest. With the default, such a machine stops at \"Could NOT find GTest\", which is the error you want: a build that silently skips its tests looks the same as one that passed them."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Install what the package needs, the way a fresh machine will:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/test_bench\nrosdep install --from-paths src --ignore-src -y"
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "check.sh"
+         },
+         {
+          "t": "text",
+          "v": " at the top of the repository, and make it executable with "
+         },
+         {
+          "t": "code",
+          "v": "chmod +x check.sh"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "#!/usr/bin/env bash\n# Builds every package in the workspace and runs every test. Exit code 0 means all passed.\nsource /opt/ros/jazzy/setup.bash\nset -euo pipefail\ncd \"$(dirname \"$0\")\"\ncolcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug\ncolcon test --event-handlers console_cohesion+ --return-code-on-test-failure"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each line is there for a reason. ROS is sourced before "
+        },
+        {
+         "t": "code",
+         "v": "set -u"
+        },
+        {
+         "t": "text",
+         "v": ", because the ROS setup script reads variables that may not be set. "
+        },
+        {
+         "t": "code",
+         "v": "cd"
+        },
+        {
+         "t": "text",
+         "v": " makes the script work from any folder. "
+        },
+        {
+         "t": "code",
+         "v": "console_cohesion+"
+        },
+        {
+         "t": "text",
+         "v": " prints each package's test output in one piece when it finishes. And "
+        },
+        {
+         "t": "code",
+         "v": "--return-code-on-test-failure"
+        },
+        {
+         "t": "text",
+         "v": " matters most: without it, "
+        },
+        {
+         "t": "code",
+         "v": "colcon test"
+        },
+        {
+         "t": "text",
+         "v": " shows the failure in its summary but still exits with 0, so a script or CI can't tell."
+        }
+       ]
+      },
+      {
+       "t": "note",
+       "c": [
+        {
+         "t": "text",
+         "v": "colcon also passes a package that has no tests at all without printing anything. Its CMake support first asks "
+        },
+        {
+         "t": "code",
+         "v": "ctest --show-only"
+        },
+        {
+         "t": "text",
+         "v": " for the list of tests and returns quietly when the list is empty. After you add a package, look at the test output once to see that its tests ran."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ". The output ends with the CTest summary of "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " and colcon's line saying one package finished. colcon also warns that it could not run the installation step, because the package has no install rules yet. Build 2 adds them. Then change one expected value in a test, run it again, and check that it prints the failure and that "
+         },
+         {
+          "t": "code",
+          "v": "echo $?"
+         },
+         {
+          "t": "text",
+          "v": " shows a non-zero code. Undo the change."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 8,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit and push. Then prove the pass bar on a clean copy:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "git clone git@github.com:<you>/test_bench.git /tmp/bench_clone\n/tmp/bench_clone/check.sh"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the fresh clone passes "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": ", and a failing test makes it exit with a non-zero code. If the clone fails where your own folder worked, something the build needs was never committed. That is exactly what this check is for."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, another package can use "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "find_package"
+        },
+        {
+         "t": "text",
+         "v": ", and GitHub runs "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " on every push."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The ROS 2 packages will link "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " once the supervisor's rules live there. Each of them is built as a separate CMake project, so it can't see the "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " target directly: it has to find an installed copy. For that, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " installs its library and headers, and writes a file that tells CMake how to use them. These lines were measured with CMake 3.28 on Ubuntu 24.04."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Change the library part of "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": " to this. The test part stays as it is:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "include(GNUInstallDirs)\n\nadd_library(bench_core src/odometry.cpp)\nadd_library(bench_core::bench_core ALIAS bench_core)\ntarget_include_directories(bench_core PUBLIC\n  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>\n  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)\ntarget_compile_options(bench_core PRIVATE -Wall -Wextra -Werror)\n\ninstall(TARGETS bench_core EXPORT bench_coreTargets)\ninstall(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})\ninstall(EXPORT bench_coreTargets NAMESPACE bench_core::\n        FILE bench_coreConfig.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/bench_core)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The include directory is different before and after installing: in the source tree it is "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_core/include"
+        },
+        {
+         "t": "text",
+         "v": ", and after installing it is "
+        },
+        {
+         "t": "code",
+         "v": "include"
+        },
+        {
+         "t": "text",
+         "v": " under the install prefix. The two "
+        },
+        {
+         "t": "i",
+         "v": "generator expressions"
+        },
+        {
+         "t": "text",
+         "v": " give each case its own path. "
+        },
+        {
+         "t": "code",
+         "v": "install(EXPORT ...)"
+        },
+        {
+         "t": "text",
+         "v": " writes "
+        },
+        {
+         "t": "code",
+         "v": "bench_coreConfig.cmake"
+        },
+        {
+         "t": "text",
+         "v": ", which is the file "
+        },
+        {
+         "t": "code",
+         "v": "find_package(bench_core)"
+        },
+        {
+         "t": "text",
+         "v": " looks for, and defines the target "
+        },
+        {
+         "t": "code",
+         "v": "bench_core::bench_core"
+        },
+        {
+         "t": "text",
+         "v": " in it. The "
+        },
+        {
+         "t": "code",
+         "v": "ALIAS"
+        },
+        {
+         "t": "text",
+         "v": " line gives the library that same name inside this project too, so code that links it is written the same way everywhere. Writing the exported targets straight into the config file is enough while "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " depends on nothing. A package with dependencies of its own needs a separate config file that finds them first."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Install it into a scratch prefix and look at what arrives. The tests are switched off here to keep the output short:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "$ cmake -S src/bench_core -B /tmp/core_build -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=/tmp/core_install\n$ cmake --build /tmp/core_build\n$ cmake --install /tmp/core_build\n-- Install configuration: \"\"\n-- Installing: /tmp/core_install/lib/libbench_core.a\n-- Installing: /tmp/core_install/include\n-- Installing: /tmp/core_install/include/bench\n-- Installing: /tmp/core_install/include/bench/odometry.hpp\n-- Installing: /tmp/core_install/lib/cmake/bench_core/bench_coreConfig.cmake\n-- Installing: /tmp/core_install/lib/cmake/bench_core/bench_coreConfig-noconfig.cmake"
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that another project can use it. In "
+         },
+         {
+          "t": "code",
+          "v": "/tmp/consumer"
+         },
+         {
+          "t": "text",
+          "v": ", next to a copy of "
+         },
+         {
+          "t": "code",
+          "v": "app/main.cpp"
+         },
+         {
+          "t": "text",
+          "v": " from the CMake topic, write this "
+         },
+         {
+          "t": "code",
+          "v": "CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "cmake_minimum_required(VERSION 3.22)\nproject(consumer LANGUAGES CXX)\nfind_package(bench_core REQUIRED)\nadd_executable(drive main.cpp)\ntarget_link_libraries(drive PRIVATE bench_core::bench_core)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Configure it with "
+        },
+        {
+         "t": "code",
+         "v": "-DCMAKE_PREFIX_PATH=/tmp/core_install"
+        },
+        {
+         "t": "text",
+         "v": ", build it, and run "
+        },
+        {
+         "t": "code",
+         "v": "drive"
+        },
+        {
+         "t": "text",
+         "v": ". It prints "
+        },
+        {
+         "t": "code",
+         "v": "1.00 m"
+        },
+        {
+         "t": "text",
+         "v": ". Configure it again without the prefix path and read the error:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "CMake Error at CMakeLists.txt:3 (find_package):\n  By not providing \"Findbench_core.cmake\" in CMAKE_MODULE_PATH this project\n  has asked CMake to find a package configuration file provided by\n  \"bench_core\", but CMake did not find one."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "CMake looked for "
+        },
+        {
+         "t": "code",
+         "v": "bench_coreConfig.cmake"
+        },
+        {
+         "t": "text",
+         "v": " and didn't know where. In the workspace you never pass the prefix yourself: colcon installs each package under "
+        },
+        {
+         "t": "code",
+         "v": "install/<package>"
+        },
+        {
+         "t": "text",
+         "v": ", and when a package lists "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " as a dependency in its "
+        },
+        {
+         "t": "code",
+         "v": "package.xml"
+        },
+        {
+         "t": "text",
+         "v": ", colcon adds that folder to "
+        },
+        {
+         "t": "code",
+         "v": "CMAKE_PREFIX_PATH"
+        },
+        {
+         "t": "text",
+         "v": " for its build."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add CI. Create "
+         },
+         {
+          "t": "code",
+          "v": ".github/workflows/ci.yml"
+         },
+         {
+          "t": "text",
+          "v": ". It runs the same "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " inside the official ROS 2 Jazzy container, so CI and your machine build the same way:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "name: ci\non: [push, pull_request]\njobs:\n  build-and-test:\n    runs-on: ubuntu-24.04\n    container: ros:jazzy-ros-base\n    steps:\n      - uses: actions/checkout@v4\n      - name: Install dependencies\n        shell: bash\n        run: |\n          apt-get update -qq\n          rosdep update\n          rosdep install --from-paths src --ignore-src -y\n      - name: Build and test\n        shell: bash\n        run: ./check.sh"
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Push, and wait for the green check on GitHub. Then prove that CI can fail: on a branch, break a test, push, open a pull request, and see the check turn red. Close the pull request without merging and delete the branch."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "a fresh clone passes "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "CI is green on "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", and you have seen it red on a pull request with a broken test;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the consumer project finds "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " through "
+         },
+         {
+          "t": "code",
+          "v": "find_package"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write the \"Build and test\" section of "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic, and it is for someone who has never seen the repository, including you in three months. Give the prerequisites (Ubuntu 24.04 and ROS 2 Jazzy, with a link to "
+        },
+        {
+         "t": "code",
+         "v": "docs/environment.md"
+        },
+        {
+         "t": "text",
+         "v": " from the environment topic), the "
+        },
+        {
+         "t": "code",
+         "v": "rosdep"
+        },
+        {
+         "t": "text",
+         "v": " command, the one command that builds and tests, and how to run a single test, for example "
+        },
+        {
+         "t": "code",
+         "v": "colcon test --packages-select bench_core --ctest-args -R Distance.ZeroTicksIsZero"
+        },
+        {
+         "t": "text",
+         "v": ". Then write three lines on the layout decision: why the logic lives in a package without ROS, and why the repository is a colcon workspace."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": null
+}

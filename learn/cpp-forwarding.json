@@ -1,0 +1,3320 @@
+{
+ "id": "cpp-forwarding",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "Tracer"
+     },
+     {
+      "t": "text",
+      "v": " prints a line from its copy constructor and another from its move constructor. For each of the three numbered lines, say which of "
+     },
+     {
+      "t": "code",
+      "v": "Tracer"
+     },
+     {
+      "t": "text",
+      "v": "'s constructors runs, and how many "
+     },
+     {
+      "t": "code",
+      "v": "Tracer"
+     },
+     {
+      "t": "text",
+      "v": " objects are created. One line needs more than a constructor's name. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "template <typename T>\nclass Holder {\n public:\n  template <typename U>\n  explicit Holder(U&& value) : value_(std::forward<U>(value)) {}\n\n private:\n  T value_;\n};\n\nTracer tracer;\nHolder<Tracer> a(tracer);    // 1\nHolder<Tracer> b(Tracer{});  // 2\nHolder<Tracer> c(a);         // 3"
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The first two lines, run:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <iostream>\n#include <utility>\n\nstruct Tracer {\n  Tracer() = default;\n  Tracer(const Tracer&) { std::cout << \"copy constructor\\n\"; }\n  Tracer(Tracer&&) noexcept { std::cout << \"move constructor\\n\"; }\n  Tracer& operator=(const Tracer&) = default;\n  Tracer& operator=(Tracer&&) = default;\n  ~Tracer() = default;\n};\n\ntemplate <typename T>\nclass Holder {\n public:\n  template <typename U>\n  explicit Holder(U&& value) : value_(std::forward<U>(value)) {}\n\n private:\n  T value_;\n};\n\nint main() {\n  Tracer tracer;\n  const Holder<Tracer> a(tracer);\n  const Holder<Tracer> b(Tracer{});\n}"
+   },
+   {
+    "t": "output",
+    "text": "copy constructor\nmove constructor"
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "code",
+       "v": "tracer"
+      },
+      {
+       "t": "text",
+       "v": " is an lvalue, so "
+      },
+      {
+       "t": "code",
+       "v": "U"
+      },
+      {
+       "t": "text",
+       "v": " is deduced as "
+      },
+      {
+       "t": "code",
+       "v": "Tracer&"
+      },
+      {
+       "t": "text",
+       "v": ", "
+      },
+      {
+       "t": "code",
+       "v": "std::forward<U>"
+      },
+      {
+       "t": "text",
+       "v": " returns an lvalue, and "
+      },
+      {
+       "t": "code",
+       "v": "value_"
+      },
+      {
+       "t": "text",
+       "v": " is copy-constructed. The caller's "
+      },
+      {
+       "t": "code",
+       "v": "tracer"
+      },
+      {
+       "t": "text",
+       "v": " is untouched."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "Tracer{}"
+      },
+      {
+       "t": "text",
+       "v": " is a prvalue. It can't be built straight into "
+      },
+      {
+       "t": "code",
+       "v": "value_"
+      },
+      {
+       "t": "text",
+       "v": ", because the constructor takes a reference, and a reference needs an object to refer to. So the temporary is created first, "
+      },
+      {
+       "t": "code",
+       "v": "U"
+      },
+      {
+       "t": "text",
+       "v": " is "
+      },
+      {
+       "t": "code",
+       "v": "Tracer"
+      },
+      {
+       "t": "text",
+       "v": ", "
+      },
+      {
+       "t": "code",
+       "v": "std::forward<U>"
+      },
+      {
+       "t": "text",
+       "v": " returns an rvalue, and "
+      },
+      {
+       "t": "code",
+       "v": "value_"
+      },
+      {
+       "t": "text",
+       "v": " is move-constructed from the temporary. Two "
+      },
+      {
+       "t": "code",
+       "v": "Tracer"
+      },
+      {
+       "t": "text",
+       "v": "s exist for a moment, and the temporary is destroyed at the end of the line. Guaranteed copy elision applies only when a prvalue initialises an object of its type directly, not through a reference."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "It doesn't compile. "
+      },
+      {
+       "t": "code",
+       "v": "a"
+      },
+      {
+       "t": "text",
+       "v": " is a non-const "
+      },
+      {
+       "t": "code",
+       "v": "Holder<Tracer>"
+      },
+      {
+       "t": "text",
+       "v": " lvalue. The template constructor with "
+      },
+      {
+       "t": "code",
+       "v": "U = Holder<Tracer>&"
+      },
+      {
+       "t": "text",
+       "v": " takes a "
+      },
+      {
+       "t": "code",
+       "v": "Holder<Tracer>&"
+      },
+      {
+       "t": "text",
+       "v": ", which fits better than the copy constructor's "
+      },
+      {
+       "t": "code",
+       "v": "const Holder<Tracer>&"
+      },
+      {
+       "t": "text",
+       "v": ", so overload resolution picks the template, and the template then tries to build a "
+      },
+      {
+       "t": "code",
+       "v": "Tracer"
+      },
+      {
+       "t": "text",
+       "v": " from a "
+      },
+      {
+       "t": "code",
+       "v": "Holder"
+      },
+      {
+       "t": "text",
+       "v": ":"
+      }
+     ]
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "compile-fail",
+    "expect": "Tracer::Tracer(Holder<Tracer>&)",
+    "text": "#include <iostream>\n#include <utility>\n\nstruct Tracer {\n  Tracer() = default;\n  Tracer(const Tracer&) { std::cout << \"copy constructor\\n\"; }\n  Tracer(Tracer&&) noexcept { std::cout << \"move constructor\\n\"; }\n  Tracer& operator=(const Tracer&) = default;\n  Tracer& operator=(Tracer&&) = default;\n  ~Tracer() = default;\n};\n\ntemplate <typename T>\nclass Holder {\n public:\n  template <typename U>\n  explicit Holder(U&& value) : value_(std::forward<U>(value)) {}\n\n private:\n  T value_;\n};\n\nint main() {\n  Tracer tracer;\n  Holder<Tracer> a(tracer);\n  Holder<Tracer> c(a);  // meant as a copy\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "GCC 13's error names the call it couldn't make: "
+     },
+     {
+      "t": "code",
+      "v": "no matching function for call to Tracer::Tracer(Holder<Tracer>&)"
+     },
+     {
+      "t": "text",
+      "v": ". You pass with all three right and the reasons. Two right, or all three without knowing why the temporary in line 2 is moved rather than elided, is a partial pass. Expecting the copy constructor in line 3 is the most common miss; it is the last failure case of this topic."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A forwarding reference is a function parameter declared "
+    },
+    {
+     "t": "code",
+     "v": "T&&"
+    },
+    {
+     "t": "text",
+     "v": " where "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " is a template parameter deduced from that call, and it is the one parameter form that binds to anything: an lvalue or an rvalue, "
+    },
+    {
+     "t": "code",
+     "v": "const"
+    },
+    {
+     "t": "text",
+     "v": " or not. Deduction gives it away: an lvalue argument of type "
+    },
+    {
+     "t": "code",
+     "v": "A"
+    },
+    {
+     "t": "text",
+     "v": " deduces "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " as "
+    },
+    {
+     "t": "code",
+     "v": "A&"
+    },
+    {
+     "t": "text",
+     "v": ", an rvalue deduces the plain type "
+    },
+    {
+     "t": "code",
+     "v": "A"
+    },
+    {
+     "t": "text",
+     "v": ", so "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " itself records which one arrived. "
+    },
+    {
+     "t": "i",
+     "v": "Reference collapsing"
+    },
+    {
+     "t": "text",
+     "v": " then decides what "
+    },
+    {
+     "t": "code",
+     "v": "T&&"
+    },
+    {
+     "t": "text",
+     "v": " means once "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " is itself a reference: a reference to a reference collapses to a plain lvalue reference unless both sides are rvalue references, in which case it stays an rvalue reference. "
+    },
+    {
+     "t": "code",
+     "v": "std::forward<T>"
+    },
+    {
+     "t": "text",
+     "v": " casts its argument back to the category "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " recorded, an lvalue reference when "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " is a reference, an rvalue reference otherwise."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is passing an argument on without losing what it was. Inside a function, a parameter has a name, and a named expression is always an lvalue whatever the parameter's own type, so handing a parameter to another call copies it, even when the caller passed a temporary meant to be moved. A factory building a "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " from arguments of any type, not knowing whether each will arrive as an lvalue or an rvalue, and without a "
+    },
+    {
+     "t": "code",
+     "v": "const&"
+    },
+    {
+     "t": "text",
+     "v": " and a "
+    },
+    {
+     "t": "code",
+     "v": "&&"
+    },
+    {
+     "t": "text",
+     "v": " overload for every parameter, needs to pass each one on exactly as it came in."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "code",
+     "v": "std::forward<T>(arg)"
+    },
+    {
+     "t": "text",
+     "v": " is that way: it is "
+    },
+    {
+     "t": "code",
+     "v": "static_cast<T&&>(arg)"
+    },
+    {
+     "t": "text",
+     "v": ", and because collapsing already ties "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " to the argument's original category, the cast reproduces it. One forwarding reference per parameter, each forwarded once, replaces the overload pair a hand-written version would need for every parameter, which is how "
+    },
+    {
+     "t": "code",
+     "v": "std::make_unique"
+    },
+    {
+     "t": "text",
+     "v": " passes its constructor arguments on."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that forwarding must run exactly once on every path through the function. Forwarding the same parameter twice, once to a recorder and once to a sender, moves it into the first call and hands the second whatever the move left behind, and the mistake compiles cleanly, hidden whenever the caller passes a named argument, which only copies. And "
+    },
+    {
+     "t": "code",
+     "v": "T&&"
+    },
+    {
+     "t": "text",
+     "v": " is a forwarding reference only when "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " is deduced at that call; the same spelling on a class template's own parameter is a plain rvalue reference that refuses an lvalue outright."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet forwarding wherever the robot's code builds an object from arguments it only passes on, an emplace-style factory or a constructor wrapper, and the interview question itself asks exactly this: which constructor a forwarding wrapper calls for an lvalue, for a temporary, and for another wrapper holding the same type."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "refs",
+   "title": "Forwarding references versus rvalue references; reference collapsing",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One function template, called with four kinds of argument. "
+        },
+        {
+         "t": "code",
+         "v": "spelled"
+        },
+        {
+         "t": "text",
+         "v": " names the few types involved, because C++ has no portable way to print a type:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string_view>\n#include <type_traits>\n#include <utility>\n\ntemplate <typename T>\n[[nodiscard]] constexpr std::string_view spelled() {\n  if constexpr (std::is_same_v<T, int>) return \"int\";\n  else if constexpr (std::is_same_v<T, int&>) return \"int&\";\n  else if constexpr (std::is_same_v<T, int&&>) return \"int&&\";\n  else if constexpr (std::is_same_v<T, const int&>) return \"const int&\";\n  else return \"something else\";\n}\n\ntemplate <typename T>\nvoid show(std::string_view call, T&& arg) {\n  std::cout << std::format(\"{:<24}T = {:<12}arg is {}\\n\", call, spelled<T>(), spelled<decltype(arg)>());\n}\n\nint main() {\n  int count = 3;\n  const int limit = 10;\n  show(\"show(count)\", count);\n  show(\"show(limit)\", limit);\n  show(\"show(std::move(count))\", std::move(count));\n  show(\"show(42)\", 42);\n}"
+      },
+      {
+       "t": "output",
+       "text": "show(count)             T = int&        arg is int&\nshow(limit)             T = const int&  arg is const int&\nshow(std::move(count))  T = int         arg is int&&\nshow(42)                T = int         arg is int&&"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "arg"
+        },
+        {
+         "t": "text",
+         "v": " is written "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": ", yet for the lvalues "
+        },
+        {
+         "t": "code",
+         "v": "count"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "limit"
+        },
+        {
+         "t": "text",
+         "v": " it is an lvalue reference. The parameter binds to anything: lvalues and rvalues, "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " or not. The standard calls "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " a "
+        },
+        {
+         "t": "i",
+         "v": "forwarding reference"
+        },
+        {
+         "t": "text",
+         "v": " when "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is a template parameter of that same function template and is deduced from the call. Scott Meyers's earlier name for it, universal reference, is still common. Two rules make it work."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first is a special case in template argument deduction ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/language/template_argument_deduction"
+        },
+        {
+         "t": "text",
+         "v": "). When the parameter is a forwarding reference and the argument is an lvalue of type "
+        },
+        {
+         "t": "code",
+         "v": "A"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is deduced as "
+        },
+        {
+         "t": "code",
+         "v": "A&"
+        },
+        {
+         "t": "text",
+         "v": " instead of "
+        },
+        {
+         "t": "code",
+         "v": "A"
+        },
+        {
+         "t": "text",
+         "v": ". For an rvalue, "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is deduced as the plain type "
+        },
+        {
+         "t": "code",
+         "v": "A"
+        },
+        {
+         "t": "text",
+         "v": ". So "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " records the argument's value category: a reference type means an lvalue came in, and a non-reference type means an rvalue did."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second is "
+        },
+        {
+         "t": "i",
+         "v": "reference collapsing"
+        },
+        {
+         "t": "text",
+         "v": ". With "
+        },
+        {
+         "t": "code",
+         "v": "T = int&"
+        },
+        {
+         "t": "text",
+         "v": ", the parameter type "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "int& &&"
+        },
+        {
+         "t": "text",
+         "v": ", a reference to a reference. You can't write that yourself, but it can arise through a template argument, a type alias or "
+        },
+        {
+         "t": "code",
+         "v": "decltype"
+        },
+        {
+         "t": "text",
+         "v": ", and then it collapses: if either reference is an lvalue reference, the result is an lvalue reference, and only "
+        },
+        {
+         "t": "code",
+         "v": "&&"
+        },
+        {
+         "t": "text",
+         "v": " applied to "
+        },
+        {
+         "t": "code",
+         "v": "&&"
+        },
+        {
+         "t": "text",
+         "v": " stays an rvalue reference ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/language/reference"
+        },
+        {
+         "t": "text",
+         "v": "). The compiler checks these four "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": "s, so the program compiles only if the rule holds:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <type_traits>\n\nusing LRef = int&;\nusing RRef = int&&;\n\nstatic_assert(std::is_same_v<LRef&, int&>);    // & &   becomes &\nstatic_assert(std::is_same_v<LRef&&, int&>);   // & &&  becomes &\nstatic_assert(std::is_same_v<RRef&, int&>);    // && &  becomes &\nstatic_assert(std::is_same_v<RRef&&, int&&>);  // && && becomes &&\n\nint main() {}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Not every "
+        },
+        {
+         "t": "code",
+         "v": "&&"
+        },
+        {
+         "t": "text",
+         "v": " next to a template parameter is a forwarding reference, and Mateusz Pusz's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on forwarding references",
+         "href": "https://www.youtube.com/watch?v=0GXnfi9RAlU"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2023) quizzes the audience on exactly this. "
+        },
+        {
+         "t": "code",
+         "v": "const T&&"
+        },
+        {
+         "t": "text",
+         "v": " is an rvalue reference to "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<T>&&"
+        },
+        {
+         "t": "text",
+         "v": " is an rvalue reference to a vector: neither accepts an lvalue. Nor does a member function's "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " when "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is a parameter of the class template, because "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " was fixed when the class was instantiated and nothing is deduced at the call:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "cannot bind rvalue reference",
+       "text": "#include <string>\n#include <utility>\n\ntemplate <typename T>\nclass Slot {\n public:\n  void set(T&& value) { value_ = std::move(value); }  // T is Slot's parameter: an rvalue reference\n\n private:\n  T value_;\n};\n\nint main() {\n  Slot<std::string> slot;\n  std::string name = \"front_lidar\";\n  slot.set(name);  // an lvalue: refused\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "auto&&"
+        },
+        {
+         "t": "text",
+         "v": " is a forwarding reference too, both in a declaration such as "
+        },
+        {
+         "t": "code",
+         "v": "auto&& x = f();"
+        },
+        {
+         "t": "text",
+         "v": " and in a C++20 abbreviated template such as "
+        },
+        {
+         "t": "code",
+         "v": "void log(auto&& value)"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now the reason for all this. Inside "
+        },
+        {
+         "t": "code",
+         "v": "show"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "arg"
+        },
+        {
+         "t": "text",
+         "v": " has a name, and an expression that names a variable is an lvalue, whatever the variable's type. The copy and move topic made the same point about a named "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " parameter. So when a function passes "
+        },
+        {
+         "t": "code",
+         "v": "arg"
+        },
+        {
+         "t": "text",
+         "v": " on, it always passes an lvalue, and the callee copies even when the caller handed over a temporary. "
+        },
+        {
+         "t": "code",
+         "v": "std::forward<T>(arg)"
+        },
+        {
+         "t": "text",
+         "v": " restores what the caller passed. It is a conditional cast, "
+        },
+        {
+         "t": "code",
+         "v": "static_cast<T&&>(arg)"
+        },
+        {
+         "t": "text",
+         "v": ", and collapsing does the rest: when "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "int&"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "int&"
+        },
+        {
+         "t": "text",
+         "v": " and the result is an lvalue; when "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", the result is an "
+        },
+        {
+         "t": "code",
+         "v": "int&&"
+        },
+        {
+         "t": "text",
+         "v": ", an rvalue. "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " is the unconditional version: it casts to an rvalue reference whatever it is given. Klaus Iglberger's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on move semantics, part 2",
+         "href": "https://www.youtube.com/watch?v=pIzaZbKUw2s"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019) walks through both casts with "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " substituted. "
+        },
+        {
+         "t": "code",
+         "v": "std::forward"
+        },
+        {
+         "t": "text",
+         "v": " needs its template argument written out, because its parameter is declared as "
+        },
+        {
+         "t": "code",
+         "v": "std::remove_reference_t<T>&"
+        },
+        {
+         "t": "text",
+         "v": ", which deduction can't see through ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/utility/forward"
+        },
+        {
+         "t": "text",
+         "v": "). That is deliberate: "
+        },
+        {
+         "t": "code",
+         "v": "std::forward(arg)"
+        },
+        {
+         "t": "text",
+         "v": " without "
+        },
+        {
+         "t": "code",
+         "v": "<T>"
+        },
+        {
+         "t": "text",
+         "v": " doesn't compile, so nobody forgets which "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " to use."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Together they solve a problem every factory has. Iglberger builds "
+        },
+        {
+         "t": "code",
+         "v": "std::make_unique"
+        },
+        {
+         "t": "text",
+         "v": " by trying each way to pass its arguments. By value adds a copy of every argument. "
+        },
+        {
+         "t": "code",
+         "v": "Arg&"
+        },
+        {
+         "t": "text",
+         "v": " rejects rvalues, so "
+        },
+        {
+         "t": "code",
+         "v": "make_unique<int>(1)"
+        },
+        {
+         "t": "text",
+         "v": " fails. "
+        },
+        {
+         "t": "code",
+         "v": "const Arg&"
+        },
+        {
+         "t": "text",
+         "v": " makes every argument "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ", so a constructor that takes an "
+        },
+        {
+         "t": "code",
+         "v": "int&"
+        },
+        {
+         "t": "text",
+         "v": " can't be called. Writing both a "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "&&"
+        },
+        {
+         "t": "text",
+         "v": " overload for each parameter works, but needs 2 to the power n overloads for n parameters; Pusz shows how that grows. One forwarding reference per parameter and one "
+        },
+        {
+         "t": "code",
+         "v": "std::forward"
+        },
+        {
+         "t": "text",
+         "v": " per use does it for any n, and that is how the standard library declares it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "template <typename T, typename... Args>\n[[nodiscard]] std::unique_ptr<T> make_unique(Args&&... args);\n// The body passes std::forward<Args>(args)... to T's constructor."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The C++ Core Guidelines put the rule in one line, "
+        },
+        {
+         "t": "a",
+         "v": "F.19",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-forward"
+        },
+        {
+         "t": "text",
+         "v": ": take a parameter by "
+        },
+        {
+         "t": "code",
+         "v": "TP&&"
+        },
+        {
+         "t": "text",
+         "v": " only when the function passes it on, and then "
+        },
+        {
+         "t": "code",
+         "v": "std::forward"
+        },
+        {
+         "t": "text",
+         "v": " it, exactly once on every path through the function. A function that uses the value itself takes "
+        },
+        {
+         "t": "code",
+         "v": "const T&"
+        },
+        {
+         "t": "text",
+         "v": ". A function that keeps its own copy of one known type, such as a constructor that stores a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": ", can take it by value and move it into place: one extra move, no template, and no pitfalls from this topic's last section. Forwarding references are for generic code that doesn't know what it passes on: factories, "
+        },
+        {
+         "t": "code",
+         "v": "emplace"
+        },
+        {
+         "t": "text",
+         "v": " functions and wrappers."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three wrappers pass one argument on to "
+        },
+        {
+         "t": "code",
+         "v": "store"
+        },
+        {
+         "t": "text",
+         "v": ", which takes a "
+        },
+        {
+         "t": "code",
+         "v": "Tracer"
+        },
+        {
+         "t": "text",
+         "v": " by value. They differ only in how they pass it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <utility>\n\nstruct Tracer {\n  Tracer() = default;\n  Tracer(const Tracer&) { std::cout << \"copy\\n\"; }\n  Tracer(Tracer&&) noexcept { std::cout << \"move\\n\"; }\n  Tracer& operator=(const Tracer&) = default;\n  Tracer& operator=(Tracer&&) = default;\n  ~Tracer() = default;\n};\n\nvoid store(Tracer /*kept*/) {}\n\ntemplate <typename T>\nvoid pass_by_name(T&& arg) {\n  store(arg);\n}\n\ntemplate <typename T>\nvoid pass_moved(T&& arg) {\n  store(std::move(arg));\n}\n\ntemplate <typename T>\nvoid pass_forwarded(T&& arg) {\n  store(std::forward<T>(arg));\n}\n\nint main() {\n  Tracer kept;\n  std::cout << \"by name,   lvalue: \";\n  pass_by_name(kept);\n  std::cout << \"by name,   rvalue: \";\n  pass_by_name(Tracer{});\n  std::cout << \"std::move, lvalue: \";\n  pass_moved(kept);\n  std::cout << \"std::move, rvalue: \";\n  pass_moved(Tracer{});\n  std::cout << \"forward,   lvalue: \";\n  pass_forwarded(kept);\n  std::cout << \"forward,   rvalue: \";\n  pass_forwarded(Tracer{});\n}"
+      },
+      {
+       "t": "output",
+       "text": "by name,   lvalue: copy\nby name,   rvalue: copy\nstd::move, lvalue: move\nstd::move, rvalue: move\nforward,   lvalue: copy\nforward,   rvalue: move"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Each line has exactly one copy or move, the one into "
+         },
+         {
+          "t": "code",
+          "v": "store"
+         },
+         {
+          "t": "text",
+          "v": "'s parameter. The "
+         },
+         {
+          "t": "code",
+          "v": "Tracer{}"
+         },
+         {
+          "t": "text",
+          "v": " temporaries bind to "
+         },
+         {
+          "t": "code",
+          "v": "arg"
+         },
+         {
+          "t": "text",
+          "v": " directly, with neither."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Passing by name copies the temporary. Inside the wrapper "
+         },
+         {
+          "t": "code",
+          "v": "arg"
+         },
+         {
+          "t": "text",
+          "v": " is an lvalue, so the caller's rvalue is lost, and the wrapper costs a copy wherever a move was possible."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::move"
+         },
+         {
+          "t": "text",
+          "v": " moves from the caller's "
+         },
+         {
+          "t": "code",
+          "v": "kept"
+         },
+         {
+          "t": "text",
+          "v": ", an lvalue the caller still owns and may use afterwards. It compiles without a warning, and it is the worse bug of the two: the first wrapper is slow, this one changes the caller's object."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::forward"
+         },
+         {
+          "t": "text",
+          "v": " gives each caller what it passed: a copy for the lvalue and a move for the temporary. That is the whole of perfect forwarding: the callee can't tell whether it was called directly or through the wrapper."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "wrapper",
+   "title": "Forwarding wrapper and emplace-style factory with test cases",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "call_logged(label, f, args...)"
+        },
+        {
+         "t": "text",
+         "v": ", which prints "
+        },
+        {
+         "t": "code",
+         "v": "calling <label>"
+        },
+        {
+         "t": "text",
+         "v": " and then calls "
+        },
+        {
+         "t": "code",
+         "v": "f"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "args"
+        },
+        {
+         "t": "text",
+         "v": ". The call must behave as if the caller had called "
+        },
+        {
+         "t": "code",
+         "v": "f"
+        },
+        {
+         "t": "text",
+         "v": " directly: the same arguments with the same value categories, and the same result, a reference if "
+        },
+        {
+         "t": "code",
+         "v": "f"
+        },
+        {
+         "t": "text",
+         "v": " returns one. Constrain it so that a call "
+        },
+        {
+         "t": "code",
+         "v": "f"
+        },
+        {
+         "t": "text",
+         "v": " can't accept fails at the call to "
+        },
+        {
+         "t": "code",
+         "v": "call_logged"
+        },
+        {
+         "t": "text",
+         "v": ". Then test in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A function taking a "
+         },
+         {
+          "t": "code",
+          "v": "std::string&"
+         },
+         {
+          "t": "text",
+          "v": " and appending to it changes the caller's string."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A function taking a "
+         },
+         {
+          "t": "code",
+          "v": "Tracer"
+         },
+         {
+          "t": "text",
+          "v": " by value gets a copy of an lvalue and a move of an rvalue."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A function returning an "
+         },
+         {
+          "t": "code",
+          "v": "int&"
+         },
+         {
+          "t": "text",
+          "v": " to the first element of a vector returns a reference through the wrapper, so that "
+         },
+         {
+          "t": "code",
+          "v": "call_logged(...) = 10"
+         },
+         {
+          "t": "text",
+          "v": " changes the vector."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A lambda that counts its own calls in a "
+         },
+         {
+          "t": "code",
+          "v": "mutable"
+         },
+         {
+          "t": "text",
+          "v": " member is called itself, not a copy: calling it twice through the wrapper returns 1, then 2."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <concepts>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Tracer {\n  Tracer() = default;\n  Tracer(const Tracer&) { std::cout << \"  copied\\n\"; }\n  Tracer(Tracer&&) noexcept { std::cout << \"  moved\\n\"; }\n  Tracer& operator=(const Tracer&) = default;\n  Tracer& operator=(Tracer&&) = default;\n  ~Tracer() = default;\n};\n\n// Calls f exactly as the caller would have: same arguments, same value categories, same result.\ntemplate <typename F, typename... Args>\n  requires std::invocable<F, Args...>\ndecltype(auto) call_logged(std::string_view label, F&& f, Args&&... args) {\n  std::cout << std::format(\"calling {}\\n\", label);\n  return std::invoke(std::forward<F>(f), std::forward<Args>(args)...);\n}\n\nvoid append_suffix(std::string& text) { text += \".bag\"; }\nvoid keep(Tracer /*kept*/) {}\n[[nodiscard]] int& front_of(std::vector<int>& values) { return values.front(); }\n\nint main() {\n  std::string name = \"run_07\";\n  call_logged(\"append_suffix\", append_suffix, name);\n  std::cout << std::format(\"  name is now {}\\n\", name);\n\n  Tracer tracer;\n  call_logged(\"keep with an lvalue\", keep, tracer);\n  call_logged(\"keep with an rvalue\", keep, std::move(tracer));\n\n  std::vector<int> gains{1, 2, 3};\n  call_logged(\"front_of\", front_of, gains) = 10;\n  std::cout << std::format(\"  gains[0] is now {}\\n\", gains[0]);\n\n  auto counter = [calls = 0]() mutable { return ++calls; };\n  const int first = call_logged(\"counter\", counter);\n  const int second = call_logged(\"counter\", counter);\n  std::cout << std::format(\"  counter returned {}, then {}\\n\", first, second);\n}"
+      },
+      {
+       "t": "output",
+       "text": "calling append_suffix\n  name is now run_07.bag\ncalling keep with an lvalue\n  copied\ncalling keep with an rvalue\n  moved\ncalling front_of\n  gains[0] is now 10\ncalling counter\ncalling counter\n  counter returned 1, then 2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each test checks one part of the signature. Test 1 needs "
+        },
+        {
+         "t": "code",
+         "v": "Args&&"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::forward"
+        },
+        {
+         "t": "text",
+         "v": ": a "
+        },
+        {
+         "t": "code",
+         "v": "const Args&"
+        },
+        {
+         "t": "text",
+         "v": " parameter would hand "
+        },
+        {
+         "t": "code",
+         "v": "append_suffix"
+        },
+        {
+         "t": "text",
+         "v": " a "
+        },
+        {
+         "t": "code",
+         "v": "const std::string"
+        },
+        {
+         "t": "text",
+         "v": ", which it refuses, and a by-value parameter would append to a copy. Test 2 is the worked example again, through a variadic pack. Test 3 needs "
+        },
+        {
+         "t": "code",
+         "v": "decltype(auto)"
+        },
+        {
+         "t": "text",
+         "v": ". With plain "
+        },
+        {
+         "t": "code",
+         "v": "auto"
+        },
+        {
+         "t": "text",
+         "v": ", the wrapper would return an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " by value, and GCC 13 refuses "
+        },
+        {
+         "t": "code",
+         "v": "= 10"
+        },
+        {
+         "t": "text",
+         "v": " on that prvalue with \"lvalue required as left operand of assignment\". Test 4 needs "
+        },
+        {
+         "t": "code",
+         "v": "F&&"
+        },
+        {
+         "t": "text",
+         "v": " too: with "
+        },
+        {
+         "t": "code",
+         "v": "F f"
+        },
+        {
+         "t": "text",
+         "v": " by value, the wrapper would call a copy of the lambda, and both calls would return 1. Josuttis's "
+        },
+        {
+         "t": "a",
+         "v": "C++ Move Semantics: The Complete Guide",
+         "href": "https://leanpub.com/cppmove"
+        },
+        {
+         "t": "text",
+         "v": " covers the return side in chapter 12, \"Perfect Returning with decltype(auto)\"."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::invoke"
+        },
+        {
+         "t": "text",
+         "v": " calls anything callable the same way: a function, a lambda, a member function pointer with its object as the first argument. "
+        },
+        {
+         "t": "code",
+         "v": "requires std::invocable<F, Args...>"
+        },
+        {
+         "t": "text",
+         "v": " moves the error for a bad call from the middle of "
+        },
+        {
+         "t": "code",
+         "v": "std::invoke"
+        },
+        {
+         "t": "text",
+         "v": " to the line that calls "
+        },
+        {
+         "t": "code",
+         "v": "call_logged"
+        },
+        {
+         "t": "text",
+         "v": ", where GCC reports that the constraint isn't satisfied."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. A "
+        },
+        {
+         "t": "code",
+         "v": "SensorRegistry"
+        },
+        {
+         "t": "text",
+         "v": " owns sensors of different classes derived from "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": ", in a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::unique_ptr<Sensor>>"
+        },
+        {
+         "t": "text",
+         "v": ". Give it "
+        },
+        {
+         "t": "code",
+         "v": "emplace<S>(args...)"
+        },
+        {
+         "t": "text",
+         "v": ", which constructs an "
+        },
+        {
+         "t": "code",
+         "v": "S"
+        },
+        {
+         "t": "text",
+         "v": " from the caller's arguments, stores it and returns an "
+        },
+        {
+         "t": "code",
+         "v": "S&"
+        },
+        {
+         "t": "text",
+         "v": " to it, like "
+        },
+        {
+         "t": "code",
+         "v": "std::make_unique<S>"
+        },
+        {
+         "t": "text",
+         "v": " combined with "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": ". It must refuse an "
+        },
+        {
+         "t": "code",
+         "v": "S"
+        },
+        {
+         "t": "text",
+         "v": " that isn't a "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": ", and arguments that "
+        },
+        {
+         "t": "code",
+         "v": "S"
+        },
+        {
+         "t": "text",
+         "v": " can't be constructed from, at the call site."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Lidar"
+        },
+        {
+         "t": "text",
+         "v": " has three constructors: from a "
+        },
+        {
+         "t": "code",
+         "v": "const LidarConfig&"
+        },
+        {
+         "t": "text",
+         "v": ", which prints that it copies the configuration; from a "
+        },
+        {
+         "t": "code",
+         "v": "LidarConfig&&"
+        },
+        {
+         "t": "text",
+         "v": ", which prints that it moves it; and from a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " frame id and an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " rate, which builds the configuration in place. "
+        },
+        {
+         "t": "code",
+         "v": "Imu"
+        },
+        {
+         "t": "text",
+         "v": " has a default constructor. Before running your test, write down which constructor runs for each of these calls:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "emplace<Lidar>(front)"
+         },
+         {
+          "t": "text",
+          "v": ", where "
+         },
+         {
+          "t": "code",
+          "v": "front"
+         },
+         {
+          "t": "text",
+          "v": " is a "
+         },
+         {
+          "t": "code",
+          "v": "const LidarConfig"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "emplace<Lidar>(std::move(rear))"
+         },
+         {
+          "t": "text",
+          "v": ", where "
+         },
+         {
+          "t": "code",
+          "v": "rear"
+         },
+         {
+          "t": "text",
+          "v": " is a non-const "
+         },
+         {
+          "t": "code",
+          "v": "LidarConfig"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "emplace<Lidar>(\"top_lidar\", 5)"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "emplace<Imu>()"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer: why must the caller write "
+        },
+        {
+         "t": "code",
+         "v": "<Lidar>"
+        },
+        {
+         "t": "text",
+         "v": ", and why does the reference returned by the first call stay valid after more sensors are added?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <concepts>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct LidarConfig {\n  std::string frame_id;\n  int rate_hz = 10;\n};\n\nclass Sensor {\n public:\n  virtual ~Sensor() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n};\n\nclass Lidar final : public Sensor {\n public:\n  explicit Lidar(const LidarConfig& config) : config_(config) {\n    std::cout << \"  Lidar(const LidarConfig&): copies the config\\n\";\n  }\n  explicit Lidar(LidarConfig&& config) : config_(std::move(config)) {\n    std::cout << \"  Lidar(LidarConfig&&): moves the config\\n\";\n  }\n  Lidar(std::string_view frame_id, int rate_hz) : config_{.frame_id = std::string(frame_id), .rate_hz = rate_hz} {\n    std::cout << \"  Lidar(std::string_view, int): builds the config in place\\n\";\n  }\n  [[nodiscard]] std::string_view name() const override { return config_.frame_id; }\n\n private:\n  LidarConfig config_;\n};\n\nclass Imu final : public Sensor {\n public:\n  Imu() { std::cout << \"  Imu()\\n\"; }\n  [[nodiscard]] std::string_view name() const override { return \"imu\"; }\n};\n\nclass SensorRegistry {\n public:\n  // Constructs an S from the caller's arguments, keeps it, and returns it.\n  template <std::derived_from<Sensor> S, typename... Args>\n    requires std::constructible_from<S, Args...>\n  S& emplace(Args&&... args) {\n    auto sensor = std::make_unique<S>(std::forward<Args>(args)...);\n    S& added = *sensor;\n    sensors_.push_back(std::move(sensor));\n    return added;\n  }\n  [[nodiscard]] std::ptrdiff_t size() const { return std::ssize(sensors_); }\n\n private:\n  std::vector<std::unique_ptr<Sensor>> sensors_;\n};\n\nint main() {\n  SensorRegistry registry;\n  const LidarConfig front{.frame_id = \"front_lidar\", .rate_hz = 20};\n  LidarConfig rear{.frame_id = \"rear_lidar\", .rate_hz = 10};\n\n  std::cout << \"emplace<Lidar>(front):\\n\";\n  const Lidar& first = registry.emplace<Lidar>(front);\n  std::cout << \"emplace<Lidar>(std::move(rear)):\\n\";\n  registry.emplace<Lidar>(std::move(rear));\n  std::cout << \"emplace<Lidar>(\\\"top_lidar\\\", 5):\\n\";\n  registry.emplace<Lidar>(\"top_lidar\", 5);\n  std::cout << \"emplace<Imu>():\\n\";\n  registry.emplace<Imu>();\n  std::cout << std::format(\"{} sensors; the first is still {}\\n\", registry.size(), first.name());\n}"
+      },
+      {
+       "t": "output",
+       "text": "emplace<Lidar>(front):\n  Lidar(const LidarConfig&): copies the config\nemplace<Lidar>(std::move(rear)):\n  Lidar(LidarConfig&&): moves the config\nemplace<Lidar>(\"top_lidar\", 5):\n  Lidar(std::string_view, int): builds the config in place\nemplace<Imu>():\n  Imu()\n4 sensors; the first is still front_lidar"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Overload resolution inside "
+        },
+        {
+         "t": "code",
+         "v": "std::make_unique"
+        },
+        {
+         "t": "text",
+         "v": " sees each argument exactly as the caller wrote it, so it picks the constructor the caller would have picked by writing "
+        },
+        {
+         "t": "code",
+         "v": "Lidar(front)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Lidar(std::move(rear))"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "Lidar(\"top_lidar\", 5)"
+        },
+        {
+         "t": "text",
+         "v": " directly. The third call is what makes an emplace function worth having: nothing is built in the caller's frame, and the string literal and the "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " travel as references down to the one constructor that uses them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The caller writes "
+        },
+        {
+         "t": "code",
+         "v": "<Lidar>"
+        },
+        {
+         "t": "text",
+         "v": " because "
+        },
+        {
+         "t": "code",
+         "v": "S"
+        },
+        {
+         "t": "text",
+         "v": " appears in no parameter, so nothing can deduce it, and it has to come first in the template parameter list, before the deduced pack. The reference stays valid because the vector holds "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s: when it grows, it moves the pointers, and the sensors stay where they are. With a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Lidar>"
+        },
+        {
+         "t": "text",
+         "v": ", the first "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " that reallocated would leave "
+        },
+        {
+         "t": "code",
+         "v": "first"
+        },
+        {
+         "t": "text",
+         "v": " dangling."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two constraints turn a mistake into a short error at the call. Without them, "
+        },
+        {
+         "t": "code",
+         "v": "emplace<Lidar>(3.5)"
+        },
+        {
+         "t": "text",
+         "v": " would fail deep inside "
+        },
+        {
+         "t": "code",
+         "v": "std::make_unique"
+        },
+        {
+         "t": "text",
+         "v": ". With them, GCC 13 says there is no matching "
+        },
+        {
+         "t": "code",
+         "v": "emplace"
+        },
+        {
+         "t": "text",
+         "v": " and that the constraints are not satisfied. The same effect, in a smaller program:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "constraints not satisfied",
+       "text": "#include <concepts>\n#include <memory>\n#include <string>\n#include <string_view>\n#include <utility>\n\nstruct Lidar {\n  Lidar(std::string_view frame_id, int rate_hz) : frame_id_(frame_id), rate_hz_(rate_hz) {}\n  std::string frame_id_;\n  int rate_hz_;\n};\n\ntemplate <typename S, typename... Args>\n  requires std::constructible_from<S, Args...>\n[[nodiscard]] std::unique_ptr<S> build(Args&&... args) {\n  return std::make_unique<S>(std::forward<Args>(args)...);\n}\n\nint main() {\n  const auto lidar = build<Lidar>(3.5);\n  return lidar->rate_hz_;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An emplace function constructs with direct initialisation, so it calls "
+        },
+        {
+         "t": "code",
+         "v": "explicit"
+        },
+        {
+         "t": "text",
+         "v": " constructors, which "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " never does. That is a sharp edge as well as a convenience. With "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::vector<float>> scans"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "scans.emplace_back(360)"
+        },
+        {
+         "t": "text",
+         "v": " compiles and appends a scan of 360 zeros, while "
+        },
+        {
+         "t": "code",
+         "v": "scans.push_back(360)"
+        },
+        {
+         "t": "text",
+         "v": " doesn't compile, because the size constructor of "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " is explicit. Abseil's "
+        },
+        {
+         "t": "a",
+         "v": "tip 112",
+         "href": "https://abseil.io/tips/112"
+        },
+        {
+         "t": "text",
+         "v": " shows the same trap and recommends "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " when you already have an object, keeping "
+        },
+        {
+         "t": "code",
+         "v": "emplace_back"
+        },
+        {
+         "t": "text",
+         "v": " for constructing from arguments. Ben Deane's "
+        },
+        {
+         "t": "a",
+         "v": "talk on in-place construction",
+         "href": "https://www.youtube.com/watch?v=oTMSgI1XjF8"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019) adds the mirror image: "
+        },
+        {
+         "t": "code",
+         "v": "v.emplace_back(Record(a, b))"
+        },
+        {
+         "t": "text",
+         "v": " builds a temporary and moves it, which is exactly "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": ". Pass the arguments, "
+        },
+        {
+         "t": "code",
+         "v": "v.emplace_back(a, b)"
+        },
+        {
+         "t": "text",
+         "v": ", or call "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pitfalls",
+   "title": "Forwarding twice, auto&& in loops, constructors that hijack copies",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This "
+        },
+        {
+         "t": "code",
+         "v": "publish"
+        },
+        {
+         "t": "text",
+         "v": " forwards its message twice, once to a recorder and once to a link. It compiles cleanly, and with an rvalue it sends an empty message:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <utility>\n#include <vector>\n\nclass Recorder {\n public:\n  void record(std::string line) { lines_.push_back(std::move(line)); }\n  [[nodiscard]] const std::string& last() const { return lines_.back(); }\n\n private:\n  std::vector<std::string> lines_;\n};\n\nclass Link {\n public:\n  void send(std::string message) { sent_ = std::move(message); }\n  [[nodiscard]] const std::string& last_sent() const { return sent_; }\n\n private:\n  std::string sent_;\n};\n\ntemplate <typename S>\nvoid publish(Recorder& recorder, Link& link, S&& message) {\n  recorder.record(std::forward<S>(message));  // moves an rvalue into the recorder\n  link.send(std::forward<S>(message));        // then sends what the move left behind\n}\n\nint main() {\n  Recorder recorder;\n  Link link;\n  publish(recorder, link, std::string(\"pose 12.5 3.0 heading 1.57 from the localiser\"));\n  std::cout << std::format(\"recorded: '{}'\\nsent:     '{}'\\n\", recorder.last(), link.last_sent());\n}"
+      },
+      {
+       "t": "output",
+       "text": "recorded: 'pose 12.5 3.0 heading 1.57 from the localiser'\nsent:     ''"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first "
+        },
+        {
+         "t": "code",
+         "v": "std::forward"
+        },
+        {
+         "t": "text",
+         "v": " casts the temporary to an rvalue and the recorder moves from it. The second passes the moved-from string, which GCC's library leaves empty; the standard only promises that it is valid with unspecified contents. With an lvalue argument both forwards copy and the bug stays hidden, which is why it survives tests that pass named strings. F.19 says forward \"exactly once on every path\". Use the parameter as an lvalue everywhere but the last use, and forward only there: "
+        },
+        {
+         "t": "code",
+         "v": "recorder.record(message); link.send(std::forward<S>(message));"
+        },
+        {
+         "t": "text",
+         "v": " copies once and moves once. The same holds for one parameter used to initialise two members, one of Iglberger's pitfalls, and for a forward inside a loop body, which runs once per iteration."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second group is about loops. A loop over a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " that spells out its element type looks careful, and copies every element, because the map's element type is "
+        },
+        {
+         "t": "code",
+         "v": "std::pair<const std::string, Pose>"
+        },
+        {
+         "t": "text",
+         "v": ", with a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " key. The reference can't bind to it, so each iteration builds a converted temporary pair, copying the name and the pose. GCC's "
+        },
+        {
+         "t": "code",
+         "v": "-Wrange-loop-construct"
+        },
+        {
+         "t": "text",
+         "v": ", part of "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": ", catches it, and with "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " the build stops:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "binds to a temporary constructed from type",
+       "text": "#include <format>\n#include <iostream>\n#include <map>\n#include <string>\n\nstruct Pose {\n  double x = 0;\n  double y = 0;\n};\n\nint main() {\n  const std::map<std::string, Pose> poses{{\"dock\", {0, 0}}, {\"shelf\", {3, 4}}};\n  for (const std::pair<std::string, Pose>& entry : poses) {\n    std::cout << std::format(\"{} at ({}, {})\\n\", entry.first, entry.second.x, entry.second.y);\n  }\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write "
+        },
+        {
+         "t": "code",
+         "v": "const auto& [name, pose] : poses"
+        },
+        {
+         "t": "text",
+         "v": " and the question doesn't arise. Where the loop may also modify elements, "
+        },
+        {
+         "t": "code",
+         "v": "auto&"
+        },
+        {
+         "t": "text",
+         "v": " looks like the general form and isn't. "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<bool>"
+        },
+        {
+         "t": "text",
+         "v": " stores bits, and its iterator returns a proxy object by value, a prvalue that a non-const lvalue reference can't bind to:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "cannot bind non-const lvalue reference",
+       "text": "#include <vector>\n\nint main() {\n  std::vector<bool> lamps(4);\n  for (auto& lamp : lamps) lamp = true;\n  return lamps.front() ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "auto&&"
+        },
+        {
+         "t": "text",
+         "v": " binds to anything, and for a proxy it deduces the proxy type itself, so the assignment writes through to the bit. It also binds to the prvalues a view such as "
+        },
+        {
+         "t": "code",
+         "v": "std::views::transform"
+        },
+        {
+         "t": "text",
+         "v": " produces:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <ranges>\n#include <vector>\n\nint main() {\n  std::vector<bool> lamps(4);\n  for (auto&& lamp : lamps) lamp = true;  // lamp binds to a std::vector<bool>::reference proxy\n  std::cout << std::format(\"lamps on: {}\\n\", std::ranges::count(lamps, true));\n\n  const auto squares = std::views::iota(1, 5) | std::views::transform([](int i) { return i * i; });\n  for (auto&& square : squares) std::cout << std::format(\"{} \", square);\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "lamps on: 4\n1 4 9 16 "
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So in generic code, and in any loop that modifies elements of a range whose type it doesn't control, "
+        },
+        {
+         "t": "code",
+         "v": "for (auto&& x : range)"
+        },
+        {
+         "t": "text",
+         "v": " is the form that always compiles and never copies; Pusz and Amir Kirsh's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on rvalues and move semantics",
+         "href": "https://www.youtube.com/watch?v=i_Z_o9T2fNE"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) both recommend it. In ordinary code, "
+        },
+        {
+         "t": "code",
+         "v": "const auto&"
+        },
+        {
+         "t": "text",
+         "v": " for reading and "
+        },
+        {
+         "t": "code",
+         "v": "auto&"
+        },
+        {
+         "t": "text",
+         "v": " for writing say more. "
+        },
+        {
+         "t": "code",
+         "v": "auto&&"
+        },
+        {
+         "t": "text",
+         "v": " does not make a loop over a temporary's member safe: "
+        },
+        {
+         "t": "code",
+         "v": "for (auto&& waypoint : make_route().waypoints())"
+        },
+        {
+         "t": "text",
+         "v": " dangles in C++20 for the reason the storage and lifetime topic gave. "
+        },
+        {
+         "t": "code",
+         "v": "waypoints()"
+        },
+        {
+         "t": "text",
+         "v": " returns a reference into the route, and nothing keeps the temporary route alive past the loop's first line."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third failure is the one from the cold check. A class with a single-parameter constructor template taking a forwarding reference competes with its own copy constructor, and for a non-const lvalue it wins:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "basic_string(Topic&)",
+       "text": "#include <string>\n#include <utility>\n\nclass Topic {\n public:\n  template <typename S>\n  explicit Topic(S&& name) : name_(std::forward<S>(name)) {}\n\n private:\n  std::string name_;\n};\n\nint main() {\n  Topic scan(\"scan\");\n  Topic copy(scan);  // meant as a copy; S is deduced as Topic&\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both constructors can take "
+        },
+        {
+         "t": "code",
+         "v": "scan"
+        },
+        {
+         "t": "text",
+         "v": ", and both bindings rank as exact matches. The copy constructor's "
+        },
+        {
+         "t": "code",
+         "v": "const Topic&"
+        },
+        {
+         "t": "text",
+         "v": " adds "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " to the argument, while the template, with "
+        },
+        {
+         "t": "code",
+         "v": "S = Topic&"
+        },
+        {
+         "t": "text",
+         "v": ", takes a plain "
+        },
+        {
+         "t": "code",
+         "v": "Topic&"
+        },
+        {
+         "t": "text",
+         "v": ". When two reference bindings differ only in "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ", the one that adds less wins, so the template is chosen, and it tries to build a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " from a "
+        },
+        {
+         "t": "code",
+         "v": "Topic"
+        },
+        {
+         "t": "text",
+         "v": ". For a "
+        },
+        {
+         "t": "code",
+         "v": "const Topic"
+        },
+        {
+         "t": "text",
+         "v": " the two bind identically, and then the non-template copy constructor wins the tie, so copies of "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " objects work and hide the bug. Iglberger's version of this has a "
+        },
+        {
+         "t": "code",
+         "v": "Person"
+        },
+        {
+         "t": "text",
+         "v": " class; Pusz shows a worse one, where the class converts to the member's type, so the hijacked copy compiles and produces a wrong object instead of an error."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fix is a constraint that says what the template is for and what it isn't for, so that it drops out of overload resolution for everything else. This "
+        },
+        {
+         "t": "code",
+         "v": "Topic"
+        },
+        {
+         "t": "text",
+         "v": " also converts to "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "LatchedTopic"
+        },
+        {
+         "t": "text",
+         "v": " derives from it: the two cases that get past simpler constraints. The copy constructor records how each object was made:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <concepts>\n#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <type_traits>\n#include <utility>\n\nclass Topic {\n public:\n  template <typename S>\n    requires std::constructible_from<std::string, S> && (!std::derived_from<std::remove_cvref_t<S>, Topic>)\n  explicit Topic(S&& name) : name_(std::forward<S>(name)), origin_(Origin::converted) {}\n  Topic(const Topic& other) : name_(other.name_), origin_(Origin::copied) {}\n  Topic(Topic&&) noexcept = default;\n  Topic& operator=(const Topic&) = default;\n  Topic& operator=(Topic&&) noexcept = default;\n  ~Topic() = default;\n\n  operator std::string_view() const { return name_; }  // lets a Topic stand in for its name\n  [[nodiscard]] std::string_view made_by() const { return origin_ == Origin::copied ? \"copied\" : \"converted\"; }\n\n private:\n  enum class Origin { converted, copied };\n  std::string name_;\n  Origin origin_;\n};\n\nclass LatchedTopic : public Topic {\n public:\n  using Topic::Topic;\n};\n\nint main() {\n  Topic scan(\"scan\");\n  const Topic copy(scan);\n  LatchedTopic map_topic(\"map\");\n  const Topic sliced(map_topic);\n  std::cout << std::format(\"copy: {}, from a derived object: {}\\n\", copy.made_by(), sliced.made_by());\n}"
+      },
+      {
+       "t": "output",
+       "text": "copy: copied, from a derived object: copied"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each half of the constraint closes one hole. "
+        },
+        {
+         "t": "code",
+         "v": "std::constructible_from<std::string, S>"
+        },
+        {
+         "t": "text",
+         "v": " says what the template is for, and on its own it fixes the "
+        },
+        {
+         "t": "code",
+         "v": "Topic"
+        },
+        {
+         "t": "text",
+         "v": " of the compile-fail example. It doesn't fix this one: a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " can be constructed from a "
+        },
+        {
+         "t": "code",
+         "v": "Topic&"
+        },
+        {
+         "t": "text",
+         "v": " through the conversion to "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", so the template stays a candidate and wins. With only the first half, GCC 13 builds both objects through the template, and the program prints "
+        },
+        {
+         "t": "code",
+         "v": "copy: converted, from a derived object: converted"
+        },
+        {
+         "t": "text",
+         "v": ". That is the silent version of the bug, the one Pusz shows with his "
+        },
+        {
+         "t": "code",
+         "v": "int_or_empty"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "!std::derived_from<std::remove_cvref_t<S>, Topic>"
+        },
+        {
+         "t": "text",
+         "v": " says what the template isn't for: a "
+        },
+        {
+         "t": "code",
+         "v": "Topic"
+        },
+        {
+         "t": "text",
+         "v": ", or any class derived from one, whatever "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " or reference comes with it. Pusz also shows the narrower "
+        },
+        {
+         "t": "code",
+         "v": "!std::same_as<std::remove_cvref_t<S>, Topic>"
+        },
+        {
+         "t": "text",
+         "v": ", which excludes only "
+        },
+        {
+         "t": "code",
+         "v": "Topic"
+        },
+        {
+         "t": "text",
+         "v": " itself; measured with GCC 13, it still hands "
+        },
+        {
+         "t": "code",
+         "v": "Topic sliced(map_topic)"
+        },
+        {
+         "t": "text",
+         "v": " to the template."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say when "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " is a forwarding reference and when it is an rvalue reference, what "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is deduced as for an lvalue and for an rvalue, and the collapsing rule. Explain why a named parameter is an lvalue, what "
+        },
+        {
+         "t": "code",
+         "v": "std::forward<T>"
+        },
+        {
+         "t": "text",
+         "v": " does with it, and how it differs from "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": ". Name the three failures: forwarding twice, "
+        },
+        {
+         "t": "code",
+         "v": "auto&"
+        },
+        {
+         "t": "text",
+         "v": " where "
+        },
+        {
+         "t": "code",
+         "v": "auto&&"
+        },
+        {
+         "t": "text",
+         "v": " is needed, and the constructor template that beats the copy constructor, with the fix for each."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "In "
+     },
+     {
+      "t": "code",
+      "v": "template <typename T> void f(T&& x)"
+     },
+     {
+      "t": "text",
+      "v": ", what is "
+     },
+     {
+      "t": "code",
+      "v": "T"
+     },
+     {
+      "t": "text",
+      "v": " for an "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " lvalue, a "
+     },
+     {
+      "t": "code",
+      "v": "const int"
+     },
+     {
+      "t": "text",
+      "v": " lvalue and an "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " prvalue?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which of "
+     },
+     {
+      "t": "code",
+      "v": "T&&"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "const T&&"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<T>&&"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "auto&&"
+     },
+     {
+      "t": "text",
+      "v": " are forwarding references, and when is a member function's "
+     },
+     {
+      "t": "code",
+      "v": "T&&"
+     },
+     {
+      "t": "text",
+      "v": " not one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "State the reference collapsing rule, and show where it makes "
+     },
+     {
+      "t": "code",
+      "v": "std::forward"
+     },
+     {
+      "t": "text",
+      "v": " return an lvalue."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "std::forward"
+     },
+     {
+      "t": "text",
+      "v": " need its template argument, while "
+     },
+     {
+      "t": "code",
+      "v": "std::move"
+     },
+     {
+      "t": "text",
+      "v": " doesn't?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is a prvalue passed to a "
+     },
+     {
+      "t": "code",
+      "v": "U&&"
+     },
+     {
+      "t": "text",
+      "v": " constructor parameter moved rather than elided?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "decltype(auto)"
+     },
+     {
+      "t": "text",
+      "v": " do for a wrapper that plain "
+     },
+     {
+      "t": "code",
+      "v": "auto"
+     },
+     {
+      "t": "text",
+      "v": " doesn't?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "emplace_back"
+     },
+     {
+      "t": "text",
+      "v": " call explicit constructors, and when is "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " the better call?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What goes wrong when a function forwards the same argument twice, and why do tests with named arguments miss it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why doesn't "
+     },
+     {
+      "t": "code",
+      "v": "for (auto& b : bits)"
+     },
+     {
+      "t": "text",
+      "v": " compile for a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<bool>"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a class with a forwarding constructor template that doesn't hijack its copy constructor."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Mateusz Pusz, Back to Basics: Forwarding References, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Forwarding_References.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=0GXnfi9RAlU"
+     },
+     {
+      "t": "text",
+      "v": ". The deduction table, what isn't a forwarding reference, sinks with 2 to the power n overloads, constraining a forwarding constructor, and "
+     },
+     {
+      "t": "code",
+      "v": "auto&&"
+     },
+     {
+      "t": "text",
+      "v": " in range-for loops."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: Move Semantics, part 2, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_move_semantics_part_2/back_to_basics_move_semantics_part_2__klaus_iglberger__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=pIzaZbKUw2s"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "make_unique"
+     },
+     {
+      "t": "text",
+      "v": " built step by step, "
+     },
+     {
+      "t": "code",
+      "v": "std::forward"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::move"
+     },
+     {
+      "t": "text",
+      "v": " with "
+     },
+     {
+      "t": "code",
+      "v": "T"
+     },
+     {
+      "t": "text",
+      "v": " substituted, and the pitfalls of forwarding references."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh, Back to Basics: Rvalues and Move Semantics, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Rvalues_and_Move_Semantics.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=i_Z_o9T2fNE"
+     },
+     {
+      "t": "text",
+      "v": ". Forwarding references in use, and "
+     },
+     {
+      "t": "code",
+      "v": "auto&&"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<bool>"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Ben Deane, Everyday Efficiency: In-Place Construction, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/everyday_efficiency_inplace_construction/everyday_efficiency_inplace_construction__ben_deane__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=oTMSgI1XjF8"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "emplace_back"
+     },
+     {
+      "t": "text",
+      "v": " calls explicit constructors, and a constructor call written inside "
+     },
+     {
+      "t": "code",
+      "v": "emplace_back"
+     },
+     {
+      "t": "text",
+      "v": " defeats it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "F.19",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-forward"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "T.10",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-concepts"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, "
+     },
+     {
+      "t": "a",
+      "v": "C++ Move Semantics: The Complete Guide",
+      "href": "https://leanpub.com/cppmove"
+     },
+     {
+      "t": "text",
+      "v": ", chapters 9 to 12: perfect forwarding, its tricky details, "
+     },
+     {
+      "t": "code",
+      "v": "auto&&"
+     },
+     {
+      "t": "text",
+      "v": ", and perfect returning with "
+     },
+     {
+      "t": "code",
+      "v": "decltype(auto)"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil "
+     },
+     {
+      "t": "a",
+      "v": "tip 112, emplace against push_back",
+      "href": "https://abseil.io/tips/112"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::forward",
+      "href": "https://en.cppreference.com/cpp/utility/forward"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "references and reference collapsing",
+      "href": "https://en.cppreference.com/cpp/language/reference"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "template argument deduction",
+      "href": "https://en.cppreference.com/cpp/language/template_argument_deduction"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::invoke",
+      "href": "https://en.cppreference.com/cpp/utility/functional/invoke"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1925 @@
+{
+ "id": "dsa-arrays-strings",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "void move_zeros(std::span<int> v)"
+     },
+     {
+      "t": "text",
+      "v": ", which moves every zero to the end and keeps the other elements in their original order, without a second container. "
+     },
+     {
+      "t": "code",
+      "v": "{0, 1, 0, 3, 12}"
+     },
+     {
+      "t": "text",
+      "v": " becomes "
+     },
+     {
+      "t": "code",
+      "v": "{1, 3, 12, 0, 0}"
+     },
+     {
+      "t": "text",
+      "v": ". State the time and extra space. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\nvoid move_zeros(std::span<int> v) {\n  std::ptrdiff_t write = 0;  // the next slot for an element that stays\n  for (std::ptrdiff_t read = 0; read < std::ssize(v); ++read)\n    if (v[read] != 0) v[write++] = v[read];\n  for (; write < std::ssize(v); ++write) v[write] = 0;\n}\n\n[[nodiscard]] std::string show(std::span<const int> v) {\n  std::string out = \"{\";\n  for (std::string_view separator; const int x : v) {\n    out += std::format(\"{}{}\", separator, x);\n    separator = \", \";\n  }\n  return out + \"}\";\n}\n\nint main() {\n  std::vector<std::vector<int>> cases{{0, 1, 0, 3, 12}, {}, {0, 0}, {5, 6}};\n  for (std::vector<int>& v : cases) {\n    move_zeros(v);\n    std::cout << show(v) << '\\n';\n  }\n}"
+   },
+   {
+    "t": "output",
+    "text": "{1, 3, 12, 0, 0}\n{}\n{0, 0}\n{5, 6}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "This is O(n) time and O(1) extra space. The parameter is a "
+     },
+     {
+      "t": "code",
+      "v": "std::span<int>"
+     },
+     {
+      "t": "text",
+      "v": " because the function changes elements but never the size, so the same code works on a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": ", a "
+     },
+     {
+      "t": "code",
+      "v": "std::array"
+     },
+     {
+      "t": "text",
+      "v": " or a part of either. The test loop takes each case by non-const reference, because "
+     },
+     {
+      "t": "code",
+      "v": "move_zeros"
+     },
+     {
+      "t": "text",
+      "v": " changes it in place."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if yours is in place, keeps the order, and handles an empty vector and one with no zeros. The library version below, "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::remove"
+     },
+     {
+      "t": "text",
+      "v": " followed by "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::fill"
+     },
+     {
+      "t": "text",
+      "v": ", passes too if you can say what "
+     },
+     {
+      "t": "code",
+      "v": "remove"
+     },
+     {
+      "t": "text",
+      "v": " returns. A version that uses a second vector, or that loses the order, is a partial pass. More than that is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": ", a "
+    },
+    {
+     "t": "code",
+     "v": "std::array"
+    },
+    {
+     "t": "text",
+     "v": " and a "
+    },
+    {
+     "t": "code",
+     "v": "std::string"
+    },
+    {
+     "t": "text",
+     "v": " store their elements next to each other in memory, so element i sits at a fixed offset from the first one and "
+    },
+    {
+     "t": "code",
+     "v": "v[i]"
+    },
+    {
+     "t": "text",
+     "v": " costs the same O(1) time whichever index you ask for. A "
+    },
+    {
+     "t": "code",
+     "v": "std::span<T>"
+    },
+    {
+     "t": "text",
+     "v": " is a view over such a run of elements, a pointer and a length with no ownership of its own, which lets one function work on a vector, an array or part of either."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is changing which elements are present without a second container. Elements sit back to back, so removing one from the middle means every element after it must shift down to close the gap, O(n) for one removal and O(n²) repeated once per element. Copying only the kept elements into a new container avoids the shifting but pays O(n) extra space for a layout you already had."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The "
+    },
+    {
+     "t": "i",
+     "v": "write pointer"
+    },
+    {
+     "t": "text",
+     "v": " fixes both: one index reads every element once, and a second names the next slot for an element that stays, copying into it and advancing both indices when the current element should stay, or only moving the reading index on when it should not. The invariant, true before and after every step, is that every slot before the write index already holds the kept elements in their original order, and because it never gets ahead of the reading index, a copy never overwrites something unread. One pass, O(n) time, O(1) extra space. The standard library names this "
+    },
+    {
+     "t": "code",
+     "v": "std::ranges::remove"
+    },
+    {
+     "t": "text",
+     "v": ", whose returned tail you overwrite yourself, and "
+    },
+    {
+     "t": "code",
+     "v": "std::erase"
+    },
+    {
+     "t": "text",
+     "v": " does both steps at once."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What goes wrong under pressure is the surrounding index arithmetic, not the pointer itself. "
+    },
+    {
+     "t": "code",
+     "v": "v.size() - 1"
+    },
+    {
+     "t": "text",
+     "v": " on an empty container wraps around in "
+    },
+    {
+     "t": "code",
+     "v": "std::size_t"
+    },
+    {
+     "t": "text",
+     "v": " instead of going negative, and reads memory that does not exist, which signed indices through "
+    },
+    {
+     "t": "code",
+     "v": "std::ssize"
+    },
+    {
+     "t": "text",
+     "v": " avoid outright. A counting table indexed by a plain "
+    },
+    {
+     "t": "code",
+     "v": "char"
+    },
+    {
+     "t": "text",
+     "v": " breaks the same way, because "
+    },
+    {
+     "t": "code",
+     "v": "char"
+    },
+    {
+     "t": "text",
+     "v": " is signed on x86 and a byte above 127 becomes a negative index; casting to "
+    },
+    {
+     "t": "code",
+     "v": "unsigned char"
+    },
+    {
+     "t": "text",
+     "v": " first is the fix. Reach for the write pointer when order must survive; when it need not, swapping the removed element with the last one is cheaper."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself, moving every zero in an array to the end in place, and it is one of three shapes, alongside a single running-state pass and a counting table, that most short array and string problems reduce to."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "scan",
+   "title": "In-place scanning, counting and write pointers",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Trace the answer to the cold check on "
+        },
+        {
+         "t": "code",
+         "v": "{0, 1, 0, 3, 12}"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "read"
+        },
+        {
+         "t": "text",
+         "v": " visits every element, and "
+        },
+        {
+         "t": "code",
+         "v": "write"
+        },
+        {
+         "t": "text",
+         "v": " is the next slot for an element that stays:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "read"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "value"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "action"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "write afterwards"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "vector afterwards"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "skip"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0 1 0 3 12"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "copy to slot 0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1 1 0 3 12"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "skip"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1 1 0 3 12"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "copy to slot 1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1 3 0 3 12"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "12"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "copy to slot 2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1 3 12 3 12"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "After the loop, slots 0 to 2 hold the kept elements in order, and the second loop writes zeros into slots 3 and 4. What makes this correct is an "
+        },
+        {
+         "t": "i",
+         "v": "invariant"
+        },
+        {
+         "t": "text",
+         "v": ", a statement that is true before and after every step: the slots before "
+        },
+        {
+         "t": "code",
+         "v": "write"
+        },
+        {
+         "t": "text",
+         "v": " hold exactly the non-zero elements seen so far, in their original order. Because "
+        },
+        {
+         "t": "code",
+         "v": "write"
+        },
+        {
+         "t": "text",
+         "v": " never passes "
+        },
+        {
+         "t": "code",
+         "v": "read"
+        },
+        {
+         "t": "text",
+         "v": ", the copy never overwrites an element that hasn't been read yet. Say the invariant out loud in an interview. It is how you convince the interviewer, and yourself, that the loop is right."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The standard library has this loop under a name. The possible implementation of "
+        },
+        {
+         "t": "a",
+         "v": "std::ranges::remove",
+         "href": "https://en.cppreference.com/cpp/algorithm/ranges/remove"
+        },
+        {
+         "t": "text",
+         "v": " on cppreference is the same write pointer, with a "
+        },
+        {
+         "t": "code",
+         "v": "find"
+        },
+        {
+         "t": "text",
+         "v": " first to skip the prefix that stays where it is. So move zeros is two named steps:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\nvoid move_zeros(std::span<int> v) {\n  const auto tail = std::ranges::remove(v, 0);  // the kept elements move to the front\n  std::ranges::fill(tail, 0);                   // tail is what they left behind\n}\n\n[[nodiscard]] std::string show(std::span<const int> v) {\n  std::string out = \"{\";\n  for (std::string_view separator; const int x : v) {\n    out += std::format(\"{}{}\", separator, x);\n    separator = \", \";\n  }\n  return out + \"}\";\n}\n\nint main() {\n  std::vector<int> v{0, 1, 0, 3, 12};\n  const auto tail = std::ranges::remove(v, 0);\n  std::cout << std::format(\"remove kept {} elements and left a tail of {}\\n\", tail.begin() - v.begin(), std::ssize(tail));\n  std::vector<int> w{0, 1, 0, 3, 12};\n  move_zeros(w);\n  std::cout << show(w) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "remove kept 3 elements and left a tail of 2\n{1, 3, 12, 0, 0}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::ranges::remove"
+        },
+        {
+         "t": "text",
+         "v": " returns the tail itself, as a subrange, so "
+        },
+        {
+         "t": "code",
+         "v": "fill"
+        },
+        {
+         "t": "text",
+         "v": " can take it as it is. The older "
+        },
+        {
+         "t": "code",
+         "v": "std::remove"
+        },
+        {
+         "t": "text",
+         "v": " returns only the iterator where the tail starts. The elements in the tail are in a valid but unspecified state, which is why the code overwrites them and never reads them. In production code the two-line version is the one to write, because the names say what it does (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.1",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+        },
+        {
+         "t": "text",
+         "v": "). In an interview, write the loop first, because the loop is what the question tests, and then name the algorithm it matches. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::stable_partition"
+        },
+        {
+         "t": "text",
+         "v": " with \"is not zero\" keeps the order too, but it tries to allocate a buffer and needs up to n·log₂ n swaps without one, so "
+        },
+        {
+         "t": "code",
+         "v": "remove"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "fill"
+        },
+        {
+         "t": "text",
+         "v": " is the closer match."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Most short array and string problems use one of three shapes. The first is a single pass that keeps a little state, such as the largest value so far or a running count, which is O(n) time and O(1) space. The second is a counting table: for lowercase letters a "
+        },
+        {
+         "t": "code",
+         "v": "std::array<int, 26>"
+        },
+        {
+         "t": "text",
+         "v": " indexed by "
+        },
+        {
+         "t": "code",
+         "v": "c - 'a'"
+        },
+        {
+         "t": "text",
+         "v": ", and for any byte a table of 256 indexed by "
+        },
+        {
+         "t": "code",
+         "v": "static_cast<unsigned char>(c)"
+        },
+        {
+         "t": "text",
+         "v": ". The cast matters, because "
+        },
+        {
+         "t": "code",
+         "v": "char"
+        },
+        {
+         "t": "text",
+         "v": " is signed on x86, and a byte above 127 would give a negative index. The third is a write pointer for compacting in place, as above. When the task is to delete elements rather than move them to the end, C++20's "
+        },
+        {
+         "t": "code",
+         "v": "std::erase(v, value)"
+        },
+        {
+         "t": "text",
+         "v": " removes them and shrinks the vector in one call."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Second-largest distinct element; move zeros; character counts in a string",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes, including tests. Write "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int> second_largest(std::span<const int> v)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the second-largest distinct value, or no value when there are fewer than two distinct values. Make it one pass with O(1) extra space. It must give these results, where "
+        },
+        {
+         "t": "code",
+         "v": "lowest"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "std::numeric_limits<int>::min()"
+        },
+        {
+         "t": "text",
+         "v": ", -2147483648:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Input"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Result"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "{3, 5, 5, 4}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "{7, 7}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no value"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "{}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no value"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "{-1, -3}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "-3"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "{lowest, 0}"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "lowest"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The usual mistake is to start both trackers at "
+        },
+        {
+         "t": "code",
+         "v": "std::numeric_limits<int>::min()"
+        },
+        {
+         "t": "text",
+         "v": " and treat it as \"nothing yet\". The last test case breaks that, because there the smallest "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " is a real value. "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " says \"nothing yet\" without taking a value away from the input (Abseil tip "
+        },
+        {
+         "t": "a",
+         "v": "#171",
+         "href": "https://abseil.io/tips/171"
+        },
+        {
+         "t": "text",
+         "v": "):"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <limits>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\n[[nodiscard]] std::optional<int> second_largest(std::span<const int> v) {\n  std::optional<int> first;\n  std::optional<int> second;\n  for (const int x : v) {\n    if (!first || x > *first) {\n      second = first;\n      first = x;\n    } else if (x != *first && (!second || x > *second)) {\n      second = x;\n    }\n  }\n  return second;\n}\n\nint main() {\n  constexpr int lowest = std::numeric_limits<int>::min();\n  const std::vector<std::vector<int>> cases{{3, 5, 5, 4}, {7, 7}, {}, {-1, -3}, {lowest, 0}};\n  for (const std::vector<int>& v : cases) {\n    const std::optional<int> result = second_largest(v);\n    std::cout << (result ? std::to_string(*result) : \"no value\") << '\\n';\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "4\nno value\nno value\n-3\n-2147483648"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "x != *first"
+        },
+        {
+         "t": "text",
+         "v": " test is what makes the answer distinct: a second 5 in "
+        },
+        {
+         "t": "code",
+         "v": "{3, 5, 5, 4}"
+        },
+        {
+         "t": "text",
+         "v": " must not become the second-largest. It's O(n) time and O(1) space."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Move zeros keeps the removed values at the end. This variant deletes them and shrinks the vector. Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t remove_value(std::vector<int>& v, int value)"
+        },
+        {
+         "t": "text",
+         "v": ", which removes every copy of "
+        },
+        {
+         "t": "code",
+         "v": "value"
+        },
+        {
+         "t": "text",
+         "v": " in place, keeps the order of the rest, shrinks the vector, and returns how many elements it removed, as C++20's "
+        },
+        {
+         "t": "code",
+         "v": "std::erase"
+        },
+        {
+         "t": "text",
+         "v": " does. Then do the same with one standard library call. Test both on "
+        },
+        {
+         "t": "code",
+         "v": "{3, 2, 2, 3, 4}"
+        },
+        {
+         "t": "text",
+         "v": " with the value 3, and on an empty vector."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It's the write pointer again, followed by an "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " of the tail:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\nstd::ptrdiff_t remove_value(std::vector<int>& v, int value) {\n  std::ptrdiff_t write = 0;\n  for (std::ptrdiff_t read = 0; read < std::ssize(v); ++read)\n    if (v[read] != value) v[write++] = v[read];\n  const std::ptrdiff_t removed = std::ssize(v) - write;\n  v.erase(v.begin() + write, v.end());\n  return removed;\n}\n\n[[nodiscard]] std::string show(std::span<const int> v) {\n  std::string out = \"{\";\n  for (std::string_view separator; const int x : v) {\n    out += std::format(\"{}{}\", separator, x);\n    separator = \", \";\n  }\n  return out + \"}\";\n}\n\nint main() {\n  std::vector<int> by_hand{3, 2, 2, 3, 4};\n  std::vector<int> by_library = by_hand;\n  std::vector<int> empty;\n  const std::ptrdiff_t removed = remove_value(by_hand, 3);\n  const auto erased = std::erase(by_library, 3);  // C++20\n  std::cout << std::format(\"removed {} and {}: {} {}\\n\", removed, erased, show(by_hand), show(by_library));\n  std::cout << std::format(\"empty: removed {}, {}\\n\", remove_value(empty, 3), show(empty));\n}"
+      },
+      {
+       "t": "output",
+       "text": "removed 2 and 2: {2, 2, 4} {2, 2, 4}\nempty: removed 0, {}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::erase(v, value)"
+        },
+        {
+         "t": "text",
+         "v": " is the named form. It is "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::remove"
+        },
+        {
+         "t": "text",
+         "v": " followed by the vector's "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " on the tail, which before C++20 was written "
+        },
+        {
+         "t": "code",
+         "v": "v.erase(std::remove(v.begin(), v.end(), value), v.end())"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "remove"
+        },
+        {
+         "t": "text",
+         "v": " on its own doesn't shrink the vector. It moves the kept elements forward and leaves a tail of elements in a valid but unspecified state. Forgetting the "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " after "
+        },
+        {
+         "t": "code",
+         "v": "remove"
+        },
+        {
+         "t": "text",
+         "v": " is a classic bug, and "
+        },
+        {
+         "t": "code",
+         "v": "std::erase"
+        },
+        {
+         "t": "text",
+         "v": " exists so that you can't forget."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "bool is_anagram(std::string_view a, std::string_view b)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns true when both strings contain the same bytes the same number of times: "
+        },
+        {
+         "t": "code",
+         "v": "\"listen\""
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "\"silent\""
+        },
+        {
+         "t": "text",
+         "v": " are anagrams, "
+        },
+        {
+         "t": "code",
+         "v": "\"rat\""
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "\"car\""
+        },
+        {
+         "t": "text",
+         "v": " are not. Make it O(n) time with a counting table, and make it work for any byte rather than for lowercase letters alone. Test it with an empty pair, and with a string containing "
+        },
+        {
+         "t": "code",
+         "v": "\"é\""
+        },
+        {
+         "t": "text",
+         "v": ", which in UTF-8 is two bytes above 127."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string_view>\n\n[[nodiscard]] bool is_anagram(std::string_view a, std::string_view b) {\n  if (a.size() != b.size()) return false;\n  std::array<std::int64_t, 256> counts{};\n  const auto slot = [](char c) { return static_cast<unsigned char>(c); };  // char may be negative\n  for (const char c : a) ++counts[slot(c)];\n  for (const char c : b)\n    if (--counts[slot(c)] < 0) return false;\n  return true;\n}\n\nint main() {\n  std::cout << std::format(\"{} {} {} {}\\n\", is_anagram(\"listen\", \"silent\"), is_anagram(\"rat\", \"car\"),\n                           is_anagram(\"\", \"\"), is_anagram(\"caf\\xc3\\xa9\", \"\\xc3\\xa9\" \"fac\"));\n}"
+      },
+      {
+       "t": "output",
+       "text": "true false true true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The early size check means the second loop can stop at the first count that goes negative: with equal sizes, a count that never goes negative means every count ends at zero. The table has a fixed size of 256, so the extra space is O(1). The cast to "
+        },
+        {
+         "t": "code",
+         "v": "unsigned char"
+        },
+        {
+         "t": "text",
+         "v": " is not optional, and the next section shows what happens without it. This compares bytes, not letters: "
+        },
+        {
+         "t": "code",
+         "v": "\"é\""
+        },
+        {
+         "t": "text",
+         "v": " counts as two bytes, which is right for this task and wrong if the task is about letters in a language. The string literal is split in two, "
+        },
+        {
+         "t": "code",
+         "v": "\"\\xc3\\xa9\" \"fac\""
+        },
+        {
+         "t": "text",
+         "v": ", because a hex escape takes every hex digit that follows it, and "
+        },
+        {
+         "t": "code",
+         "v": "\\xa9fac"
+        },
+        {
+         "t": "text",
+         "v": " would be one escape."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Empty input, one element, duplicates, large input",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Most wrong answers in short array problems come from inputs at the edges, so test those first. An empty input is the most common crash. "
+        },
+        {
+         "t": "code",
+         "v": "v.size() - 1"
+        },
+        {
+         "t": "text",
+         "v": " is computed in "
+        },
+        {
+         "t": "code",
+         "v": "std::size_t"
+        },
+        {
+         "t": "text",
+         "v": ", which has no negative numbers, so for an empty vector it wraps round to 18,446,744,073,709,551,615, and this loop reads memory that doesn't exist:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:SEGV on unknown address",
+       "text": "#include <cstddef>\n#include <iostream>\n#include <vector>\n\nint main() {\n  const std::vector<int> v;\n  int rises = 0;\n  for (std::size_t i = 0; i < v.size() - 1; ++i)  // size() - 1 wraps round when v is empty\n    if (v[i + 1] > v[i]) ++rises;\n  std::cout << rises << '\\n';\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "There are two fixes that work for every size. Abseil tip "
+        },
+        {
+         "t": "a",
+         "v": "#227",
+         "href": "https://abseil.io/tips/227"
+        },
+        {
+         "t": "text",
+         "v": " moves the arithmetic to the side that can't wrap: "
+        },
+        {
+         "t": "code",
+         "v": "i + 1 < v.size()"
+        },
+        {
+         "t": "text",
+         "v": ". Signed indices remove the wrap altogether. "
+        },
+        {
+         "t": "code",
+         "v": "std::ssize(v)"
+        },
+        {
+         "t": "text",
+         "v": " returns a "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t"
+        },
+        {
+         "t": "text",
+         "v": ", so for an empty vector "
+        },
+        {
+         "t": "code",
+         "v": "std::ssize(v) - 1"
+        },
+        {
+         "t": "text",
+         "v": " is -1 and the loop doesn't run, which is what Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.107",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+        },
+        {
+         "t": "text",
+         "v": " asks for:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <vector>\n\n[[nodiscard]] std::ptrdiff_t rises(std::span<const int> v) {\n  std::ptrdiff_t count = 0;\n  for (std::ptrdiff_t i = 0; i < std::ssize(v) - 1; ++i)\n    if (v[i + 1] > v[i]) ++count;\n  return count;\n}\n\nint main() {\n  const std::vector<int> empty;\n  const std::vector<int> one{7};\n  const std::vector<int> some{1, 3, 2, 5};\n  std::cout << std::format(\"{} {} {}\\n\", rises(empty), rises(one), rises(some));\n}"
+      },
+      {
+       "t": "output",
+       "text": "0 0 2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In C++23, "
+        },
+        {
+         "t": "code",
+         "v": "std::views::pairwise(v)"
+        },
+        {
+         "t": "text",
+         "v": " hands you the neighbouring pairs, and there is no index left to get wrong."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Indexing a table with a plain "
+        },
+        {
+         "t": "code",
+         "v": "char"
+        },
+        {
+         "t": "text",
+         "v": " fails for bytes above 127, because "
+        },
+        {
+         "t": "code",
+         "v": "char"
+        },
+        {
+         "t": "text",
+         "v": " is signed on x86 and the index becomes negative. GCC warns about it under "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " makes that an error. The warning, "
+        },
+        {
+         "t": "code",
+         "v": "-Wchar-subscripts"
+        },
+        {
+         "t": "text",
+         "v": ", looks only at built-in arrays, which is why this demo uses one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "array subscript has type",
+       "text": "#include <iostream>\n#include <string_view>\n\nint main() {\n  constexpr std::string_view word = \"caf\\xc3\\xa9\";\n  int counts[256] = {};  // built-in on purpose: the warning covers only these\n  for (const char c : word) ++counts[c];\n  std::cout << counts['c'] << '\\n';\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Without "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": ", UBSan catches the built-in array at run time: "
+        },
+        {
+         "t": "code",
+         "v": "index -61 out of bounds for type 'int [256]'"
+        },
+        {
+         "t": "text",
+         "v": ". The same loop over a "
+        },
+        {
+         "t": "code",
+         "v": "std::array<int, 256>"
+        },
+        {
+         "t": "text",
+         "v": " is quieter, and worse. Its "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": " takes a "
+        },
+        {
+         "t": "code",
+         "v": "std::size_t"
+        },
+        {
+         "t": "text",
+         "v": ", so -61 converts without a warning to 18,446,744,073,709,551,555, and the two increments land 244 and 348 bytes before the table. Built with both sanitizers, that version compiled cleanly, ran without a report, and printed 0 as the count of byte 0xC3. Building with "
+        },
+        {
+         "t": "code",
+         "v": "-D_GLIBCXX_ASSERTIONS"
+        },
+        {
+         "t": "text",
+         "v": " turns on libstdc++'s index check in "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": ", and that build stops with "
+        },
+        {
+         "t": "code",
+         "v": "Assertion '__n < this->size()' failed"
+        },
+        {
+         "t": "text",
+         "v": ". The fix in the code is the cast to "
+        },
+        {
+         "t": "code",
+         "v": "unsigned char"
+        },
+        {
+         "t": "text",
+         "v": ", written once, as the "
+        },
+        {
+         "t": "code",
+         "v": "slot"
+        },
+        {
+         "t": "text",
+         "v": " lambda in Exercise 3 does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Other edges to test every time: a single element, all elements equal, the value you look for at the first and at the last position, and the extreme values of the type, such as "
+        },
+        {
+         "t": "code",
+         "v": "std::numeric_limits<int>::min()"
+        },
+        {
+         "t": "text",
+         "v": ". For large inputs, check two things before you code. The first is the complexity: n up to 10⁵ rules out O(n²). The second is whether a sum or a product can overflow an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", as in the average of the encoder counts in the memory-bugs topic."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Describe the three shapes of short array and string problems, the invariant of the write pointer and the algorithm it matches. Say why a counting table needs "
+        },
+        {
+         "t": "code",
+         "v": "unsigned char"
+        },
+        {
+         "t": "text",
+         "v": ", why "
+        },
+        {
+         "t": "code",
+         "v": "size() - 1"
+        },
+        {
+         "t": "text",
+         "v": " is dangerous and how to write the loop instead, and which edge cases you test before submitting."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "State the invariant of the write-pointer loop in move zeros, and explain why the copy never overwrites an element that hasn't been read."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which standard algorithm is the write-pointer loop, what does "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::remove"
+     },
+     {
+      "t": "text",
+      "v": " return, and what does "
+     },
+     {
+      "t": "code",
+      "v": "std::erase"
+     },
+     {
+      "t": "text",
+      "v": " add?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is "
+     },
+     {
+      "t": "code",
+      "v": "std::numeric_limits<int>::min()"
+     },
+     {
+      "t": "text",
+      "v": " a bad \"nothing yet\" value for the largest so far, and what do you use instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "for (std::size_t i = 0; i < v.size() - 1; ++i)"
+     },
+     {
+      "t": "text",
+      "v": " crash on an empty vector, and what are two ways to write it correctly?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a counting table need "
+     },
+     {
+      "t": "code",
+      "v": "unsigned char"
+     },
+     {
+      "t": "text",
+      "v": ", and why doesn't a "
+     },
+     {
+      "t": "code",
+      "v": "std::array"
+     },
+     {
+      "t": "text",
+      "v": " table warn you when you forget?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: second-largest distinct element in one pass, with the five test cases above."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". Why "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " is the default container, and how to sort, search, insert and erase in it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Naming a loop with the algorithm it matches."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, Back to Basics: Strings and Character Sequences, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Back_To_Basics_Strings_and_Character_Sequences.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=LVU7lq9aL8o"
+     },
+     {
+      "t": "text",
+      "v": ". A view is a pointer and a length: cheap to copy, and it owns nothing."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Ranges, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Back_To_Basics_Ranges.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=Q434UHWRzI0"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Tristan Brindle, C++20 ranges in practice, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=d_E-VLyUnzc"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-arrays"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-bounds"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.71",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-for-range"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.107",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "SL.str.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rstr-string"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "SL.str.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rstr-view"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tips "
+     },
+     {
+      "t": "a",
+      "v": "#227",
+      "href": "https://abseil.io/tips/227"
+     },
+     {
+      "t": "text",
+      "v": " on empty containers and unsigned arithmetic, and "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "ranges::remove",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/remove"
+     },
+     {
+      "t": "text",
+      "v": ", whose possible implementation is the write-pointer loop, "
+     },
+     {
+      "t": "a",
+      "v": "std::erase for vectors",
+      "href": "https://en.cppreference.com/cpp/container/vector/erase2"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::stable_partition",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/stable_partition"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::ssize",
+      "href": "https://en.cppreference.com/cpp/iterator/size"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "views::pairwise",
+      "href": "https://en.cppreference.com/cpp/ranges/adjacent_view"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

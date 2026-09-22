@@ -1,0 +1,2145 @@
+{
+ "id": "ros-callback-failures",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Answer on paper, without looking anything up. Name two ways a ROS 2 callback can run against an object that no longer exists: say what the code looked like in each case, and when the window opens. Then say what happens to the process when a subscription callback throws, and whether a timer callback is any different. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The first way is a lambda that captured a raw pointer or a reference to something that is not part of the node. The entity outlives what the capture points at, and the window opens the moment that object dies while the subscription or timer is still registered. Capturing "
+     },
+     {
+      "t": "code",
+      "v": "this"
+     },
+     {
+      "t": "text",
+      "v": " on the node itself is not this bug: the entities are members, so they die with "
+     },
+     {
+      "t": "code",
+      "v": "this"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The second way is the wrong member order inside the node. A class destroys its members in reverse declaration order, so an entity declared before the state it uses is destroyed after that state, and a callback that runs while the node is being destroyed reads a member that is already gone. That window needs a second thread to open, because with a single-threaded executor you destroy the node after "
+     },
+     {
+      "t": "code",
+      "v": "spin"
+     },
+     {
+      "t": "text",
+      "v": " has returned."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Two more answers are worth full marks: a detached thread that captured "
+     },
+     {
+      "t": "code",
+      "v": "this"
+     },
+     {
+      "t": "text",
+      "v": " and outlives the node, and "
+     },
+     {
+      "t": "code",
+      "v": "shared_from_this()"
+     },
+     {
+      "t": "text",
+      "v": " called in a constructor, which throws "
+     },
+     {
+      "t": "code",
+      "v": "std::bad_weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": " because no shared pointer owns the object yet."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "An exception out of a callback ends the process, and the two kinds behave the same way. rclcpp catches nothing your code throws. "
+     },
+     {
+      "t": "code",
+      "v": "Executor::execute_timer"
+     },
+     {
+      "t": "text",
+      "v": " is one line, "
+     },
+     {
+      "t": "code",
+      "v": "timer->execute_callback(data_ptr)"
+     },
+     {
+      "t": "text",
+      "v": ", with no "
+     },
+     {
+      "t": "code",
+      "v": "try"
+     },
+     {
+      "t": "text",
+      "v": " around it, and "
+     },
+     {
+      "t": "code",
+      "v": "execute_subscription"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "execute_service"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "execute_client"
+     },
+     {
+      "t": "text",
+      "v": " put only the take inside a "
+     },
+     {
+      "t": "code",
+      "v": "try"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::exceptions::RCLError"
+     },
+     {
+      "t": "text",
+      "v": " and call your handler outside it ("
+     },
+     {
+      "t": "a",
+      "v": "executor.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executor.cpp"
+     },
+     {
+      "t": "text",
+      "v": "). So the exception leaves "
+     },
+     {
+      "t": "code",
+      "v": "spin()"
+     },
+     {
+      "t": "text",
+      "v": ". Under "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::spin"
+     },
+     {
+      "t": "text",
+      "v": " it reaches "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": ", where a "
+     },
+     {
+      "t": "code",
+      "v": "try"
+     },
+     {
+      "t": "text",
+      "v": " can catch it. Under a "
+     },
+     {
+      "t": "code",
+      "v": "MultiThreadedExecutor"
+     },
+     {
+      "t": "text",
+      "v": " built for more than one thread, the process aborts whichever thread threw, by two different routes: "
+     },
+     {
+      "t": "code",
+      "v": "spin()"
+     },
+     {
+      "t": "text",
+      "v": " starts "
+     },
+     {
+      "t": "code",
+      "v": "number_of_threads_ - 1"
+     },
+     {
+      "t": "text",
+      "v": " threads and then runs the loop on the calling thread as well, so a throw on a started thread escapes that thread's function, which is "
+     },
+     {
+      "t": "code",
+      "v": "std::terminate"
+     },
+     {
+      "t": "text",
+      "v": ", and a throw on the calling thread unwinds out of "
+     },
+     {
+      "t": "code",
+      "v": "spin()"
+     },
+     {
+      "t": "text",
+      "v": " before it joins the others, destroying a vector of still-joinable "
+     },
+     {
+      "t": "code",
+      "v": "std::thread"
+     },
+     {
+      "t": "text",
+      "v": "s, which is "
+     },
+     {
+      "t": "code",
+      "v": "std::terminate"
+     },
+     {
+      "t": "text",
+      "v": " too. Built for exactly one thread, as the executors topic already allows, the constructor only logs a warning, "
+     },
+     {
+      "t": "code",
+      "v": "spin()"
+     },
+     {
+      "t": "text",
+      "v": " starts none of its own, "
+     },
+     {
+      "t": "code",
+      "v": "run(0)"
+     },
+     {
+      "t": "text",
+      "v": " runs on the calling thread, and a throw there unwinds out of "
+     },
+     {
+      "t": "code",
+      "v": "spin()"
+     },
+     {
+      "t": "text",
+      "v": " with an empty vector to destroy, nothing joinable in it, so a "
+     },
+     {
+      "t": "code",
+      "v": "try"
+     },
+     {
+      "t": "text",
+      "v": " in "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": " does catch it. Only with more than one thread does "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": " never get the chance."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if both lifetime answers name the shape of the code and the moment the window opens, and the exception answer says the process ends. Naming one lifetime case and the exception is a partial pass. Answering that rclcpp catches callback exceptions is a fail: it leads to code that relies on a node surviving a throw."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A ROS callback owns nothing by default: the only owner of an entity such as a subscription or a timer is the member holding its handle, and the only owner of whatever the callback touches is whatever its capture names, since the executor keeps no reference to it. Capturing "
+    },
+    {
+     "t": "code",
+     "v": "this"
+    },
+    {
+     "t": "text",
+     "v": " in a node is the one safe habit, because the entity and the state it uses are both members of one object and cannot outlive each other."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem these failures share is that they stay invisible in the ordinary case, reachable only once something that looks like configuration changes: a second thread, a second callback group, or shutdown catching a callback mid-flight. A node can pass every test run on one thread and still carry a callback that reads a destroyed object, throws past every safety net, or quietly runs at a fraction of its stated rate."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A class destroys its members in reverse declaration order, so an entity declared before the state its callback reads is destroyed after it, opening a window, during destruction, where the callback still runs against state already gone; one thread never reaches it, already returned from spinning first, but a second thread can be mid-callback while the first tears the node down. An exception leaving a callback is caught nowhere inside rclcpp: it unwinds out of the executor's loop, reaching "
+    },
+    {
+     "t": "code",
+     "v": "main"
+    },
+    {
+     "t": "text",
+     "v": " under one thread, and ending the process under more than one, since the language will not let an exception escape a thread's own function. An overrun timer is not queued and repaid; missed periods are dropped, so a slow callback settles at a lower rate with no error, unless the timer is asked how late it ran."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "code",
+     "v": "[this]"
+    },
+    {
+     "t": "text",
+     "v": " earns its reputation as the safe default and betrays it the moment a lambda reaches past the node itself, to a local, a raw pointer handed in from outside, or a member of another object nobody promised would still exist. A second executor thread or one more callback group touches no line of the node's logic, yet reaches a destruction order or a throw a single-threaded test cannot."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: naming two shapes of a callback reading an object that is gone, and saying, without hedging, that an exception out of any callback ends the process rather than being logged, whether from a subscription or a timer."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Captured this, dangling handles, shutdown order",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This constructor compiles, runs, and reads freed memory the first time the pool takes its object back:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// Wrong: `tally` belongs to the pool, and the subscription belongs to the node.\nTally* tally = pool.borrow();\nsubscription_ = create_subscription<nav_msgs::msg::Odometry>(\n    \"odom\", rclcpp::QoS(rclcpp::KeepLast(10)),\n    [tally](const nav_msgs::msg::Odometry&) { tally->add(); });"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The reason is an ownership rule you already half know from the topics page. "
+        },
+        {
+         "t": "code",
+         "v": "create_subscription"
+        },
+        {
+         "t": "text",
+         "v": " hands you the only owning pointer to the subscription; the node keeps nothing but a weak one. rclcpp's "
+        },
+        {
+         "t": "code",
+         "v": "CallbackGroup"
+        },
+        {
+         "t": "text",
+         "v": " stores its five kinds of entity as weak pointers, "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<rclcpp::SubscriptionBase::WeakPtr>"
+        },
+        {
+         "t": "text",
+         "v": " and the same for timers, services, clients and waitables ("
+        },
+        {
+         "t": "a",
+         "v": "callback_group.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/callback_group.hpp"
+        },
+        {
+         "t": "text",
+         "v": "), and the executor holds weak pointers to the nodes and groups you add. So the single owner of every entity is the member you stored it in, and the single owner of whatever the callback touches is whoever you wrote in that lambda. rclcpp keeps no reference at all to the second one, and it cannot: the capture is your type, not its."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That is why "
+        },
+        {
+         "t": "code",
+         "v": "[this]"
+        },
+        {
+         "t": "text",
+         "v": " is the safe default and also the one that misleads. It is safe because the entity and the state are both members of the node, so the entity cannot outlive "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": ". It stops being safe the instant the lambda reaches something that is not on that object: a local in the constructor, a member of another object passed in by reference, a raw pointer from a factory, an iterator into a container somebody else can resize."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Inside the node the order still matters, and it is the plain C++ rule: members are destroyed in reverse declaration order. Put the plain logic class first and the subscription last, as the topics page did, and the subscription is destroyed first, which is what stops the middleware handing it a message. Put them the other way round and there is a window during "
+        },
+        {
+         "t": "code",
+         "v": "~Node"
+        },
+        {
+         "t": "text",
+         "v": " in which the subscription is alive and the state it uses is not. With "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin"
+        },
+        {
+         "t": "text",
+         "v": " that window is closed, because "
+        },
+        {
+         "t": "code",
+         "v": "spin"
+        },
+        {
+         "t": "text",
+         "v": " has already returned before the node is destroyed. Add a "
+        },
+        {
+         "t": "code",
+         "v": "MultiThreadedExecutor"
+        },
+        {
+         "t": "text",
+         "v": " on another thread and it opens, and it opens for a few microseconds at shutdown, which is exactly the frequency that makes a bug survive a year of testing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third source is the exception. Nothing in rclcpp catches what your callback throws, and it is worth reading the two functions that prove it. "
+        },
+        {
+         "t": "code",
+         "v": "Executor::execute_timer"
+        },
+        {
+         "t": "text",
+         "v": " is a single call to "
+        },
+        {
+         "t": "code",
+         "v": "timer->execute_callback(data_ptr)"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "execute_subscription"
+        },
+        {
+         "t": "text",
+         "v": " calls a helper, "
+        },
+        {
+         "t": "code",
+         "v": "take_and_do_error_handling"
+        },
+        {
+         "t": "text",
+         "v": ", whose "
+        },
+        {
+         "t": "code",
+         "v": "try"
+        },
+        {
+         "t": "text",
+         "v": " covers only "
+        },
+        {
+         "t": "code",
+         "v": "take_action()"
+        },
+        {
+         "t": "text",
+         "v": " and catches only "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::exceptions::RCLError"
+        },
+        {
+         "t": "text",
+         "v": "; your handler runs in the "
+        },
+        {
+         "t": "code",
+         "v": "if (taken)"
+        },
+        {
+         "t": "text",
+         "v": " branch, outside the "
+        },
+        {
+         "t": "code",
+         "v": "try"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "executor.cpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executor.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). So your exception unwinds through "
+        },
+        {
+         "t": "code",
+         "v": "execute_any_executable"
+        },
+        {
+         "t": "text",
+         "v": " and out of "
+        },
+        {
+         "t": "code",
+         "v": "spin()"
+        },
+        {
+         "t": "text",
+         "v": ". One detail is handled for you: "
+        },
+        {
+         "t": "code",
+         "v": "AnyExecutable"
+        },
+        {
+         "t": "text",
+         "v": "'s destructor stores "
+        },
+        {
+         "t": "code",
+         "v": "true"
+        },
+        {
+         "t": "text",
+         "v": " back into its callback group's "
+        },
+        {
+         "t": "code",
+         "v": "can_be_taken_from"
+        },
+        {
+         "t": "text",
+         "v": " flag ("
+        },
+        {
+         "t": "a",
+         "v": "any_executable.cpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/any_executable.cpp"
+        },
+        {
+         "t": "text",
+         "v": "), so an exception does not leave a group permanently locked. What is not handled is the thread, and the multi-threaded case reaches "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": " by two different routes, which is worth reading rather than assuming. "
+        },
+        {
+         "t": "code",
+         "v": "MultiThreadedExecutor::spin()"
+        },
+        {
+         "t": "text",
+         "v": " starts "
+        },
+        {
+         "t": "code",
+         "v": "number_of_threads_ - 1"
+        },
+        {
+         "t": "text",
+         "v": " threads into a local "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::thread>"
+        },
+        {
+         "t": "text",
+         "v": ", then calls "
+        },
+        {
+         "t": "code",
+         "v": "run(thread_id)"
+        },
+        {
+         "t": "text",
+         "v": " on the thread that called it, and joins the others afterwards ("
+        },
+        {
+         "t": "a",
+         "v": "multi_threaded_executor.cpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executors/multi_threaded_executor.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). A callback that throws on one of the started threads escapes the function that thread is running, and the language ends the process there. A callback that throws on the calling thread does unwind out of "
+        },
+        {
+         "t": "code",
+         "v": "spin()"
+        },
+        {
+         "t": "text",
+         "v": ", so it looks as though a "
+        },
+        {
+         "t": "code",
+         "v": "try"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " would catch it. It does not get that far: the unwind skips the join loop and destroys that local vector while its threads are still running, and destroying a joinable "
+        },
+        {
+         "t": "code",
+         "v": "std::thread"
+        },
+        {
+         "t": "text",
+         "v": " calls "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": ". Single-threaded, under "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin"
+        },
+        {
+         "t": "text",
+         "v": ", there is no vector and no second thread, and the exception really does reach "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Shutdown is the last of the three, and it has its own order. "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::shutdown()"
+        },
+        {
+         "t": "text",
+         "v": " invalidates the context, which makes "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::ok()"
+        },
+        {
+         "t": "text",
+         "v": " false and ends the executor's loop, but it does not interrupt a callback that is already running: that call finishes first, on the stack it is on. A publish from inside it is handled: "
+        },
+        {
+         "t": "code",
+         "v": "Publisher::do_inter_process_publish"
+        },
+        {
+         "t": "text",
+         "v": " checks for "
+        },
+        {
+         "t": "code",
+         "v": "RCL_RET_PUBLISHER_INVALID"
+        },
+        {
+         "t": "text",
+         "v": ", and when the publisher is valid except for a context that has been shut down it returns without an error ("
+        },
+        {
+         "t": "a",
+         "v": "publisher.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/publisher.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). Any other failure becomes an exception through "
+        },
+        {
+         "t": "code",
+         "v": "throw_from_rcl_error"
+        },
+        {
+         "t": "text",
+         "v": ", and by the earlier paragraph that ends the process. So a timer that fires during shutdown is not a crash by itself. It becomes one when the callback touches something that shutdown has already taken down, which is why "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " destroys nothing before "
+        },
+        {
+         "t": "code",
+         "v": "spin"
+        },
+        {
+         "t": "text",
+         "v": " returns, and why work that has to happen at the end belongs in a context shutdown callback rather than in a timer."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Seeing all three is easier than guessing, and Jazzy added the tool for the timer case. A timer callback may take a "
+        },
+        {
+         "t": "code",
+         "v": "const rclcpp::TimerInfo&"
+        },
+        {
+         "t": "text",
+         "v": ", which carries "
+        },
+        {
+         "t": "code",
+         "v": "expected_call_time"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "actual_call_time"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "timer.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/timer.hpp"
+        },
+        {
+         "t": "text",
+         "v": "), so a callback can report how late it was without reading a clock and without the test having to wait in real time. For the lifetime bugs the tool is AddressSanitizer: build the package with "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=address -g"
+        },
+        {
+         "t": "text",
+         "v": " and the first use after free prints the freeing stack next to the reading stack. And the plain class the logic lives in is still the part you test with a compiler and no middleware, which is the reason it is worth keeping the callback down to one line."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fix",
+   "title": "Reproduce and fix a dangling callback",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the shape of the bug with the middleware taken away: an object that keeps callbacks and runs them later, a plain logic class, and a lambda that captured a raw pointer to it. The "
+        },
+        {
+         "t": "code",
+         "v": "Loop"
+        },
+        {
+         "t": "text",
+         "v": " is standing in for the executor, and nothing about the failure depends on ROS:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <utility>\n#include <vector>\n\n// Stands in for the executor: it keeps callbacks and runs them later, which is what a\n// subscription and a timer do.\nclass Loop {\n public:\n  void add(std::function<void()> callback) { callbacks_.push_back(std::move(callback)); }\n  void spin_once() const {\n    for (const std::function<void()>& callback : callbacks_) callback();\n  }\n\n private:\n  std::vector<std::function<void()>> callbacks_;\n};\n\n// The plain class the node keeps its logic in.\nclass Tally {\n public:\n  void add() { ++count_; }\n  [[nodiscard]] std::int64_t count() const { return count_; }\n\n private:\n  std::int64_t count_ = 0;\n};\n\nint main() {\n  Loop loop;\n  auto tally = std::make_unique<Tally>();\n  Tally* borrowed = tally.get();  // the raw pointer the lambda captures\n  loop.add([borrowed] {\n    borrowed->add();\n    std::cout << std::format(\"count {}\\n\", borrowed->count());\n  });\n\n  loop.spin_once();  // fine, the tally is alive\n  tally.reset();     // the node let it go; the loop still holds the callback\n  loop.spin_once();  // reads an object that is gone\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Built with "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=address"
+        },
+        {
+         "t": "text",
+         "v": ", the second "
+        },
+        {
+         "t": "code",
+         "v": "spin_once"
+        },
+        {
+         "t": "text",
+         "v": " stops the program. Here is the head of the report from that run, with the process id, the register addresses, the absolute path and the four "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " frames between #1 and #6 cut out:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "==ERROR: AddressSanitizer: heap-use-after-free on address 0x502000000010\nREAD of size 8 at 0x502000000010 thread T0\n    #0 Tally::add() dangling.cpp:25\n    #1 operator() dangling.cpp:37\n    #6 Loop::spin_once() const dangling.cpp:15\n    #7 main dangling.cpp:43"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the frames upward. The read happened in "
+        },
+        {
+         "t": "code",
+         "v": "Tally::add"
+        },
+        {
+         "t": "text",
+         "v": ", called from a lambda, called from the loop. Further down, the report prints where the memory was freed and where it was allocated, which is the pair you need: "
+        },
+        {
+         "t": "code",
+         "v": "tally.reset()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "make_unique"
+        },
+        {
+         "t": "text",
+         "v": ". In a real node those two lines are in different files, and without the sanitizer the symptom is a plausible wrong number rather than a crash, because the freed bytes usually still hold the old value for a while."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fix is to say what you mean about ownership. If the callback may run after the object is gone, it must be able to ask:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <utility>\n#include <vector>\n\nclass Loop {\n public:\n  void add(std::function<void()> callback) { callbacks_.push_back(std::move(callback)); }\n  void spin_once() const {\n    for (const std::function<void()>& callback : callbacks_) callback();\n  }\n\n private:\n  std::vector<std::function<void()>> callbacks_;\n};\n\nclass Tally {\n public:\n  void add() { ++count_; }\n  [[nodiscard]] std::int64_t count() const { return count_; }\n\n private:\n  std::int64_t count_ = 0;\n};\n\nint main() {\n  Loop loop;\n  auto tally = std::make_shared<Tally>();\n  // The callback holds a weak reference, so it can ask whether the object is still there.\n  loop.add([watched = std::weak_ptr<Tally>(tally)] {\n    const std::shared_ptr<Tally> alive = watched.lock();\n    if (!alive) {\n      std::cout << \"the tally is gone, nothing to do\\n\";\n      return;\n    }\n    alive->add();\n    std::cout << std::format(\"count {}\\n\", alive->count());\n  });\n\n  loop.spin_once();\n  tally.reset();\n  loop.spin_once();\n}"
+      },
+      {
+       "t": "output",
+       "text": "count 1\nthe tally is gone, nothing to do"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "lock()"
+        },
+        {
+         "t": "text",
+         "v": " either hands you an owner for the length of the callback or tells you there is none, and there is no window between the check and the use, which is the property a raw "
+        },
+        {
+         "t": "code",
+         "v": "bool alive"
+        },
+        {
+         "t": "text",
+         "v": " flag does not have. It costs an atomic increment per call, which is nothing next to a message you already took from the middleware."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The cheaper fix is usually available and usually better: hold the thing by value as a member of the node, declared before the entities. Then there is no pointer to dangle, the destruction order is right by construction, and the callback captures only "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": " private:\n  Tally tally_;                                               // destroyed last\n  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_;  // destroyed first\n  rclcpp::TimerBase::SharedPtr timer_;"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Swap those three lines and the node still compiles, still passes every single-threaded test, and has a use-after-free during "
+        },
+        {
+         "t": "code",
+         "v": "~Node"
+        },
+        {
+         "t": "text",
+         "v": " on any executor with more than one thread."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three more failures belong to this family."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A detached thread started in a callback outlives everything. It captured "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": ", nothing joins it, and "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::shutdown"
+        },
+        {
+         "t": "text",
+         "v": " does not touch it, so it can still be running while the node is destroyed. That is the reason the actions page put the work on a timer, and the reason Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "CP.26",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detached_thread"
+        },
+        {
+         "t": "text",
+         "v": " argues against "
+        },
+        {
+         "t": "code",
+         "v": "detach"
+        },
+        {
+         "t": "text",
+         "v": ". A "
+        },
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": " member joins in its destructor, which turns the same code into a deadlock if the thread waits on something the node destroys first: wrong, but loudly wrong, which is the trade you want."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "shared_from_this()"
+        },
+        {
+         "t": "text",
+         "v": " in a constructor throws "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", because the "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " that will own the node does not exist until "
+        },
+        {
+         "t": "code",
+         "v": "make_shared"
+        },
+        {
+         "t": "text",
+         "v": " returns. Anything that needs the node as a shared pointer, such as "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin_until_future_complete"
+        },
+        {
+         "t": "text",
+         "v": " or a "
+        },
+        {
+         "t": "code",
+         "v": "tf2_ros::TransformListener"
+        },
+        {
+         "t": "text",
+         "v": " built from the node's shared pointer, belongs in a factory function or in an "
+        },
+        {
+         "t": "code",
+         "v": "init()"
+        },
+        {
+         "t": "text",
+         "v": " called after construction."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "And a callback that outruns its period is not a lifetime bug but it looks like one in the logs. rcl moves an overdue timer's next call time forward by whole periods rather than queueing them, as the executors page measured, so a timer that takes 120 ms on a 100 ms period runs at about 5 Hz with no error anywhere. A callback taking "
+        },
+        {
+         "t": "code",
+         "v": "const rclcpp::TimerInfo&"
+        },
+        {
+         "t": "text",
+         "v": " turns that into a number you can log or publish: "
+        },
+        {
+         "t": "code",
+         "v": "actual_call_time - expected_call_time"
+        },
+        {
+         "t": "text",
+         "v": " is the lateness, and the node needs no clock of its own to compute it."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes in a package of your own that depends on "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "nav_msgs"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "watchdog"
+         },
+         {
+          "t": "text",
+          "v": ", a node with a subscription to "
+         },
+         {
+          "t": "code",
+          "v": "/odom"
+         },
+         {
+          "t": "text",
+          "v": " and a 10 Hz timer. Keep its logic in a plain class "
+         },
+         {
+          "t": "code",
+          "v": "Lateness"
+         },
+         {
+          "t": "text",
+          "v": " with two members and no ROS types: "
+         },
+         {
+          "t": "code",
+          "v": "record(expected_ns, actual_ns)"
+         },
+         {
+          "t": "text",
+          "v": " stores the overrun, and "
+         },
+         {
+          "t": "code",
+          "v": "worst()"
+         },
+         {
+          "t": "text",
+          "v": " returns the largest seen so far as a "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<std::int64_t>"
+         },
+         {
+          "t": "text",
+          "v": ". The timer callback takes "
+         },
+         {
+          "t": "code",
+          "v": "const rclcpp::TimerInfo&"
+         },
+         {
+          "t": "text",
+          "v": " and feeds both stamps to it, so the node reads no clock for this."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Now build the bug on purpose. Hold the "
+         },
+         {
+          "t": "code",
+          "v": "Lateness"
+         },
+         {
+          "t": "text",
+          "v": " in a "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr"
+         },
+         {
+          "t": "text",
+          "v": " member declared after the timer and the subscription, and keep a raw pointer to it in a second member, set once in the constructor. Capture "
+         },
+         {
+          "t": "code",
+          "v": "this"
+         },
+         {
+          "t": "text",
+          "v": " in both callbacks and read the raw pointer through it, never a copy taken once and kept. Add a service "
+         },
+         {
+          "t": "code",
+          "v": "~/release"
+         },
+         {
+          "t": "text",
+          "v": " of "
+         },
+         {
+          "t": "code",
+          "v": "example_interfaces/srv/Trigger"
+         },
+         {
+          "t": "text",
+          "v": " whose callback replaces the object, "
+         },
+         {
+          "t": "code",
+          "v": "lateness_ = std::make_unique<Lateness>();"
+         },
+         {
+          "t": "text",
+          "v": ", and refreshes the raw pointer member right after, in the same callback. Put the timer and the service in two different mutually exclusive callback groups, "
+         },
+         {
+          "t": "code",
+          "v": "control_"
+         },
+         {
+          "t": "text",
+          "v": " for the timer and "
+         },
+         {
+          "t": "code",
+          "v": "admin_"
+         },
+         {
+          "t": "text",
+          "v": " for the service, leaving the subscription in the node's default group, and spin with a "
+         },
+         {
+          "t": "code",
+          "v": "MultiThreadedExecutor"
+         },
+         {
+          "t": "text",
+          "v": ". Predict what happens when the service is called."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Build the package with "
+         },
+         {
+          "t": "code",
+          "v": "colcon build --cmake-args -DCMAKE_CXX_FLAGS=\"-fsanitize=address -g\""
+         },
+         {
+          "t": "text",
+          "v": ", run the node, call "
+         },
+         {
+          "t": "code",
+          "v": "ros2 service call /watchdog/release example_interfaces/srv/Trigger"
+         },
+         {
+          "t": "text",
+          "v": ", and write down the first three lines of the report and the two stacks it names."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Fix it in the two ways this page gives, and say which you would ship and why."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Answer one question from what you saw: why can the broken version run for hours under "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::spin"
+         },
+         {
+          "t": "text",
+          "v": " without a report, and what does that say about a test suite that only spins single-threaded?"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fixed node, with the logic by value and declared before the entities:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <chrono>\n#include <cinttypes>\n#include <cstdint>\n#include <format>\n#include <memory>\n#include <optional>\n#include <string>\n\n#include <example_interfaces/srv/trigger.hpp>\n#include <nav_msgs/msg/odometry.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nusing namespace std::chrono_literals;\n\n// How late the timer has been. No ROS types and no clock: both times arrive as arguments, so a\n// test replays any timeline in a few microseconds.\nclass Lateness {\n public:\n  void record(std::int64_t expected_ns, std::int64_t actual_ns) {\n    const std::int64_t late_ns = actual_ns - expected_ns;\n    worst_ns_ = worst_ns_ ? std::max(*worst_ns_, late_ns) : late_ns;\n    ++calls_;\n  }\n\n  [[nodiscard]] std::optional<std::int64_t> worst() const { return worst_ns_; }\n  [[nodiscard]] std::int64_t calls() const { return calls_; }\n  void forget() { *this = Lateness{}; }\n\n private:\n  std::optional<std::int64_t> worst_ns_;\n  std::int64_t calls_ = 0;\n};\n\nclass Watchdog : public rclcpp::Node {\n public:\n  using Trigger = example_interfaces::srv::Trigger;\n\n  explicit Watchdog(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"watchdog\", options) {\n    // All three entities stay in the node's default callback group, which is mutually exclusive,\n    // because all three touch `lateness_` and `messages_`. Splitting them would need a lock.\n    odometry_ = create_subscription<nav_msgs::msg::Odometry>(\n        \"odom\", rclcpp::QoS(rclcpp::KeepLast(10)),\n        [this](const nav_msgs::msg::Odometry&) { ++messages_; });\n\n    // The callback takes the two times rclcpp already knows, so the node needs no clock here.\n    timer_ = create_timer(100ms, [this](const rclcpp::TimerInfo& info) { on_tick(info); });\n\n    service_ = create_service<Trigger>(\n        \"~/release\", [this](const std::shared_ptr<Trigger::Request>, std::shared_ptr<Trigger::Response> response) {\n          response->message = report();\n          response->success = true;\n          lateness_.forget();  // resets the contents; the object itself is never released\n        });\n  }\n\n private:\n  void on_tick(const rclcpp::TimerInfo& info) {\n    lateness_.record(info.expected_call_time.nanoseconds(), info.actual_call_time.nanoseconds());\n    if (const std::optional<std::int64_t> worst = lateness_.worst(); worst && *worst > 50'000'000) {\n      RCLCPP_WARN(get_logger(), \"timer was %\" PRId64 \" ms late within %\" PRId64 \" calls\", *worst / 1'000'000,\n                  lateness_.calls());\n    }\n  }\n\n  [[nodiscard]] std::string report() const {\n    const std::optional<std::int64_t> worst = lateness_.worst();\n    return std::format(\"{} odometry messages, worst lateness {} us\", messages_,\n                       worst ? *worst / 1000 : 0);\n  }\n\n  Lateness lateness_;        // declared first, so it is destroyed last\n  std::int64_t messages_ = 0;\n  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_;\n  rclcpp::TimerBase::SharedPtr timer_;\n  rclcpp::Service<Trigger>::SharedPtr service_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::executors::MultiThreadedExecutor executor;\n  const auto node = std::make_shared<Watchdog>();\n  executor.add_node(node);\n  executor.spin();\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What step 2 produces, and why. The service callback runs in "
+        },
+        {
+         "t": "code",
+         "v": "admin_"
+        },
+        {
+         "t": "text",
+         "v": " while the timer callback runs in "
+        },
+        {
+         "t": "code",
+         "v": "control_"
+        },
+        {
+         "t": "text",
+         "v": ", and two different groups may always run at the same time, so nothing stops the timer callback from already holding the raw pointer, read a moment earlier, when the service callback replaces the object underneath it: "
+        },
+        {
+         "t": "code",
+         "v": "lateness_ = std::make_unique<Lateness>();"
+        },
+        {
+         "t": "text",
+         "v": " frees the old "
+        },
+        {
+         "t": "code",
+         "v": "Lateness"
+        },
+        {
+         "t": "text",
+         "v": " as it takes ownership of the new one, and only then does the service callback refresh the raw pointer member, which is too late for a timer callback already mid-call on the old address. AddressSanitizer stops the process with "
+        },
+        {
+         "t": "code",
+         "v": "ERROR: AddressSanitizer: heap-use-after-free"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "READ"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "WRITE"
+        },
+        {
+         "t": "text",
+         "v": " line naming the size and the thread, and a stack whose top frame is inside "
+        },
+        {
+         "t": "code",
+         "v": "Lateness"
+        },
+        {
+         "t": "text",
+         "v": ". Under it the report prints "
+        },
+        {
+         "t": "code",
+         "v": "freed by thread T…"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "operator delete"
+        },
+        {
+         "t": "text",
+         "v": " and the service callback, and "
+        },
+        {
+         "t": "code",
+         "v": "previously allocated by thread T0"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "make_unique"
+        },
+        {
+         "t": "text",
+         "v": " and the constructor. Those two stacks are the answer: one line created the object, a second line freed it while replacing it, and a third was already reading the address that the second line made dangling. The plain program in the failure cases above is the same report with the middleware removed, and it is worth running that one first, because it takes a second rather than a build."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two fixes. Holding the logic by value, declared before the entities, is what the solution does: there is no pointer to dangle, the destruction order is correct by construction, and "
+        },
+        {
+         "t": "code",
+         "v": "~/release"
+        },
+        {
+         "t": "text",
+         "v": " calls "
+        },
+        {
+         "t": "code",
+         "v": "forget()"
+        },
+        {
+         "t": "text",
+         "v": " instead of destroying anything. That is the one to ship. The "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " pair is the right answer when the object genuinely has to be replaceable at run time or is shared with something outside the node, and it costs a "
+        },
+        {
+         "t": "code",
+         "v": "lock()"
+        },
+        {
+         "t": "text",
+         "v": " per callback plus the discipline of handling the empty case; use it when the first fix is not available, not instead of it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The solution makes a third change that is worth arguing about, because the broken version's two callback groups were never justified. All three callbacks touch "
+        },
+        {
+         "t": "code",
+         "v": "lateness_"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "messages_"
+        },
+        {
+         "t": "text",
+         "v": ", so they belong in one mutually exclusive group, which is the node's default and needs no code at all. Two mutually exclusive groups do not exclude each other, as the executors topic said, so splitting these callbacks would have meant a mutex or an atomic for every member they share, and the dangling pointer was only the first thing that went wrong with the split. Split a node into callback groups when the callbacks have nothing in common, and leave them together when they do."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5. Under "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin"
+        },
+        {
+         "t": "text",
+         "v": " there is one thread, and a callback can never run while another callback of the same node is running, so the service callback finishes replacing the object and refreshing the raw pointer before the timer callback runs again: there is no moment at which the timer can hold a stale address. The bug only becomes reachable when somebody changes "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " to a multi-threaded executor, loads the node into "
+        },
+        {
+         "t": "code",
+         "v": "component_container_mt"
+        },
+        {
+         "t": "text",
+         "v": ", or gives it a second callback group, all of which look like configuration rather than code. A test suite that only spins single-threaded cannot see it. Run at least one test of every node under a "
+        },
+        {
+         "t": "code",
+         "v": "MultiThreadedExecutor"
+        },
+        {
+         "t": "text",
+         "v": " with two callback groups and a sanitizer build, and the class of bug stops being invisible."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say who owns an entity and who owns what its callback touches, and why "
+        },
+        {
+         "t": "code",
+         "v": "[this]"
+        },
+        {
+         "t": "text",
+         "v": " is safe on a node and not safe on anything else. Give the member declaration order that makes destruction correct, and say which executor makes the wrong order reachable. Say what rclcpp does and does not catch around your callback, naming the one function that wraps a "
+        },
+        {
+         "t": "code",
+         "v": "try"
+        },
+        {
+         "t": "text",
+         "v": " and what it wraps, and give the two different outcomes for a single-threaded and a multi-threaded executor. Say what happens to a timer callback and a publish during shutdown. Name the two tools: "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::TimerInfo"
+        },
+        {
+         "t": "text",
+         "v": " for lateness, AddressSanitizer for lifetime."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Who holds the owning pointer to a subscription, and what does the node hold?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is capturing "
+     },
+     {
+      "t": "code",
+      "v": "this"
+     },
+     {
+      "t": "text",
+      "v": " in a node's callback safe, and what turns the same habit into a use-after-free?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In which order are a node's members destroyed, and where do the entities belong in the declaration list?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which executor makes a wrong member order reachable, and why does a single-threaded test never see it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which part of "
+     },
+     {
+      "t": "code",
+      "v": "execute_subscription"
+     },
+     {
+      "t": "text",
+      "v": " sits inside a "
+     },
+     {
+      "t": "code",
+      "v": "try"
+     },
+     {
+      "t": "text",
+      "v": ", and which part does not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A subscription callback throws under "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::spin"
+     },
+     {
+      "t": "text",
+      "v": ", and the same callback throws under a "
+     },
+     {
+      "t": "code",
+      "v": "MultiThreadedExecutor"
+     },
+     {
+      "t": "text",
+      "v": " built for more than one thread, once on a thread the executor started and once on the thread that called "
+     },
+     {
+      "t": "code",
+      "v": "spin()"
+     },
+     {
+      "t": "text",
+      "v": ". What ends the process in each of the three, and which one of them could "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": " have caught? What changes if that "
+     },
+     {
+      "t": "code",
+      "v": "MultiThreadedExecutor"
+     },
+     {
+      "t": "text",
+      "v": " was built for exactly one thread instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A timer fires while "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::shutdown"
+     },
+     {
+      "t": "text",
+      "v": " is running and its callback publishes. What does the publish do?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "shared_from_this()"
+     },
+     {
+      "t": "text",
+      "v": " throw in a constructor, and where does that work belong instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A 100 ms timer whose callback takes 120 ms: what rate does it actually run at, and how do you get the lateness as a number without reading a clock?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a node whose timer callback reports its own lateness, with the logic in a plain class and the members in an order that is safe to destroy."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "executor.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executor.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "execute_timer"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "execute_subscription"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "code",
+      "v": "take_and_do_error_handling"
+     },
+     {
+      "t": "text",
+      "v": " helper whose "
+     },
+     {
+      "t": "code",
+      "v": "try"
+     },
+     {
+      "t": "text",
+      "v": " covers only the take; "
+     },
+     {
+      "t": "a",
+      "v": "any_executable.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/any_executable.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", whose destructor puts the callback group back; "
+     },
+     {
+      "t": "a",
+      "v": "callback_group.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/callback_group.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the five vectors of weak pointers; "
+     },
+     {
+      "t": "a",
+      "v": "timer.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/timer.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::TimerInfo"
+     },
+     {
+      "t": "text",
+      "v": " and the three callback shapes a timer accepts; "
+     },
+     {
+      "t": "a",
+      "v": "publisher.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/publisher.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the publish that returns quietly once the context is shut down."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rcl on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "timer.c",
+      "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/src/rcl/timer.c"
+     },
+     {
+      "t": "text",
+      "v": ": an overdue timer moves its next call time forward by whole periods."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation: "
+     },
+     {
+      "t": "a",
+      "v": "Executors",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Executors.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Using callback groups",
+      "href": "https://docs.ros.org/en/jazzy/How-To-Guides/Using-callback-groups.html"
+     },
+     {
+      "t": "text",
+      "v": ", for which callbacks may overlap."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "AddressSanitizer",
+      "href": "https://clang.llvm.org/docs/AddressSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "a",
+      "v": "GCC instrumentation options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html"
+     },
+     {
+      "t": "text",
+      "v": ": the report that names the reading stack, the freeing stack and the allocating stack."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": " on a raw pointer never owning, "
+     },
+     {
+      "t": "a",
+      "v": "F.53",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-value-capture"
+     },
+     {
+      "t": "text",
+      "v": " against capturing by reference in a lambda that is stored or handed to another thread, "
+     },
+     {
+      "t": "a",
+      "v": "CP.26",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detached_thread"
+     },
+     {
+      "t": "text",
+      "v": " against detaching a thread, and "
+     },
+     {
+      "t": "a",
+      "v": "C.47",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-order"
+     },
+     {
+      "t": "text",
+      "v": " on initialising data members in declaration order."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "weak_ptr::lock",
+      "href": "https://en.cppreference.com/cpp/memory/weak_ptr/lock"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "enable_shared_from_this",
+      "href": "https://en.cppreference.com/cpp/memory/enable_shared_from_this"
+     },
+     {
+      "t": "text",
+      "v": ", which throws "
+     },
+     {
+      "t": "code",
+      "v": "std::bad_weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": " before an owner exists."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Phil Nash, Back to Basics: Lifetime Management, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Lifetime_Management.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=aMvIv6blzBs"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

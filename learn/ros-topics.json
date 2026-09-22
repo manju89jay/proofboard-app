@@ -1,0 +1,1557 @@
+{
+ "id": "ros-topics",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Without looking anything up, write a C++ node that publishes a number on the topic "
+     },
+     {
+      "t": "code",
+      "v": "count"
+     },
+     {
+      "t": "text",
+      "v": " once a second, counting up from 0. Include the headers, the node class, the timer and "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": ". Take 10 minutes, and don't worry about exact spelling of the API."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "ros",
+    "expect": "",
+    "text": "#include <chrono>\n#include <cstdint>\n#include <memory>\n\n#include <rclcpp/rclcpp.hpp>\n#include <std_msgs/msg/int64.hpp>\n\nusing namespace std::chrono_literals;\n\nclass Counter : public rclcpp::Node {\n public:\n  explicit Counter(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"counter\", options) {\n    // Keep the 10 newest messages while they can't be delivered as fast as they are published.\n    publisher_ = create_publisher<std_msgs::msg::Int64>(\"count\", rclcpp::QoS(rclcpp::KeepLast(10)));\n    // Runs on the node's clock, so it follows simulation time when use_sim_time is set.\n    timer_ = create_timer(1s, [this] {\n      std_msgs::msg::Int64 msg;\n      msg.data = next_++;\n      publisher_->publish(msg);\n    });\n  }\n\n private:\n  rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr publisher_;\n  rclcpp::TimerBase::SharedPtr timer_;\n  std::int64_t next_ = 0;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<Counter>());\n  rclcpp::shutdown();\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The parts that matter are the publisher, created with a topic name and a history depth; the timer, whose callback builds and publishes a message; the members that keep both alive; and "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::spin"
+     },
+     {
+      "t": "text",
+      "v": ", without which the timer never fires. You pass if you had all four and the structure would compile with small fixes. Missing "
+     },
+     {
+      "t": "code",
+      "v": "spin"
+     },
+     {
+      "t": "text",
+      "v": " or the members is a partial pass, and more than that is a fail. A plain "
+     },
+     {
+      "t": "code",
+      "v": "10"
+     },
+     {
+      "t": "text",
+      "v": " for the depth, a constructor without "
+     },
+     {
+      "t": "code",
+      "v": "NodeOptions"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "create_wall_timer"
+     },
+     {
+      "t": "text",
+      "v": " all pass too; the theory below says why this page writes each of them differently."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A topic is a named channel that carries exactly one message type, such as "
+    },
+    {
+     "t": "code",
+     "v": "/chatter"
+    },
+    {
+     "t": "text",
+     "v": " carrying "
+    },
+    {
+     "t": "code",
+     "v": "std_msgs/msg/String"
+    },
+    {
+     "t": "text",
+     "v": ". Any number of nodes can publish to it and any number can subscribe, and each message type is defined once in a "
+    },
+    {
+     "t": "code",
+     "v": ".msg"
+    },
+    {
+     "t": "text",
+     "v": " file and turned into a C++ class at build time, following a fixed naming pattern: the type "
+    },
+    {
+     "t": "code",
+     "v": "std_msgs/msg/String"
+    },
+    {
+     "t": "text",
+     "v": " becomes the class "
+    },
+    {
+     "t": "code",
+     "v": "std_msgs::msg::String"
+    },
+    {
+     "t": "text",
+     "v": ", declared in the lowercase header "
+    },
+    {
+     "t": "code",
+     "v": "std_msgs/msg/string.hpp"
+    },
+    {
+     "t": "text",
+     "v": "."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is letting nodes exchange data without knowing about each other. A publisher doesn't know who is listening, or whether anyone is, and finding the other side of a topic is the middleware's job, a DDS implementation by default; a node can be restarted, replaced or never started at all, and the nodes on the other end of its topics keep running unchanged, noticing only through what does or doesn't arrive."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "code",
+     "v": "create_publisher<T>(name, qos)"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "create_subscription<T>(name, qos, callback)"
+    },
+    {
+     "t": "text",
+     "v": " each return the one shared pointer that owns the publisher or subscription; the node itself keeps only a weak reference. A subscription's callback runs only while the node is "
+    },
+    {
+     "t": "i",
+     "v": "spinning"
+    },
+    {
+     "t": "text",
+     "v": ": "
+    },
+    {
+     "t": "code",
+     "v": "rclcpp::spin(node)"
+    },
+    {
+     "t": "text",
+     "v": " loops, waiting for work, and calls timer and subscription callbacks one at a time on the thread that called it, so a node that never spins receives nothing, and a callback that blocks stops every other callback on that node too."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake that catches most first attempts is not keeping that returned pointer: if it isn't stored in a member, the publisher or subscription is destroyed at the end of the statement that created it, with no error and nothing in the log, and a subscriber built this way compiles cleanly and never receives a message. The same holds for timers and services; every handle a node creates has to be kept alive in a member for as long as it needs to work."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself, sketching a publisher whose timer callback builds and sends a message once a second, where the parts that matter are the publisher and the timer kept alive as members and the call to "
+    },
+    {
+     "t": "code",
+     "v": "rclcpp::spin"
+    },
+    {
+     "t": "text",
+     "v": " that makes either one ever run."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "pubsub",
+   "title": "Topics, message types, publishers, subscribers, callbacks",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start the demo talker and look at what it creates:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run demo_nodes_cpp talker     # terminal 1: prints \"Publishing: 'Hello World: 1'\" and so on\nros2 topic list                    # terminal 2: /chatter, /parameter_events, /rosout\nros2 topic info /chatter           # Type: std_msgs/msg/String, Publisher count: 1, Subscription count: 0\nros2 topic echo /chatter           # data: 'Hello World: 12', then ---"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "topic"
+        },
+        {
+         "t": "text",
+         "v": " is a named channel that carries one message type. "
+        },
+        {
+         "t": "code",
+         "v": "/chatter"
+        },
+        {
+         "t": "text",
+         "v": " carries "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs/msg/String"
+        },
+        {
+         "t": "text",
+         "v": ", a message with one field, "
+        },
+        {
+         "t": "code",
+         "v": "data"
+        },
+        {
+         "t": "text",
+         "v": ". Any number of nodes can publish to a topic, and any number can subscribe. A publisher doesn't know who is listening, or whether anyone is: "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info"
+        },
+        {
+         "t": "text",
+         "v": " showed one publisher and no subscriptions, and the talker kept publishing anyway. Finding the other side is the middleware's job. In Jazzy that is a DDS implementation by default, and a later topic covers it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each message type is defined in a "
+        },
+        {
+         "t": "code",
+         "v": ".msg"
+        },
+        {
+         "t": "text",
+         "v": " file and turned into a C++ struct at build time. The naming follows a fixed pattern: the type "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs/msg/String"
+        },
+        {
+         "t": "text",
+         "v": " becomes the class "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs::msg::String"
+        },
+        {
+         "t": "text",
+         "v": ", declared in the header "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs/msg/string.hpp"
+        },
+        {
+         "t": "text",
+         "v": ". The header name is in lowercase with underscores, so "
+        },
+        {
+         "t": "code",
+         "v": "sensor_msgs/msg/LaserScan"
+        },
+        {
+         "t": "text",
+         "v": " lives in "
+        },
+        {
+         "t": "code",
+         "v": "sensor_msgs/msg/laser_scan.hpp"
+        },
+        {
+         "t": "text",
+         "v": ". The one-field wrappers in "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs"
+        },
+        {
+         "t": "text",
+         "v": ", such as "
+        },
+        {
+         "t": "code",
+         "v": "String"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Int64"
+        },
+        {
+         "t": "text",
+         "v": ", carry a comment in their "
+        },
+        {
+         "t": "code",
+         "v": ".msg"
+        },
+        {
+         "t": "text",
+         "v": " files that says they are deprecated since Foxy, and that a real interface should define its own message with a meaningful name, like the "
+        },
+        {
+         "t": "code",
+         "v": "bench_interfaces/msg/Tick"
+        },
+        {
+         "t": "text",
+         "v": " you made in the packages topic. They are fine for a first example, and the official tutorials use them the same way."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In C++, "
+        },
+        {
+         "t": "code",
+         "v": "create_publisher<std_msgs::msg::Int64>(\"count\", rclcpp::QoS(rclcpp::KeepLast(10)))"
+        },
+        {
+         "t": "text",
+         "v": " returns a shared pointer to a publisher. The second argument is its "
+        },
+        {
+         "t": "i",
+         "v": "quality of service"
+        },
+        {
+         "t": "text",
+         "v": " (QoS), and "
+        },
+        {
+         "t": "code",
+         "v": "KeepLast(10)"
+        },
+        {
+         "t": "text",
+         "v": " is the history depth: keep the 10 newest messages while they can't be delivered as fast as they are published, and drop older ones. It is a queue length, not a rate. Most code, including the Jazzy tutorials, writes a bare "
+        },
+        {
+         "t": "code",
+         "v": "10"
+        },
+        {
+         "t": "text",
+         "v": ", which converts to exactly this. This page writes "
+        },
+        {
+         "t": "code",
+         "v": "KeepLast(10)"
+        },
+        {
+         "t": "text",
+         "v": " so the number says what it is. 10 is also the depth of ROS 2's default profile, and the demo talker you ran uses 7. The QoS topic covers the other settings."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A subscription is created the same way with a callback, and here the common misunderstanding is about when that callback runs. It doesn't run when a message arrives on the network. It runs when your node is "
+        },
+        {
+         "t": "i",
+         "v": "spinning"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin(node)"
+        },
+        {
+         "t": "text",
+         "v": " loops, waits for work, and calls timer and subscription callbacks one at a time on the thread that called "
+        },
+        {
+         "t": "code",
+         "v": "spin"
+        },
+        {
+         "t": "text",
+         "v": ". A node that never spins receives nothing, and a callback that blocks stops every other callback of that node. The topic on executors comes back to this."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A timer is a callback too, and rclcpp offers two kinds. "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": " counts on the computer's steady clock. "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": " counts on the node's clock, which is "
+        },
+        {
+         "t": "i",
+         "v": "ROS time"
+        },
+        {
+         "t": "text",
+         "v": ": the system clock normally, and the time published on "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " when the node runs with "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": ". In a Gazebo world that runs at half of real time, a 1 s "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": " fires once per simulated second and stays in step with the robot, while a 1 s wall timer fires twice per simulated second. Both are declared in rclcpp's "
+        },
+        {
+         "t": "a",
+         "v": "node.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/node.hpp"
+        },
+        {
+         "t": "text",
+         "v": ", and a wall timer is built on "
+        },
+        {
+         "t": "code",
+         "v": "RCL_STEADY_TIME"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "a",
+         "v": "timer.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/timer.hpp"
+        },
+        {
+         "t": "text",
+         "v": ". The ros2/examples still use "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": ", which is right only when the work must follow the computer's clock whatever the robot's time is. Robot logic uses "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": ". The Gazebo topic shows what a node with "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": " does when nothing publishes "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The constructor takes "
+        },
+        {
+         "t": "code",
+         "v": "const rclcpp::NodeOptions&"
+        },
+        {
+         "t": "text",
+         "v": ", as the nodes in ros2/demos do. With a default argument, "
+        },
+        {
+         "t": "code",
+         "v": "std::make_shared<Counter>()"
+        },
+        {
+         "t": "text",
+         "v": " still works, and the same class can later be loaded as a component into a shared process, where the container passes its own options."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is a subscriber for the counter from the cold check. It logs every number it hears:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <cinttypes>\n#include <memory>\n\n#include <rclcpp/rclcpp.hpp>\n#include <std_msgs/msg/int64.hpp>\n\nclass Watcher : public rclcpp::Node {\n public:\n  explicit Watcher(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"watcher\", options) {\n    subscription_ = create_subscription<std_msgs::msg::Int64>(\n        \"count\", rclcpp::QoS(rclcpp::KeepLast(10)),\n        [this](const std_msgs::msg::Int64& msg) { RCLCPP_INFO(get_logger(), \"heard %\" PRId64, msg.data); });\n  }\n\n private:\n  rclcpp::Subscription<std_msgs::msg::Int64>::SharedPtr subscription_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<Watcher>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four details in it matter. The topic name and the message type must match the publisher's exactly. If either differs, both sides run without errors and nothing arrives: the watcher sees no publisher. The callback takes the message by "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": ", which is one of several signatures rclcpp accepts. The log line is printf-style, and GCC checks it: rcutils declares its log function with the "
+        },
+        {
+         "t": "code",
+         "v": "format(printf)"
+        },
+        {
+         "t": "text",
+         "v": " attribute ("
+        },
+        {
+         "t": "a",
+         "v": "logging.h",
+         "href": "https://github.com/ros2/rcutils/blob/jazzy/include/rcutils/logging.h"
+        },
+        {
+         "t": "text",
+         "v": "), so with "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Werror"
+        },
+        {
+         "t": "text",
+         "v": " a wrong specifier doesn't compile. "
+        },
+        {
+         "t": "code",
+         "v": "msg.data"
+        },
+        {
+         "t": "text",
+         "v": " is a "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": ", and its specifier is the macro "
+        },
+        {
+         "t": "code",
+         "v": "PRId64"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "<cinttypes>"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/types/integer"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "code",
+         "v": "%ld"
+        },
+        {
+         "t": "text",
+         "v": " happens to match on 64-bit Linux, where "
+        },
+        {
+         "t": "code",
+         "v": "int64_t"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "long"
+        },
+        {
+         "t": "text",
+         "v": ", but not on 32-bit ARM, where it is "
+        },
+        {
+         "t": "code",
+         "v": "long long"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "RCLCPP_INFO_STREAM(get_logger(), \"heard \" << msg.data)"
+        },
+        {
+         "t": "text",
+         "v": " avoids the question, at the cost of a "
+        },
+        {
+         "t": "code",
+         "v": "std::stringstream"
+        },
+        {
+         "t": "text",
+         "v": " built on every call, even when the level is switched off."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "And the subscription is stored in a member. That last point is where most first attempts fail. "
+        },
+        {
+         "t": "code",
+         "v": "create_subscription"
+        },
+        {
+         "t": "text",
+         "v": " returns the only owning pointer to the subscription. The node itself holds only a weak reference to it, so if you don't store the result, the subscription is destroyed at the end of the statement and the callback never runs. There's no error message. This constructor compiles and never logs anything:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "explicit Watcher(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"watcher\", options) {\n  // The returned shared pointer is dropped here, and with it the subscription.\n  create_subscription<std_msgs::msg::Int64>(\n      \"count\", rclcpp::QoS(rclcpp::KeepLast(10)),\n      [this](const std_msgs::msg::Int64& msg) { RCLCPP_INFO(get_logger(), \"heard %\" PRId64, msg.data); });\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same holds for timers, publishers and services. Keep every handle you create in a member for as long as you want it to work."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pair",
+   "title": "Publisher and subscriber pair from a blank file",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes and work in a workspace of your own, such as "
+        },
+        {
+         "t": "code",
+         "v": "~/bench_ws"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Create an ament_cmake package "
+         },
+         {
+          "t": "code",
+          "v": "bench_count"
+         },
+         {
+          "t": "text",
+          "v": " that depends on "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "std_msgs"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Add a "
+         },
+         {
+          "t": "code",
+          "v": "counter"
+         },
+         {
+          "t": "text",
+          "v": " executable that publishes "
+         },
+         {
+          "t": "code",
+          "v": "std_msgs/msg/Int64"
+         },
+         {
+          "t": "text",
+          "v": " on "
+         },
+         {
+          "t": "code",
+          "v": "/count"
+         },
+         {
+          "t": "text",
+          "v": " twice a second, counting from 0."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Add a "
+         },
+         {
+          "t": "code",
+          "v": "watcher"
+         },
+         {
+          "t": "text",
+          "v": " executable that subscribes to "
+         },
+         {
+          "t": "code",
+          "v": "/count"
+         },
+         {
+          "t": "text",
+          "v": ", logs each number, and logs a warning when a number isn't one more than the previous one."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Put the check from step 3 in a plain class "
+         },
+         {
+          "t": "code",
+          "v": "SequenceCheck"
+         },
+         {
+          "t": "text",
+          "v": " with no ROS types in it. Its "
+         },
+         {
+          "t": "code",
+          "v": "observe(value)"
+         },
+         {
+          "t": "text",
+          "v": " returns a "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<std::int64_t>"
+         },
+         {
+          "t": "text",
+          "v": ": the number it expected when "
+         },
+         {
+          "t": "code",
+          "v": "value"
+         },
+         {
+          "t": "text",
+          "v": " isn't the previous one plus one, and nothing when it is, or when "
+         },
+         {
+          "t": "code",
+          "v": "value"
+         },
+         {
+          "t": "text",
+          "v": " is the first one. Prove it with a small program that feeds it numbers, built with "
+         },
+         {
+          "t": "code",
+          "v": "g++"
+         },
+         {
+          "t": "text",
+          "v": " alone."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Build with colcon, run both nodes, and check the rate with "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic hz /count"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Stop the counter with Ctrl+C and start it again. Predict what the watcher prints, then check."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The commands, in order:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "mkdir -p ~/bench_ws/src && cd ~/bench_ws/src\nros2 pkg create --build-type ament_cmake bench_count --dependencies rclcpp std_msgs\n# write src/counter.cpp and src/watcher.cpp, then add both executables to CMakeLists.txt\ncd ~/bench_ws\ncolcon build --packages-select bench_count\nsource install/setup.bash\nros2 run bench_count counter      # terminal 1\nros2 run bench_count watcher      # terminal 2, after sourcing install/setup.bash there too\nros2 topic hz /count              # terminal 3: \"average rate: 2.000\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The counter is the cold-check node with "
+        },
+        {
+         "t": "code",
+         "v": "500ms"
+        },
+        {
+         "t": "text",
+         "v": " instead of "
+        },
+        {
+         "t": "code",
+         "v": "1s"
+        },
+        {
+         "t": "text",
+         "v": ". The watcher hands each number to a "
+        },
+        {
+         "t": "code",
+         "v": "SequenceCheck"
+        },
+        {
+         "t": "text",
+         "v": ", and only logs:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <cinttypes>\n#include <cstdint>\n#include <memory>\n#include <optional>\n\n#include <rclcpp/rclcpp.hpp>\n#include <std_msgs/msg/int64.hpp>\n\n// Plain C++ with no ROS types, so a test reaches it without starting ROS.\nclass SequenceCheck {\n public:\n  // Returns the number that should have come when `value` isn't one more than the last one,\n  // and nothing when it is, or when `value` is the first one seen.\n  [[nodiscard]] std::optional<std::int64_t> observe(std::int64_t value) {\n    std::optional<std::int64_t> expected;\n    if (last_ && value != *last_ + 1) expected = *last_ + 1;\n    last_ = value;\n    return expected;\n  }\n\n private:\n  std::optional<std::int64_t> last_;\n};\n\nclass Watcher : public rclcpp::Node {\n public:\n  explicit Watcher(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"watcher\", options) {\n    subscription_ = create_subscription<std_msgs::msg::Int64>(\n        \"count\", rclcpp::QoS(rclcpp::KeepLast(10)), [this](const std_msgs::msg::Int64& msg) { on_count(msg.data); });\n  }\n\n private:\n  void on_count(std::int64_t value) {\n    RCLCPP_INFO(get_logger(), \"heard %\" PRId64, value);\n    if (const std::optional<std::int64_t> expected = check_.observe(value)) {\n      RCLCPP_WARN(get_logger(), \"expected %\" PRId64 \", got %\" PRId64, *expected, value);\n    }\n  }\n\n  SequenceCheck check_;  // declared before the subscription, so it outlives the callback that uses it\n  rclcpp::Subscription<std_msgs::msg::Int64>::SharedPtr subscription_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<Watcher>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The callback is one line, and everything worth testing sits in "
+        },
+        {
+         "t": "code",
+         "v": "SequenceCheck"
+        },
+        {
+         "t": "text",
+         "v": ". This is the design Bilal Gill argues for in his CppCon 2023 talk on testable ROS 2 code: callbacks translate between messages and plain types, and the logic lives where a test can call it directly. Here is the same class in a program that needs only a compiler. It feeds a run, a gap of two and a restart from 0:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n\nclass SequenceCheck {\n public:\n  [[nodiscard]] std::optional<std::int64_t> observe(std::int64_t value) {\n    std::optional<std::int64_t> expected;\n    if (last_ && value != *last_ + 1) expected = *last_ + 1;\n    last_ = value;\n    return expected;\n  }\n\n private:\n  std::optional<std::int64_t> last_;\n};\n\nint main() {\n  SequenceCheck check;\n  for (const std::int64_t value : {0, 1, 2, 5, 6, 0, 1}) {\n    const std::optional<std::int64_t> expected = check.observe(value);\n    std::cout << (expected ? std::format(\"{}: expected {}\\n\", value, *expected) : std::format(\"{}: ok\\n\", value));\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "0: ok\n1: ok\n2: ok\n5: expected 3\n6: ok\n0: expected 7\n1: ok"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first value never counts as a gap, because the watcher may start long after the counter. In a real package the class goes in a header that both the node and a GoogleTest test include; the bench project sets that up when it gets its first nodes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ros2 pkg create"
+        },
+        {
+         "t": "text",
+         "v": " already added "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "package.xml"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "find_package"
+        },
+        {
+         "t": "text",
+         "v": " calls to "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ". You add the two executables and install them, so that "
+        },
+        {
+         "t": "code",
+         "v": "ros2 run"
+        },
+        {
+         "t": "text",
+         "v": " can find them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "add_executable(counter src/counter.cpp)\nament_target_dependencies(counter rclcpp std_msgs)\nadd_executable(watcher src/watcher.cpp)\nament_target_dependencies(watcher rclcpp std_msgs)\n\ninstall(TARGETS counter watcher DESTINATION lib/${PROJECT_NAME})"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When the counter restarts, it counts from 0 again, so the watcher logs a warning such as "
+        },
+        {
+         "t": "code",
+         "v": "expected 18, got 0"
+        },
+        {
+         "t": "text",
+         "v": ". The watcher kept running, and it found the new counter without any change on its side, because neither node knows the other. The only thing they share is the topic name and the type."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a topic is, how a message type becomes a C++ class and header, and what the history depth means. Explain when a subscription callback runs, why a subscription that isn't stored in a member never receives anything, and which clock "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": " uses compared with "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What happens when the publisher and the subscriber use different message types on the same topic name?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Where does the header for "
+     },
+     {
+      "t": "code",
+      "v": "sensor_msgs/msg/LaserScan"
+     },
+     {
+      "t": "text",
+      "v": " live, and what is the C++ class called?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does the 10 in "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::KeepLast(10)"
+     },
+     {
+      "t": "text",
+      "v": " mean, and what does it not mean?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "On which thread does a subscription callback run, and what stops it from running?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which clock drives "
+     },
+     {
+      "t": "code",
+      "v": "create_timer"
+     },
+     {
+      "t": "text",
+      "v": ", which drives "
+     },
+     {
+      "t": "code",
+      "v": "create_wall_timer"
+     },
+     {
+      "t": "text",
+      "v": ", and what changes with "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time:=true"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "%ld"
+     },
+     {
+      "t": "text",
+      "v": " for an "
+     },
+     {
+      "t": "code",
+      "v": "int64_t"
+     },
+     {
+      "t": "text",
+      "v": " build cleanly on a 64-bit laptop and trip "
+     },
+     {
+      "t": "code",
+      "v": "-Wformat"
+     },
+     {
+      "t": "text",
+      "v": " on a 32-bit ARM board, and what do you write instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a publisher and a subscriber for "
+     },
+     {
+      "t": "code",
+      "v": "std_msgs/msg/Int64"
+     },
+     {
+      "t": "text",
+      "v": ", with every handle kept alive and the gap check in a plain class."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "ros2/examples on the jazzy branch: the "
+     },
+     {
+      "t": "a",
+      "v": "minimal publisher",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/topics/minimal_publisher/lambda.cpp"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "a",
+      "v": "minimal subscriber",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/topics/minimal_subscriber/lambda.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", in their lambda forms."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The demo "
+     },
+     {
+      "t": "a",
+      "v": "talker",
+      "href": "https://github.com/ros2/demos/blob/jazzy/demo_nodes_cpp/src/topics/talker.cpp"
+     },
+     {
+      "t": "text",
+      "v": " from ros2/demos: a constructor that takes "
+     },
+     {
+      "t": "code",
+      "v": "NodeOptions"
+     },
+     {
+      "t": "text",
+      "v": ", and a history depth of 7."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The Jazzy tutorial on "
+     },
+     {
+      "t": "a",
+      "v": "writing a publisher and subscriber in C++",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-Client-Libraries/Writing-A-Simple-Cpp-Publisher-And-Subscriber.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the concept page on "
+     },
+     {
+      "t": "a",
+      "v": "quality of service",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "node.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/node.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "create_timer"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "create_wall_timer"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "timer.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/timer.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the steady clock under a wall timer."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rcutils on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "logging.h",
+      "href": "https://github.com/ros2/rcutils/blob/jazzy/include/rcutils/logging.h"
+     },
+     {
+      "t": "text",
+      "v": ": the "
+     },
+     {
+      "t": "code",
+      "v": "format(printf)"
+     },
+     {
+      "t": "text",
+      "v": " attribute that lets GCC check "
+     },
+     {
+      "t": "code",
+      "v": "RCLCPP_INFO"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "code",
+      "v": "std_msgs"
+     },
+     {
+      "t": "text",
+      "v": " "
+     },
+     {
+      "t": "a",
+      "v": "Int64.msg",
+      "href": "https://github.com/ros2/common_interfaces/blob/jazzy/std_msgs/msg/Int64.msg"
+     },
+     {
+      "t": "text",
+      "v": ", with its deprecation note."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on the "
+     },
+     {
+      "t": "a",
+      "v": "fixed-width integer types",
+      "href": "https://en.cppreference.com/cpp/types/integer"
+     },
+     {
+      "t": "text",
+      "v": " and their format macros such as "
+     },
+     {
+      "t": "code",
+      "v": "PRId64"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

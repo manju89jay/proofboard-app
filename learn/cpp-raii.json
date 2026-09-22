@@ -1,0 +1,2103 @@
+{
+ "id": "cpp-raii",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "From memory, write a class "
+     },
+     {
+      "t": "code",
+      "v": "File"
+     },
+     {
+      "t": "text",
+      "v": " that opens a file in its constructor, closes it when the object goes away, can't be copied, and can be moved. Then write a "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": " that writes a line to a file and reads it back. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <array>\n#include <cstdio>\n#include <filesystem>\n#include <iostream>\n#include <memory>\n#include <stdexcept>\n\nclass File {\n public:\n  enum class Mode { read, write };\n\n  // Opens the file or throws, so a File never holds a failed open.\n  File(const std::filesystem::path& path, Mode mode)\n      : handle_(std::fopen(path.c_str(), mode == Mode::read ? \"r\" : \"w\")) {\n    if (!handle_) throw std::runtime_error(\"cannot open \" + path.string());\n  }\n\n  [[nodiscard]] std::FILE* get() const { return handle_.get(); }\n\n private:\n  struct Closer {\n    void operator()(std::FILE* f) const noexcept { std::fclose(f); }\n  };\n  std::unique_ptr<std::FILE, Closer> handle_;\n};\n\nint main() {\n  {\n    const File out(\"notes.txt\", File::Mode::write);\n    std::fputs(\"dock reached\\n\", out.get());\n  }  // closed here, which hands the buffered line to the operating system\n  const File in(\"notes.txt\", File::Mode::read);\n  std::array<char, 64> line{};\n  if (std::fgets(line.data(), static_cast<int>(line.size()), in.get()) != nullptr) std::cout << line.data();\n}"
+   },
+   {
+    "t": "output",
+    "text": "dock reached"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "File"
+     },
+     {
+      "t": "text",
+      "v": " has no destructor, no copy and no move operations of its own, and it still closes the file exactly once, can't be copied and can be moved. The "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " member does all of it: its destructor calls "
+     },
+     {
+      "t": "code",
+      "v": "Closer"
+     },
+     {
+      "t": "text",
+      "v": ", and it is move-only. This is the "
+     },
+     {
+      "t": "i",
+      "v": "rule of zero"
+     },
+     {
+      "t": "text",
+      "v": " (Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "C.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-zero"
+     },
+     {
+      "t": "text",
+      "v": "): when every member manages itself, the class declares none of the five special members. The mode is an "
+     },
+     {
+      "t": "code",
+      "v": "enum class"
+     },
+     {
+      "t": "text",
+      "v": " rather than a second "
+     },
+     {
+      "t": "code",
+      "v": "const char*"
+     },
+     {
+      "t": "text",
+      "v": ", so a call can't swap the path and the mode. "
+     },
+     {
+      "t": "code",
+      "v": "path.c_str()"
+     },
+     {
+      "t": "text",
+      "v": " is a "
+     },
+     {
+      "t": "code",
+      "v": "const char*"
+     },
+     {
+      "t": "text",
+      "v": " on Linux and macOS, which "
+     },
+     {
+      "t": "code",
+      "v": "fopen"
+     },
+     {
+      "t": "text",
+      "v": " needs. On Windows it is a wide string, which needs "
+     },
+     {
+      "t": "code",
+      "v": "_wfopen"
+     },
+     {
+      "t": "text",
+      "v": " instead."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if yours opens in the constructor and fails loudly when "
+     },
+     {
+      "t": "code",
+      "v": "fopen"
+     },
+     {
+      "t": "text",
+      "v": " fails, closes exactly once on every path, can't be copied, and can be moved. A hand-written destructor, deleted copy operations and moves that empty the source also pass: Exercise 1 writes that version. Missing the moves is a partial pass. A class that can be copied is a fail, because two copies close the same "
+     },
+     {
+      "t": "code",
+      "v": "FILE*"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "RAII stands for resource acquisition is initialisation, which is an awkward name for a plain idea: an object takes charge of a resource when it is created and gives it back when it is destroyed. The resource is anything you have to hand back. Heap memory, an open file, a socket, a lock, a ROS subscription."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is the cleanup you forget. You open a file at the top of a function and close it at the bottom, and then someone adds an early return in the middle, or a line between them throws, and the file stays open. Every exit path needs its own cleanup and the compiler cannot tell you which one you missed. RAII moves the cleanup into a destructor, and the language already promises to run that destructor when the object goes out of scope: on a return, on a break, and while an exception unwinds the stack. One place, every path."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "That is why C++ has no "
+    },
+    {
+     "t": "code",
+     "v": "finally"
+    },
+    {
+     "t": "text",
+     "v": " block. The destructor is the finally block, and it belongs to the resource rather than to whichever function happens to use it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs you is that the owner has to answer three questions the compiler would otherwise answer badly. Can it be copied, which usually means no, because two owners would each release the same handle. Can it be moved, which usually means yes, and the moved-from object has to be left safe to destroy. And what happens when the release itself fails: destructors are "
+    },
+    {
+     "t": "code",
+     "v": "noexcept"
+    },
+    {
+     "t": "text",
+     "v": " by default, so an exception leaving one calls "
+    },
+    {
+     "t": "code",
+     "v": "std::terminate"
+    },
+    {
+     "t": "text",
+     "v": ", which is why a file owner also offers an explicit close for a caller who wants to hear about the error."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet it everywhere in the robot you are building. Every node owns its publishers, timers and subscriptions this way, and "
+    },
+    {
+     "t": "code",
+     "v": "std::unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "std::lock_guard"
+    },
+    {
+     "t": "text",
+     "v": " are the same idea with the boilerplate already written."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Resource acquisition is initialisation; destructors on every exit path",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This function looks correct and isn't. Andre Kostur builds his "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on RAII",
+         "href": "https://www.youtube.com/watch?v=Rfu06XAhx90"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2022) around a function like it, here recording a robot's sensor readings:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "class Recorder {\n public:\n  void record(const Reading& r) {\n    mutex_.lock();\n    if (!r.valid()) return;   // returns with mutex_ locked: the next call waits forever\n    readings_.push_back(r);   // can throw std::bad_alloc, with the same result\n    mutex_.unlock();\n  }\n\n private:\n  std::mutex mutex_;\n  std::vector<Reading> readings_;\n};"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Pairing "
+        },
+        {
+         "t": "code",
+         "v": "lock"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "unlock"
+        },
+        {
+         "t": "text",
+         "v": " by hand means releasing on every way out of the function: the end, every early "
+        },
+        {
+         "t": "code",
+         "v": "return"
+        },
+        {
+         "t": "text",
+         "v": ", and every exception thrown by anything it calls. Adding a "
+        },
+        {
+         "t": "code",
+         "v": "try"
+        },
+        {
+         "t": "text",
+         "v": " block with a second "
+        },
+        {
+         "t": "code",
+         "v": "unlock"
+        },
+        {
+         "t": "text",
+         "v": " in the "
+        },
+        {
+         "t": "code",
+         "v": "catch"
+        },
+        {
+         "t": "text",
+         "v": " fixes today's exits and not the one someone adds next month. The fix is one line, "
+        },
+        {
+         "t": "code",
+         "v": "const std::scoped_lock lock(mutex_);"
+        },
+        {
+         "t": "text",
+         "v": " in place of the two calls, and it covers every exit, including the ones not written yet."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That line is "
+        },
+        {
+         "t": "i",
+         "v": "RAII"
+        },
+        {
+         "t": "text",
+         "v": ", resource acquisition is initialisation. An object's constructor acquires the resource and its destructor releases it, and C++ runs the destructor of every fully constructed local object when its scope ends, however it ends: falling off the end, "
+        },
+        {
+         "t": "code",
+         "v": "return"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "break"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "continue"
+        },
+        {
+         "t": "text",
+         "v": ", or an exception passing through. "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::scoped_lock"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": " are all RAII types, for memory, locks and threads (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "R.1",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-raii"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "CP.20",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-raii"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four situations skip destructors. "
+        },
+        {
+         "t": "code",
+         "v": "std::exit"
+        },
+        {
+         "t": "text",
+         "v": " doesn't destroy local objects, "
+        },
+        {
+         "t": "code",
+         "v": "std::abort"
+        },
+        {
+         "t": "text",
+         "v": " destroys nothing, and a process killed with SIGKILL gets no chance at all. And when an exception is thrown and never caught, "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": " is called, and whether the stack is unwound first is implementation-defined. Catch exceptions in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " if the cleanup matters."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "HandleTable"
+        },
+        {
+         "t": "text",
+         "v": " below stands in for a C API that hands out handles and counts how many are still open. "
+        },
+        {
+         "t": "code",
+         "v": "parse_by_hand"
+        },
+        {
+         "t": "text",
+         "v": " pairs "
+        },
+        {
+         "t": "code",
+         "v": "open"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "close"
+        },
+        {
+         "t": "text",
+         "v": " itself, and "
+        },
+        {
+         "t": "code",
+         "v": "parse_raii"
+        },
+        {
+         "t": "text",
+         "v": " gives the handle to a small owner. Both parse three lines: a good one, an empty one that returns early, and one that throws."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <stdexcept>\n#include <string_view>\n\n// Stands in for a C API that hands out handles and counts how many are still open.\nclass HandleTable {\n public:\n  [[nodiscard]] int open() {\n    ++open_;\n    return next_++;\n  }\n  void close(int /*handle*/) { --open_; }\n  [[nodiscard]] int still_open() const { return open_; }\n\n private:\n  int next_ = 1;\n  int open_ = 0;\n};\n\nvoid parse_by_hand(HandleTable& table, std::string_view line) {\n  const int handle = table.open();\n  if (line.empty()) return;                                      // leaks handle\n  if (line == \"garbage\") throw std::runtime_error(\"bad line\");  // leaks handle\n  table.close(handle);\n}\n\nclass Handle {\n public:\n  explicit Handle(HandleTable& table) : table_(table), id_(table.open()) {}\n  ~Handle() { table_.close(id_); }\n  Handle(const Handle&) = delete;\n  Handle& operator=(const Handle&) = delete;\n  Handle(Handle&&) = delete;\n  Handle& operator=(Handle&&) = delete;\n\n private:\n  HandleTable& table_;\n  int id_;\n};\n\nvoid parse_raii(HandleTable& table, std::string_view line) {\n  const Handle handle(table);\n  if (line.empty()) return;\n  if (line == \"garbage\") throw std::runtime_error(\"bad line\");\n}\n\nusing Parser = void (*)(HandleTable&, std::string_view);\n\n[[nodiscard]] int left_open_after(Parser parse) {\n  HandleTable table;\n  for (const std::string_view line : {\"12.5\", \"\", \"garbage\"}) {\n    try {\n      parse(table, line);\n    } catch (const std::runtime_error&) {\n    }\n  }\n  return table.still_open();\n}\n\nint main() {\n  std::cout << \"by hand: \" << left_open_after(parse_by_hand) << \" handles left open\\n\";\n  std::cout << \"raii:    \" << left_open_after(parse_raii) << \" handles left open\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "by hand: 2 handles left open\nraii:    0 handles left open"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "parse_raii"
+         },
+         {
+          "t": "text",
+          "v": " never mentions closing, yet it closes on all three paths. When the exception leaves it, the stack is unwound and "
+         },
+         {
+          "t": "code",
+          "v": "~Handle"
+         },
+         {
+          "t": "text",
+          "v": " runs on the way out."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Handle"
+         },
+         {
+          "t": "text",
+          "v": " deletes its copy and move operations. A copy would close the same id twice, and the compiler now refuses any code that tries. Deleting the copy operations would already stop the compiler from generating moves, but Core Guidelines "
+         },
+         {
+          "t": "a",
+          "v": "C.21",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+         },
+         {
+          "t": "text",
+          "v": " asks you to say so: once you declare one of the five, declare or delete all of them, so the reader doesn't have to know the rules for which ones are generated."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Nothing here is global, and the test data decides the path, not a flag passed in. The table is an ordinary object handed to each call, which is also what makes this code testable."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "file-owner",
+   "title": "File-handle owner: non-copyable, movable, released on return and on exception",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "File"
+        },
+        {
+         "t": "text",
+         "v": " again from a blank file, but this time without "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ": hold a raw "
+        },
+        {
+         "t": "code",
+         "v": "std::FILE*"
+        },
+        {
+         "t": "text",
+         "v": " and write the destructor, the deleted copy operations and the two move operations yourself. This is what "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " does inside, and writing it once shows why you rarely should. Then test each of these in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A function "
+         },
+         {
+          "t": "code",
+          "v": "open_log"
+         },
+         {
+          "t": "text",
+          "v": " that returns a "
+         },
+         {
+          "t": "code",
+          "v": "File"
+         },
+         {
+          "t": "text",
+          "v": " by value. Say why this compiles even though "
+         },
+         {
+          "t": "code",
+          "v": "File"
+         },
+         {
+          "t": "text",
+          "v": " can't be copied."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A move from one "
+         },
+         {
+          "t": "code",
+          "v": "File"
+         },
+         {
+          "t": "text",
+          "v": " into another, after which the source's "
+         },
+         {
+          "t": "code",
+          "v": "get()"
+         },
+         {
+          "t": "text",
+          "v": " returns "
+         },
+         {
+          "t": "code",
+          "v": "nullptr"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Move-assigning a "
+         },
+         {
+          "t": "code",
+          "v": "File"
+         },
+         {
+          "t": "text",
+          "v": " onto one that already holds an open file. The old file has to be closed, not leaked. Prove it by reading the old file back."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Returning by value compiles because "
+        },
+        {
+         "t": "code",
+         "v": "return File(path, File::Mode::write);"
+        },
+        {
+         "t": "text",
+         "v": " returns a temporary, and since C++17 the result is built directly in the caller, so no copy or move happens at all. Returning a named local also works: the compiler tries a move before a copy."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cstdio>\n#include <filesystem>\n#include <iostream>\n#include <optional>\n#include <stdexcept>\n#include <string>\n#include <utility>\n\nclass File {\n public:\n  enum class Mode { read, write };\n\n  File(const std::filesystem::path& path, Mode mode)\n      : f_(std::fopen(path.c_str(), mode == Mode::read ? \"r\" : \"w\")) {\n    if (f_ == nullptr) throw std::runtime_error(\"cannot open \" + path.string());\n  }\n  ~File() { close(); }\n\n  File(const File&) = delete;\n  File& operator=(const File&) = delete;\n  File(File&& other) noexcept : f_(std::exchange(other.f_, nullptr)) {}\n  File& operator=(File&& other) noexcept {\n    if (this != &other) {\n      close();  // ours first, or it leaks\n      f_ = std::exchange(other.f_, nullptr);\n    }\n    return *this;\n  }\n\n  [[nodiscard]] std::FILE* get() const { return f_; }\n\n private:\n  void close() noexcept {\n    if (f_ != nullptr) std::fclose(f_);\n  }\n  std::FILE* f_;\n};\n\n[[nodiscard]] File open_log(const std::filesystem::path& path) { return File(path, File::Mode::write); }\n\n[[nodiscard]] std::optional<std::string> first_line(const std::filesystem::path& path) {\n  const File in(path, File::Mode::read);\n  std::array<char, 64> line{};\n  if (std::fgets(line.data(), static_cast<int>(line.size()), in.get()) == nullptr) return std::nullopt;\n  return line.data();\n}\n\nint main() {\n  File log = open_log(\"run.log\");\n  File moved = std::move(log);\n  std::cout << \"after move: source \" << (log.get() != nullptr ? \"open\" : \"empty\") << \", target \"\n            << (moved.get() != nullptr ? \"open\" : \"empty\") << '\\n';\n\n  File other(\"other.log\", File::Mode::write);\n  std::fputs(\"written before the move assignment\\n\", other.get());\n  other = std::move(moved);  // closes other.log, which hands its buffered line to the operating system\n  std::cout << \"other.log holds: \" << first_line(\"other.log\").value_or(\"nothing\\n\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "after move: source empty, target open\nother.log holds: written before the move assignment"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Compare this with the cold check's answer. Here, 14 lines of special members and "
+        },
+        {
+         "t": "code",
+         "v": "close()"
+        },
+        {
+         "t": "text",
+         "v": " do what one "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " member did there, and each of them is a place for a bug: forget "
+        },
+        {
+         "t": "code",
+         "v": "close()"
+        },
+        {
+         "t": "text",
+         "v": " in the move assignment and the old file leaks, forget the self-assignment test and "
+        },
+        {
+         "t": "code",
+         "v": "f = std::move(f)"
+        },
+        {
+         "t": "text",
+         "v": " closes the file it is about to keep. Arthur O'Dwyer's "
+        },
+        {
+         "t": "a",
+         "v": "RAII and the Rule of Zero",
+         "href": "https://www.youtube.com/watch?v=7Qgd9B1KuMQ"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019) draws the line this way: a class that manages a resource should be small and do only that, and every other class should hold such classes and follow the rule of zero. "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " with a deleter is a small resource class somebody already wrote and tested."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The moves are "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", and they can promise that because they only move a pointer. It matters as soon as "
+        },
+        {
+         "t": "code",
+         "v": "File"
+        },
+        {
+         "t": "text",
+         "v": "s sit in a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ". When the vector grows, it moves its elements if the move can't throw, and otherwise copies them, so that a failure halfway leaves the old elements intact. "
+        },
+        {
+         "t": "code",
+         "v": "File"
+        },
+        {
+         "t": "text",
+         "v": " can't be copied, so the vector moves it either way, but without "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " a throwing move could leave the vector half moved, and growth would lose its all-or-nothing promise (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.66",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-noexcept"
+        },
+        {
+         "t": "text",
+         "v": "). For a copyable type, a missing "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " turns every growth into copies."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Kostur ends his talk with the questions to answer for any RAII class, and they are a good review of this one. Is there a valid empty state? Here, only after a move: a moved-from "
+        },
+        {
+         "t": "code",
+         "v": "File"
+        },
+        {
+         "t": "text",
+         "v": " can be destroyed, assigned to, or asked for "
+        },
+        {
+         "t": "code",
+         "v": "get()"
+        },
+        {
+         "t": "text",
+         "v": ", which returns "
+        },
+        {
+         "t": "code",
+         "v": "nullptr"
+        },
+        {
+         "t": "text",
+         "v": ". Should it adopt a handle someone else opened? If so, through an "
+        },
+        {
+         "t": "code",
+         "v": "explicit"
+        },
+        {
+         "t": "text",
+         "v": " constructor. Copyable, movable, both or neither? Does it need "
+        },
+        {
+         "t": "code",
+         "v": "get()"
+        },
+        {
+         "t": "text",
+         "v": " for C functions, and a "
+        },
+        {
+         "t": "code",
+         "v": "release()"
+        },
+        {
+         "t": "text",
+         "v": " that gives the handle up, marked "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": " so the caller can't drop it?"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Show that the file is closed when an exception passes through the function that owns it. Write "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " with a custom deleter as the owner, and a factory function "
+        },
+        {
+         "t": "code",
+         "v": "open_file"
+        },
+        {
+         "t": "text",
+         "v": " that returns an open file or throws, never a null handle. Then write a function that opens a file for writing, writes a line with "
+        },
+        {
+         "t": "code",
+         "v": "std::fputs"
+        },
+        {
+         "t": "text",
+         "v": " and throws before returning. Catch the exception in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", open the same file for reading and print what it holds."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Before you run it, answer this: why does printing the contents prove that "
+        },
+        {
+         "t": "code",
+         "v": "fclose"
+        },
+        {
+         "t": "text",
+         "v": " ran?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "fputs"
+        },
+        {
+         "t": "text",
+         "v": " writes into a buffer inside the "
+        },
+        {
+         "t": "code",
+         "v": "FILE"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "fclose"
+        },
+        {
+         "t": "text",
+         "v": " hands that buffer to the operating system, where a second "
+        },
+        {
+         "t": "code",
+         "v": "fopen"
+        },
+        {
+         "t": "text",
+         "v": " of the same file sees it. So if the line can be read back after the exception, "
+        },
+        {
+         "t": "code",
+         "v": "fclose"
+        },
+        {
+         "t": "text",
+         "v": " ran while the stack was unwound. Without it, the line would still sit in the buffer when "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " reads the file, and the read would find nothing. (Getting the data onto the disk itself is "
+        },
+        {
+         "t": "code",
+         "v": "fsync"
+        },
+        {
+         "t": "text",
+         "v": "'s job, a separate step.)"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cstdio>\n#include <filesystem>\n#include <iostream>\n#include <memory>\n#include <stdexcept>\n\nstruct FileCloser {\n  void operator()(std::FILE* f) const noexcept { std::fclose(f); }\n};\nusing FilePtr = std::unique_ptr<std::FILE, FileCloser>;\n\nenum class Mode { read, write };\n\n// Returns an open file or throws, so no caller ever holds a null handle.\n[[nodiscard]] FilePtr open_file(const std::filesystem::path& path, Mode mode) {\n  FilePtr file(std::fopen(path.c_str(), mode == Mode::read ? \"r\" : \"w\"));\n  if (!file) throw std::runtime_error(\"cannot open \" + path.string());\n  return file;\n}\n\nvoid save_then_fail(const std::filesystem::path& path) {\n  const FilePtr out = open_file(path, Mode::write);\n  std::fputs(\"partial result\\n\", out.get());\n  throw std::runtime_error(\"sensor timeout\");  // out is closed while this propagates\n}\n\nint main() {\n  try {\n    save_then_fail(\"result.txt\");\n  } catch (const std::runtime_error& e) {\n    std::cout << \"caught: \" << e.what() << '\\n';\n  }\n  const FilePtr in = open_file(\"result.txt\", Mode::read);\n  std::array<char, 64> line{};\n  if (std::fgets(line.data(), static_cast<int>(line.size()), in.get()) != nullptr) {\n    std::cout << \"file holds: \" << line.data();\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "caught: sensor timeout\nfile holds: partial result"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " with a deleter is often all the RAII class a C handle needs: it is movable, not copyable, and calls the deleter only for a non-null pointer ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/memory/unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "). The deleter is a small struct rather than "
+        },
+        {
+         "t": "code",
+         "v": "&std::fclose"
+        },
+        {
+         "t": "text",
+         "v": ", for two reasons. The standard doesn't let you take the address of most standard library functions, and an empty struct adds nothing to the size of the "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", while a function pointer doubles it: 8 bytes against 16 with GCC 13. Kostur's slides also show the C++20 form, a lambda's type as the deleter, "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<std::FILE, decltype([](std::FILE* f) { std::fclose(f); })>"
+        },
+        {
+         "t": "text",
+         "v": ", which saves writing the struct."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "scope-guard",
+   "title": "Scope guard for one-off cleanup; why destructors are noexcept",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Some cleanup doesn't belong to any resource class. Undoing the first half of a change when the second half fails, removing a temporary file, sending a \"stopped\" message: each is needed in one function only. A "
+        },
+        {
+         "t": "i",
+         "v": "scope guard"
+        },
+        {
+         "t": "text",
+         "v": " is a small object that calls a function you give it when it goes out of scope, which makes it RAII for a one-off action. The Core Guidelines call it "
+        },
+        {
+         "t": "code",
+         "v": "final_action"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "E.19",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-finally"
+        },
+        {
+         "t": "text",
+         "v": "), and the Guidelines Support Library ships one as "
+        },
+        {
+         "t": "code",
+         "v": "gsl::finally"
+        },
+        {
+         "t": "text",
+         "v": ". The standard has none yet: "
+        },
+        {
+         "t": "code",
+         "v": "scope_exit"
+        },
+        {
+         "t": "text",
+         "v": " exists only in the Library Fundamentals technical specification, so projects write their own in about 15 lines, which is the next exercise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every destructor is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " unless it says otherwise, and has been since C++11. If a destructor throws anyway, "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": " ends the program. That also rules out throwing while the stack is unwound for another exception: C++ can't handle two exceptions in flight at once (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.36",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-fail"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "C.37",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-noexcept"
+        },
+        {
+         "t": "text",
+         "v": "). So cleanup that can fail, such as "
+        },
+        {
+         "t": "code",
+         "v": "fclose"
+        },
+        {
+         "t": "text",
+         "v": " failing to flush to a full disk, needs another way to report it. The usual design has an explicit "
+        },
+        {
+         "t": "code",
+         "v": "close()"
+        },
+        {
+         "t": "text",
+         "v": " that returns an error, which callers use when they care, and a destructor that closes quietly as a last resort."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes. Write a class template "
+        },
+        {
+         "t": "code",
+         "v": "ScopeGuard"
+        },
+        {
+         "t": "text",
+         "v": " whose constructor takes any callable and whose destructor calls it, with a "
+        },
+        {
+         "t": "code",
+         "v": "dismiss()"
+        },
+        {
+         "t": "text",
+         "v": " that cancels the call. Use it for the commit-or-roll-back pattern. A function "
+        },
+        {
+         "t": "code",
+         "v": "connect"
+        },
+        {
+         "t": "text",
+         "v": " registers a sensor in a "
+        },
+        {
+         "t": "code",
+         "v": "Registry"
+        },
+        {
+         "t": "text",
+         "v": ", then opens it on a "
+        },
+        {
+         "t": "code",
+         "v": "Bus"
+        },
+        {
+         "t": "text",
+         "v": ". The bus reads the registration while it opens the device, and throws when the sensor doesn't answer. When opening fails, the registration must be undone, so the registry never lists a sensor that isn't connected. Test a sensor that answers and one that doesn't."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <concepts>\n#include <iostream>\n#include <stdexcept>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\ntemplate <std::invocable F>\nclass ScopeGuard {\n public:\n  [[nodiscard]] explicit ScopeGuard(F f) : f_(std::move(f)) {}\n  ~ScopeGuard() {\n    if (active_) f_();\n  }\n  ScopeGuard(const ScopeGuard&) = delete;\n  ScopeGuard& operator=(const ScopeGuard&) = delete;\n  ScopeGuard(ScopeGuard&&) = delete;\n  ScopeGuard& operator=(ScopeGuard&&) = delete;\n  void dismiss() noexcept { active_ = false; }\n\n private:\n  F f_;\n  bool active_ = true;\n};\n\nclass Registry {\n public:\n  void add(std::string name) { names_.push_back(std::move(name)); }\n  void remove_last() noexcept { names_.pop_back(); }  // undoes the latest add, and only that\n  [[nodiscard]] bool contains(std::string_view name) const { return std::ranges::find(names_, name) != names_.end(); }\n  [[nodiscard]] const std::vector<std::string>& names() const { return names_; }\n\n private:\n  std::vector<std::string> names_;\n};\n\n// Stands in for a hardware bus. It reads the sensor's registration while opening it,\n// and throws when the sensor doesn't answer.\nclass Bus {\n public:\n  void open(std::string_view sensor, const Registry& registry) const {\n    if (!registry.contains(sensor)) throw std::logic_error(\"register the sensor first\");\n    if (sensor == \"lidar\") throw std::runtime_error(\"lidar did not answer\");\n  }\n};\n\n// Registers the sensor, then opens it. If opening fails, the registration is undone.\nvoid connect(Registry& registry, const Bus& bus, std::string_view sensor) {\n  registry.add(std::string(sensor));\n  ScopeGuard undo([&] { registry.remove_last(); });\n  bus.open(sensor, registry);\n  undo.dismiss();\n}\n\nint main() {\n  Registry registry;\n  const Bus bus;\n  for (const std::string_view sensor : {\"imu\", \"lidar\", \"camera\"}) {\n    try {\n      connect(registry, bus, sensor);\n    } catch (const std::runtime_error& e) {\n      std::cout << \"failed: \" << e.what() << '\\n';\n    }\n  }\n  std::cout << \"registered:\";\n  for (const std::string& name : registry.names()) std::cout << ' ' << name;\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "failed: lidar did not answer\nregistered: imu camera"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "\"lidar\" was registered before the bus refused it, and the guard removed it on the way out. When opening succeeds, "
+        },
+        {
+         "t": "code",
+         "v": "dismiss()"
+        },
+        {
+         "t": "text",
+         "v": " keeps the registration. This is the "
+        },
+        {
+         "t": "i",
+         "v": "strong exception guarantee"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "connect"
+        },
+        {
+         "t": "text",
+         "v": " either succeeds or leaves the registry as it was. The undo removes exactly the entry "
+        },
+        {
+         "t": "code",
+         "v": "add"
+        },
+        {
+         "t": "text",
+         "v": " appended, not every entry with that name, so a sensor registered earlier survives a failed second attempt. It must not throw, for the same reason a destructor must not, and removing the last element of a vector doesn't. "
+        },
+        {
+         "t": "code",
+         "v": "std::invocable"
+        },
+        {
+         "t": "text",
+         "v": " makes a non-callable argument a clear compile error at the constructor, instead of an error deep inside the destructor."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Use a guard only for what you can't check or stage beforehand. When a change can be validated first, or built aside and swapped in at the end, do that instead: it is simpler, and nothing needs undoing. The registration is different. The bus reads it while opening the device, so it has to exist before "
+        },
+        {
+         "t": "code",
+         "v": "open"
+        },
+        {
+         "t": "text",
+         "v": ", and only "
+        },
+        {
+         "t": "code",
+         "v": "open"
+        },
+        {
+         "t": "text",
+         "v": " can tell whether the sensor answers."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The constructor is "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": " for one mistake: writing the guard without a name. "
+        },
+        {
+         "t": "code",
+         "v": "ScopeGuard([&] { ... });"
+        },
+        {
+         "t": "text",
+         "v": " creates a temporary that is destroyed at the semicolon, so the rollback runs immediately, on the success path too. With "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": " on the constructor and "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": ", GCC 13 refuses it. Putting "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": " on the class instead doesn't catch this form in GCC 13, so it goes on the constructor:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "ignoring return value of",
+       "text": "#include <concepts>\n#include <utility>\n\ntemplate <std::invocable F>\nclass ScopeGuard {\n public:\n  [[nodiscard]] explicit ScopeGuard(F f) : f_(std::move(f)) {}\n  ~ScopeGuard() { f_(); }\n  ScopeGuard(const ScopeGuard&) = delete;\n  ScopeGuard& operator=(const ScopeGuard&) = delete;\n  ScopeGuard(ScopeGuard&&) = delete;\n  ScopeGuard& operator=(ScopeGuard&&) = delete;\n\n private:\n  F f_;\n};\n\nint main() {\n  int restored = 0;\n  ScopeGuard([&] { restored = 1; });  // no name: destroyed at the semicolon\n  return restored;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A destructor with a "
+        },
+        {
+         "t": "code",
+         "v": "throw"
+        },
+        {
+         "t": "text",
+         "v": " in its body doesn't compile with "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " in GCC 13. GCC's "
+        },
+        {
+         "t": "code",
+         "v": "-Wterminate"
+        },
+        {
+         "t": "text",
+         "v": " warning, which is on by default, says the throw will always call "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "will always call",
+       "text": "#include <stdexcept>\n\nstruct Closer {\n  ~Closer() { throw std::runtime_error(\"close failed\"); }\n};\n\nint main() { const Closer c; }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The warning only sees a "
+        },
+        {
+         "t": "code",
+         "v": "throw"
+        },
+        {
+         "t": "text",
+         "v": " written in the destructor itself. When the destructor calls a function that throws, this compiles cleanly under "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra -Werror"
+        },
+        {
+         "t": "text",
+         "v": ", and the "
+        },
+        {
+         "t": "code",
+         "v": "catch"
+        },
+        {
+         "t": "text",
+         "v": " never runs:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "void close_or_throw() { throw std::runtime_error(\"close failed\"); }\n\nstruct Closer {\n  ~Closer() { close_or_throw(); }  // no throw written here, so no warning\n};\n\nint main() {\n  try {\n    const Closer c;\n  } catch (const std::runtime_error& e) {\n    std::cout << \"caught: \" << e.what() << '\\n';  // never reached\n  }\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Built with GCC 13.3 and run, it prints this, and the shell reports exit status 134: 128 plus 6, the number of "
+        },
+        {
+         "t": "code",
+         "v": "SIGABRT"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "terminate called after throwing an instance of 'std::runtime_error'\n  what():  close failed"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An owner that doesn't delete its copy operations closes the same handle twice. The compiler-generated copy duplicates the "
+        },
+        {
+         "t": "code",
+         "v": "FILE*"
+        },
+        {
+         "t": "text",
+         "v": ", both destructors call "
+        },
+        {
+         "t": "code",
+         "v": "fclose"
+        },
+        {
+         "t": "text",
+         "v": " on it, and because "
+        },
+        {
+         "t": "code",
+         "v": "fclose"
+        },
+        {
+         "t": "text",
+         "v": " frees the "
+        },
+        {
+         "t": "code",
+         "v": "FILE"
+        },
+        {
+         "t": "text",
+         "v": ", AddressSanitizer reports the second call as a double free. Holding a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " makes this impossible, because the class then isn't copyable at all:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:attempting double-free",
+       "text": "#include <cstdio>\n\nstruct File {\n  std::FILE* f;\n  explicit File(const char* path) : f(std::fopen(path, \"w\")) {}\n  ~File() {\n    if (f != nullptr) std::fclose(f);\n  }\n};\n\nint main() {\n  const File a(\"notes.txt\");\n  const File b = a;  // copies the pointer; both destructors close it\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A resource acquired before its owner exists isn't protected. In "
+        },
+        {
+         "t": "code",
+         "v": "Handle h(open_handle(), parse(config));"
+        },
+        {
+         "t": "text",
+         "v": " the order in which the two arguments are evaluated is unspecified, and if "
+        },
+        {
+         "t": "code",
+         "v": "parse"
+        },
+        {
+         "t": "text",
+         "v": " throws after "
+        },
+        {
+         "t": "code",
+         "v": "open_handle"
+        },
+        {
+         "t": "text",
+         "v": " has run, nothing owns the handle yet and it leaks. Acquire each resource in a statement of its own and hand it to its owner at once (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "R.12",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-immediate-alloc"
+        },
+        {
+         "t": "text",
+         "v": "). The same reasoning made "
+        },
+        {
+         "t": "code",
+         "v": "std::make_unique"
+        },
+        {
+         "t": "text",
+         "v": " the rule for memory: before C++17, "
+        },
+        {
+         "t": "code",
+         "v": "f(std::unique_ptr<T>(new T), g())"
+        },
+        {
+         "t": "text",
+         "v": " could run "
+        },
+        {
+         "t": "code",
+         "v": "new T"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "g"
+        },
+        {
+         "t": "text",
+         "v": ", and leak the "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " when "
+        },
+        {
+         "t": "code",
+         "v": "g"
+        },
+        {
+         "t": "text",
+         "v": " threw."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Explain what RAII is, on which exit paths a destructor runs, and the four situations where it doesn't. Say when a class writes the five special members itself and when it holds a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " instead. Give the reason a destructor must not throw and how to report a failed close instead, and what a scope guard's "
+        },
+        {
+         "t": "code",
+         "v": "dismiss"
+        },
+        {
+         "t": "text",
+         "v": " is for."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "On which ways out of a scope do destructors run, and which four situations skip them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the rule of zero, and when do you write the five special members yourself?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why must a handle-owning class not be copyable, and why should its moves be "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does move assignment have to do with the handle the target already owns?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does reading back a file after an exception prove that "
+     },
+     {
+      "t": "code",
+      "v": "fclose"
+     },
+     {
+      "t": "text",
+      "v": " ran?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a "
+     },
+     {
+      "t": "code",
+      "v": "ScopeGuard"
+     },
+     {
+      "t": "text",
+      "v": " with "
+     },
+     {
+      "t": "code",
+      "v": "dismiss"
+     },
+     {
+      "t": "text",
+      "v": " that undoes a registration when the step after it throws."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Andre Kostur, Back to Basics: RAII in C++, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/Cppcon-2022-Back-to-Basics-RAII.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=Rfu06XAhx90"
+     },
+     {
+      "t": "text",
+      "v": ". The lock example, the "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " file owner and the design questions."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: RAII and the Rule of Zero, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_raii_and_the_rule_of_zero/back_to_basics_raii_and_the_rule_of_zero__arthur_odwyer__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=7Qgd9B1KuMQ"
+     },
+     {
+      "t": "text",
+      "v": ". Resource classes stay small and do only that; everything else follows the rule of zero."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: C++ Smart Pointers, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/Olsen-Smart-Pointers-CppCon22.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=YokY6HzLkXs"
+     },
+     {
+      "t": "text",
+      "v": ". Custom deleters."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "R.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-raii"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.12",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-immediate-alloc"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-zero"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.36",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-fail"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.37",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-noexcept"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.66",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-noexcept"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "E.19",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-finally"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "CP.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-raii"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bjarne Stroustrup, A Tour of C++, 3rd edition, chapters 5 and 6, on classes and on the operations every class needs: "
+     },
+     {
+      "t": "a",
+      "v": "contents",
+      "href": "https://www.stroustrup.com/tour3toc.pdf"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jason Turner, C++ Weekly episode 482 on wrapping C APIs: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=RtxZaKUtU-c"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "RAII",
+      "href": "https://en.cppreference.com/cpp/language/raii"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::unique_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

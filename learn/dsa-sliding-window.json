@@ -1,0 +1,2050 @@
+{
+ "id": "dsa-sliding-window",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "max_window_sum(nums, k)"
+     },
+     {
+      "t": "text",
+      "v": ", which returns the largest sum of "
+     },
+     {
+      "t": "code",
+      "v": "k"
+     },
+     {
+      "t": "text",
+      "v": " consecutive elements, or no value when "
+     },
+     {
+      "t": "code",
+      "v": "k"
+     },
+     {
+      "t": "text",
+      "v": " is not between 1 and the number of elements. "
+     },
+     {
+      "t": "code",
+      "v": "{2, 1, 5, 1, 3, 2}"
+     },
+     {
+      "t": "text",
+      "v": " with k = 3 gives 9, "
+     },
+     {
+      "t": "code",
+      "v": "{-3, -1, -2}"
+     },
+     {
+      "t": "text",
+      "v": " with k = 2 gives -3, and "
+     },
+     {
+      "t": "code",
+      "v": "{1, 2}"
+     },
+     {
+      "t": "text",
+      "v": " with k = 3 gives no value. Take the numbers as "
+     },
+     {
+      "t": "code",
+      "v": "std::span<const int>"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "k"
+     },
+     {
+      "t": "text",
+      "v": " as "
+     },
+     {
+      "t": "code",
+      "v": "std::ptrdiff_t"
+     },
+     {
+      "t": "text",
+      "v": ", return "
+     },
+     {
+      "t": "code",
+      "v": "std::optional<std::int64_t>"
+     },
+     {
+      "t": "text",
+      "v": ", and use O(n) time and O(1) extra space. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <iostream>\n#include <numeric>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\n[[nodiscard]] std::optional<std::int64_t> max_window_sum(std::span<const int> nums, std::ptrdiff_t k) {\n  if (k < 1 || k > std::ssize(nums)) return std::nullopt;\n  std::int64_t window = std::accumulate(nums.begin(), nums.begin() + k, std::int64_t{0});  // nums[0..k-1]\n  std::int64_t best = window;\n  for (std::ptrdiff_t right = k; right < std::ssize(nums); ++right) {\n    window += nums[right];      // enters\n    window -= nums[right - k];  // leaves\n    best = std::max(best, window);\n  }\n  return best;\n}\n\n[[nodiscard]] std::string show(const std::optional<std::int64_t>& sum) {\n  return sum ? std::to_string(*sum) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> a{2, 1, 5, 1, 3, 2};\n  const std::vector<int> b{-3, -1, -2};\n  const std::vector<int> c{1, 2};\n  std::cout << show(max_window_sum(a, 3)) << ' ' << show(max_window_sum(b, 2)) << ' ' << show(max_window_sum(c, 3))\n            << '\\n';\n}"
+   },
+   {
+    "t": "output",
+    "text": "9 -3 no value"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Sum the first window once. After that, each step adds the element that enters on the right and subtracts the one that leaves on the left, so the whole run is O(n) time and O(1) extra space."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Three details make it correct beyond the examples. "
+     },
+     {
+      "t": "code",
+      "v": "best"
+     },
+     {
+      "t": "text",
+      "v": " starts at the first window's sum, not at 0: every window of "
+     },
+     {
+      "t": "code",
+      "v": "{-3, -1, -2}"
+     },
+     {
+      "t": "text",
+      "v": " has a negative sum, and a "
+     },
+     {
+      "t": "code",
+      "v": "best"
+     },
+     {
+      "t": "text",
+      "v": " of 0 would report a window that doesn't exist. The sums are 64-bit throughout. "
+     },
+     {
+      "t": "code",
+      "v": "std::accumulate"
+     },
+     {
+      "t": "text",
+      "v": " adds in the type of its initial value, so the "
+     },
+     {
+      "t": "code",
+      "v": "std::int64_t{0}"
+     },
+     {
+      "t": "text",
+      "v": " matters, and the update is two statements because "
+     },
+     {
+      "t": "code",
+      "v": "nums[right] - nums[right - k]"
+     },
+     {
+      "t": "text",
+      "v": " would be an "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " subtraction that can overflow before it reaches "
+     },
+     {
+      "t": "code",
+      "v": "window"
+     },
+     {
+      "t": "text",
+      "v": ". And a "
+     },
+     {
+      "t": "code",
+      "v": "k"
+     },
+     {
+      "t": "text",
+      "v": " outside 1 to n gives no value through "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": ", instead of a made-up sum."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with the O(n) sliding sum, a "
+     },
+     {
+      "t": "code",
+      "v": "best"
+     },
+     {
+      "t": "text",
+      "v": " that starts from a real window, and no value for a bad "
+     },
+     {
+      "t": "code",
+      "v": "k"
+     },
+     {
+      "t": "text",
+      "v": ". Recomputing every window, which is O(n·k), or starting "
+     },
+     {
+      "t": "code",
+      "v": "best"
+     },
+     {
+      "t": "text",
+      "v": " at 0, is a partial pass. Anything less is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Sliding window is a technique for a running range over a sequence, kept as two indices, left and right, that only move forward, plus a running summary of what sits between them: a sum, a count of distinct values, a table of occurrences. Instead of recomputing that summary for every range considered, you update it as one element enters at the right and, when the range needs to shrink, another leaves at the left."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The shape of problem that signals it is a question about a contiguous run, a substring or a subarray rather than any subset, asking for the longest, the shortest, the maximum or a count, where the property you watch stays true as the run gets shorter. \"Longest substring with no repeated character\", \"shortest subarray whose sum reaches a target\" and \"longest run of ones after k flips\" are this shape. A question about a subsequence, where elements need not sit next to each other, is not: no window applies to it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is the window invariant, the property the range must hold at the moment you read off the answer. For a longest window, the new element goes in first, then you shrink from the left in a loop, not an "
+    },
+    {
+     "t": "code",
+     "v": "if"
+    },
+    {
+     "t": "text",
+     "v": ", until the invariant holds again, and only then compare against the best answer. For a shortest window, the order flips: while the invariant already holds, you record the length and try to do without the leftmost element. Because left only ever moves forward and never further than right, the whole pass across n elements does O(n) work, even with a loop inside the loop."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake that shows up under pressure is shrinking with an "
+    },
+    {
+     "t": "code",
+     "v": "if"
+    },
+    {
+     "t": "text",
+     "v": " instead of a "
+    },
+    {
+     "t": "code",
+     "v": "while"
+    },
+    {
+     "t": "text",
+     "v": ", which removes one element and stops even when the range is still invalid, so the answer quietly comes from a broken window. The other is a sum-based invariant on data that can be negative: removing an element from the left can then raise the sum, so the shrink loop stops in the wrong place and the answer is wrong with no error at all."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: find the largest sum of any k consecutive readings, or, in the harder variable form, the longest run satisfying some running condition, both solved in one pass with nothing more than a running total or a small table beside the two indices."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Fixed and variable windows; the window invariant",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program finds the best sum of 100 consecutive readings out of 1000 twice: once by summing every window from scratch, and once by sliding. It counts how many times each version adds or subtracts an element:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <vector>\n\nstruct Tally {\n  std::int64_t best = 0;\n  std::int64_t additions = 0;  // element additions and subtractions\n};\n\n[[nodiscard]] Tally recompute(std::span<const int> nums, std::ptrdiff_t k) {\n  Tally t;\n  for (std::ptrdiff_t left = 0; left + k <= std::ssize(nums); ++left) {\n    std::int64_t sum = 0;\n    for (std::ptrdiff_t i = left; i < left + k; ++i) {\n      sum += nums[i];\n      ++t.additions;\n    }\n    t.best = left == 0 ? sum : std::max(t.best, sum);\n  }\n  return t;\n}\n\n[[nodiscard]] Tally slide(std::span<const int> nums, std::ptrdiff_t k) {\n  Tally t;\n  std::int64_t window = 0;\n  for (std::ptrdiff_t i = 0; i < k; ++i) {\n    window += nums[i];\n    ++t.additions;\n  }\n  t.best = window;\n  for (std::ptrdiff_t right = k; right < std::ssize(nums); ++right) {\n    window += nums[right];\n    window -= nums[right - k];\n    t.additions += 2;\n    t.best = std::max(t.best, window);\n  }\n  return t;\n}\n\nint main() {\n  std::vector<int> readings(1000);\n  for (std::ptrdiff_t i = 0; i < std::ssize(readings); ++i) readings[i] = static_cast<int>(i * 37 % 101) - 50;\n  for (const Tally& t : {recompute(readings, 100), slide(readings, 100)})\n    std::cout << std::format(\"best {}, {} additions\\n\", t.best, t.additions);\n}"
+      },
+      {
+       "t": "output",
+       "text": "best 50, 90100 additions\nbest 50, 1900 additions"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both find the same best window. Recomputing costs k additions for each of the n − k + 1 windows, here 901 × 100 = 90,100, which is O(n·k). Sliding costs k for the first window and two per step after it, here 100 + 2 × 900 = 1,900, which is O(n) whatever k is."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "window"
+        },
+        {
+         "t": "text",
+         "v": " is a contiguous run of the input. In this topic's code it is "
+        },
+        {
+         "t": "code",
+         "v": "nums[left..right]"
+        },
+        {
+         "t": "text",
+         "v": ", with both ends included, so its length is "
+        },
+        {
+         "t": "code",
+         "v": "right - left + 1"
+        },
+        {
+         "t": "text",
+         "v": ". The technique keeps a summary of the window, such as a sum, a table of counts or a number of zeros, and updates it as elements enter at the right and leave at the left, instead of recomputing it. In a "
+        },
+        {
+         "t": "i",
+         "v": "fixed"
+        },
+        {
+         "t": "text",
+         "v": " window both ends move together, one step at a time, as in the program above."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In a "
+        },
+        {
+         "t": "i",
+         "v": "variable"
+        },
+        {
+         "t": "text",
+         "v": " window the length is part of the answer: the longest run with at most two distinct values, the shortest subarray whose sum reaches a target. Now "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " moves forward one element per step, and "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " moves only when the window needs it. There are two shapes. For a longest window, you let the new element in, then remove elements from the left until the window is acceptable again, and then read the answer:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "std::ptrdiff_t left = 0;\nfor (std::ptrdiff_t right = 0; right < std::ssize(items); ++right) {\n  add(items[right]);                            // the new element may break the invariant\n  while (!acceptable()) remove(items[left++]);  // shrink until it holds again\n  best = std::max(best, right - left + 1);      // items[left..right] is acceptable here\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For a shortest window, the order inside the loop turns round. While the window meets the condition, you record it and then try to do without its leftmost element:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "std::ptrdiff_t left = 0;\nfor (std::ptrdiff_t right = 0; right < std::ssize(items); ++right) {\n  add(items[right]);\n  while (left <= right && meets_condition()) {\n    record(right - left + 1);  // record first: the shrink may break the condition\n    remove(items[left++]);\n  }\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "i",
+         "v": "window invariant"
+        },
+        {
+         "t": "text",
+         "v": " is the property the window has at the point where you read the answer. For \"longest run with at most two distinct values\" it is \"the window holds at most two distinct values\". The entering element is the only thing that can break it, and the inner loop exists to restore it. When you explain a solution, state the invariant first: the code, the loop condition and the place where the answer is read all follow from it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Shrinking can restore the invariant only when the property is monotone. A window with at most two distinct values still has at most two after you remove an element, and a window with three still has three after you add one. A sum behaves like that only when no element is negative. With a negative element, removing an element from the left can raise the sum, and the loop stops in the wrong place. The last section of this topic shows the counterexample, and the fix comes with prefix sums."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The nested loop is O(n) in total, not O(n²). "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " takes n values. "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " only moves forward and never passes "
+        },
+        {
+         "t": "code",
+         "v": "right + 1"
+        },
+        {
+         "t": "text",
+         "v": ", so the body of the inner loop runs at most n times over the whole run, not n times per step. Each element enters once and leaves at most once. It is the same argument as for amortised vector growth in the complexity topic: one step can cost O(n), but all the steps together cost O(n). The extra space is whatever the summary needs: O(1) for a sum, and O(size of the alphabet) or O(k) for a table of counts."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "To recognise a sliding-window problem, look for a contiguous range (a substring, a subarray, consecutive readings) together with longest, shortest, maximum or count, and a condition that stays true when the range shrinks. A "
+        },
+        {
+         "t": "i",
+         "v": "subsequence"
+        },
+        {
+         "t": "text",
+         "v": " doesn't need adjacent elements, and no window applies to it. It is the fast-and-slow shape from the two-pointer topic: both ends move forward, and the invariant decides when the back end moves."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot logs, for each reading, the id of the sensor that produced it. Find the longest run of consecutive readings that comes from at most k different sensors. For the ids "
+        },
+        {
+         "t": "code",
+         "v": "{3, 1, 3, 2, 2, 3, 1}"
+        },
+        {
+         "t": "text",
+         "v": " and k = 2 the answer is 4, the run "
+        },
+        {
+         "t": "code",
+         "v": "{3, 2, 2, 3}"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The invariant is \"the window holds at most k distinct ids\". The summary is a hash map from id to how often it occurs in the window:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <unordered_map>\n#include <vector>\n\n[[nodiscard]] std::ptrdiff_t longest_with_at_most(std::span<const int> ids, std::ptrdiff_t k) {\n  if (k < 1) return 0;\n  std::unordered_map<int, std::ptrdiff_t> in_window;  // id -> occurrences in ids[left..right]\n  std::ptrdiff_t best = 0;\n  std::ptrdiff_t left = 0;\n  for (std::ptrdiff_t right = 0; right < std::ssize(ids); ++right) {\n    ++in_window[ids[right]];\n    while (std::ssize(in_window) > k) {\n      const auto it = in_window.find(ids[left]);\n      if (--it->second == 0) in_window.erase(it);  // keep size() equal to the number of distinct ids\n      ++left;\n    }\n    best = std::max(best, right - left + 1);\n  }\n  return best;\n}\n\nint main() {\n  const std::vector<int> ids{3, 1, 3, 2, 2, 3, 1};\n  for (const std::ptrdiff_t k : {1, 2, 3}) std::cout << std::format(\"k = {}: {}\\n\", k, longest_with_at_most(ids, k));\n  std::cout << std::format(\"empty: {}\\n\", longest_with_at_most(std::vector<int>{}, 2));\n}"
+      },
+      {
+       "t": "output",
+       "text": "k = 1: 2\nk = 2: 4\nk = 3: 7\nempty: 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Trace it for k = 2:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "right"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "enters"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "leaves"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "window"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "counts"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "best"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "{3}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3:1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "{3, 1}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3:1, 1:1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "{3, 1, 3}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3:2, 1:1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3, 1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "{3, 2}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3:1, 2:1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "{3, 2, 2}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3:1, 2:2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "5"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "{3, 2, 2, 3}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3:2, 2:2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "6"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3, 2, 2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "{3, 1}"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3:1, 1:1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "At right = 3 the window has to drop two elements, because removing the first 3 leaves another 3 inside and the window still holds three ids. The "
+        },
+        {
+         "t": "code",
+         "v": "while"
+        },
+        {
+         "t": "text",
+         "v": " keeps removing until it holds two. At right = 6 it drops three. Those long steps are paid for by the steps where nothing leaves: over the whole run "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " moves 5 times, fewer than the 7 elements. The answer is read after the "
+        },
+        {
+         "t": "code",
+         "v": "while"
+        },
+        {
+         "t": "text",
+         "v": ", where the invariant holds again."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The map erases an id when its count reaches 0, so "
+        },
+        {
+         "t": "code",
+         "v": "in_window.size()"
+        },
+        {
+         "t": "text",
+         "v": " is the number of distinct ids in the window. Without the erase, ids with a count of 0 would stay in the map and the size would count them. The function returns 0 for k < 1, because only an empty run has fewer than one distinct id; without that check, a negative "
+        },
+        {
+         "t": "code",
+         "v": "k"
+        },
+        {
+         "t": "text",
+         "v": " would let the inner loop run past "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": ". It is O(n) time on average, with the hash map's usual caveat, and O(k) space, because the map never holds more than k + 1 ids."
+        }
+       ]
+      }
+     ],
+     "faded": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each segment of a planned route costs some energy, and no cost is negative. Find the longest run of consecutive segments whose total cost is at most "
+        },
+        {
+         "t": "code",
+         "v": "budget"
+        },
+        {
+         "t": "text",
+         "v": ", which is also not negative. For the costs "
+        },
+        {
+         "t": "code",
+         "v": "{3, 1, 2, 1, 4, 1}"
+        },
+        {
+         "t": "text",
+         "v": " and a budget of 5 the answer is 3, the run "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 1}"
+        },
+        {
+         "t": "text",
+         "v": ". Fill in the two missing lines, then compare with the full version."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "[[nodiscard]] std::ptrdiff_t longest_within(std::span<const int> costs, std::int64_t budget) {\n  std::int64_t window = 0;  // total cost of costs[left..right]\n  std::ptrdiff_t best = 0;\n  std::ptrdiff_t left = 0;\n  for (std::ptrdiff_t right = 0; right < std::ssize(costs); ++right) {\n    // 1. let costs[right] enter the window\n    // 2. shrink until the window is within budget again\n    best = std::max(best, right - left + 1);\n  }\n  return best;\n}"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <vector>\n\n[[nodiscard]] std::ptrdiff_t longest_within(std::span<const int> costs, std::int64_t budget) {\n  std::int64_t window = 0;\n  std::ptrdiff_t best = 0;\n  std::ptrdiff_t left = 0;\n  for (std::ptrdiff_t right = 0; right < std::ssize(costs); ++right) {\n    window += costs[right];\n    while (window > budget) {\n      window -= costs[left];\n      ++left;\n    }\n    best = std::max(best, right - left + 1);\n  }\n  return best;\n}\n\nint main() {\n  const std::vector<int> costs{3, 1, 2, 1, 4, 1};\n  for (const std::int64_t budget : {5, 0, 100}) std::cout << std::format(\"budget {}: {}\\n\", budget, longest_within(costs, budget));\n}"
+      },
+      {
+       "t": "output",
+       "text": "budget 5: 3\nbudget 0: 0\nbudget 100: 6"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With a budget of 0, every segment leaves again right after it enters, and the answer is 0. The loop never runs past "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " because an empty window costs 0, which is within any budget that isn't negative. That is why the statement says the budget isn't negative."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Longest substring without repeats; shortest subarray with sum at least k; longest ones with k flips",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "longest_unique(s)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the length of the longest substring of "
+        },
+        {
+         "t": "code",
+         "v": "s"
+        },
+        {
+         "t": "text",
+         "v": " in which no character repeats. "
+        },
+        {
+         "t": "code",
+         "v": "\"abcabcbb\""
+        },
+        {
+         "t": "text",
+         "v": " gives 3, "
+        },
+        {
+         "t": "code",
+         "v": "\"bbbbb\""
+        },
+        {
+         "t": "text",
+         "v": " gives 1, "
+        },
+        {
+         "t": "code",
+         "v": "\"pwwkew\""
+        },
+        {
+         "t": "text",
+         "v": " gives 3 ("
+        },
+        {
+         "t": "code",
+         "v": "\"wke\""
+        },
+        {
+         "t": "text",
+         "v": "), "
+        },
+        {
+         "t": "code",
+         "v": "\"abba\""
+        },
+        {
+         "t": "text",
+         "v": " gives 2, and "
+        },
+        {
+         "t": "code",
+         "v": "\"\""
+        },
+        {
+         "t": "text",
+         "v": " gives 0. Any byte can appear in "
+        },
+        {
+         "t": "code",
+         "v": "s"
+        },
+        {
+         "t": "text",
+         "v": ". Take "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", state the window invariant, the time and the space, and include "
+        },
+        {
+         "t": "code",
+         "v": "\"abba\""
+        },
+        {
+         "t": "text",
+         "v": " in your tests: it catches two common mistakes."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The invariant is \"no byte occurs twice in "
+        },
+        {
+         "t": "code",
+         "v": "s[left..right]"
+        },
+        {
+         "t": "text",
+         "v": "\". Only the byte that entered last can break it, so the inner loop checks that byte alone. Here is the counting version, and a second version that jumps "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " straight past the earlier copy:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <string_view>\n\n[[nodiscard]] std::ptrdiff_t longest_unique(std::string_view s) {\n  std::array<std::ptrdiff_t, 256> counts{};  // occurrences of each byte in s[left..right]\n  const auto slot = [](char c) { return static_cast<unsigned char>(c); };  // char may be negative\n  std::ptrdiff_t best = 0;\n  std::ptrdiff_t left = 0;\n  for (std::ptrdiff_t right = 0; right < std::ssize(s); ++right) {\n    const unsigned char entering = slot(s[right]);\n    ++counts[entering];\n    while (counts[entering] > 1) {\n      --counts[slot(s[left])];\n      ++left;\n    }\n    best = std::max(best, right - left + 1);\n  }\n  return best;\n}\n\n[[nodiscard]] std::ptrdiff_t longest_unique_jump(std::string_view s) {\n  std::array<std::ptrdiff_t, 256> after_last{};  // one past the last index of each byte; 0 if not seen\n  std::ptrdiff_t best = 0;\n  std::ptrdiff_t left = 0;\n  for (std::ptrdiff_t right = 0; right < std::ssize(s); ++right) {\n    const unsigned char entering = static_cast<unsigned char>(s[right]);\n    left = std::max(left, after_last[entering]);  // never move left backwards\n    after_last[entering] = right + 1;\n    best = std::max(best, right - left + 1);\n  }\n  return best;\n}\n\nint main() {\n  for (const std::string_view s : {\"abcabcbb\", \"bbbbb\", \"pwwkew\", \"abba\", \"\"})\n    std::cout << std::format(\"\\\"{}\\\": {} {}\\n\", s, longest_unique(s), longest_unique_jump(s));\n}"
+      },
+      {
+       "t": "output",
+       "text": "\"abcabcbb\": 3 3\n\"bbbbb\": 1 1\n\"pwwkew\": 3 3\n\"abba\": 2 2\n\"\": 0 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both are O(n) time and O(1) extra space: 256 counters, whatever the length of "
+        },
+        {
+         "t": "code",
+         "v": "s"
+        },
+        {
+         "t": "text",
+         "v": ". With a known small alphabet, such as lowercase letters, the table shrinks to 26."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "\"abba\""
+        },
+        {
+         "t": "text",
+         "v": " catches the two mistakes. The counting version fails on it if the "
+        },
+        {
+         "t": "code",
+         "v": "while"
+        },
+        {
+         "t": "text",
+         "v": " is an "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": ": at the second "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " it removes only the first "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": ", the window "
+        },
+        {
+         "t": "code",
+         "v": "\"bb\""
+        },
+        {
+         "t": "text",
+         "v": " still holds a repeat, and the final "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " then makes "
+        },
+        {
+         "t": "code",
+         "v": "\"bba\""
+        },
+        {
+         "t": "text",
+         "v": " look valid, so it answers 3. The jump version fails on it without the "
+        },
+        {
+         "t": "code",
+         "v": "std::max"
+        },
+        {
+         "t": "text",
+         "v": ": at the final "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": ", the earlier "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " is at index 0 but "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " is already 2, and moving "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " back to 1 would let the first "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " back in, next to the second. Storing \"one past the last index\" also means a byte that hasn't appeared has 0 in the table, which is a real position and not a sentinel, so no special case is needed."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. The numbers in "
+        },
+        {
+         "t": "code",
+         "v": "nums"
+        },
+        {
+         "t": "text",
+         "v": " are not negative. Write "
+        },
+        {
+         "t": "code",
+         "v": "shortest_at_least(nums, target)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the length of the shortest contiguous subarray whose sum is at least "
+        },
+        {
+         "t": "code",
+         "v": "target"
+        },
+        {
+         "t": "text",
+         "v": ", or no value when there is none. "
+        },
+        {
+         "t": "code",
+         "v": "{2, 3, 1, 2, 4, 3}"
+        },
+        {
+         "t": "text",
+         "v": " with target 7 gives 2 ("
+        },
+        {
+         "t": "code",
+         "v": "{4, 3}"
+        },
+        {
+         "t": "text",
+         "v": "), "
+        },
+        {
+         "t": "code",
+         "v": "{1, 4, 4}"
+        },
+        {
+         "t": "text",
+         "v": " with target 4 gives 1, and "
+        },
+        {
+         "t": "code",
+         "v": "{1, 1, 1}"
+        },
+        {
+         "t": "text",
+         "v": " with target 11 gives no value. Take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const int>"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " target, and return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::ptrdiff_t>"
+        },
+        {
+         "t": "text",
+         "v": ". Then answer: what should target 0 give, and what does your code do with it?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the shortest shape. Every window that meets the target is recorded before it shrinks:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\n[[nodiscard]] std::optional<std::ptrdiff_t> shortest_at_least(std::span<const int> nums, std::int64_t target) {\n  std::optional<std::ptrdiff_t> best;\n  std::int64_t window = 0;  // sum of nums[left..right]\n  std::ptrdiff_t left = 0;\n  for (std::ptrdiff_t right = 0; right < std::ssize(nums); ++right) {\n    window += nums[right];\n    while (left <= right && window >= target) {\n      const std::ptrdiff_t length = right - left + 1;\n      if (!best || length < *best) best = length;\n      window -= nums[left];\n      ++left;\n    }\n  }\n  return best;\n}\n\n[[nodiscard]] std::string show(const std::optional<std::ptrdiff_t>& length) {\n  return length ? std::to_string(*length) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> a{2, 3, 1, 2, 4, 3};\n  const std::vector<int> b{1, 4, 4};\n  const std::vector<int> c{1, 1, 1};\n  const std::vector<int> none;\n  std::cout << std::format(\"{} {} {}\\n\", show(shortest_at_least(a, 7)), show(shortest_at_least(b, 4)),\n                           show(shortest_at_least(c, 11)));\n  std::cout << std::format(\"target 0: {}, empty input: {}\\n\", show(shortest_at_least(a, 0)),\n                           show(shortest_at_least(none, 1)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "2 1 no value\ntarget 0: 1, empty input: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time and O(1) extra space. Why it finds the shortest: each start position "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " is removed at most once, and only at the first "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " where its window reaches the target. Any later "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " would make a longer window from the same start, so that first moment is the shortest window starting there, and the code records it before "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " moves on. After the inner loop, the window's sum is below the target, and because no number is negative, every shorter window ending at "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " is below it too."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Target 0, or any target at or below 0, should give 1 for a non-empty input, because a single element that isn't negative already reaches it. The "
+        },
+        {
+         "t": "code",
+         "v": "left <= right"
+        },
+        {
+         "t": "text",
+         "v": " condition is what makes the code give 1. Without it, the loop would go on to \"record\" the empty window as length 0 and then read "
+        },
+        {
+         "t": "code",
+         "v": "nums[left]"
+        },
+        {
+         "t": "text",
+         "v": " one past "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": ", which is past the end of the input on the last step."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. "
+        },
+        {
+         "t": "code",
+         "v": "bits"
+        },
+        {
+         "t": "text",
+         "v": " holds only 0s and 1s, and you may flip at most "
+        },
+        {
+         "t": "code",
+         "v": "k"
+        },
+        {
+         "t": "text",
+         "v": " zeros into ones. Write "
+        },
+        {
+         "t": "code",
+         "v": "longest_ones(bits, k)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the length of the longest run of consecutive ones you can make. For "
+        },
+        {
+         "t": "code",
+         "v": "{1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1}"
+        },
+        {
+         "t": "text",
+         "v": " the answer is 3 with k = 0, 5 with k = 1, 7 with k = 2, and 11 with k = 5. State the window invariant in one sentence, and test your function against an O(n²) version that tries every run."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The invariant is \"the window holds at most k zeros\": any window like that becomes all ones with at most k flips, and the longest such window is the answer. It is the longest shape, with a count of zeros as the summary:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <vector>\n\n[[nodiscard]] std::ptrdiff_t longest_ones(std::span<const int> bits, std::ptrdiff_t k) {\n  if (k < 0) return 0;\n  std::ptrdiff_t zeros = 0;  // zeros in bits[left..right]\n  std::ptrdiff_t best = 0;\n  std::ptrdiff_t left = 0;\n  for (std::ptrdiff_t right = 0; right < std::ssize(bits); ++right) {\n    if (bits[right] == 0) ++zeros;\n    while (zeros > k) {\n      if (bits[left] == 0) --zeros;\n      ++left;\n    }\n    best = std::max(best, right - left + 1);\n  }\n  return best;\n}\n\n// Tries every run bits[first..last]: O(n²), for testing only.\n[[nodiscard]] std::ptrdiff_t longest_ones_slow(std::span<const int> bits, std::ptrdiff_t k) {\n  std::ptrdiff_t best = 0;\n  for (std::ptrdiff_t first = 0; first < std::ssize(bits); ++first) {\n    std::ptrdiff_t zeros = 0;\n    for (std::ptrdiff_t last = first; last < std::ssize(bits); ++last) {\n      if (bits[last] == 0) ++zeros;\n      if (zeros <= k) best = std::max(best, last - first + 1);\n    }\n  }\n  return best;\n}\n\nint main() {\n  const std::vector<int> bits{1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1};\n  for (const std::ptrdiff_t k : {0, 1, 2, 5})\n    std::cout << std::format(\"k = {}: {} (slow {})\\n\", k, longest_ones(bits, k), longest_ones_slow(bits, k));\n  const std::vector<int> zeros_only{0, 0, 0};\n  std::cout << std::format(\"zeros only, k = 0: {}\\n\", longest_ones(zeros_only, 0));\n}"
+      },
+      {
+       "t": "output",
+       "text": "k = 0: 3 (slow 3)\nk = 1: 5 (slow 5)\nk = 2: 7 (slow 7)\nk = 5: 11 (slow 11)\nzeros only, k = 0: 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time and O(1) extra space. The slow version is the test oracle: it is too simple to be wrong in the same way, and comparing the two on more inputs, such as every 0/1 vector of length 10, would make the test stronger. With k = 0 the function finds the longest run of ones that is already there. With a "
+        },
+        {
+         "t": "code",
+         "v": "k"
+        },
+        {
+         "t": "text",
+         "v": " at or above the number of zeros, the window never shrinks and the answer is the whole input."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Shrinking too early or too late",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The window must be acceptable at the moment you read the answer. The commonest bug shrinks with "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": " instead of "
+        },
+        {
+         "t": "code",
+         "v": "while"
+        },
+        {
+         "t": "text",
+         "v": ", which removes at most one element per step and can leave the window broken. This version of "
+        },
+        {
+         "t": "code",
+         "v": "longest_unique"
+        },
+        {
+         "t": "text",
+         "v": " compiles, passes "
+        },
+        {
+         "t": "code",
+         "v": "\"abcabcbb\""
+        },
+        {
+         "t": "text",
+         "v": ", and answers 3 for "
+        },
+        {
+         "t": "code",
+         "v": "\"abba\""
+        },
+        {
+         "t": "text",
+         "v": ", where the right answer is 2:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <string_view>\n\n[[nodiscard]] std::ptrdiff_t longest_unique_with_if(std::string_view s) {\n  std::array<std::ptrdiff_t, 256> counts{};\n  const auto slot = [](char c) { return static_cast<unsigned char>(c); };\n  std::ptrdiff_t best = 0;\n  std::ptrdiff_t left = 0;\n  for (std::ptrdiff_t right = 0; right < std::ssize(s); ++right) {\n    const unsigned char entering = slot(s[right]);\n    ++counts[entering];\n    if (counts[entering] > 1) {  // wrong: one removal may not be enough\n      --counts[slot(s[left])];\n      ++left;\n    }\n    best = std::max(best, right - left + 1);\n  }\n  return best;\n}\n\nint main() {\n  for (const std::string_view s : {\"abcabcbb\", \"abba\"}) std::cout << std::format(\"\\\"{}\\\": {}\\n\", s, longest_unique_with_if(s));\n}"
+      },
+      {
+       "t": "output",
+       "text": "\"abcabcbb\": 3\n\"abba\": 3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "At the second "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " the window is "
+        },
+        {
+         "t": "code",
+         "v": "\"abb\""
+        },
+        {
+         "t": "text",
+         "v": ". The "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": " removes the "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": ", and the window "
+        },
+        {
+         "t": "code",
+         "v": "\"bb\""
+        },
+        {
+         "t": "text",
+         "v": " still repeats a byte, so the loop stopped shrinking too soon: it should have gone on. From there the window is broken, and when the final "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " enters, its own count is 1, so nothing is removed and "
+        },
+        {
+         "t": "code",
+         "v": "\"bba\""
+        },
+        {
+         "t": "text",
+         "v": " is counted. The fix is the "
+        },
+        {
+         "t": "code",
+         "v": "while"
+        },
+        {
+         "t": "text",
+         "v": ", which keeps removing until the invariant holds."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The shortest shape has the opposite risk: removing before recording, so the record comes too late. If you remove the leftmost element first and record afterwards, the window you record may no longer meet the target, and the answer comes out too short. Record inside the loop, before the removal, as Exercise 2 does. The same exercise shows the other edge: without "
+        },
+        {
+         "t": "code",
+         "v": "left <= right"
+        },
+        {
+         "t": "text",
+         "v": ", a target of 0 or less shrinks past the empty window."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third failure isn't in the code but in the input. A sum-based window assumes no negative numbers, and with them the loop stops shrinking too soon. Run Exercise 2's function on "
+        },
+        {
+         "t": "code",
+         "v": "{3, -2, 4}"
+        },
+        {
+         "t": "text",
+         "v": " with target 4 and compare it with trying every subarray:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\n[[nodiscard]] std::optional<std::ptrdiff_t> shortest_at_least(std::span<const int> nums, std::int64_t target) {\n  std::optional<std::ptrdiff_t> best;\n  std::int64_t window = 0;\n  std::ptrdiff_t left = 0;\n  for (std::ptrdiff_t right = 0; right < std::ssize(nums); ++right) {\n    window += nums[right];\n    while (left <= right && window >= target) {\n      const std::ptrdiff_t length = right - left + 1;\n      if (!best || length < *best) best = length;\n      window -= nums[left];\n      ++left;\n    }\n  }\n  return best;\n}\n\n[[nodiscard]] std::optional<std::ptrdiff_t> shortest_by_trying_all(std::span<const int> nums, std::int64_t target) {\n  std::optional<std::ptrdiff_t> best;\n  for (std::ptrdiff_t first = 0; first < std::ssize(nums); ++first) {\n    std::int64_t sum = 0;\n    for (std::ptrdiff_t last = first; last < std::ssize(nums); ++last) {\n      sum += nums[last];\n      if (sum >= target && (!best || last - first + 1 < *best)) best = last - first + 1;\n    }\n  }\n  return best;\n}\n\n[[nodiscard]] std::string show(const std::optional<std::ptrdiff_t>& length) {\n  return length ? std::to_string(*length) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> nums{3, -2, 4};\n  std::cout << std::format(\"window: {}, every subarray: {}\\n\", show(shortest_at_least(nums, 4)),\n                           show(shortest_by_trying_all(nums, 4)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "window: 3, every subarray: 1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The window reaches the target at right = 2 with "
+        },
+        {
+         "t": "code",
+         "v": "{3, -2, 4}"
+        },
+        {
+         "t": "text",
+         "v": ", records 3, and removes the 3. The sum drops to 2, below the target, so the loop stops. But removing the -2 as well would have raised the sum back to 4 with "
+        },
+        {
+         "t": "code",
+         "v": "{4}"
+        },
+        {
+         "t": "text",
+         "v": " alone. The invariant argument needs \"a shorter window has a smaller sum\", and a negative number breaks it. The same problem with negative numbers is solved in O(n) with prefix sums and a deque that keeps its prefix sums in increasing order; the next topics build both parts."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Explain the difference between a fixed and a variable window, and write the two loop shapes, longest and shortest, from memory. Give the window invariant of each exercise, and say why the nested loop is O(n). Say when a sum-based window stops working, with the three-element counterexample."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What is the window invariant for the longest substring without repeats, and which character can break it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is a variable window O(n) even though it has a "
+     },
+     {
+      "t": "code",
+      "v": "while"
+     },
+     {
+      "t": "text",
+      "v": " loop inside a "
+     },
+     {
+      "t": "code",
+      "v": "for"
+     },
+     {
+      "t": "text",
+      "v": " loop?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In the shortest shape, why is the answer recorded inside the shrinking loop and not after it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a sum-based window fail when the input has negative numbers? Give a three-element example."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "max_window_sum"
+     },
+     {
+      "t": "text",
+      "v": " start "
+     },
+     {
+      "t": "code",
+      "v": "best"
+     },
+     {
+      "t": "text",
+      "v": " at the first window's sum, and why is its update two statements?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: the longest run of ones with at most k flips, with a test for k = 0."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh and Adam Segoli Schubert, Back to Basics: Algorithmic Complexity, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Algorithmic_Complexity.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=AY2FqpDCBGs"
+     },
+     {
+      "t": "text",
+      "v": ". Counting the work of nested loops."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". When a named algorithm such as "
+     },
+     {
+      "t": "code",
+      "v": "std::accumulate"
+     },
+     {
+      "t": "text",
+      "v": " says more than a loop, and when the loop is the point."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.102",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.103",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-overflow"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "F.24",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-range"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tip "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::accumulate",
+      "href": "https://en.cppreference.com/cpp/algorithm/accumulate"
+     },
+     {
+      "t": "text",
+      "v": ", whose accumulator has the type of the initial value, and "
+     },
+     {
+      "t": "a",
+      "v": "std::ssize",
+      "href": "https://en.cppreference.com/cpp/iterator/size"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

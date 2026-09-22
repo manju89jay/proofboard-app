@@ -1,0 +1,732 @@
+{
+ "id": "dsa-mixed-1",
+ "check": null,
+ "interview": null,
+ "subs": [
+  {
+   "id": "set",
+   "title": "Three unlabelled problems",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three problems in this set don't say which technique they need; recognising it is the skill. Treat them as a mock: 40 minutes each with a timer, no notes, and no looking back at earlier topics. Before you write any code, write one line that names the pattern you'll use and the time and space you expect. Then write the function and a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that tests it, including the edge cases."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Score each problem out of 3. One point for naming, before coding, a pattern that works. One point for a correct solution with the complexity you named. One point for tests that cover the edge cases the solution lists. Each solution starts by naming the pattern and the words in the statement that point to it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The problem: a robot's bus delivers message ids in order. Write "
+        },
+        {
+         "t": "code",
+         "v": "nearby_repeat(ids, k)"
+        },
+        {
+         "t": "text",
+         "v": ", which finds the first position "
+        },
+        {
+         "t": "code",
+         "v": "j"
+        },
+        {
+         "t": "text",
+         "v": " whose id already appeared at a position "
+        },
+        {
+         "t": "code",
+         "v": "i"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "j - i <= k"
+        },
+        {
+         "t": "text",
+         "v": ", and returns the pair "
+        },
+        {
+         "t": "code",
+         "v": "{i, j}"
+        },
+        {
+         "t": "text",
+         "v": " using the latest such "
+        },
+        {
+         "t": "code",
+         "v": "i"
+        },
+        {
+         "t": "text",
+         "v": ", or no value when there is none. "
+        },
+        {
+         "t": "code",
+         "v": "{7, 3, 9, 3, 7}"
+        },
+        {
+         "t": "text",
+         "v": " with k = 2 gives "
+        },
+        {
+         "t": "code",
+         "v": "{1, 3}"
+        },
+        {
+         "t": "text",
+         "v": ", the same ids with k = 1 give no value, and "
+        },
+        {
+         "t": "code",
+         "v": "{4, 1, 2, 3, 4, 4}"
+        },
+        {
+         "t": "text",
+         "v": " with k = 1 gives "
+        },
+        {
+         "t": "code",
+         "v": "{4, 5}"
+        },
+        {
+         "t": "text",
+         "v": ". Take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const int>"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t"
+        },
+        {
+         "t": "text",
+         "v": " k, return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::pair<std::ptrdiff_t, std::ptrdiff_t>>"
+        },
+        {
+         "t": "text",
+         "v": ", and state the time and space."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pattern is a hash map from each id to the last index where it appeared: for each element, ask a question about the elements before it, then record the element. The words that point to it are \"already appeared\", a question about earlier elements that a nested loop would answer in O(n·k)."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <unordered_map>\n#include <utility>\n#include <vector>\n\nusing IndexPair = std::pair<std::ptrdiff_t, std::ptrdiff_t>;\n\n[[nodiscard]] std::optional<IndexPair> nearby_repeat(std::span<const int> ids, std::ptrdiff_t k) {\n  std::unordered_map<int, std::ptrdiff_t> last_seen;  // id -> its latest index so far\n  for (std::ptrdiff_t j = 0; j < std::ssize(ids); ++j) {\n    if (const auto it = last_seen.find(ids[j]); it != last_seen.end() && j - it->second <= k) {\n      return IndexPair{it->second, j};\n    }\n    last_seen.insert_or_assign(ids[j], j);  // overwrite: the nearest earlier copy is the one that matters\n  }\n  return std::nullopt;\n}\n\n[[nodiscard]] std::string show(const std::optional<IndexPair>& pair) {\n  return pair ? std::format(\"{{{}, {}}}\", pair->first, pair->second) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> a{7, 3, 9, 3, 7};\n  const std::vector<int> b{4, 1, 2, 3, 4, 4};\n  const std::vector<int> c{5, 5};\n  const std::vector<int> none;\n  std::cout << std::format(\"{} {} {}\\n\", show(nearby_repeat(a, 2)), show(nearby_repeat(a, 1)), show(nearby_repeat(b, 1)));\n  std::cout << std::format(\"k = 0: {}, empty: {}\\n\", show(nearby_repeat(c, 0)), show(nearby_repeat(none, 3)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "{1, 3} no value {4, 5}\nk = 0: no value, empty: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time on average and O(n) space for the map. The edge cases are an empty input, k = 0, which can never match because two positions are never 0 apart, and a repeat that comes too late before one that comes in time, as in "
+        },
+        {
+         "t": "code",
+         "v": "{4, 1, 2, 3, 4, 4}"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That last case is why the map must overwrite. Keeping the first index, with "
+        },
+        {
+         "t": "code",
+         "v": "try_emplace"
+        },
+        {
+         "t": "text",
+         "v": " as in Two Sum, remembers the 4 at index 0, finds it 5 positions back at j = 5 and misses the pair "
+        },
+        {
+         "t": "code",
+         "v": "{4, 5}"
+        },
+        {
+         "t": "text",
+         "v": ". Two Sum needed any earlier match, and this problem needs the nearest one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A sliding window works too, and is a fair answer: keep the ids of the last k positions in a "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_set"
+        },
+        {
+         "t": "text",
+         "v": ", erase the id that falls out of the window at each step, and report a repeat when an insert finds its id already there. That uses O(min(n, k)) space instead of O(n). To return "
+        },
+        {
+         "t": "code",
+         "v": "i"
+        },
+        {
+         "t": "text",
+         "v": " as well, the window needs the positions, which brings back a map. Either one named before coding earns the point. A loop over the previous k elements for each element is O(n·k), and it earns the second point only if you named that complexity."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes, with the same rules. Write "
+        },
+        {
+         "t": "code",
+         "v": "anagram_starts(text, pattern)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns, in increasing order, every index where a substring of "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": " starts that uses exactly the same bytes as "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": ", each as often. "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": " is not empty. "
+        },
+        {
+         "t": "code",
+         "v": "\"abxbaaxab\""
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "\"ab\""
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "{0, 3, 7}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "\"aaaa\""
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "\"aa\""
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "{0, 1, 2}"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "\"ab\""
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "\"abc\""
+        },
+        {
+         "t": "text",
+         "v": " gives an empty result. Take both as "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", return "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::ptrdiff_t>"
+        },
+        {
+         "t": "text",
+         "v": ", and state the time and space."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pattern is a fixed-size sliding window with a table of counts. The words that point to it are \"substring\", which means contiguous, and a length fixed by "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": ". Two substrings are anagrams exactly when their byte counts are equal, so the window keeps the counts of its bytes and compares them with the pattern's:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <string_view>\n#include <vector>\n\n[[nodiscard]] std::vector<std::ptrdiff_t> anagram_starts(std::string_view text, std::string_view pattern) {\n  std::vector<std::ptrdiff_t> starts;\n  const std::ptrdiff_t m = std::ssize(pattern);\n  if (m == 0 || m > std::ssize(text)) return starts;\n  const auto slot = [](char c) { return static_cast<unsigned char>(c); };  // char may be negative\n  std::array<std::ptrdiff_t, 256> need{};\n  std::array<std::ptrdiff_t, 256> have{};  // byte counts of the window text[right - m + 1..right]\n  for (const char c : pattern) ++need[slot(c)];\n  for (std::ptrdiff_t right = 0; right < std::ssize(text); ++right) {\n    ++have[slot(text[right])];\n    if (right >= m) --have[slot(text[right - m])];  // the byte that leaves\n    if (right >= m - 1 && have == need) starts.push_back(right - m + 1);\n  }\n  return starts;\n}\n\nstruct Case {\n  std::string_view text;\n  std::string_view pattern;\n};\n\nint main() {\n  const std::array<Case, 3> cases{{{.text = \"abxbaaxab\", .pattern = \"ab\"},\n                                   {.text = \"aaaa\", .pattern = \"aa\"},\n                                   {.text = \"ab\", .pattern = \"abc\"}}};\n  for (const Case& c : cases) {\n    std::cout << std::format(\"\\\"{}\\\" \\\"{}\\\":\", c.text, c.pattern);\n    for (const std::ptrdiff_t start : anagram_starts(c.text, c.pattern)) std::cout << ' ' << start;\n    std::cout << '\\n';\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "\"abxbaaxab\" \"ab\": 0 3 7\n\"aaaa\" \"aa\": 0 1 2\n\"ab\" \"abc\":"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Comparing two tables of 256 counts costs 256 steps, so the whole run is 256·n steps, which is O(n) for a fixed alphabet, and the space is O(1) besides the output. To make each step O(1), keep a count of the byte values whose counts differ between "
+        },
+        {
+         "t": "code",
+         "v": "have"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "need"
+        },
+        {
+         "t": "text",
+         "v": ", and update it only for the byte that enters and the byte that leaves. The edge cases are a pattern longer than the text, overlapping matches as in "
+        },
+        {
+         "t": "code",
+         "v": "\"aaaa\""
+        },
+        {
+         "t": "text",
+         "v": ", and a match that ends on the last byte of the text."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Sorting every substring and comparing it with the sorted pattern is correct and costs O(n·m log m). It earns the second point only if you named that cost before coding."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes, with the same rules. A robot logs its cross-track error, the sideways distance from the planned path in millimetres, negative to the left and positive to the right, and the log is sorted. Write "
+        },
+        {
+         "t": "code",
+         "v": "sorted_squares(errors)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the squared errors in non-decreasing order in O(n) time. "
+        },
+        {
+         "t": "code",
+         "v": "{-7, -3, 0, 2, 5}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "{0, 4, 9, 25, 49}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{-2, -1}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "{1, 4}"
+        },
+        {
+         "t": "text",
+         "v": ", and an empty log gives an empty result. Take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const int>"
+        },
+        {
+         "t": "text",
+         "v": " and return "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::int64_t>"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pattern is two pointers from opposite ends, writing the output from the back. The words that point to it are \"sorted\" together with \"O(n)\": after squaring, the largest values sit at the two ends of the input, so the larger of the two end squares is always the next largest result."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <iostream>\n#include <span>\n#include <string_view>\n#include <vector>\n\n[[nodiscard]] std::vector<std::int64_t> sorted_squares(std::span<const int> errors) {\n  std::vector<std::int64_t> out(errors.size());\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = std::ssize(errors) - 1;\n  for (std::ptrdiff_t write = std::ssize(errors) - 1; write >= 0; --write) {  // an empty log: write is -1\n    const std::int64_t left = std::int64_t{errors[lo]} * errors[lo];  // 64-bit: 46341 squared passes the int limit\n    const std::int64_t right = std::int64_t{errors[hi]} * errors[hi];\n    if (left > right) {\n      out[write] = left;\n      ++lo;\n    } else {\n      out[write] = right;\n      --hi;\n    }\n  }\n  return out;\n}\n\nint main() {\n  const std::vector<std::vector<int>> logs{{-7, -3, 0, 2, 5}, {-2, -1}, {}, {-46341, 46341}};\n  for (const std::vector<int>& log : logs) {\n    const std::vector<std::int64_t> squares = sorted_squares(log);\n    std::string_view separator;\n    for (const std::int64_t square : squares) {\n      std::cout << separator << square;\n      separator = \" \";\n    }\n    std::cout << (squares.empty() ? \"(empty)\\n\" : \"\\n\");\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "0 4 9 25 49\n1 4\n(empty)\n2147488281 2147488281"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time and O(1) extra space besides the output. The invariant: "
+        },
+        {
+         "t": "code",
+         "v": "out[write + 1..n - 1]"
+        },
+        {
+         "t": "text",
+         "v": " holds the largest squares in order, and every square not yet written comes from "
+        },
+        {
+         "t": "code",
+         "v": "errors[lo..hi]"
+        },
+        {
+         "t": "text",
+         "v": ". The edge cases are an empty log, all errors on one side, where one pointer never moves, and values whose square passes the "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " limit: 46,341² is 2,147,488,281, above 2,147,483,647. Signed indices make the empty log safe: "
+        },
+        {
+         "t": "code",
+         "v": "write"
+        },
+        {
+         "t": "text",
+         "v": " starts at -1, so the loop doesn't run; with "
+        },
+        {
+         "t": "code",
+         "v": "std::size_t"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "write >= 0"
+        },
+        {
+         "t": "text",
+         "v": " is always true."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Squaring everything and calling "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::sort"
+        },
+        {
+         "t": "text",
+         "v": " is correct and costs O(n log n), which misses the O(n) the statement asks for. It names a pattern that misses the required O(n), so it loses the first point. If you named O(n log n) before coding, it keeps the second."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down, for each problem, the pattern you named before coding, whether it worked, the words in the statement that should have told you, your time, and your score out of 3. Add one line on the mistake you most want not to repeat. You pass this set when you earned the first two points on all three problems. A problem where you named the wrong pattern goes back on your list: re-solve it closed book in a week."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "insert_or_assign",
+      "href": "https://en.cppreference.com/cpp/container/unordered_map/insert_or_assign"
+     },
+     {
+      "t": "text",
+      "v": ", which the first solution uses to keep the latest index, and on "
+     },
+     {
+      "t": "a",
+      "v": "comparing std::array",
+      "href": "https://en.cppreference.com/cpp/container/array/operator_cmp"
+     },
+     {
+      "t": "text",
+      "v": ", which the second uses to compare two count tables."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.102",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ES.103",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-overflow"
+     },
+     {
+      "t": "text",
+      "v": ", behind the signed indices and the 64-bit squares."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tip "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values, the reason the first problem returns "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

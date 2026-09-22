@@ -1,0 +1,882 @@
+{
+ "id": "oss-reproduce-issue",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage turns a report on someone else's tracker into evidence a maintainer can act on. It starts with choosing one issue out of a shortlist of three, each checked against five conditions: one observable behaviour, one package, an expectation checkable against the documentation or the code rather than against taste, no hardware or second machine, and no hidden design decision waiting inside it. Only then does it become worth an evening."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is separating what the reporter saw from what they concluded, before touching a keyboard. Every sentence with \"because\" or \"it seems\" is a hypothesis from someone who may have been reading that code for the first time, and only the commands and the output are reproducible. The reproduction plan gets written down, prediction included, before a single command runs, because a run with no prediction only tells you what happened."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What this leaves us able to do: state a reproduction as a count out of ten runs on a named commit, with the middleware and storage plugin that were tried, or state with the same precision that it does not reproduce and under which conditions were ruled out; narrow a failing case to its smallest form by removing one thing at a time until the failure stops surviving it; and write the result in the exact shape a maintainer can act on with no follow-up question needed."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "reproduce",
+   "title": "Find a narrow issue, check existing work, reproduce it",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, you have three candidate issues from rosbag2's tracker, a line on each saying why it is narrow enough, and the one you will spend the next three sessions on."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A reproduction is the most useful thing a stranger can give a maintainer, and it is the one contribution that never gets rejected on taste. It is also the part that decides whether the fix is an evening or a month, so the choice of issue matters more than the work that follows it. Most time lost on a first contribution is lost here, on an issue that turned out to need hardware, or a decision, or a conversation nobody wants to have again."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Open the tracker at "
+        },
+        {
+         "t": "a",
+         "v": "github.com/ros2/rosbag2/issues",
+         "href": "https://github.com/ros2/rosbag2/issues"
+        },
+        {
+         "t": "text",
+         "v": " and use the search box rather than the list. These queries do most of the work:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "is:issue is:open label:bug sort:created-desc\nis:issue is:open label:bug no:assignee -linked:pr\nis:issue is:open sort:comments-asc\nis:issue is:open label:bug updated:>2025-01-01"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second is the one to start from. "
+        },
+        {
+         "t": "code",
+         "v": "no:assignee"
+        },
+        {
+         "t": "text",
+         "v": " skips what somebody has already taken, and "
+        },
+        {
+         "t": "code",
+         "v": "-linked:pr"
+        },
+        {
+         "t": "text",
+         "v": " skips what already has a pull request pointing at it. Sorting by fewest comments finds the ones nobody has looked at, which are often narrow and always welcome."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Narrow means five things, and an issue that misses one of them is not a bad issue, it is a bad first issue:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "it describes one observable behaviour, as a command and an outcome;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it lives in one package, or at least one layer of the four you mapped last topic;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "its expectation can be checked against the documentation or the code, and not against taste;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it needs no hardware, no second machine and no distribution you don't have;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "there is no decision hiding in it. The fix is \"make it do what it says\", not \"decide what it should do\"."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Skip feature requests, anything labelled "
+        },
+        {
+         "t": "code",
+         "v": "question"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "discussion"
+        },
+        {
+         "t": "text",
+         "v": ", performance reports with no number in them, and anything where the last comment is a maintainer asking for a design. Those are real work and they are not this work."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Skim twenty issues and keep the five that look closest. Reading twenty is the point: you are learning what this project's bugs look like, and the fifth one is easier to judge than the first."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "For each of the five, write one line: the observable behaviour, the package you think it lives in, and the reason it is or is not narrow."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Cut to three and put them in your notes."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Pick one, and write down why you skipped the other two. That sentence is worth keeping: it is the reasoning an interviewer will ask you to repeat."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when three candidates are written down with a line each, one is chosen, and you can say in one sentence what behaviour you expect to see with your own eyes by the end of Build 3."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, you know whether somebody is already fixing your issue, and you have taken the report apart into what was seen, what was concluded and what was asked for."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both halves save an evening. Work that is already in flight is the commonest reason a first contribution goes nowhere, and a reporter's diagnosis taken as fact is the commonest reason a reproduction fails and the reader blames their machine."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Look for existing work in the repository you cloned:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/rosbag2_ws/src/rosbag2\ngit fetch origin rolling\ngit log --oneline --grep \"<a word from the issue title>\" -20\ngit log --oneline jazzy..origin/rolling -- rosbag2_transport | head -40"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last one is the question people forget to ask: is this already fixed on the development branch and not backported? If it is, your issue is a backport request, which is a different and much shorter piece of work, and saying so in the thread is itself a contribution."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Look for existing work on GitHub. The issue's own sidebar lists linked pull requests. Then search the pull requests directly:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "is:pr <issue number>\nis:pr is:open <two words from the title>\nis:pr is:closed <two words from the title>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Closed pull requests matter as much as open ones: a fix that was proposed and abandoned usually comes with the reason it was abandoned, and that reason is often the real problem. If an open pull request already fixes it, write that down and either pick another issue or carry on, because reviewing that pull request is what the review topic later does."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Take the report apart into three lists. What the reporter observed: commands, output, versions. What the reporter concluded: every sentence with \"because\", \"it seems\" or \"the cause is\". What the reporter asked for. Only the first list is reproducible, and only the first list is evidence. The second is a hypothesis from somebody who may have been reading the code for the first time."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Fill the gaps from the code rather than from the thread. You will usually be missing the version, a default value or the code path. "
+         },
+         {
+          "t": "code",
+          "v": "git log --since"
+         },
+         {
+          "t": "text",
+          "v": " and the release tags tell you what the reporter's version contained; the package's source tells you what the default is. Reaching for the code first is also what makes your comment worth reading: \"on jazzy the default is X, set in "
+         },
+         {
+          "t": "code",
+          "v": "<file>:<line>"
+         },
+         {
+          "t": "text",
+          "v": "\" is a fact, and \"what version are you on?\" is a delay."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the reproduction plan before you run anything, as four lines: the exact commands, what the documentation says should happen, what the issue says happens instead, and what you predict you will see. Predicting first is what turns a run into evidence. A run with no prediction tells you what happened; a run with one tells you whether you understand it."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when you can say whether the issue is already fixed, already claimed or open; the three lists are written down; and the plan is on paper before a single command has been run."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 3",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, you have run the plan, and you either reproduce the issue reliably or you know exactly which conditions it needs and which it does not."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Start from a clean clone and a green suite. "
+         },
+         {
+          "t": "code",
+          "v": "git -C ~/rosbag2_ws/src/rosbag2 status"
+         },
+         {
+          "t": "text",
+          "v": " says nothing is modified, and the tests from the last topic still pass. Anything left over from an experiment is the reason a reproduction is unrepeatable later."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run the plan, and keep everything. Record the terminal with "
+         },
+         {
+          "t": "code",
+          "v": "script -c \"<command>\" ~/repro-1.log"
+         },
+         {
+          "t": "text",
+          "v": " or paste the whole output into your notes, including the parts that look boring. The part that looks boring is where the version numbers are."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it ten times and count. A bug that appears ten times out of ten and a bug that appears three times out of ten are different bugs with different fixes, and the count is the single most useful number you can add to a thread. A short script that exits non-zero on the bad behaviour makes this one line:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "for i in $(seq 10); do ./repro.sh > /tmp/repro-$i.log 2>&1; echo \"run $i: exit $?\"; done"
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "If it does not reproduce, change one thing at a time, in this order, and write down each answer:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "git -C src/rosbag2 log -1 --oneline            # the commit you are testing\nRMW_IMPLEMENTATION=rmw_cyclonedds_cpp ./repro.sh   # a different middleware\nros2 bag record --storage sqlite3 ...          # the other storage plugin"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then the reporter's version, if it differs from your branch, and last the machine's load, which matters for anything with a timeout in it. Every one of those you rule out is a line worth posting, because a negative result with versions attached is a contribution: it narrows the search for everybody who comes after you."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "If it reproduces on one commit and not on another, let "
+         },
+         {
+          "t": "code",
+          "v": "git bisect"
+         },
+         {
+          "t": "text",
+          "v": " find the change:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/rosbag2_ws/src/rosbag2\ngit bisect start <bad commit> <good commit>\ngit bisect run ~/repro.sh          # exit 0 means good, non-zero means bad\ngit bisect reset"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "git bisect run"
+        },
+        {
+         "t": "text",
+         "v": " needs the script to be honest about its exit code and to rebuild what it tests, so put "
+        },
+        {
+         "t": "code",
+         "v": "colcon build --packages-select <package>"
+        },
+        {
+         "t": "text",
+         "v": " inside it. It is slow, and it is still faster than reading the log by hand."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when you can state the reproduction as a number out of ten on a named commit, with the middleware and the storage plugin written down, or when you can state with the same precision that it does not reproduce and under which conditions you looked."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 4",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the reproduction is as small as you can make it, it lives in a script, and the write-up is ready for the thread."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Narrow it. Remove one thing at a time and re-run, and keep the removal only if the failure survives it: fewer topics, fewer messages, a shorter recording, the default storage plugin, one node instead of two, no compression, no sim time. Stop when removing anything at all makes it stop failing. What is left is the statement of the bug, and it is usually half the size of what the reporter sent."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Put it in "
+         },
+         {
+          "t": "code",
+          "v": "repro.sh"
+         },
+         {
+          "t": "text",
+          "v": " next to your notes, not in the clone. It should be runnable by somebody who has the branch and nothing else: what to build, what to run, and an exit code that says whether the bug appeared."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the report. This is the shape the ROS 2 developer guide asks for, and a maintainer can act on it without a single follow-up question:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "Reproduced on <branch> at <commit>.\n\nEnvironment\n  OS               Ubuntu 24.04\n  ROS 2            jazzy, installed from debian packages, rosbag2 built from source\n  rosbag2          <commit>, branch <branch>\n  RMW              <rmw_fastrtps_cpp or whichever you ran>\n  storage plugin   <mcap or sqlite3>\n\nSteps\n  1. <command>\n  2. <command>\n\nExpected   <what the documentation or the code says, with the file and line>\nActual     <what happens, with the output>\nFrequency  <n> out of 10 runs\n\nAlso tried  <the things you ruled out, one line each>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The title of your comment, if you write one, states the behaviour and not the cause: \"play --rate 2 ends early on an mcap bag\" rather than \"the player's clock is wrong\". You may turn out to be right about the cause, and if you lead with it the thread argues about your theory instead of your evidence."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Read it once more before posting, for three things. Is every sentence something you saw, rather than something you concluded? Have you read the whole existing thread, so that you are not repeating a comment from last year? And is the tone one you would want to receive? A tracker comment is public, permanent and attached to your name, and the people reading it are volunteers."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Post it as a comment on the existing issue. Open a new issue only if what you found is a different bug from the one described, and then link the two. Do not post \"+1\" or \"any update on this\", which add nothing and cost everybody a notification. A reproduction, a smaller reproduction, or a negative result with versions are all welcome; nothing else is."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "repro.sh"
+         },
+         {
+          "t": "text",
+          "v": " runs the smallest form of the bug and exits non-zero when it appears;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the report is written in the shape above with no placeholder left in it;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it is posted on the issue, or you have written down why it should not be."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add an \"Issue\" section to "
+        },
+        {
+         "t": "code",
+         "v": "docs/upstream-rosbag2.md"
+        },
+        {
+         "t": "text",
+         "v": ", under the build notes from the last topic. It is the proof for this topic and the starting point for the patch topic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the issue with its number and title, and the three candidates you did not pick with the reason for each. Then the three lists from Build 2: observed, concluded, asked for. Then the reproduction as it ended up, the commands, the count out of ten, and the conditions it needs, with the ones you ruled out."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Finish with two paragraphs you will reuse. The first is what the smallest reproduction turned out to be, and what you removed to get there; that is the paragraph the patch topic turns into a regression test. The second is the one for yourself: how long the search took, which of the four navigation moves from the last topic found the answer, and what you would look at first next time."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 "
+     },
+     {
+      "t": "a",
+      "v": "developer guide",
+      "href": "https://docs.ros.org/en/jazzy/The-ROS2-Project/Contributing/Developer-Guide.html"
+     },
+     {
+      "t": "text",
+      "v": ", which asks a report to name the operating system, the installation method, the ROS 2 version, the middleware and the client library, and to carry steps that reproduce it and a short self-contained example."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rosbag2's "
+     },
+     {
+      "t": "a",
+      "v": "CONTRIBUTING.md",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/CONTRIBUTING.md"
+     },
+     {
+      "t": "text",
+      "v": " and its "
+     },
+     {
+      "t": "a",
+      "v": "issue tracker",
+      "href": "https://github.com/ros2/rosbag2/issues"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "Developer Certificate of Origin",
+      "href": "https://developercertificate.org/"
+     },
+     {
+      "t": "text",
+      "v": " that every commit to it is signed under."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "GitHub's documentation on "
+     },
+     {
+      "t": "a",
+      "v": "searching issues and pull requests",
+      "href": "https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests"
+     },
+     {
+      "t": "text",
+      "v": ", for "
+     },
+     {
+      "t": "code",
+      "v": "no:assignee"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "-linked:pr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "sort:comments-asc"
+     },
+     {
+      "t": "text",
+      "v": " and the date qualifiers."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The git documentation on "
+     },
+     {
+      "t": "a",
+      "v": "git log",
+      "href": "https://git-scm.com/docs/git-log"
+     },
+     {
+      "t": "text",
+      "v": ", for "
+     },
+     {
+      "t": "code",
+      "v": "--grep"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "code",
+      "v": "-S"
+     },
+     {
+      "t": "text",
+      "v": " search that finds the commit which introduced a string, and on "
+     },
+     {
+      "t": "a",
+      "v": "git bisect",
+      "href": "https://git-scm.com/docs/git-bisect"
+     },
+     {
+      "t": "text",
+      "v": ", for "
+     },
+     {
+      "t": "code",
+      "v": "bisect run"
+     },
+     {
+      "t": "text",
+      "v": " with a script."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Simon Tatham, "
+     },
+     {
+      "t": "a",
+      "v": "his essay on writing a bug report that gets acted on",
+      "href": "https://www.chiark.greenend.org.uk/~sgtatham/bugs.html"
+     },
+     {
+      "t": "text",
+      "v": ": the separation between what you saw and what you think it means, which is the whole of Build 2."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Greg Law, Back to Basics: Debugging, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Debugging_CppCon_2023.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=qgszy9GquRs"
+     },
+     {
+      "t": "text",
+      "v": ", for shortening the distance between the bug and the failure, which is what the narrowing step does."
+     }
+    ]
+   ]
+  }
+ ]
+}

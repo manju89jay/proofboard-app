@@ -1,0 +1,2011 @@
+{
+ "id": "ros-dds-rmw",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Answer in writing, without looking anything up. What sits between "
+     },
+     {
+      "t": "code",
+      "v": "publisher_->publish(msg)"
+     },
+     {
+      "t": "text",
+      "v": " in your node and the bytes on the network card, layer by layer? How do you run the same compiled node on a different DDS implementation? What does "
+     },
+     {
+      "t": "code",
+      "v": "ROS_DOMAIN_ID"
+     },
+     {
+      "t": "text",
+      "v": " change on the wire, and what does it therefore stop? And how many DDS participants does one process holding three nodes create by default? Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Four layers under your node. "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp"
+     },
+     {
+      "t": "text",
+      "v": " is the C++ client library. Under it sits "
+     },
+     {
+      "t": "code",
+      "v": "rcl"
+     },
+     {
+      "t": "text",
+      "v": ", a C library that holds the parts every client library shares: node names, topic name expansion, parameters, timers, the domain id. Under that sits "
+     },
+     {
+      "t": "code",
+      "v": "rmw"
+     },
+     {
+      "t": "text",
+      "v": ", a small C interface with functions such as "
+     },
+     {
+      "t": "code",
+      "v": "rmw_create_node"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "rmw_create_publisher"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "rmw_publish"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "rmw_take"
+     },
+     {
+      "t": "text",
+      "v": ". Under that sits one package per vendor, such as "
+     },
+     {
+      "t": "code",
+      "v": "rmw_fastrtps_cpp"
+     },
+     {
+      "t": "text",
+      "v": ", which implements that interface on the vendor's DDS library, and the DDS library speaks RTPS over UDP."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You change implementation with the environment variable "
+     },
+     {
+      "t": "code",
+      "v": "RMW_IMPLEMENTATION"
+     },
+     {
+      "t": "text",
+      "v": ", for example "
+     },
+     {
+      "t": "code",
+      "v": "RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run demo_nodes_cpp talker"
+     },
+     {
+      "t": "text",
+      "v": ". Nothing is recompiled, because the rmw package is a shared library chosen at start-up. Jazzy's default is "
+     },
+     {
+      "t": "code",
+      "v": "rmw_fastrtps_cpp"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "ROS_DOMAIN_ID"
+     },
+     {
+      "t": "text",
+      "v": " shifts the UDP ports the middleware uses, by 250 per id from a base of 7400. Nodes on domain 0 send their announcements to a port that nodes on domain 1 never listen on, so the two groups never discover each other, on the same cable and with no configuration between them. The default is 0."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "One participant. A DDS participant belongs to a ROS 2 context, and a process normally has one context, so three nodes in one process share one participant. This is one reason composition is worth the trouble: participants are what discovery traffic and port use scale with, not nodes."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the layers are named in the right order, "
+     },
+     {
+      "t": "code",
+      "v": "RMW_IMPLEMENTATION"
+     },
+     {
+      "t": "text",
+      "v": " is named, the domain answer says ports and therefore no discovery, and the participant answer is one per process. Saying one participant per node is the common mistake and a partial pass. Missing the rmw layer, or thinking the vendor is chosen at compile time, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Under a node's "
+    },
+    {
+     "t": "code",
+     "v": "publish"
+    },
+    {
+     "t": "text",
+     "v": " call sit four layers: rclcpp, the C++ library; rcl, a C library holding what every client library shares; rmw, a small interface of C functions such as "
+    },
+    {
+     "t": "code",
+     "v": "rmw_create_node"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "rmw_publish"
+    },
+    {
+     "t": "text",
+     "v": "; and one package per vendor implementing that interface on an actual DDS library. Everything above rmw is written against those functions, never a vendor, which lets you swap the vendor at start-up, with an environment variable, and recompile nothing. DDS itself has no broker and no master: every process announces itself and finds the others."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this layering solves is letting nodes find each other and exchange data without wiring the code to one transport, and without a single process whose failure takes the graph down."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Discovery happens in two stages. Participants announce themselves over multicast first, so a process starting late still finds the ones already running; then participants that found each other exchange their topics, types and QoS profiles over unicast, which is why another process's QoS settings can be read from the command line at all. A domain id splits one network into logical ones through port numbers alone, a fixed block per domain and a smaller one per participant, so two domain ids sharing a cable never see each other's announcements. A process holds exactly one participant however many nodes it contains, since a process normally has one context, so participant count, not node count, is what discovery traffic and port use scale with."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake under pressure is treating a silent graph as a node problem. Two machines can ping and ssh each other while discovering nothing, because discovery depends on UDP multicast on ports that have nothing to do with basic reachability: a different domain id, a different middleware vendor, a client-isolated Wi-Fi access point, a managed switch, or two subnets each stop discovery outright, with no error on either side, only an empty topic list. Discovering a node also is not talking to it: two nodes that find each other can still refuse every message over incompatible delivery promises, a separate question."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: naming all four layers under a publish call, saying how the same compiled node runs on a different DDS vendor with no rebuild, explaining what a domain id changes on the wire, and getting the participant count right for a process holding several nodes: one, not one per node."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "dds",
+   "title": "RMW, DDS, discovery, participants, domains, transports",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start by looking at what is installed and swapping it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "printenv RMW_IMPLEMENTATION      # empty means the distribution's default, rmw_fastrtps_cpp\nros2 doctor --report             # its RMW MIDDLEWARE section prints the middleware name actually loaded\nRMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run demo_nodes_cpp talker     # terminal 1\nRMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run demo_nodes_cpp listener   # terminal 2: it hears the talker"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same two binaries, the same machine, a different middleware under them. That is what the rmw layer buys. "
+        },
+        {
+         "t": "code",
+         "v": "rmw"
+        },
+        {
+         "t": "text",
+         "v": " is a set of C headers, and the main one, "
+        },
+        {
+         "t": "a",
+         "v": "rmw/rmw.h on the jazzy branch",
+         "href": "https://github.com/ros2/rmw/blob/jazzy/rmw/include/rmw/rmw.h"
+        },
+        {
+         "t": "text",
+         "v": ", carries 71 declarations marked "
+        },
+        {
+         "t": "code",
+         "v": "RMW_PUBLIC"
+        },
+        {
+         "t": "text",
+         "v": ", from "
+        },
+        {
+         "t": "code",
+         "v": "rmw_create_node"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "rmw_create_publisher"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "rmw_publish"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "rmw_take"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "rmw_get_publishers_info_by_topic"
+        },
+        {
+         "t": "text",
+         "v": ". Everything above it, rcl and rclcpp and your node, is written against those functions and never against a vendor. A vendor package such as "
+        },
+        {
+         "t": "code",
+         "v": "rmw_fastrtps_cpp"
+        },
+        {
+         "t": "text",
+         "v": " implements them, and "
+        },
+        {
+         "t": "code",
+         "v": "rmw_implementation"
+        },
+        {
+         "t": "text",
+         "v": " picks one at start-up from the "
+        },
+        {
+         "t": "code",
+         "v": "RMW_IMPLEMENTATION"
+        },
+        {
+         "t": "text",
+         "v": " variable, defaulting to Fast DDS when it is installed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Jazzy's binary packages carry four:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Product"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "rmw package"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Status in Jazzy"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "eProsima Fast DDS"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rmw_fastrtps_cpp"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The default, shipped with the binaries"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Eclipse Cyclone DDS"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rmw_cyclonedds_cpp"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Shipped with the binaries"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "RTI Connext DDS"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rmw_connextdds"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Supported, Connext installed separately"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "GurumNetworks GurumDDS"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rmw_gurumdds_cpp"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Community support, GurumDDS installed separately"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Mixing vendors sometimes works and is not guaranteed. The Jazzy page on middleware vendors lists pairs that are known to fail on some types, and advises one ROS version and one rmw across a whole system. On a robot with a laptop attached, that means checking the laptop too."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "DDS itself is an OMG standard for data-centric publish and subscribe, and RTPS, properly DDSI-RTPS, is its wire protocol. The property that matters most to ROS 2 is that it has no broker and no master. Every process announces itself and finds the others, which is why killing one node never takes the graph down, and also why a node that nobody can discover fails silently instead of getting an error."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Discovery"
+        },
+        {
+         "t": "text",
+         "v": " happens in two stages. First, participant discovery: each participant sends an announcement to a well-known multicast address and port, and repeats it, so that a participant starting later still finds the ones already running. Second, endpoint discovery: two participants that have found each other exchange the list of their publishers and subscriptions over unicast, with each one's topic name, type name, type hash and full QoS profile. Matching happens per pair and per topic, in both processes independently. That exchange is why "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info /chatter --verbose"
+        },
+        {
+         "t": "text",
+         "v": " can print another process's QoS profile, and why a QoS mismatch is decided at discovery time rather than at publish time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The domain id is how DDS splits one physical network into logical ones, and it does that entirely through port numbers. The RTPS specification computes the ports from a base of 7400, a 250-port block per domain, and 2 ports per participant inside that block. The ROS 2 documentation on the domain id gives the constants and the worked examples, and the program in the worked example below computes them. Three consequences follow, and all three show up in real systems:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Two groups on different domain ids share a cable and never see each other. This is the cheapest isolation there is, and the first thing to check when nothing is discovered."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The highest id whose ports still fit in a 16-bit port number is 232. On Linux the default ephemeral range, 32768 to 60999, sits in the middle of that span, so the ids clear of it are 0 to 101 and 215 to 232. Pick from the lower block unless you have a reason not to."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A domain's block is only 250 ports wide, so the 121st process on one computer in domain 1 lands on domain 2's multicast ports."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Participants"
+        },
+        {
+         "t": "text",
+         "v": " are the unit that all of this counts. One participant belongs to one "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::Context"
+        },
+        {
+         "t": "text",
+         "v": ", and a process has one context unless you make more, so a process has one participant however many nodes you put in it. The Jazzy page on the domain id states it plainly: for each ROS 2 process running on a computer, one DDS participant is created. Each participant costs two ports, its own share of the announcement traffic, and its own copy of the discovery database, which holds an entry for every endpoint in the domain. Twenty single-node processes on a robot means twenty participants and a discovery database replicated twenty times; twenty nodes in one component container means one participant. That is the argument for composition that has nothing to do with copying messages."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three variables control how far announcements travel. Two are current, and the third is the one they replaced:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "ROS_AUTOMATIC_DISCOVERY_RANGE"
+         },
+         {
+          "t": "text",
+          "v": " takes "
+         },
+         {
+          "t": "code",
+          "v": "OFF"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "LOCALHOST"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "SUBNET"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "SYSTEM_DEFAULT"
+         },
+         {
+          "t": "text",
+          "v": ", and rcl defaults it to "
+         },
+         {
+          "t": "code",
+          "v": "SUBNET"
+         },
+         {
+          "t": "text",
+          "v": ". A value it does not recognise is a warning and falls back to "
+         },
+         {
+          "t": "code",
+          "v": "LOCALHOST"
+         },
+         {
+          "t": "text",
+          "v": " ("
+         },
+         {
+          "t": "a",
+          "v": "rcl/src/rcl/discovery_options.c",
+          "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/src/rcl/discovery_options.c"
+         },
+         {
+          "t": "text",
+          "v": ")."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "ROS_STATIC_PEERS"
+         },
+         {
+          "t": "text",
+          "v": " is a list of addresses separated by semicolons, each at most 255 characters, that this process contacts directly. It is how you reach a machine whose announcements cannot arrive by multicast."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "ROS_LOCALHOST_ONLY"
+         },
+         {
+          "t": "text",
+          "v": " still works and is deprecated. rcl logs "
+         },
+         {
+          "t": "code",
+          "v": "ROS_LOCALHOST_ONLY is deprecated but still honored if it is enabled. Use ROS_AUTOMATIC_DISCOVERY_RANGE and ROS_STATIC_PEERS instead."
+         },
+         {
+          "t": "text",
+          "v": ", and when it is enabled it overrides both of them ("
+         },
+         {
+          "t": "a",
+          "v": "rcl/src/rcl/init.c",
+          "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/src/rcl/init.c"
+         },
+         {
+          "t": "text",
+          "v": "). A value of 1 left in somebody's "
+         },
+         {
+          "t": "code",
+          "v": ".bashrc"
+         },
+         {
+          "t": "text",
+          "v": " is a classic cause of a robot that talks to itself."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When multicast is unavailable or the number of participants makes the announcement traffic too heavy, Fast DDS offers a discovery server: one process keeps the graph and the others register with it. You start it with "
+        },
+        {
+         "t": "code",
+         "v": "fastdds discovery --server-id 0"
+        },
+        {
+         "t": "text",
+         "v": " and point nodes at it with "
+        },
+        {
+         "t": "code",
+         "v": "ROS_DISCOVERY_SERVER=127.0.0.1:11811"
+        },
+        {
+         "t": "text",
+         "v": ". The variable is a positional list separated by semicolons, so server 1 alone is written "
+        },
+        {
+         "t": "code",
+         "v": ";127.0.0.1:11888"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Transports"
+        },
+        {
+         "t": "text",
+         "v": " are the last layer. By default the announcements go out by UDP multicast and the data by UDP unicast, one copy per matched subscription on another machine. Inside one machine the vendors add a shared-memory transport, and above that comes zero copy: a publisher whose middleware and message type allow it lends you the buffer the subscriber will read. In rclcpp that is "
+        },
+        {
+         "t": "code",
+         "v": "publisher->can_loan_messages()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "publisher->borrow_loaned_message()"
+        },
+        {
+         "t": "text",
+         "v": ", and if the middleware cannot lend, "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::LoanedMessage"
+        },
+        {
+         "t": "text",
+         "v": " allocates normally and logs "
+        },
+        {
+         "t": "code",
+         "v": "Currently used middleware can't loan messages. Local allocator will be used."
+        },
+        {
+         "t": "text",
+         "v": " once ("
+        },
+        {
+         "t": "a",
+         "v": "loaned_message.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/loaned_message.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). Zero copy of that kind needs a message whose size the middleware can work out before you fill the buffer, so a type with an unbounded array or a string normally gets no loan."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Inside one process rclcpp has its own shortcut, which is not DDS at all. Build the nodes with "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::NodeOptions().use_intra_process_comms(true)"
+        },
+        {
+         "t": "text",
+         "v": " and a message published as a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " is handed to the subscriptions in the same process as a pointer, with no serialisation. It has conditions: the QoS history has to be keep last and the depth cannot be zero, or the publisher and the subscription constructors throw "
+        },
+        {
+         "t": "code",
+         "v": "std::invalid_argument"
+        },
+        {
+         "t": "text",
+         "v": " with a message naming the topic ("
+        },
+        {
+         "t": "a",
+         "v": "publisher.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/publisher.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). It is off by default."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Whatever leaves the process is serialised, in CDR, the DDS encoding. The cost is not uniform. The Jazzy tuning guide names the case that bites: a message with a large variable-length array of a non-primitive type serialises element by element, and "
+        },
+        {
+         "t": "code",
+         "v": "builtin_interfaces/Time"
+        },
+        {
+         "t": "text",
+         "v": " counts as non-primitive, so an array of stamped structs is much more expensive than the same numbers in parallel arrays of primitives. "
+        },
+        {
+         "t": "code",
+         "v": "sensor_msgs/msg/PointCloud2"
+        },
+        {
+         "t": "text",
+         "v": " packs its points into a byte array for exactly this reason."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each vendor keeps its own configuration outside ROS, which is where buffer sizes, transports and discovery live: "
+        },
+        {
+         "t": "code",
+         "v": "FASTRTPS_DEFAULT_PROFILES_FILE"
+        },
+        {
+         "t": "text",
+         "v": " points at an XML profile for Fast DDS, and "
+        },
+        {
+         "t": "code",
+         "v": "CYCLONEDDS_URI"
+        },
+        {
+         "t": "text",
+         "v": " at one for Cyclone DDS."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Across machines, the list of things that break is short and always the same. The two ends are on different domain ids or different rmw implementations. One end has "
+        },
+        {
+         "t": "code",
+         "v": "ROS_LOCALHOST_ONLY=1"
+        },
+        {
+         "t": "text",
+         "v": ". Multicast is dropped, by client isolation on a Wi-Fi access point, by a managed switch, or by a firewall that lets ping through and not UDP 7400 and up. The two ends are on different subnets, so announcements are never routed. A VPN or a docker bridge carries the announcements out of the interface you meant. And once data does flow, a large message over Wi-Fi meets IP fragmentation: one lost fragment leaves the rest in the kernel's reassembly buffer, which defaults to 256 KB, until "
+        },
+        {
+         "t": "code",
+         "v": "net.ipv4.ipfrag_time"
+        },
+        {
+         "t": "text",
+         "v": " expires after 30 seconds, and during that time nothing else gets in. The link looks fine and the topic hangs."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the port arithmetic, written out. Give it a domain id and a participant index and it says which four UDP ports that participant uses:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string>\n\n// Where one participant listens, from the port formula of the DDSI-RTPS specification with the\n// constants the ROS 2 documentation on the domain id uses.\nstruct Endpoint {\n  std::int32_t domain;       // ROS_DOMAIN_ID\n  std::int32_t participant;  // index of the participant on this computer, counted from 0\n};\n\nstruct Ports {\n  std::int32_t discovery_multicast;\n  std::int32_t user_multicast;\n  std::int32_t discovery_unicast;\n  std::int32_t user_unicast;\n};\n\n[[nodiscard]] constexpr Ports ports_of(Endpoint where) {\n  constexpr std::int32_t base = 7400;          // PB, the port base\n  constexpr std::int32_t per_domain = 250;     // DG, the domain gain\n  constexpr std::int32_t per_participant = 2;  // PG, the participant gain\n  const std::int32_t domain_base = base + per_domain * where.domain;\n  return Ports{.discovery_multicast = domain_base,\n               .user_multicast = domain_base + 1,\n               .discovery_unicast = domain_base + 10 + per_participant * where.participant,\n               .user_unicast = domain_base + 11 + per_participant * where.participant};\n}\n\nint main() {\n  constexpr std::int32_t ephemeral_low = 32768;  // the Linux default of ip_local_port_range\n  for (const Endpoint where : {Endpoint{.domain = 0, .participant = 0},\n                               Endpoint{.domain = 1, .participant = 0},\n                               Endpoint{.domain = 1, .participant = 119},\n                               Endpoint{.domain = 1, .participant = 120},\n                               Endpoint{.domain = 2, .participant = 0},\n                               Endpoint{.domain = 101, .participant = 54}}) {\n    const Ports ports = ports_of(where);\n    const Ports next_domain = ports_of(Endpoint{.domain = where.domain + 1, .participant = 0});\n    std::string note;\n    if (ports.user_unicast >= ephemeral_low) {\n      note = \"  <- inside the ephemeral range\";\n    } else if (ports.discovery_unicast >= next_domain.discovery_multicast) {\n      note = \"  <- on top of the next domain\";\n    }\n    std::cout << std::format(\"domain {:>3}, participant {:>3}: multicast {} {}, unicast {} {}{}\\n\", where.domain,\n                             where.participant, ports.discovery_multicast, ports.user_multicast,\n                             ports.discovery_unicast, ports.user_unicast, note);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "domain   0, participant   0: multicast 7400 7401, unicast 7410 7411\ndomain   1, participant   0: multicast 7650 7651, unicast 7660 7661\ndomain   1, participant 119: multicast 7650 7651, unicast 7898 7899\ndomain   1, participant 120: multicast 7650 7651, unicast 7900 7901  <- on top of the next domain\ndomain   2, participant   0: multicast 7900 7901, unicast 7910 7911\ndomain 101, participant  54: multicast 32650 32651, unicast 32768 32769  <- inside the ephemeral range"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the rows in pairs. Domain 0 and domain 1 have no port in common, which is the whole isolation mechanism, and it is also why a firewall rule written for domain 0 silently blocks nothing when somebody moves the robot to domain 7. Domain 1's 121st participant, index 120, takes 7900 and 7901 for its own unicast traffic, and those are domain 2's multicast ports: two groups that believed they were separate now collide. And on Linux, domain 101 runs out of room after 54 participants, because the next pair of ports is inside the range the kernel hands out to anything that opens a socket."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same arithmetic tells you what to open on a firewall. For domain 5 with at most 20 processes per machine, you need UDP 8650 and 8651 for multicast and UDP 8660 to 8699 for unicast, and nothing else."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the other half of the transport story, in a node. It publishes a "
+        },
+        {
+         "t": "code",
+         "v": "sensor_msgs/msg/LaserScan"
+        },
+        {
+         "t": "text",
+         "v": " through a loaned buffer when the middleware can lend one, and through an ordinary message when it cannot, and it says at start-up which of the two it got:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstddef>\n#include <cstdint>\n#include <memory>\n#include <utility>\n#include <vector>\n\n#include <rclcpp/rclcpp.hpp>\n#include <sensor_msgs/msg/laser_scan.hpp>\n\nusing namespace std::chrono_literals;\n\n// Fills a scan with a fixed pattern. No ROS types in the arithmetic, so a test drives it.\nclass ScanPattern {\n public:\n  explicit ScanPattern(std::ptrdiff_t beams) : beams_(beams) {}\n\n  [[nodiscard]] std::vector<float> ranges(std::int64_t tick) const {\n    std::vector<float> values(static_cast<std::size_t>(beams_));\n    for (std::ptrdiff_t i = 0; i < beams_; ++i) {\n      values[static_cast<std::size_t>(i)] = 1.0F + 0.001F * static_cast<float>((tick + i) % 1000);\n    }\n    return values;\n  }\n\n private:\n  std::ptrdiff_t beams_;\n};\n\nclass ScanSource : public rclcpp::Node {\n public:\n  explicit ScanSource(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"scan_source\", options) {\n    publisher_ = create_publisher<sensor_msgs::msg::LaserScan>(\"scan\", rclcpp::SensorDataQoS());\n    const bool intra_process = get_node_options().use_intra_process_comms();\n    // A loan goes straight to the middleware and skips the intra-process path, so take it only\n    // when that path is off. The two are separate routes, and they do not combine.\n    lend_ = publisher_->can_loan_messages() && !intra_process;\n    RCLCPP_INFO(get_logger(), \"middleware can loan: %s, intra-process: %s, publishing loans: %s\",\n                publisher_->can_loan_messages() ? \"yes\" : \"no\", intra_process ? \"on\" : \"off\",\n                lend_ ? \"yes\" : \"no\");\n    timer_ = create_timer(100ms, [this] { publish_scan(); });\n  }\n\n private:\n  void publish_scan() {\n    ++tick_;\n    if (lend_) {\n      // The middleware owns this buffer, and a subscriber in another process on this machine\n      // can read it without a copy.\n      auto loaned = publisher_->borrow_loaned_message();\n      fill(loaned.get());\n      publisher_->publish(std::move(loaned));\n      return;\n    }\n    auto message = std::make_unique<sensor_msgs::msg::LaserScan>();\n    fill(*message);\n    publisher_->publish(std::move(message));  // a unique_ptr, so intra-process delivery moves it\n  }\n\n  void fill(sensor_msgs::msg::LaserScan& scan) const {\n    scan.header.stamp = now();\n    scan.header.frame_id = \"base_scan\";\n    scan.range_min = 0.1F;\n    scan.range_max = 10.0F;\n    scan.ranges = pattern_.ranges(tick_);\n  }\n\n  ScanPattern pattern_{360};\n  std::int64_t tick_ = 0;\n  bool lend_ = false;\n  rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr publisher_;\n  rclcpp::TimerBase::SharedPtr timer_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<ScanSource>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice. "
+        },
+        {
+         "t": "code",
+         "v": "can_loan_messages()"
+        },
+        {
+         "t": "text",
+         "v": " is a question about this publisher with this message type on this middleware, so it is asked at run time and not decided in a build file. With Fast DDS and a "
+        },
+        {
+         "t": "code",
+         "v": "LaserScan"
+        },
+        {
+         "t": "text",
+         "v": " the answer is normally no, because the message has a variable-length array and the middleware cannot size the buffer in advance; ask the same question about a fixed-size message and the answer can change."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The condition on "
+        },
+        {
+         "t": "code",
+         "v": "lend_"
+        },
+        {
+         "t": "text",
+         "v": " is the part to remember. A loan and intra-process delivery are two separate zero-copy routes, and in Jazzy they do not combine. "
+        },
+        {
+         "t": "code",
+         "v": "Publisher::publish(rclcpp::LoanedMessage&&)"
+        },
+        {
+         "t": "text",
+         "v": " hands the buffer to "
+        },
+        {
+         "t": "code",
+         "v": "do_loaned_message_publish"
+        },
+        {
+         "t": "text",
+         "v": ", which calls "
+        },
+        {
+         "t": "code",
+         "v": "rcl_publish_loaned_message"
+        },
+        {
+         "t": "text",
+         "v": " and nothing else, whenever "
+        },
+        {
+         "t": "code",
+         "v": "can_loan_messages()"
+        },
+        {
+         "t": "text",
+         "v": " is true; that branch never reads "
+        },
+        {
+         "t": "code",
+         "v": "intra_process_is_enabled_"
+        },
+        {
+         "t": "text",
+         "v": " and never reaches the "
+        },
+        {
+         "t": "code",
+         "v": "IntraProcessManager"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "publisher.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/publisher.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). Only the "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " overloads take the intra-process path. So a node built with "
+        },
+        {
+         "t": "code",
+         "v": "use_intra_process_comms(true)"
+        },
+        {
+         "t": "text",
+         "v": " on a middleware that can lend, and written to lend whenever it can, publishes loans that go out over the middleware, so a subscriber in the same process pays a serialise and a deserialise for every scan and the intra-process option buys that publisher nothing. The messages still arrive: an intra-process subscription keeps its own middleware subscription, and the ordinary overloads skip the middleware only because "
+        },
+        {
+         "t": "code",
+         "v": "publish(unique_ptr)"
+        },
+        {
+         "t": "text",
+         "v": " compares the subscriber counts first. Choose the route once at construction, from both flags, which is what the line the node logs at start-up reports. That line is also the first thing to ask for when somebody says the same code is slower on the robot than on the desk."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "debug",
+   "title": "Debug two nodes that cannot see each other",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes, on paper. You have this situation."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot running Ubuntu 24.04 and ROS 2 Jazzy publishes "
+        },
+        {
+         "t": "code",
+         "v": "sensor_msgs/msg/LaserScan"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "/scan"
+        },
+        {
+         "t": "text",
+         "v": " from a node called "
+        },
+        {
+         "t": "code",
+         "v": "lidar_driver"
+        },
+        {
+         "t": "text",
+         "v": ". Your laptop, also Jazzy, is on the same Wi-Fi network. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic list"
+        },
+        {
+         "t": "text",
+         "v": " on the laptop does not show "
+        },
+        {
+         "t": "code",
+         "v": "/scan"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 node list"
+        },
+        {
+         "t": "text",
+         "v": " shows only the laptop's own nodes. "
+        },
+        {
+         "t": "code",
+         "v": "ping"
+        },
+        {
+         "t": "text",
+         "v": " works in both directions, and "
+        },
+        {
+         "t": "code",
+         "v": "ssh"
+        },
+        {
+         "t": "text",
+         "v": " into the robot works. On the robot itself, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic echo /scan"
+        },
+        {
+         "t": "text",
+         "v": " prints scans."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write an ordered list of at most eight checks. For each one give the command, the machine you run it on, and what a bad result proves. Put the checks that are cheapest and rule out the most first."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Then answer a second question. Suppose "
+         },
+         {
+          "t": "code",
+          "v": "/scan"
+         },
+         {
+          "t": "text",
+          "v": " does appear on the laptop's "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic list"
+         },
+         {
+          "t": "text",
+          "v": ", but "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic echo /scan"
+         },
+         {
+          "t": "text",
+          "v": " prints nothing. Name the two most likely causes and the one command that tells them apart."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The checks, in order. The first three cost nothing and settle most cases."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "On both machines: "
+         },
+         {
+          "t": "code",
+          "v": "printenv | grep -E '^ROS_|^RMW_'"
+         },
+         {
+          "t": "text",
+          "v": ". You are looking for "
+         },
+         {
+          "t": "code",
+          "v": "ROS_DOMAIN_ID"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "RMW_IMPLEMENTATION"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "ROS_LOCALHOST_ONLY"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "ROS_AUTOMATIC_DISCOVERY_RANGE"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "ROS_STATIC_PEERS"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "ROS_DISCOVERY_SERVER"
+         },
+         {
+          "t": "text",
+          "v": ". Any difference in the first two ends the search: different domain ids use different ports, and different rmw implementations are not guaranteed to interoperate. "
+         },
+         {
+          "t": "code",
+          "v": "ROS_LOCALHOST_ONLY=1"
+         },
+         {
+          "t": "text",
+          "v": " on either side proves it too, because it overrides the discovery range. Remember that "
+         },
+         {
+          "t": "code",
+          "v": "ros2 run"
+         },
+         {
+          "t": "text",
+          "v": " over "
+         },
+         {
+          "t": "code",
+          "v": "ssh"
+         },
+         {
+          "t": "text",
+          "v": " gets the robot's login environment, which is not always the environment the robot's own service files use: check the service too."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "On the laptop: "
+         },
+         {
+          "t": "code",
+          "v": "ros2 daemon stop"
+         },
+         {
+          "t": "text",
+          "v": ", then "
+         },
+         {
+          "t": "code",
+          "v": "ros2 node list"
+         },
+         {
+          "t": "text",
+          "v": " again. The command-line tools talk to a background daemon that caches the graph, and a daemon started with the wrong domain id in its environment keeps answering with that domain's graph. If the topic appears after this, nothing was wrong with the network."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "On the laptop "
+         },
+         {
+          "t": "code",
+          "v": "ros2 multicast receive"
+         },
+         {
+          "t": "text",
+          "v": ", then on the robot "
+         },
+         {
+          "t": "code",
+          "v": "ros2 multicast send"
+         },
+         {
+          "t": "text",
+          "v": ". If nothing arrives, multicast between the two machines is blocked, which is normal on an access point with client isolation and common on managed switches. Discovery then cannot work by announcement, whatever ROS is configured to do. Be precise about what this proves: "
+         },
+         {
+          "t": "code",
+          "v": "ros2 multicast"
+         },
+         {
+          "t": "text",
+          "v": " uses group 225.0.0.1 and port 49150, not the DDS ports, so it shows that multicast can cross the link, and not that the DDS ports are open."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "On both: "
+         },
+         {
+          "t": "code",
+          "v": "sudo ufw status"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "sudo iptables -L -n"
+         },
+         {
+          "t": "text",
+          "v": ". RTPS needs UDP from 7400 plus 250 times the domain id upwards. "
+         },
+         {
+          "t": "code",
+          "v": "ping"
+         },
+         {
+          "t": "text",
+          "v": " passing proves ICMP passes, and says nothing about UDP."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "On both: "
+         },
+         {
+          "t": "code",
+          "v": "ip -brief addr"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "ip route"
+         },
+         {
+          "t": "text",
+          "v": ". You are checking that the addresses the two machines would announce are on one subnet, and that a VPN, a "
+         },
+         {
+          "t": "code",
+          "v": "docker0"
+         },
+         {
+          "t": "text",
+          "v": " bridge or a second interface is not the one the middleware picked. This is the check that explains \"it worked on the bench and not in the lab\"."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "On the robot: "
+         },
+         {
+          "t": "code",
+          "v": "ros2 node list"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic info /scan"
+         },
+         {
+          "t": "text",
+          "v": ". The statement says scans are echoing locally, so this is already answered here; keep it in the list because the local check separates \"the network is wrong\" from \"the node is wrong\", and it is the first thing to run when you do not have that information."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "On the laptop, once "
+         },
+         {
+          "t": "code",
+          "v": "/scan"
+         },
+         {
+          "t": "text",
+          "v": " appears: "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic info /scan --verbose"
+         },
+         {
+          "t": "text",
+          "v": ". It prints the publisher's node name, its GID, its topic type hash and its full QoS profile, which is what discovery carried across. A type hash that differs between the two machines means two different builds of the message package, and that stops delivery."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "On both: "
+         },
+         {
+          "t": "code",
+          "v": "ros2 doctor --report"
+         },
+         {
+          "t": "text",
+          "v": ". It prints the platform, the ROS distribution, the middleware and the network interfaces in one place, which is the report to paste into a ticket."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "If multicast is the problem and you cannot change the network, the fix is to name the peers: set "
+        },
+        {
+         "t": "code",
+         "v": "ROS_STATIC_PEERS"
+        },
+        {
+         "t": "text",
+         "v": " to the other machine's address on both sides, or run a Fast DDS discovery server and point both at it with "
+        },
+        {
+         "t": "code",
+         "v": "ROS_DISCOVERY_SERVER"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For the second question: a topic that is listed but silent is almost always either a QoS mismatch or a data path that discovery does not use. Discovery succeeded, so the two participants found each other over the announcement ports; delivery is a separate matter."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two likely causes are an incompatible QoS pair, most often a best-effort publisher against a reliable subscription, and IP fragmentation of a large message over Wi-Fi, where one lost fragment fills the kernel's reassembly buffer and blocks the rest for "
+        },
+        {
+         "t": "code",
+         "v": "net.ipv4.ipfrag_time"
+        },
+        {
+         "t": "text",
+         "v": " seconds."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The command that tells them apart is "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info /scan --verbose"
+        },
+        {
+         "t": "text",
+         "v": " on the laptop. If the publisher offers best effort and your subscription asks for reliable, the profiles are printed side by side and the case is closed; "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic echo"
+        },
+        {
+         "t": "text",
+         "v": " defaults to a reliable subscription, which is why it is the usual victim. If the profiles are compatible, it is the network, and "
+        },
+        {
+         "t": "code",
+         "v": "cat /proc/net/snmp | grep -A1 '^Ip:'"
+        },
+        {
+         "t": "text",
+         "v": " confirms it by showing the "
+        },
+        {
+         "t": "code",
+         "v": "ReasmFails"
+        },
+        {
+         "t": "text",
+         "v": " counter climbing. The QoS topic comes next and takes the first case apart properly."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the four layers from your node down to the network, and the variable that swaps the bottom one. Say what discovery does in its two stages and what endpoint discovery carries across. Give the domain id's effect in terms of ports, the safe range on Linux and why it exists. Say how many participants a process has and what that means for composition. Name the two variables that replaced "
+        },
+        {
+         "t": "code",
+         "v": "ROS_LOCALHOST_ONLY"
+        },
+        {
+         "t": "text",
+         "v": ", and the two shortcuts that avoid a copy inside one machine. Finish with three reasons two machines on one network do not see each other."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Name the layers between "
+     },
+     {
+      "t": "code",
+      "v": "publish"
+     },
+     {
+      "t": "text",
+      "v": " and the network card, and say which of them knows the vendor's name."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which environment variable chooses the middleware, and when is it read?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What do the two stages of discovery do, and which of them carries the QoS profile?"
+     }
+    ],
+    [
+     {
+      "t": "code",
+      "v": "ROS_DOMAIN_ID=1"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "ROS_DOMAIN_ID=2"
+     },
+     {
+      "t": "text",
+      "v": " on one switch. Which ports does each use, and where do they collide?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is 101 the largest domain id usually recommended on Linux?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How many DDS participants does a container process with twelve components create, and how many do twelve separate processes create?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "ROS_AUTOMATIC_DISCOVERY_RANGE"
+     },
+     {
+      "t": "text",
+      "v": " default to, and which two variables replaced "
+     },
+     {
+      "t": "code",
+      "v": "ROS_LOCALHOST_ONLY"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When does "
+     },
+     {
+      "t": "code",
+      "v": "can_loan_messages()"
+     },
+     {
+      "t": "text",
+      "v": " return true, and what does rclcpp do when it returns false?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the two conditions on the QoS profile for intra-process delivery, and what happens when they are not met?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Two machines ping each other and see no ROS topics. Give your first three checks and what each one rules out."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation: "
+     },
+     {
+      "t": "a",
+      "v": "The ROS_DOMAIN_ID",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Domain-ID.html"
+     },
+     {
+      "t": "text",
+      "v": " for the port formula, the safe ranges and the one participant per process; "
+     },
+     {
+      "t": "a",
+      "v": "Different middleware vendors",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Different-Middleware-Vendors.html"
+     },
+     {
+      "t": "text",
+      "v": " for the four rmw packages and the cross-vendor warning; "
+     },
+     {
+      "t": "a",
+      "v": "Working with multiple RMW implementations",
+      "href": "https://docs.ros.org/en/jazzy/How-To-Guides/Working-with-multiple-RMW-implementations.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "RMW_IMPLEMENTATION"
+     },
+     {
+      "t": "text",
+      "v": "; "
+     },
+     {
+      "t": "a",
+      "v": "DDS tuning",
+      "href": "https://docs.ros.org/en/jazzy/How-To-Guides/DDS-tuning.html"
+     },
+     {
+      "t": "text",
+      "v": " for the fragmentation numbers and the serialisation cost of arrays of non-primitive types; "
+     },
+     {
+      "t": "a",
+      "v": "the Fast DDS discovery server tutorial",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Advanced/Discovery-Server/Discovery-Server.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "ROS_DISCOVERY_SERVER"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article "
+     },
+     {
+      "t": "a",
+      "v": "ROS on DDS",
+      "href": "https://design.ros2.org/articles/ros_on_dds.html"
+     },
+     {
+      "t": "text",
+      "v": ": why DDS, and what RTPS gives the graph."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "rmw on the jazzy branch",
+      "href": "https://github.com/ros2/rmw/tree/jazzy/rmw"
+     },
+     {
+      "t": "text",
+      "v": ": the C interface every client library is written against, including "
+     },
+     {
+      "t": "a",
+      "v": "discovery_options.h",
+      "href": "https://github.com/ros2/rmw/blob/jazzy/rmw/include/rmw/discovery_options.h"
+     },
+     {
+      "t": "text",
+      "v": " with the four discovery ranges and the buffer that gives a static peer address its 255-character limit."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rcl on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "discovery_options.c",
+      "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/src/rcl/discovery_options.c"
+     },
+     {
+      "t": "text",
+      "v": " for the default of "
+     },
+     {
+      "t": "code",
+      "v": "SUBNET"
+     },
+     {
+      "t": "text",
+      "v": " and the semicolon-separated "
+     },
+     {
+      "t": "code",
+      "v": "ROS_STATIC_PEERS"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "init.c",
+      "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/src/rcl/init.c"
+     },
+     {
+      "t": "text",
+      "v": " for the deprecation warning on "
+     },
+     {
+      "t": "code",
+      "v": "ROS_LOCALHOST_ONLY"
+     },
+     {
+      "t": "text",
+      "v": " and the fact that it overrides the newer options."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "loaned_message.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/loaned_message.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the loan and the fallback it logs, "
+     },
+     {
+      "t": "a",
+      "v": "publisher.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/publisher.hpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "subscription.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/subscription.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the intra-process conditions, and "
+     },
+     {
+      "t": "a",
+      "v": "node_options.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/node_options.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "use_intra_process_comms"
+     },
+     {
+      "t": "text",
+      "v": " and its default."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ros2cli on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "ros2multicast",
+      "href": "https://github.com/ros2/ros2cli/tree/jazzy/ros2multicast"
+     },
+     {
+      "t": "text",
+      "v": ", whose group and port are 225.0.0.1 and 49150, and "
+     },
+     {
+      "t": "a",
+      "v": "ros2doctor",
+      "href": "https://github.com/ros2/ros2cli/tree/jazzy/ros2doctor"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The OMG "
+     },
+     {
+      "t": "a",
+      "v": "DDSI-RTPS specification",
+      "href": "https://www.omg.org/spec/DDSI-RTPS/"
+     },
+     {
+      "t": "text",
+      "v": ", which defines the port formula the worked example computes."
+     }
+    ]
+   ]
+  }
+ ]
+}

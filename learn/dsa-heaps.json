@@ -1,0 +1,1985 @@
+{
+ "id": "dsa-heaps",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "kth_largest(readings, k)"
+     },
+     {
+      "t": "text",
+      "v": ", which returns the k-th largest value of a "
+     },
+     {
+      "t": "code",
+      "v": "std::span<const int>"
+     },
+     {
+      "t": "text",
+      "v": ", or no value when k is below 1 or above the number of readings. Equal values count separately, so the second largest of "
+     },
+     {
+      "t": "code",
+      "v": "{7, 7, 7}"
+     },
+     {
+      "t": "text",
+      "v": " is 7. Use a heap that never holds more than k elements, and say what the time and the extra space are in terms of n and k. Test k = 1, 3 and 8 on eight readings, k = 9 and k = 0, the all-equal case, and the empty input. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstddef>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <optional>\n#include <queue>\n#include <span>\n#include <string>\n#include <vector>\n\n// The k-th largest value, or no value when k is outside 1 to the size.\n// Keeps the k largest seen so far in a min-heap, so its smallest is the answer.\n[[nodiscard]] std::optional<int> kth_largest(std::span<const int> values, std::ptrdiff_t k) {\n  if (k < 1 || k > std::ssize(values)) return std::nullopt;\n  std::priority_queue<int, std::vector<int>, std::greater<>> smallest_on_top;\n  for (const int x : values) {\n    smallest_on_top.push(x);\n    if (std::ssize(smallest_on_top) > k) smallest_on_top.pop();  // drop the smallest of the k + 1\n  }\n  return smallest_on_top.top();\n}\n\n[[nodiscard]] std::string text(std::optional<int> v) { return v ? std::format(\"{}\", *v) : \"none\"; }\n\nint main() {\n  const std::vector<int> readings{3, 1, 4, 1, 5, 9, 2, 6};\n  for (const std::ptrdiff_t k : {1, 3, 8, 9, 0})\n    std::cout << std::format(\"k = {}: {}\\n\", k, text(kth_largest(readings, k)));\n  const std::vector<int> ties{7, 7, 7};\n  std::cout << std::format(\"all equal, k = 2: {}\\n\", text(kth_largest(ties, 2)));\n  std::cout << std::format(\"empty, k = 1: {}\\n\", text(kth_largest({}, 1)));\n}"
+   },
+   {
+    "t": "output",
+    "text": "k = 1: 9\nk = 3: 5\nk = 8: 1\nk = 9: none\nk = 0: none\nall equal, k = 2: 7\nempty, k = 1: none"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The trick is that the heap is a "
+     },
+     {
+      "t": "i",
+      "v": "min"
+     },
+     {
+      "t": "text",
+      "v": "-heap holding the k "
+     },
+     {
+      "t": "i",
+      "v": "largest"
+     },
+     {
+      "t": "text",
+      "v": " values. Once it has k of them, its smallest element is the weakest of the survivors, so the next reading either beats it and takes its place, or loses and is dropped. When the input runs out, the k largest are inside and the smallest of those is the k-th largest."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "That is O(n log k) time, because each of the n readings does at most one push and one pop of a heap of size k, and O(k) extra space. The alternative answers are worth naming out loud. Sorting and indexing is O(n log n) time and changes or copies the input. "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::nth_element"
+     },
+     {
+      "t": "text",
+      "v": " from the sorting topic is O(n) on average and the fastest of the three when you may rearrange the input and have it all in memory. The heap wins when n is much larger than k, when the readings arrive one at a time and you cannot hold them all, or when you want the whole top k rather than one element."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with a size-k heap of the right polarity, the "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": " guard on k, and O(n log k) and O(k) stated. A max-heap of all n elements popped k times is correct at O(n + k log n) and a partial pass, because it holds every reading. Sorting, or a heap of the wrong polarity that keeps the k smallest, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A heap is a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " where every parent compares at least as high as its children, index i's children at 2i + 1 and 2i + 2, its parent at (i − 1) / 2, with no pointer stored and no separate node. That single rule says nothing about siblings or cousins, so a heap is not sorted, and the one certain position is the root: whichever element compares highest under the chosen ordering."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is repeatedly asking for the current largest, or smallest, element while the set keeps changing, without paying to keep everything else in order too. Sorting after every insertion, or scanning the whole collection for the extreme each time, does more work than the question needs; the invariant a heap keeps is exactly the part of sorting the question actually uses."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "code",
+     "v": "top"
+    },
+    {
+     "t": "text",
+     "v": " reads the root, O(1). A push appends the new element at the back and sifts it up, swapping with its parent while it outranks it, walking at most the tree's height, O(log n); a pop swaps the root with the last element, shrinks the range, and sifts that element down from the root, also O(log n). The tree is complete by construction, filled level by level with no gaps, so its height is always ⌊log₂ n⌋ whatever order elements arrived in, unlike a search tree's. Building a heap from a whole container at once costs only O(n), most elements sitting near the leaves with almost nothing to sift, cheaper than pushing them in one at a time."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "code",
+     "v": "std::priority_queue"
+    },
+    {
+     "t": "text",
+     "v": " wraps this in "
+    },
+    {
+     "t": "code",
+     "v": "top"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "push"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "pop"
+    },
+    {
+     "t": "text",
+     "v": " and hides the rest: no iteration over the other pending elements, no erasing or re-prioritising one that is not on top, and no access to the container without going around the adaptor. Reach for a plain "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " and the heap algorithms once you need any of that, a scheduler that cancels a task rather than only running the next one."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake that survives code review is the comparator's direction: the rule always means \"less\", but a sort places the least element at the front of the range while a heap places the greatest at the top, so "
+    },
+    {
+     "t": "code",
+     "v": "std::greater"
+    },
+    {
+     "t": "text",
+     "v": " handed to a heap gives the smallest element first, the opposite of a sort with the same comparator. That reversal is the interview question in miniature: naming which spelling gives a min-heap, and why it reads backwards, before writing a line of code."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "priority_queue, heap operations, min-heaps with comparators",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A heap is a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ". Nothing else:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <vector>\n\n[[nodiscard]] std::string show(std::span<const int> v) {\n  std::string out;\n  for (const int x : v) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", x);\n  return out;\n}\n\nint main() {\n  std::vector<int> v{5, 3, 8, 2, 4, 9, 1};\n  std::cout << std::format(\"input        {}\\n\", show(v));\n  std::make_heap(v.begin(), v.end());\n  std::cout << std::format(\"make_heap    {}   is_heap {}\\n\", show(v), std::is_heap(v.begin(), v.end()));\n\n  for (std::ptrdiff_t start = 0, width = 1; start < std::ssize(v); start += width, width *= 2) {\n    const std::ptrdiff_t count = std::min(width, std::ssize(v) - start);\n    std::cout << std::format(\"level {}      {}\\n\", start == 0 ? 0 : (start == 1 ? 1 : 2),\n                             show(std::span{v}.subspan(static_cast<std::size_t>(start),\n                                                       static_cast<std::size_t>(count))));\n  }\n\n  bool ordered = true;\n  for (std::ptrdiff_t i = 1; i < std::ssize(v); ++i) ordered = ordered && v[(i - 1) / 2] >= v[i];\n  std::cout << std::format(\"every v[(i-1)/2] >= v[i]: {}\\n\", ordered);\n\n  v.push_back(7);\n  std::cout << std::format(\"push_back 7  {}   is_heap {}\\n\", show(v), std::is_heap(v.begin(), v.end()));\n  std::push_heap(v.begin(), v.end());\n  std::cout << std::format(\"push_heap    {}   is_heap {}\\n\", show(v), std::is_heap(v.begin(), v.end()));\n  std::pop_heap(v.begin(), v.end());\n  std::cout << std::format(\"pop_heap     {}   largest now at the back\\n\", show(v));\n  v.pop_back();\n  std::cout << std::format(\"pop_back     {}   is_heap {}\\n\", show(v), std::is_heap(v.begin(), v.end()));\n}"
+      },
+      {
+       "t": "output",
+       "text": "input        5 3 8 2 4 9 1\nmake_heap    9 4 8 2 3 5 1   is_heap true\nlevel 0      9\nlevel 1      4 8\nlevel 2      2 3 5 1\nevery v[(i-1)/2] >= v[i]: true\npush_back 7  9 4 8 2 3 5 1 7   is_heap false\npush_heap    9 7 8 4 3 5 1 2   is_heap true\npop_heap     8 7 5 4 3 2 1 9   largest now at the back\npop_back     8 7 5 4 3 2 1   is_heap true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The tree is in the indices. Index 0 is the root, the children of index i are 2i + 1 and 2i + 2, and the parent of index i is (i − 1) / 2, so a node reaches its children and its parent by arithmetic and no link is stored. That is the whole reason to prefer this shape to the "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " nodes of the search tree topic: one allocation for the whole structure instead of one per element, no child pointers to pay for or follow, no destructor recursion to overflow the stack, and a tree that is "
+        },
+        {
+         "t": "i",
+         "v": "complete"
+        },
+        {
+         "t": "text",
+         "v": " by construction, every level full except possibly the last, filled left to right. Completeness means the height is always ⌊log₂ n⌋, whatever order the elements arrive in. The search tree's height was 4096 or 28 for the same 4096 keys depending on the insertion order; a heap has no such case."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The invariant is weaker than sorting, which is why it is cheaper. Every parent compares at least as high as its children, and that is all. Read the output above: "
+        },
+        {
+         "t": "code",
+         "v": "9 4 8 2 3 5 1"
+        },
+        {
+         "t": "text",
+         "v": " is a valid heap, and it is not sorted, and 4 sits above 8's subtree while being smaller than 8. Nothing is known about siblings or cousins. The one element whose position is certain is the root, and a heap is the right structure exactly when the root is all you ever ask for."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three operations follow from the shape. "
+        },
+        {
+         "t": "code",
+         "v": "top"
+        },
+        {
+         "t": "text",
+         "v": " reads index 0, in O(1). A push appends at the back and "
+        },
+        {
+         "t": "i",
+         "v": "sifts up"
+        },
+        {
+         "t": "text",
+         "v": ", swapping with its parent while it outranks it, which walks at most the height, so O(log n). A pop swaps index 0 with the back, shrinks the range by one and "
+        },
+        {
+         "t": "i",
+         "v": "sifts down"
+        },
+        {
+         "t": "text",
+         "v": " from the root, again O(log n). "
+        },
+        {
+         "t": "code",
+         "v": "std::push_heap"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::pop_heap"
+        },
+        {
+         "t": "text",
+         "v": " are those two halves, and they explain their odd shape: "
+        },
+        {
+         "t": "code",
+         "v": "push_heap"
+        },
+        {
+         "t": "text",
+         "v": " fixes a heap whose new element is already at the back, so you "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " first, and "
+        },
+        {
+         "t": "code",
+         "v": "pop_heap"
+        },
+        {
+         "t": "text",
+         "v": " moves the top element to the back and leaves it there, so you read "
+        },
+        {
+         "t": "code",
+         "v": "back()"
+        },
+        {
+         "t": "text",
+         "v": " and then "
+        },
+        {
+         "t": "code",
+         "v": "pop_back()"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::priority_queue"
+        },
+        {
+         "t": "text",
+         "v": " wraps that pair with a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " and gives you "
+        },
+        {
+         "t": "code",
+         "v": "top"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "size"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "empty"
+        },
+        {
+         "t": "text",
+         "v": ". What it hides matters as much as what it offers: there is no iteration, so you cannot look at the other pending items or report them; no "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": "; no way to erase or re-prioritise an element that is not on top; and no access to the container without deriving from the adaptor to reach its protected "
+        },
+        {
+         "t": "code",
+         "v": "c"
+        },
+        {
+         "t": "text",
+         "v": ". When you need any of that, keep your own "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " and call the algorithms, which is what the worked example does. The family is "
+        },
+        {
+         "t": "code",
+         "v": "make_heap"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "push_heap"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "pop_heap"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "sort_heap"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "is_heap"
+        },
+        {
+         "t": "text",
+         "v": ", plus "
+        },
+        {
+         "t": "code",
+         "v": "is_heap_until"
+        },
+        {
+         "t": "text",
+         "v": ", which points at the first element that breaks the invariant and is the debugging tool of the set."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Building a heap has two costs, and which one you pay depends on how you build it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <random>\n#include <span>\n#include <string_view>\n#include <vector>\n\n// Builds a heap from the whole range at once, and reports the comparisons it took.\n[[nodiscard]] std::int64_t by_heapify(std::vector<int> v) {\n  std::int64_t comparisons = 0;\n  std::make_heap(v.begin(), v.end(), [&comparisons](int a, int b) {\n    ++comparisons;\n    return a < b;\n  });\n  return comparisons;\n}\n\n// Builds the same heap one element at a time, the way priority_queue::push does.\n[[nodiscard]] std::int64_t by_pushes(std::span<const int> values) {\n  std::int64_t comparisons = 0;\n  const auto less = [&comparisons](int a, int b) {\n    ++comparisons;\n    return a < b;\n  };\n  std::vector<int> heap;\n  heap.reserve(values.size());\n  for (const int x : values) {\n    heap.push_back(x);\n    std::push_heap(heap.begin(), heap.end(), less);\n  }\n  return comparisons;\n}\n\nvoid row(std::string_view order, std::span<const int> values) {\n  const std::int64_t heapify = by_heapify(std::vector<int>(values.begin(), values.end()));\n  const std::int64_t pushes = by_pushes(values);\n  std::cout << std::format(\"{:<24}{:>12}{:>12}{:>10.2f}\\n\", order, heapify, pushes,\n                           static_cast<double>(pushes) / static_cast<double>(heapify));\n}\n\nint main() {\n  constexpr int n = 4096;\n  std::vector<int> ascending(n);\n  std::iota(ascending.begin(), ascending.end(), 0);\n  std::vector<int> shuffled = ascending;\n  std::mt19937 gen{42};\n  std::ranges::shuffle(shuffled, gen);\n  std::vector<int> descending = ascending;\n  std::ranges::reverse(descending);\n\n  std::cout << std::format(\"{:<24}{:>12}{:>12}{:>10}\\n\", \"4096 values, comparisons\", \"make_heap\", \"n pushes\",\n                           \"ratio\");\n  row(\"already ascending\", ascending);\n  row(\"shuffled\", shuffled);\n  row(\"already descending\", descending);\n  std::cout << std::format(\"n log2 n = {}, 3n = {}\\n\", n * 12, 3 * n);\n}"
+      },
+      {
+       "t": "output",
+       "text": "4096 values, comparisons   make_heap    n pushes     ratio\nalready ascending               6131       40974      6.68\nshuffled                        6724        9306      1.38\nalready descending              8178        4095      0.50\nn log2 n = 49152, 3n = 12288"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "make_heap"
+        },
+        {
+         "t": "text",
+         "v": " stays under 3n = 12,288 comparisons on all three inputs, which is the O(n) bound: it sifts down from the last parent backwards, and most of the elements are leaves with no work to do, so the total is linear rather than n log n. Pushing one at a time is O(log n) per push and O(n log n) in the worst case, and the worst case is a run of increasing values, because each new element is the largest so far and sifts all the way to the root. That is the 40,974 comparisons in the first row, close to n·log₂ n = 49,152 and 6.68 times what "
+        },
+        {
+         "t": "code",
+         "v": "make_heap"
+        },
+        {
+         "t": "text",
+         "v": " needed. Descending input is the other extreme: each new element stops at its parent immediately, 4,095 comparisons in total."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So reach for "
+        },
+        {
+         "t": "code",
+         "v": "make_heap"
+        },
+        {
+         "t": "text",
+         "v": " when the elements are already in a container, and push one at a time only when they genuinely arrive one at a time. And notice which input made pushing expensive: values in increasing order, the same shape that turned the search tree into a chain and the textbook quicksort into O(n²). Sensor readings arrive in time order."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three places in robot code want this structure. "
+        },
+        {
+         "t": "i",
+         "v": "k nearest"
+        },
+        {
+         "t": "text",
+         "v": ": keep the k closest detections in a size-k heap while the scan streams past, as the cold check does. A "
+        },
+        {
+         "t": "i",
+         "v": "scheduler"
+        },
+        {
+         "t": "text",
+         "v": ": the next task to run is the one with the earliest deadline, which is the worked example. A "
+        },
+        {
+         "t": "i",
+         "v": "frontier"
+        },
+        {
+         "t": "text",
+         "v": ": a search that always expands the cheapest unexplored state next, which is what Dijkstra's algorithm and A\\* are, and which the graph topic reaches. The intervals topic left a promise here too: the smallest number of meeting rooms is a min-heap of end times, where each meeting either reuses the room whose meeting ended earliest or opens a new one, and the heap's size is the answer."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot's scheduler holds tasks with deadlines and always runs the most urgent one. That is a min-heap by deadline, and a min-heap is the same code as a max-heap with the comparison turned around:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <queue>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Task {\n  std::string name;\n  std::int64_t due_ms = 0;\n};\n\n// std::priority_queue calls this \"less\": comp(a, b) true means a comes out after b.\nstruct RunsAfter {\n  [[nodiscard]] bool operator()(const Task& a, const Task& b) const { return a.due_ms > b.due_ms; }\n};\n\n[[nodiscard]] std::string pending(std::span<const Task> tasks) {\n  std::string out;\n  for (const Task& t : tasks) out += std::format(\"{}{}@{}\", out.empty() ? \"\" : \" \", t.name, t.due_ms);\n  return out;\n}\n\nint main() {\n  const std::vector<Task> arriving{{\"calibrate\", 900}, {\"heartbeat\", 100}, {\"log-flush\", 500},\n                                   {\"estop-check\", 50}, {\"map-save\", 700}};\n\n  std::priority_queue<Task, std::vector<Task>, RunsAfter> queue;\n  for (const Task& t : arriving) queue.push(t);\n  std::string order;\n  while (!queue.empty()) {\n    order += std::format(\"{}{}\", order.empty() ? \"\" : \" \", queue.top().name);\n    queue.pop();\n  }\n  std::cout << std::format(\"priority_queue  {}\\n\", order);\n\n  std::vector<Task> heap;\n  const RunsAfter runs_after;\n  for (const Task& t : arriving) {\n    heap.push_back(t);\n    std::push_heap(heap.begin(), heap.end(), runs_after);\n  }\n  std::cout << std::format(\"the vector      {}\\n\", pending(heap));\n  std::cout << std::format(\"is a heap: {}, {} tasks pending, next at {} ms\\n\",\n                           std::is_heap(heap.begin(), heap.end(), runs_after), heap.size(), heap.front().due_ms);\n\n  std::string drained;\n  while (!heap.empty()) {\n    std::pop_heap(heap.begin(), heap.end(), runs_after);  // the earliest moves to the back\n    drained += std::format(\"{}{}\", drained.empty() ? \"\" : \" \", heap.back().name);\n    heap.pop_back();\n  }\n  std::cout << std::format(\"drained         {}\\n\", drained);\n\n  std::vector<Task> again(arriving.begin(), arriving.end());\n  std::make_heap(again.begin(), again.end(), runs_after);\n  std::sort_heap(again.begin(), again.end(), runs_after);\n  std::cout << std::format(\"sort_heap       {}\\n\", pending(again));\n}"
+      },
+      {
+       "t": "output",
+       "text": "priority_queue  estop-check heartbeat log-flush map-save calibrate\nthe vector      estop-check@50 heartbeat@100 log-flush@500 calibrate@900 map-save@700\nis a heap: true, 5 tasks pending, next at 50 ms\ndrained         estop-check heartbeat log-flush map-save calibrate\nsort_heap       calibrate@900 map-save@700 log-flush@500 heartbeat@100 estop-check@50"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "RunsAfter"
+        },
+        {
+         "t": "text",
+         "v": " is named after what it answers, and that name is the defence against the direction mistake. "
+        },
+        {
+         "t": "code",
+         "v": "std::priority_queue"
+        },
+        {
+         "t": "text",
+         "v": " and the heap algorithms both take a comparison that means \"less\", and less means "
+        },
+        {
+         "t": "i",
+         "v": "lower priority"
+        },
+        {
+         "t": "text",
+         "v": ", which means "
+        },
+        {
+         "t": "i",
+         "v": "later"
+        },
+        {
+         "t": "text",
+         "v": ". So the comparison to write is the one that reads as \"a runs after b\", and for deadlines that is "
+        },
+        {
+         "t": "code",
+         "v": "a.due_ms > b.due_ms"
+        },
+        {
+         "t": "text",
+         "v": ". Writing "
+        },
+        {
+         "t": "code",
+         "v": "<"
+        },
+        {
+         "t": "text",
+         "v": " there gives a scheduler that runs the least urgent task first and looks fine on a test with one task."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two halves of the output are the same heap built two ways. Both drain in the same order, and both are O(log n) per task. What differs is what you can do in between. The "
+        },
+        {
+         "t": "code",
+         "v": "priority_queue"
+        },
+        {
+         "t": "text",
+         "v": " version can only tell you the next task. The vector version reports all five with their deadlines, answers "
+        },
+        {
+         "t": "code",
+         "v": "heap.size()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "heap.front()"
+        },
+        {
+         "t": "text",
+         "v": " without popping, and would let you "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::find"
+        },
+        {
+         "t": "text",
+         "v": " a cancelled task. That is the trade: "
+        },
+        {
+         "t": "code",
+         "v": "priority_queue"
+        },
+        {
+         "t": "text",
+         "v": " for a queue you only drain, your own vector plus the algorithms when the pending set is something the rest of the program asks about. Removing a task from the middle is "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::find"
+        },
+        {
+         "t": "text",
+         "v": ", then overwrite it with "
+        },
+        {
+         "t": "code",
+         "v": "heap.back()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "pop_back()"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "std::make_heap"
+        },
+        {
+         "t": "text",
+         "v": " over what is left, which is O(n); a heap has no cheap arbitrary erase, and needing one often means you wanted "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " or a map from id to position."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last line is a trap worth seeing once. "
+        },
+        {
+         "t": "code",
+         "v": "std::sort_heap"
+        },
+        {
+         "t": "text",
+         "v": " leaves the range sorted by the same comparison the heap used, so a min-heap comparison sorts the tasks latest-first, the reverse of the order the heap hands them out. "
+        },
+        {
+         "t": "code",
+         "v": "sort_heap"
+        },
+        {
+         "t": "text",
+         "v": " costs O(n log n) and is heapsort's second half; when you want a sorted vector and do not need the heap, call "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::sort"
+        },
+        {
+         "t": "text",
+         "v": ", which libstdc++ implements as introsort and which the sorting topic measured at 62 ms against "
+        },
+        {
+         "t": "code",
+         "v": "stable_sort"
+        },
+        {
+         "t": "text",
+         "v": "'s 74 on a million values."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Top-k frequent elements; merge k sorted lists",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "top_k_frequent(readings, k)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the k values that appear most often in a "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const int>"
+        },
+        {
+         "t": "text",
+         "v": ", most frequent first. Break ties by the smaller value first, so the answer is the same on every run. Return fewer than k entries when there are fewer distinct values, and an empty vector when k is below 1."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test "
+        },
+        {
+         "t": "code",
+         "v": "{1, 1, 1, 2, 2, 3, 3, 4}"
+        },
+        {
+         "t": "text",
+         "v": " with k = 1, 2, 3, 4, 5 and 0, and an empty input. Count with a hash map from the hash-map topic, then use a heap that never holds more than k entries. State the time and extra space in terms of n, the number of distinct values m, and k. Then say which input would make you drop the heap for something else, and what."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two phases. Counting is O(n) with an "
+        },
+        {
+         "t": "code",
+         "v": "unordered_map"
+        },
+        {
+         "t": "text",
+         "v": ". Then the same size-k min-heap as the cold check, over "
+        },
+        {
+         "t": "code",
+         "v": "(value, count)"
+        },
+        {
+         "t": "text",
+         "v": " pairs instead of plain values, with the comparison arranged so the entry that would be dropped first sits on top:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <queue>\n#include <span>\n#include <string>\n#include <unordered_map>\n#include <vector>\n\nstruct Tally {\n  int value = 0;\n  std::int64_t count = 0;\n};\n\n// priority_queue calls this \"less\": comp(a, b) true means a leaves the heap after b.\n// The rarest value sits on top, and among equal counts the larger value does.\nstruct Rarer {\n  [[nodiscard]] bool operator()(const Tally& a, const Tally& b) const {\n    if (a.count != b.count) return a.count > b.count;\n    return a.value < b.value;\n  }\n};\n\n// The k values that appear most often, most frequent first, smaller value first among equal counts.\n[[nodiscard]] std::vector<int> top_k_frequent(std::span<const int> readings, std::ptrdiff_t k) {\n  if (k < 1) return {};\n  std::unordered_map<int, std::int64_t> counts;\n  for (const int x : readings) ++counts[x];\n  std::priority_queue<Tally, std::vector<Tally>, Rarer> best;\n  for (const auto& [value, count] : counts) {\n    best.push({.value = value, .count = count});\n    if (std::ssize(best) > k) best.pop();  // the rarest of the k + 1 goes\n  }\n  std::vector<int> out;\n  while (!best.empty()) {\n    out.push_back(best.top().value);\n    best.pop();\n  }\n  std::ranges::reverse(out);  // the heap gave them rarest first\n  return out;\n}\n\n[[nodiscard]] std::string show(std::span<const int> v) {\n  std::string out;\n  for (const int x : v) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", x);\n  return out.empty() ? \"(none)\" : out;\n}\n\nint main() {\n  const std::vector<int> readings{1, 1, 1, 2, 2, 3, 3, 4};\n  for (const std::ptrdiff_t k : {1, 2, 3, 4, 5, 0})\n    std::cout << std::format(\"k = {}: {}\\n\", k, show(top_k_frequent(readings, k)));\n  std::cout << std::format(\"empty input, k = 2: {}\\n\", show(top_k_frequent({}, 2)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "k = 1: 1\nk = 2: 1 2\nk = 3: 1 2 3\nk = 4: 1 2 3 4\nk = 5: 1 2 3 4\nk = 0: (none)\nempty input, k = 2: (none)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "O(n) to count, then O(m log k) for the heap, and O(m) extra space for the map plus O(k) for the heap. With k = 2 the answer is 1 then 2, because 2 and 3 both appear twice and the smaller value wins the tie. That tie rule is doing real work here: "
+        },
+        {
+         "t": "code",
+         "v": "unordered_map"
+        },
+        {
+         "t": "text",
+         "v": " iteration order is unspecified, so without a total order on "
+        },
+        {
+         "t": "code",
+         "v": "(count, value)"
+        },
+        {
+         "t": "text",
+         "v": " the answer would depend on the library's bucket layout and the test would be a coin flip. Any problem whose answer is \"the top k\" needs a rule for ties before it has a testable answer, and saying so is worth a mark."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Rarer"
+        },
+        {
+         "t": "text",
+         "v": " is written to answer \"does a leave before b\", and both of its lines are turned around from what they look like. A bigger count means it leaves "
+        },
+        {
+         "t": "i",
+         "v": "later"
+        },
+        {
+         "t": "text",
+         "v": ", so "
+        },
+        {
+         "t": "code",
+         "v": "a.count > b.count"
+        },
+        {
+         "t": "text",
+         "v": ". Among equal counts, the smaller value should survive, so the smaller value leaves later, which is "
+        },
+        {
+         "t": "code",
+         "v": "a.value < b.value"
+        },
+        {
+         "t": "text",
+         "v": ". Reversing the drained vector at the end is what turns \"rarest first\" into \"most frequent first\"."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The input that should change your mind is a small range of counts. Counts lie between 1 and n, so you can bucket by count: a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::vector<int>>"
+        },
+        {
+         "t": "text",
+         "v": " indexed by count, filled in O(m), then read from the back until you have k. That is O(n + m) with no logarithms and no comparator to get wrong, and it is the better answer when k is close to m. The heap wins when k is much smaller than m, and when the readings stream past and you never hold them all. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::nth_element"
+        },
+        {
+         "t": "text",
+         "v": " on the tallies is a third answer, O(m) on average, when you may rearrange the tallies and want exactly the top k without their order."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "merge_sorted(lists)"
+        },
+        {
+         "t": "text",
+         "v": ", which merges k already sorted "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<int>"
+        },
+        {
+         "t": "text",
+         "v": " into one sorted vector. Take them as "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const std::vector<int>>"
+        },
+        {
+         "t": "text",
+         "v": " and do not change them. Use a heap whose size is at most k, so the cost is O(N log k) for N elements in total rather than the O(N log N) of concatenating and sorting."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Equal values must come out in list order, so a 1 from list 0 precedes a 1 from list 1. Test three lists with a shared value, three lists where one is empty, three empty lists, a single list with a repeated value, and no lists at all. State the time and the extra space, and say what changes if the lists are so long that only one element of each fits in memory."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The heap holds one cursor per list, the element each list is currently offering. Take the smallest, write it out, and put back the next element of the list it came from:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <queue>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Cursor {\n  int value = 0;\n  std::ptrdiff_t list = 0;  // which list it came from\n  std::ptrdiff_t at = 0;    // its position in that list\n};\n\n// priority_queue calls this \"less\": the smallest value has to come out first, so a larger\n// value means lower priority. The list index breaks ties, which keeps the merge stable.\nstruct Later {\n  [[nodiscard]] bool operator()(const Cursor& a, const Cursor& b) const {\n    if (a.value != b.value) return a.value > b.value;\n    return a.list > b.list;\n  }\n};\n\n[[nodiscard]] std::vector<int> merge_sorted(std::span<const std::vector<int>> lists) {\n  std::vector<int> out;\n  std::priority_queue<Cursor, std::vector<Cursor>, Later> front;\n  std::ptrdiff_t total = 0;\n  for (std::ptrdiff_t i = 0; i < std::ssize(lists); ++i) {\n    total += std::ssize(lists[static_cast<std::size_t>(i)]);\n    if (!lists[static_cast<std::size_t>(i)].empty())\n      front.push({.value = lists[static_cast<std::size_t>(i)].front(), .list = i, .at = 0});\n  }\n  out.reserve(static_cast<std::size_t>(total));\n  while (!front.empty()) {\n    const Cursor here = front.top();\n    front.pop();\n    out.push_back(here.value);\n    const std::vector<int>& from = lists[static_cast<std::size_t>(here.list)];\n    if (here.at + 1 < std::ssize(from))\n      front.push({.value = from[static_cast<std::size_t>(here.at + 1)], .list = here.list, .at = here.at + 1});\n  }\n  return out;\n}\n\n[[nodiscard]] std::string show(std::span<const int> v) {\n  std::string out;\n  for (const int x : v) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", x);\n  return out.empty() ? \"(none)\" : out;\n}\n\nint main() {\n  const std::vector<std::vector<int>> three{{1, 4, 5}, {1, 3, 4}, {2, 6}};\n  std::cout << std::format(\"three lists       {}\\n\", show(merge_sorted(three)));\n  const std::vector<std::vector<int>> with_empty{{1, 4, 5}, {}, {2, 6}};\n  std::cout << std::format(\"one empty         {}\\n\", show(merge_sorted(with_empty)));\n  const std::vector<std::vector<int>> all_empty{{}, {}, {}};\n  std::cout << std::format(\"all empty         {}\\n\", show(merge_sorted(all_empty)));\n  const std::vector<std::vector<int>> single{{2, 2, 7}};\n  std::cout << std::format(\"one list          {}\\n\", show(merge_sorted(single)));\n  std::cout << std::format(\"no lists          {}\\n\", show(merge_sorted({})));\n}"
+      },
+      {
+       "t": "output",
+       "text": "three lists       1 1 2 3 4 4 5 6\none empty         1 2 4 5 6\nall empty         (none)\none list          2 2 7\nno lists          (none)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every element enters and leaves the heap once, and the heap never holds more than k cursors, so it is O(N log k) time and O(k) extra space beyond the result. Concatenating and sorting is O(N log N): for k = 4 and N = a million, log₂ k is 2 against log₂ N of 20, a factor of ten in comparisons."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three details are worth defending. Empty lists are skipped at the start rather than tested in the loop, so the heap only ever holds a cursor that points at a real element. The tie-break on the list index is what makes the merge stable, the same rule the merge sort exercise used to take from the left half on equal values. And "
+        },
+        {
+         "t": "code",
+         "v": "at"
+        },
+        {
+         "t": "text",
+         "v": " is carried in the cursor rather than derived, because a cursor knows nothing about where it came from otherwise; storing an iterator instead works and ties the cursor's lifetime to the list, which is fine here and would not be if the lists could grow."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last part of the question is why this shape exists. When each list is a file or a topic on the wire and only its front element is in memory, this algorithm does not change at all: the heap holds one element per source, and the rest stays where it is. That is an external merge, the same structure a rosbag merge or a log-file merge uses. For exactly two lists the heap is overkill, and "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::merge"
+        },
+        {
+         "t": "text",
+         "v": " writes the merged result into an output range in O(N)."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Comparator direction",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same comparison object means opposite things to a sort and to a heap, and this is the mistake that survives code review:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <queue>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\n[[nodiscard]] std::string show(std::span<const int> v) {\n  std::string out;\n  for (const int x : v) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", x);\n  return out;\n}\n\ntemplate <typename Queue>\n[[nodiscard]] std::string drained(Queue queue) {\n  std::string out;\n  while (!queue.empty()) {\n    out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", queue.top());\n    queue.pop();\n  }\n  return out;\n}\n\nvoid row(std::string_view what, std::string_view result) {\n  std::cout << std::format(\"{:<40}{}\\n\", what, result);\n}\n\nint main() {\n  const std::vector<int> readings{3, 1, 4, 1, 5, 9, 2, 6};\n\n  std::priority_queue<int> by_default(readings.begin(), readings.end());\n  row(\"priority_queue<int>, popped\", drained(by_default));\n  std::priority_queue<int, std::vector<int>, std::greater<>> reversed(readings.begin(), readings.end());\n  row(\"the same with std::greater<>, popped\", drained(reversed));\n\n  std::vector<int> a = readings;\n  std::make_heap(a.begin(), a.end());\n  row(\"make_heap, default: front\", std::format(\"{}\", a.front()));\n  std::vector<int> b = readings;\n  std::make_heap(b.begin(), b.end(), std::greater<>{});\n  row(\"make_heap with std::greater<>: front\", std::format(\"{}\", b.front()));\n\n  std::vector<int> c = readings;\n  std::ranges::sort(c);\n  row(\"ranges::sort, default\", show(c));\n  std::vector<int> d = readings;\n  std::ranges::sort(d, std::greater<>{});\n  row(\"ranges::sort with std::greater<>\", show(d));\n}"
+      },
+      {
+       "t": "output",
+       "text": "priority_queue<int>, popped             9 6 5 4 3 2 1 1\nthe same with std::greater<>, popped    1 1 2 3 4 5 6 9\nmake_heap, default: front               9\nmake_heap with std::greater<>: front    1\nranges::sort, default                   1 1 2 3 4 5 6 9\nranges::sort with std::greater<>        9 6 5 4 3 2 1 1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the last four lines together. "
+        },
+        {
+         "t": "code",
+         "v": "std::greater<>"
+        },
+        {
+         "t": "text",
+         "v": " handed to a heap gives you the smallest element first. The same "
+        },
+        {
+         "t": "code",
+         "v": "std::greater<>"
+        },
+        {
+         "t": "text",
+         "v": " handed to a sort gives you the largest element first. Both are consistent with one rule, and the rule is the thing to memorise: the comparison always means \"less\", a sort puts the least at the "
+        },
+        {
+         "t": "i",
+         "v": "front of the range"
+        },
+        {
+         "t": "text",
+         "v": ", and a heap puts the greatest at the "
+        },
+        {
+         "t": "i",
+         "v": "top"
+        },
+        {
+         "t": "text",
+         "v": ". So a min-heap is spelled with "
+        },
+        {
+         "t": "code",
+         "v": "std::greater"
+        },
+        {
+         "t": "text",
+         "v": ", which reads backwards and is correct. The default "
+        },
+        {
+         "t": "code",
+         "v": "std::priority_queue<T>"
+        },
+        {
+         "t": "text",
+         "v": " is a max-heap, which is the opposite of the default people expect from a queue named after priorities, where low numbers usually mean urgent."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two habits make the mistake hard to repeat. Name the comparison after the question it answers, as "
+        },
+        {
+         "t": "code",
+         "v": "RunsAfter"
+        },
+        {
+         "t": "text",
+         "v": " does above, rather than reaching for "
+        },
+        {
+         "t": "code",
+         "v": "std::greater"
+        },
+        {
+         "t": "text",
+         "v": ", and the direction stops being a puzzle. And test with a second element: every polarity bug passes a test with one element, and most pass a test with two equal ones."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The other failure is a comparison that is not a "
+        },
+        {
+         "t": "i",
+         "v": "strict weak ordering"
+        },
+        {
+         "t": "text",
+         "v": ", the four rules from the sorting topic. There, sorting 17 equal readings with "
+        },
+        {
+         "t": "code",
+         "v": "a <= b"
+        },
+        {
+         "t": "text",
+         "v": " walked off the end of the vector and AddressSanitizer caught it. The heap algorithms are quieter, and it is worth knowing exactly how quiet."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Building every case with "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": " at sizes 1 to 300, 30 runs at each of 1 to 8 distinct values, gives 72,000 runs. Not one produced a sanitizer report. "
+        },
+        {
+         "t": "code",
+         "v": "std::sort_heap"
+        },
+        {
+         "t": "text",
+         "v": " with the same "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": " left the range sorted in all 72,000, and "
+        },
+        {
+         "t": "code",
+         "v": "push_heap"
+        },
+        {
+         "t": "text",
+         "v": " followed by "
+        },
+        {
+         "t": "code",
+         "v": "pop_heap"
+        },
+        {
+         "t": "text",
+         "v": " drained a sorted sequence in all 72,000. Asked with the default "
+        },
+        {
+         "t": "code",
+         "v": "<"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::is_heap"
+        },
+        {
+         "t": "text",
+         "v": " accepted the result of all 72,000. The one thing that noticed anything was "
+        },
+        {
+         "t": "code",
+         "v": "std::is_heap"
+        },
+        {
+         "t": "text",
+         "v": " handed the "
+        },
+        {
+         "t": "i",
+         "v": "same"
+        },
+        {
+         "t": "text",
+         "v": " "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": ", which rejected about 71,000 of them in this run, including every input that held one value repeated, because "
+        },
+        {
+         "t": "code",
+         "v": "is_heap"
+        },
+        {
+         "t": "text",
+         "v": " under "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": " demands that no parent be less than or "
+        },
+        {
+         "t": "i",
+         "v": "equal to"
+        },
+        {
+         "t": "text",
+         "v": " a child, which two equal elements cannot satisfy."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The reason nothing crashed is in the loops. libstdc++'s "
+        },
+        {
+         "t": "code",
+         "v": "__push_heap"
+        },
+        {
+         "t": "text",
+         "v": " runs "
+        },
+        {
+         "t": "code",
+         "v": "while (__holeIndex > __topIndex && __comp(...))"
+        },
+        {
+         "t": "text",
+         "v": ", so an index bound is tested before the comparison and a comparison that always answers yes still stops at the root. "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": "'s "
+        },
+        {
+         "t": "code",
+         "v": "__unguarded_partition"
+        },
+        {
+         "t": "text",
+         "v": " runs "
+        },
+        {
+         "t": "code",
+         "v": "while (__comp(__first, __pivot)) ++__first;"
+        },
+        {
+         "t": "text",
+         "v": " with no bound at all, which is what let the sorting topic's 17 readings walk off the end; "
+        },
+        {
+         "t": "code",
+         "v": "__unguarded_linear_insert"
+        },
+        {
+         "t": "text",
+         "v": " a few hundred lines earlier is unguarded in the same way. Same broken comparator, same undefined behaviour, and only one of the two tells you."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So do not read the silence as permission. The comparator is usually written once and then handed to more than one thing: the moment the same "
+        },
+        {
+         "t": "code",
+         "v": "RunsAfter"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "Rarer"
+        },
+        {
+         "t": "text",
+         "v": " reaches a "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " or a "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": ", the quiet bug becomes the loud one, in a different function from the one you changed. Build your own tests once with libstdc++'s debug mode to catch it where it is written:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -D_GLIBCXX_DEBUG -g heap_test.cpp -o heap_test && ./heap_test"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The run stops inside "
+        },
+        {
+         "t": "code",
+         "v": "bits/stl_heap.h"
+        },
+        {
+         "t": "text",
+         "v": " with \"comparison doesn't meet irreflexive requirements, assert(!(a < a))\", names the functor and the call, and exits before the heap is built. That is the same check the sorting topic used, and it is the only one of the four rules the library tests for you."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a heap is stored in and give the index arithmetic for a node's parent and children. State the invariant and say what it does not tell you. Give the cost of "
+        },
+        {
+         "t": "code",
+         "v": "top"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": ", and the measured comparison counts for "
+        },
+        {
+         "t": "code",
+         "v": "make_heap"
+        },
+        {
+         "t": "text",
+         "v": " against n pushes on 4096 ascending values. Say what "
+        },
+        {
+         "t": "code",
+         "v": "std::priority_queue"
+        },
+        {
+         "t": "text",
+         "v": " hides and when you keep your own vector instead. Say which spelling gives a min-heap and why it reads backwards. Say what the heap algorithms did with a "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": " comparison over 72,000 runs, which loop keeps them quiet, and where the same comparator does crash. Name the three robot uses: k nearest, a scheduler and a frontier."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Where are the children and the parent of index i, and why does a heap need no pointers?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does the heap invariant promise, and what does it say about two siblings?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give the cost of "
+     },
+     {
+      "t": "code",
+      "v": "top"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "push"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "pop"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "make_heap"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "sort_heap"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "4096 values in increasing order: how many comparisons did "
+     },
+     {
+      "t": "code",
+      "v": "make_heap"
+     },
+     {
+      "t": "text",
+      "v": " take, and how many did 4096 pushes take?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How do you spell a min-heap of "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": ", and why does that spelling look like the opposite?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What can you do with a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " plus the heap algorithms that "
+     },
+     {
+      "t": "code",
+      "v": "std::priority_queue"
+     },
+     {
+      "t": "text",
+      "v": " will not let you do?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does the k-th largest problem use a min-heap of size k rather than a max-heap of size n?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A "
+     },
+     {
+      "t": "code",
+      "v": "<="
+     },
+     {
+      "t": "text",
+      "v": " comparison crashes "
+     },
+     {
+      "t": "code",
+      "v": "std::sort"
+     },
+     {
+      "t": "text",
+      "v": " and does nothing visible to the heap algorithms. Which loop explains the difference, and why is the silence not good news?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: merge k sorted lists in O(N log k), with ties taken in list order."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Bob Steagall, Back to Basics: Classic STL, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/back_to_basics_classic_stl__bob_steagall__cppcon_2021_1.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=tXUXl_RzkAk"
+     },
+     {
+      "t": "text",
+      "v": ". Container adaptors, and algorithms that act on a range rather than on a container."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Calling the algorithm that names the job, and what a comparison argument means."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". Why a contiguous block beats a node per element."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh and Adam Segoli Schubert, Back to Basics: Algorithmic Complexity, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Algorithmic_Complexity.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=AY2FqpDCBGs"
+     },
+     {
+      "t": "text",
+      "v": ". Counting the work of a build, and why linear heapify and n logarithmic pushes differ."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Standard Library Containers, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ZMUKa2kWtTk"
+     },
+     {
+      "t": "text",
+      "v": ". Where the adaptors sit among the containers."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": " on preferring the library, "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " as the default container, and "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": " on measuring before claiming."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The C++ standard on the ordering every one of these algorithms requires, "
+     },
+     {
+      "t": "a",
+      "v": "alg.sorting.general",
+      "href": "https://eel.is/c++draft/alg.sorting.general"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "priority_queue",
+      "href": "https://en.cppreference.com/cpp/container/priority_queue"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "make_heap",
+      "href": "https://en.cppreference.com/cpp/algorithm/make_heap"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "push_heap",
+      "href": "https://en.cppreference.com/cpp/algorithm/push_heap"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "pop_heap",
+      "href": "https://en.cppreference.com/cpp/algorithm/pop_heap"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "sort_heap",
+      "href": "https://en.cppreference.com/cpp/algorithm/sort_heap"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "is_heap_until",
+      "href": "https://en.cppreference.com/cpp/algorithm/is_heap_until"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ranges::merge",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/merge"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "libstdc++'s "
+     },
+     {
+      "t": "a",
+      "v": "debug mode",
+      "href": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode.html"
+     },
+     {
+      "t": "text",
+      "v": ", which tests the comparison for irreflexivity before it builds the heap."
+     }
+    ]
+   ]
+  }
+ ]
+}

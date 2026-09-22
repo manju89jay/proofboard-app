@@ -1,0 +1,1157 @@
+{
+ "id": "prj-robot-world",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage puts an existing robot into an existing world and proves we can start and drive it with our own tooling. We chose the TurtleBot3 Waffle from Nav2's minimal simulation, because it already runs in Gazebo Harmonic with ROS 2 Jazzy, carries wheel odometry and a lidar, and is maintained by someone else, so the bench never has to model a robot of its own."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is writing our own launch file rather than reusing Nav2's. Ours does only the five things a launch needs: build the world from its xacro, start the Gazebo server, bridge and spawn the robot, set the resource path so meshes are found, and publish the robot's state, in that order, so the server never reads a half-written file."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: one "
+    },
+    {
+     "t": "code",
+     "v": "ros2 launch"
+    },
+    {
+     "t": "text",
+     "v": " command starts the world and the robot, headless or with the window, with the same topics and rates as Nav2's own reference. A "
+    },
+    {
+     "t": "code",
+     "v": "ros2 topic pub"
+    },
+    {
+     "t": "text",
+     "v": " on "
+    },
+    {
+     "t": "code",
+     "v": "/cmd_vel"
+    },
+    {
+     "t": "text",
+     "v": " drives it about as far as commanded, and a zero command stops it, where nothing else does, because the robot keeps repeating its last command until told otherwise, which is exactly the gap the bench's supervisor exists to close."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "choose",
+   "title": "Choose the robot and world; launch them",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, you have chosen the bench's robot and world, and seen them run with a launch file someone else maintains."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Don't build a robot. The bench tests software around a robot, so it needs one that already works in Gazebo Harmonic with ROS 2 Jazzy, has wheel odometry and a lidar, and is kept up to date by someone else. The TurtleBot3 Waffle from Nav2's minimal simulation package meets all four: the Nav2 project maintains it for its own tests, and it comes with worlds and a ROS bridge configuration. It also means Nav2 can drive the robot later without extra work. Write that reasoning down; it is the first entry in the bench's decision record."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Install Nav2 and its TurtleBot3 simulation. The "
+         },
+         {
+          "t": "a",
+          "v": "Nav2 quickstart for Jazzy",
+          "href": "https://docs.nav2.org/jazzy/getting_started/quickstart/quickstart/"
+         },
+         {
+          "t": "text",
+          "v": " gives these packages in two commands; here they are in one:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "sudo apt install ros-$ROS_DISTRO-navigation2 ros-$ROS_DISTRO-nav2-bringup ros-$ROS_DISTRO-nav2-minimal-tb*"
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run Nav2's own simulation once, with the Gazebo window. "
+         },
+         {
+          "t": "code",
+          "v": "headless"
+         },
+         {
+          "t": "text",
+          "v": " is true by default:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch nav2_bringup tb3_simulation_launch.py headless:=False"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Gazebo shows the robot in a small walled area, the sandbox world, and RViz opens with the map. This launch starts all of Nav2 as well. That is the known-good reference: when your own launch file fails later, this one tells you whether the problem is in your file or in the installation."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "While it runs, list what the robot offers, and write it down:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic list -t\nros2 topic info -v /cmd_vel     # the bridge subscribes here: note the message type it expects\nros2 topic hz /odom\nros2 topic hz /scan\ngz topic -l                     # the same data on the Gazebo side"
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Find where the files come from. "
+         },
+         {
+          "t": "code",
+          "v": "ros2 pkg prefix nav2_minimal_tb3_sim"
+         },
+         {
+          "t": "text",
+          "v": " prints the install folder, and under its "
+         },
+         {
+          "t": "code",
+          "v": "share/nav2_minimal_tb3_sim"
+         },
+         {
+          "t": "text",
+          "v": " are the folders "
+         },
+         {
+          "t": "code",
+          "v": "worlds"
+         },
+         {
+          "t": "text",
+          "v": " (with "
+         },
+         {
+          "t": "code",
+          "v": "tb3_sandbox.sdf.xacro"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "tb3_empty_world.sdf.xacro"
+         },
+         {
+          "t": "text",
+          "v": "), "
+         },
+         {
+          "t": "code",
+          "v": "urdf"
+         },
+         {
+          "t": "text",
+          "v": " (with "
+         },
+         {
+          "t": "code",
+          "v": "gz_waffle.sdf.xacro"
+         },
+         {
+          "t": "text",
+          "v": "), "
+         },
+         {
+          "t": "code",
+          "v": "configs"
+         },
+         {
+          "t": "text",
+          "v": " (with "
+         },
+         {
+          "t": "code",
+          "v": "turtlebot3_waffle_bridge.yaml"
+         },
+         {
+          "t": "text",
+          "v": ") and "
+         },
+         {
+          "t": "code",
+          "v": "launch"
+         },
+         {
+          "t": "text",
+          "v": " (with "
+         },
+         {
+          "t": "code",
+          "v": "spawn_tb3.launch.py"
+         },
+         {
+          "t": "text",
+          "v": "). Open the bridge configuration and compare its entries with the topic list from step 3."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when you have a list of the robot's topics with their types, directions and rates, and you know which file defines each of them."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, one command of your own starts Gazebo with the world, the robot and its bridge, without Nav2, headless or with the window."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nav2's launch file does much more than the bench needs at first. Its simulation part does five things, and your launch file does the same five:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "it turns the world's xacro file into an SDF file, with "
+         },
+         {
+          "t": "code",
+          "v": "xacro"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it starts the Gazebo server with "
+         },
+         {
+          "t": "code",
+          "v": "gz sim -r -s"
+         },
+         {
+          "t": "text",
+          "v": " on that file, and the window separately when "
+         },
+         {
+          "t": "code",
+          "v": "headless"
+         },
+         {
+          "t": "text",
+          "v": " is false;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it includes "
+         },
+         {
+          "t": "code",
+          "v": "spawn_tb3.launch.py"
+         },
+         {
+          "t": "text",
+          "v": ", which starts the bridge with "
+         },
+         {
+          "t": "code",
+          "v": "turtlebot3_waffle_bridge.yaml"
+         },
+         {
+          "t": "text",
+          "v": " and spawns the robot with "
+         },
+         {
+          "t": "code",
+          "v": "ros_gz_sim create"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it adds the package's folders to "
+         },
+         {
+          "t": "code",
+          "v": "GZ_SIM_RESOURCE_PATH"
+         },
+         {
+          "t": "text",
+          "v": ", so that Gazebo finds the robot's meshes;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it starts "
+         },
+         {
+          "t": "code",
+          "v": "robot_state_publisher"
+         },
+         {
+          "t": "text",
+          "v": " with the robot's URDF, which publishes "
+         },
+         {
+          "t": "code",
+          "v": "/robot_description"
+         },
+         {
+          "t": "text",
+          "v": " and the fixed transforms between the robot's parts, such as "
+         },
+         {
+          "t": "code",
+          "v": "base_footprint"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": "base_link"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "base_link"
+         },
+         {
+          "t": "text",
+          "v": " to the lidar's frame "
+         },
+         {
+          "t": "code",
+          "v": "base_scan"
+         },
+         {
+          "t": "text",
+          "v": ". Without it, RViz and Nav2 can't place the scan."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Create a package for the simulation files in the bench:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/test_bench/src\nros2 pkg create --build-type ament_cmake bench_sim\nmkdir bench_sim/launch"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Remove the lint lines from both generated files, as for "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes"
+        },
+        {
+         "t": "text",
+         "v": ". In "
+        },
+        {
+         "t": "code",
+         "v": "bench_sim/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", before "
+        },
+        {
+         "t": "code",
+         "v": "ament_package()"
+        },
+        {
+         "t": "text",
+         "v": ", install the launch folder: "
+        },
+        {
+         "t": "code",
+         "v": "install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})"
+        },
+        {
+         "t": "text",
+         "v": ". In "
+        },
+        {
+         "t": "code",
+         "v": "package.xml"
+        },
+        {
+         "t": "text",
+         "v": ", add "
+        },
+        {
+         "t": "code",
+         "v": "<exec_depend>"
+        },
+        {
+         "t": "text",
+         "v": " lines for "
+        },
+        {
+         "t": "code",
+         "v": "nav2_minimal_tb3_sim"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ros_gz_sim"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ros_gz_bridge"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "robot_state_publisher"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "xacro"
+        },
+        {
+         "t": "text",
+         "v": ", so that "
+        },
+        {
+         "t": "code",
+         "v": "rosdep"
+        },
+        {
+         "t": "text",
+         "v": " installs them on a fresh machine and CI."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "bench_sim/launch/world.launch.py"
+         },
+         {
+          "t": "text",
+          "v": ". Treat it as a starting point, not a finished file. It follows Nav2's Jazzy launch file and the 1.3.0 release of "
+         },
+         {
+          "t": "a",
+          "v": "nav2_minimal_tb3_sim",
+          "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation"
+         },
+         {
+          "t": "text",
+          "v": ", but the page's checks can't run a simulation, so expect to adapt it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "\"\"\"Starts the Test Bench world: Gazebo with the TB3 sandbox, the robot and its ROS bridge.\"\"\"\nimport os\nimport tempfile\nfrom pathlib import Path\n\nfrom ament_index_python.packages import get_package_share_directory\nfrom launch import LaunchDescription\nfrom launch.actions import (AppendEnvironmentVariable, DeclareLaunchArgument, ExecuteProcess,\n                            IncludeLaunchDescription, OpaqueFunction, RegisterEventHandler)\nfrom launch.conditions import UnlessCondition\nfrom launch.event_handlers import OnProcessExit, OnShutdown\nfrom launch.launch_description_sources import PythonLaunchDescriptionSource\nfrom launch.substitutions import LaunchConfiguration\nfrom launch_ros.actions import Node\n\n\ndef generate_launch_description():\n    sim_dir = get_package_share_directory('nav2_minimal_tb3_sim')\n    world_xacro = os.path.join(sim_dir, 'worlds', 'tb3_sandbox.sdf.xacro')\n    fd, world_sdf = tempfile.mkstemp(prefix='bench_world_', suffix='.sdf')\n    os.close(fd)\n    headless = LaunchConfiguration('headless')\n    with open(os.path.join(sim_dir, 'urdf', 'turtlebot3_waffle.urdf')) as urdf:\n        robot_description = urdf.read()\n\n    make_world = ExecuteProcess(cmd=['xacro', '-o', world_sdf, ['headless:=', headless], world_xacro])\n    server = ExecuteProcess(cmd=['gz', 'sim', '-r', '-s', world_sdf], output='screen')\n    window = ExecuteProcess(cmd=['gz', 'sim', '-g'], output='screen', condition=UnlessCondition(headless))\n    robot = IncludeLaunchDescription(\n        PythonLaunchDescriptionSource(os.path.join(sim_dir, 'launch', 'spawn_tb3.launch.py')))\n    state_publisher = Node(package='robot_state_publisher', executable='robot_state_publisher',\n                           parameters=[{'use_sim_time': True, 'robot_description': robot_description}])\n\n    return LaunchDescription([\n        DeclareLaunchArgument('headless', default_value='True'),\n        AppendEnvironmentVariable('GZ_SIM_RESOURCE_PATH', os.path.join(sim_dir, 'models')),\n        AppendEnvironmentVariable('GZ_SIM_RESOURCE_PATH', str(Path(sim_dir).parent.resolve())),\n        make_world,\n        state_publisher,\n        RegisterEventHandler(OnProcessExit(target_action=make_world, on_exit=[server, window, robot])),\n        RegisterEventHandler(OnShutdown(on_shutdown=[OpaqueFunction(function=lambda _: os.remove(world_sdf))])),\n    ])"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three choices in it differ from a first attempt. The server starts only when "
+        },
+        {
+         "t": "code",
+         "v": "xacro"
+        },
+        {
+         "t": "text",
+         "v": " has exited, so it never reads a half-written file; Nav2's file starts both at once and relies on "
+        },
+        {
+         "t": "code",
+         "v": "xacro"
+        },
+        {
+         "t": "text",
+         "v": " being fast. The resource path is set before anything starts, so the server sees it too. And the temporary world file is removed when the launch shuts down."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Build with "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", source the workspace, and start it both ways:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "source ~/test_bench/install/setup.bash\nros2 launch bench_sim world.launch.py                   # headless\nros2 launch bench_sim world.launch.py headless:=False   # with the Gazebo window"
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Check the result against your notes from Build 1: the same topics with the same types, "
+         },
+         {
+          "t": "code",
+          "v": "/clock"
+         },
+         {
+          "t": "text",
+          "v": " publishing, and "
+         },
+         {
+          "t": "code",
+          "v": "/odom"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "/scan"
+         },
+         {
+          "t": "text",
+          "v": " at the rates you measured. "
+         },
+         {
+          "t": "code",
+          "v": "ros2 node list"
+         },
+         {
+          "t": "text",
+          "v": " should show the bridge and "
+         },
+         {
+          "t": "code",
+          "v": "robot_state_publisher"
+         },
+         {
+          "t": "text",
+          "v": ", and nothing from Nav2."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when one "
+        },
+        {
+         "t": "code",
+         "v": "ros2 launch"
+        },
+        {
+         "t": "text",
+         "v": " command starts the world and the robot, headless and with the window, and the topics match your list. Commit on a branch and merge through a pull request."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "drive",
+   "title": "Drive it from a ROS topic",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, a ROS command drives the robot, and you have measured that it moved as far as you asked."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Start the world with the window. Check the message type the bridge expects on "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic info -v /cmd_vel"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The 1.3.0 release of "
+        },
+        {
+         "t": "code",
+         "v": "nav2_minimal_tb3_sim"
+        },
+        {
+         "t": "text",
+         "v": " bridges "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " as "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/TwistStamped"
+        },
+        {
+         "t": "text",
+         "v": ", and older releases as "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/Twist"
+        },
+        {
+         "t": "text",
+         "v": ". Use the type your installation shows. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic pub"
+        },
+        {
+         "t": "text",
+         "v": " accepts the other one without an error, and the robot doesn't move, as the Gazebo basics topic warned."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Drive forward at 0.2 m/s. With "
+         },
+         {
+          "t": "code",
+          "v": "TwistStamped"
+         },
+         {
+          "t": "text",
+          "v": ", the velocity is inside the field "
+         },
+         {
+          "t": "code",
+          "v": "twist"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/TwistStamped \"{twist: {linear: {x: 0.2}}}\"\nros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/Twist \"{linear: {x: 0.2}}\"     # if your bridge expects Twist"
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Measure it. In another terminal, print the position from the odometry. Stop the publisher with Ctrl+C after about 5 seconds, and read how far the robot went:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic echo /odom --field pose.pose.position"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "At 0.2 m/s for 5 s, "
+        },
+        {
+         "t": "code",
+         "v": "x"
+        },
+        {
+         "t": "text",
+         "v": " should grow by about 1 m. It starts near 0, because the DiffDrive system's odometry counts from where the robot spawned. In the world, that spot is (-2.0, -0.5), the default pose in "
+        },
+        {
+         "t": "code",
+         "v": "spawn_tb3.launch.py"
+        },
+        {
+         "t": "text",
+         "v": ", and the odometry doesn't know it."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Notice that the robot keeps moving after you stopped the publisher. The DiffDrive system keeps using the last command it received, as in the Gazebo basics topic. Stop it with a zero command, which is an empty message:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic pub --once /cmd_vel geometry_msgs/msg/TwistStamped \"{}\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the reason the bench needs a supervisor that sends a stop by itself when commands or odometry go stale. A crashed controller leaves the robot driving at its last speed."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Turn on the spot: a zero linear velocity and an angular velocity of 0.5 rad/s. Check with "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic echo /odom --field twist.twist.angular"
+         },
+         {
+          "t": "text",
+          "v": " that the reported rate matches what you asked for."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when one launch command and one "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic pub"
+        },
+        {
+         "t": "text",
+         "v": " make the robot move, the odometry shows about the distance you expected, and the zero command stops it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "notes",
+   "title": "What broke and how it was fixed",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "These are the failures most people meet in this setup, with the fix for each. Compare them with what happened to you."
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "i",
+          "v": "The Gazebo window stays black or crashes under WSL."
+         },
+         {
+          "t": "text",
+          "v": " Try software rendering with "
+         },
+         {
+          "t": "code",
+          "v": "export LIBGL_ALWAYS_SOFTWARE=1"
+         },
+         {
+          "t": "text",
+          "v": " before the launch. The headless run is unaffected, and the bench's tests run headless anyway."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "The robot appears without its shape, or not at all, and the log says it can't find a URI."
+         },
+         {
+          "t": "text",
+          "v": " Gazebo didn't find the meshes: "
+         },
+         {
+          "t": "code",
+          "v": "GZ_SIM_RESOURCE_PATH"
+         },
+         {
+          "t": "text",
+          "v": " doesn't include the package's folders. Print it with "
+         },
+         {
+          "t": "code",
+          "v": "printenv GZ_SIM_RESOURCE_PATH"
+         },
+         {
+          "t": "text",
+          "v": " in the terminal that runs the server."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "Everything starts, and the robot doesn't move."
+         },
+         {
+          "t": "text",
+          "v": " The message type on "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel"
+         },
+         {
+          "t": "text",
+          "v": " doesn't match the bridge's. Compare "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic info -v /cmd_vel"
+         },
+         {
+          "t": "text",
+          "v": " for your publisher and for the bridge."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "A node with `use_sim_time:=true` seems to hang."
+         },
+         {
+          "t": "text",
+          "v": " "
+         },
+         {
+          "t": "code",
+          "v": "/clock"
+         },
+         {
+          "t": "text",
+          "v": " isn't bridged, or the server isn't running, so ROS time stays at zero."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "Odd behaviour after an earlier run crashed, such as two robots or topics with two publishers."
+         },
+         {
+          "t": "text",
+          "v": " A Gazebo server from the earlier run may still be alive. "
+         },
+         {
+          "t": "code",
+          "v": "pgrep -af \"gz sim\""
+         },
+         {
+          "t": "text",
+          "v": " lists every Gazebo process; stop the old one by its PID."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write "
+        },
+        {
+         "t": "code",
+         "v": "docs/simulation.md"
+        },
+        {
+         "t": "text",
+         "v": " in the bench. It is the proof for this topic. Give the launch command and its "
+        },
+        {
+         "t": "code",
+         "v": "headless"
+        },
+        {
+         "t": "text",
+         "v": " argument; a table of the robot's topics with type, direction and rate; the command that drives the robot and the one that stops it, with the message type your installation needs; and the versions of "
+        },
+        {
+         "t": "code",
+         "v": "nav2_minimal_tb3_sim"
+        },
+        {
+         "t": "text",
+         "v": " and Gazebo, from "
+        },
+        {
+         "t": "code",
+         "v": "dpkg-query -W ros-jazzy-nav2-minimal-tb3-sim"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "gz sim --version"
+        },
+        {
+         "t": "text",
+         "v": ". Then list what broke for you, each with its symptom, its cause and its fix."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": null
+}

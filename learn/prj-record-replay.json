@@ -1,0 +1,1465 @@
+{
+ "id": "prj-record-replay",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage proves that a recorded run can stand in for a live one. We gave the monitor a parameter that writes down every heartbeat it receives, with the time on its own clock, then recorded a live run with "
+    },
+    {
+     "t": "code",
+     "v": "ros2 bag record"
+    },
+    {
+     "t": "text",
+     "v": " and played the same bag into a fresh monitor to compare what each one actually heard."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is what \"the same inputs\" means. Each run can miss a few heartbeats at its start while discovery finishes, so a plain difference between the two files would report a mismatch that says nothing about the replay. The comparison instead starts at the later of the two first values it saw and ends at the earlier of the two last ones, and only inside that shared stretch does every heartbeat have to match."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: our comparison tool prints "
+    },
+    {
+     "t": "code",
+     "v": "same"
+    },
+    {
+     "t": "text",
+     "v": " and exits 0 for a live run and its replay, at normal speed and at double speed, with or without simulation time. What it also shows is that only a monitor replayed on the recording's own clock, with "
+    },
+    {
+     "t": "code",
+     "v": "--clock"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "use_sim_time"
+    },
+    {
+     "t": "text",
+     "v": ", reproduces the live timing, which is exactly what anything that judges by elapsed time, such as the bench's own supervisor, will depend on."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "bag",
+   "title": "Record a run and replay it into the bench",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the monitor writes down every heartbeat it receives, a run of the bench is recorded in a bag, and the same bag played into a fresh monitor gives it the heartbeats the live monitor got."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bench's scenarios will fail now and then, and a failure you can't bring back is hard to fix. A bag keeps what the nodes received, so you can play it into the node under suspicion as often as you like, without the simulator. That only helps if the replay really gives the node the same inputs, so this topic measures it, on the simplest node the bench has. The inspection topic showed the commands on turtlesim; here they run on your own nodes."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Make the monitor write down its inputs. Give it a parameter "
+         },
+         {
+          "t": "code",
+          "v": "inputs_file"
+         },
+         {
+          "t": "text",
+          "v": "; when it is set, the monitor writes one line per heartbeat: the value, a space, and the time on the monitor's clock in nanoseconds. These are the changes to "
+         },
+         {
+          "t": "code",
+          "v": "include/bench_nodes/monitor.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", which also needs "
+         },
+         {
+          "t": "code",
+          "v": "<format>"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "<fstream>"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "<stdexcept>"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "<string>"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In the constructor, before the subscription:\nif (const auto path = declare_parameter<std::string>(\"inputs_file\", \"\"); !path.empty()) {\n  inputs_.open(path);\n  if (!inputs_) throw std::runtime_error(\"can't write \" + path);\n}\n\n// The first line of on_heartbeat, before the check:\nif (inputs_.is_open()) inputs_ << std::format(\"{} {}\\n\", value, now().nanoseconds());\n\n// A member, declared before subscription_ so that it outlives every callback:\nstd::ofstream inputs_;"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The time comes from "
+        },
+        {
+         "t": "code",
+         "v": "now()"
+        },
+        {
+         "t": "text",
+         "v": ", the node's clock, and not from the message, which carries no time. That choice is what Build 2 uses: under "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": ", the node's clock reads whatever "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " says. The file is complete once the monitor exits. Ctrl+C makes "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin"
+        },
+        {
+         "t": "text",
+         "v": " return, the node is destroyed, and the "
+        },
+        {
+         "t": "code",
+         "v": "std::ofstream"
+        },
+        {
+         "t": "text",
+         "v": " destructor flushes and closes the file."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", and source "
+         },
+         {
+          "t": "code",
+          "v": "install/setup.bash"
+         },
+         {
+          "t": "text",
+          "v": " in every terminal you use below."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Record a live run. Start the three programs in this order, each in its own terminal:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "mkdir -p ~/bags\nros2 run bench_nodes heartbeat                                                  # terminal 1\nros2 run bench_nodes monitor --ros-args -p inputs_file:=$HOME/bags/live.txt      # terminal 2\nros2 bag record -o ~/bags/heartbeat_run --topics /heartbeat                      # terminal 3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The recorder logs that it subscribed to "
+        },
+        {
+         "t": "code",
+         "v": "/heartbeat"
+        },
+        {
+         "t": "text",
+         "v": ". Unless it gets "
+        },
+        {
+         "t": "code",
+         "v": "--include-unpublished-topics"
+        },
+        {
+         "t": "text",
+         "v": ", it subscribes to a topic only once the topic has a publisher. After about 30 seconds, stop the heartbeat with Ctrl+C, then the recorder, then the monitor. Stopping the heartbeat first means both listeners have heard the last heartbeat before they stop. Don't restart the heartbeat during the recording: Build 2 compares runs of one heartbeat."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Look at the bag:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 bag info ~/bags/heartbeat_run\nwc -l ~/bags/live.txt"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ros2 bag info"
+        },
+        {
+         "t": "text",
+         "v": " prints the storage id, "
+        },
+        {
+         "t": "code",
+         "v": "mcap"
+        },
+        {
+         "t": "text",
+         "v": " on Jazzy, the duration, the start and end times, and for "
+        },
+        {
+         "t": "code",
+         "v": "/heartbeat"
+        },
+        {
+         "t": "text",
+         "v": " its type "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs/msg/Int64"
+        },
+        {
+         "t": "text",
+         "v": ", its count and the serialization format "
+        },
+        {
+         "t": "code",
+         "v": "cdr"
+        },
+        {
+         "t": "text",
+         "v": ". Check the count against the duration. The duration runs from the first message to the last, so n heartbeats at 10 Hz span (n - 1) × 0.1 s: a duration of 30.0 s means about 301 heartbeats. Then open "
+        },
+        {
+         "t": "code",
+         "v": "~/bags/heartbeat_run/metadata.yaml"
+        },
+        {
+         "t": "text",
+         "v": ". Under the topic it keeps "
+        },
+        {
+         "t": "code",
+         "v": "offered_qos_profiles"
+        },
+        {
+         "t": "text",
+         "v": ", the QoS the heartbeat offered, and the player adapts its own publisher to it. The count in "
+        },
+        {
+         "t": "code",
+         "v": "live.txt"
+        },
+        {
+         "t": "text",
+         "v": " differs from the bag's. The monitor and the recorder started at different moments after the heartbeat, and each missed the heartbeats published before it had discovered the publisher. That is why Build 2 compares only the stretch that both heard."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Replay the bag into a fresh monitor. The heartbeat must not run now, or the monitor would hear two publishers:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run bench_nodes monitor --ros-args -p inputs_file:=$HOME/bags/replay.txt    # terminal 1\nros2 bag play ~/bags/heartbeat_run --start-paused                               # terminal 2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The player creates its publisher at once and then waits. Give the two a second to discover each other, then press the space bar in the player's terminal, which toggles pause. Without "
+        },
+        {
+         "t": "code",
+         "v": "--start-paused"
+        },
+        {
+         "t": "text",
+         "v": ", the first messages would go out before discovery finished, and the monitor would lose them as it did live. A script does the same with "
+        },
+        {
+         "t": "code",
+         "v": "ros2 service call /rosbag2_player/resume rosbag2_interfaces/srv/Resume"
+        },
+        {
+         "t": "text",
+         "v": ". The player exits at the end of the bag; then stop the monitor with Ctrl+C."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Compare the two files by eye:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "wc -l ~/bags/live.txt ~/bags/replay.txt\nhead -3 ~/bags/live.txt ~/bags/replay.txt\ntail -1 ~/bags/live.txt ~/bags/replay.txt"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "replay.txt"
+        },
+        {
+         "t": "text",
+         "v": " holds exactly the bag's count. Its first value is the first one the recorder heard, which may differ from the live monitor's first value. From the first value both files have, the values should agree line by line up to the last. The times don't: they are the computer's time now, not at the recording."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit the monitor change on a branch, and merge it through a pull request once CI is green. The bags and the text files stay out of the repository."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when "
+        },
+        {
+         "t": "code",
+         "v": "replay.txt"
+        },
+        {
+         "t": "text",
+         "v": " has as many lines as "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag info"
+        },
+        {
+         "t": "text",
+         "v": " counts for "
+        },
+        {
+         "t": "code",
+         "v": "/heartbeat"
+        },
+        {
+         "t": "text",
+         "v": ", and from the first value both files hold, the values agree to the end."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, a program in "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " decides whether two runs of the monitor got the same inputs, and you have replayed the run on the recording's own clock, at normal and at double speed."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/include/bench/time.hpp"
+         },
+         {
+          "t": "text",
+          "v": " with the type "
+         },
+         {
+          "t": "code",
+          "v": "bench::Time"
+         },
+         {
+          "t": "text",
+          "v": " from the program below. It is a reading of a clock, and nothing in "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " reads a clock itself: the caller passes the time in. The supervisor's rules in the next topic use the same type."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the comparison. The types and the four declarations go into "
+         },
+         {
+          "t": "code",
+          "v": "include/bench/replay.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", which includes "
+         },
+         {
+          "t": "code",
+          "v": "\"bench/time.hpp\""
+         },
+         {
+          "t": "text",
+          "v": ", and the definitions with the unnamed namespace into "
+         },
+         {
+          "t": "code",
+          "v": "src/replay.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". Here is all of it as one program, with a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that compares small runs written inline:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <charconv>\n#include <chrono>\n#include <cstdint>\n#include <filesystem>\n#include <format>\n#include <fstream>\n#include <functional>\n#include <iostream>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <sstream>\n#include <string>\n#include <string_view>\n#include <system_error>\n#include <variant>\n#include <vector>\n\nnamespace bench {\n\n// bench/time.hpp: a reading of a node's clock, in nanoseconds since that clock's zero.\n// Code in bench_core never reads a clock itself; the caller passes the reading in.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\n// bench/replay.hpp from here on.\n\n// One heartbeat as a monitor received it: one \"value time_ns\" line of its inputs file.\nstruct Received {\n  std::int64_t value;\n  Time time;  // the monitor's clock when the heartbeat arrived\n};\n\n// Both runs heard the same heartbeats, from first to last.\nstruct Same {\n  std::int64_t first;\n  std::int64_t last;\n  std::int64_t count;\n  std::chrono::nanoseconds live_span;    // first to last on the live monitor's clock\n  std::chrono::nanoseconds replay_span;  // first to last on the replay monitor's clock\n  std::chrono::nanoseconds offset;       // replay clock minus live clock at the first one\n};\n\n// The first heartbeat that one run heard and the other didn't.\nstruct Different {\n  std::optional<std::int64_t> live;  // nothing when that run has no more heartbeats\n  std::optional<std::int64_t> replay;\n};\n\nenum class Unusable { not_one_run, nothing_in_common };\n\nusing Comparison = std::variant<Same, Different, Unusable>;\n\n// Parses an inputs file. Nothing if a line isn't two integers separated by one space.\n[[nodiscard]] std::optional<std::vector<Received>> parse_received(std::string_view text) {\n  std::vector<Received> received;\n  for (const auto part : std::views::split(text, '\\n')) {\n    const std::string_view line(part.begin(), part.end());\n    if (line.empty()) continue;\n    const char* const end = line.data() + line.size();\n    std::int64_t value = 0;\n    std::int64_t nanoseconds = 0;\n    const auto [after_value, value_error] = std::from_chars(line.data(), end, value);\n    if (value_error != std::errc{} || after_value == end || *after_value != ' ') return std::nullopt;\n    const auto [after_time, time_error] = std::from_chars(after_value + 1, end, nanoseconds);\n    if (time_error != std::errc{} || after_time != end) return std::nullopt;\n    received.push_back({.value = value, .time = {std::chrono::nanoseconds(nanoseconds)}});\n  }\n  return received;\n}\n\n// Reads and parses an inputs file. Nothing if it can't be opened or parsed.\n[[nodiscard]] std::optional<std::vector<Received>> read_received(const std::filesystem::path& file) {\n  std::ifstream in(file);\n  if (!in) return std::nullopt;\n  std::ostringstream text;\n  text << in.rdbuf();\n  return parse_received(text.str());\n}\n\nnamespace {\n\n// One run of one heartbeat: the values rise strictly, with no restart.\n[[nodiscard]] bool one_run(std::span<const Received> run) {\n  return std::ranges::adjacent_find(run, std::ranges::greater_equal{}, &Received::value) == run.end();\n}\n\n// The heartbeats of a run whose values lie in [first, last]. The run is sorted by value.\n[[nodiscard]] std::span<const Received> stretch(std::span<const Received> run, std::int64_t first,\n                                                std::int64_t last) {\n  const auto begin = std::ranges::lower_bound(run, first, {}, &Received::value);\n  const auto end = std::ranges::upper_bound(run, last, {}, &Received::value);\n  return {begin, end};\n}\n\n[[nodiscard]] std::chrono::nanoseconds duration(std::span<const Received> run) {\n  return run.back().time.since_epoch - run.front().time.since_epoch;\n}\n\n[[nodiscard]] double seconds(std::chrono::nanoseconds d) { return std::chrono::duration<double>(d).count(); }\n\n[[nodiscard]] std::string value_or_nothing(std::optional<std::int64_t> value) {\n  return value ? std::to_string(*value) : \"nothing\";\n}\n\nstruct Describe {\n  std::string operator()(const Same& same) const {\n    return std::format(\"same: {} heartbeats, {} to {}; {:.2f} s live, {:.2f} s replay; replay clock {:+.2f} s\",\n                       same.count, same.first, same.last, seconds(same.live_span), seconds(same.replay_span),\n                       seconds(same.offset));\n  }\n  std::string operator()(const Different& different) const {\n    return std::format(\"different: live has {}, replay has {}\", value_or_nothing(different.live),\n                       value_or_nothing(different.replay));\n  }\n  std::string operator()(Unusable unusable) const {\n    return unusable == Unusable::not_one_run ? \"can't compare: a run restarted\"\n                                             : \"can't compare: no heartbeat in common\";\n  }\n};\n\n}  // namespace\n\n// Compares two runs over the heartbeats both could have heard: from the later first value to\n// the earlier last one, because each run may miss a few at its start while discovery runs.\n[[nodiscard]] Comparison compare_runs(std::span<const Received> live, std::span<const Received> replay) {\n  if (!one_run(live) || !one_run(replay)) return Unusable::not_one_run;\n  if (live.empty() || replay.empty()) return Unusable::nothing_in_common;\n  const std::int64_t first = std::max(live.front().value, replay.front().value);\n  const std::int64_t last = std::min(live.back().value, replay.back().value);\n  if (first > last) return Unusable::nothing_in_common;\n\n  const auto live_part = stretch(live, first, last);\n  const auto replay_part = stretch(replay, first, last);\n  const auto [live_it, replay_it] =\n      std::ranges::mismatch(live_part, replay_part, {}, &Received::value, &Received::value);\n  if (live_it != live_part.end() || replay_it != replay_part.end()) {\n    const auto value_at = [](auto it, auto end) -> std::optional<std::int64_t> {\n      if (it == end) return std::nullopt;\n      return it->value;\n    };\n    return Different{.live = value_at(live_it, live_part.end()), .replay = value_at(replay_it, replay_part.end())};\n  }\n  return Same{.first = first,\n              .last = last,\n              .count = std::ssize(live_part),\n              .live_span = duration(live_part),\n              .replay_span = duration(replay_part),\n              .offset = replay_part.front().time.since_epoch - live_part.front().time.since_epoch};\n}\n\n// One line for a person to read.\n[[nodiscard]] std::string describe(const Comparison& comparison) { return std::visit(Describe{}, comparison); }\n\n}  // namespace bench\n\nint main() {\n  // The live monitor missed heartbeats 0 and 1. The bag starts at 1, and the replay on the\n  // recording's clock reads each arrival 10 ms early.\n  const auto live = bench::parse_received(\"2 5200000000\\n3 5300000000\\n4 5400000000\\n5 5500000000\\n\");\n  const auto replay = bench::parse_received(\"1 5090000000\\n2 5190000000\\n3 5290000000\\n4 5390000000\\n5 5490000000\\n\");\n  const auto lost_one = bench::parse_received(\"2 5190000000\\n3 5290000000\\n5 5490000000\\n\");\n  const auto restarted = bench::parse_received(\"7 5000000000\\n0 5100000000\\n\");\n  if (!live || !replay || !lost_one || !restarted) return 1;\n\n  std::cout << bench::describe(bench::compare_runs(*live, *replay)) << '\\n';\n  std::cout << bench::describe(bench::compare_runs(*live, *lost_one)) << '\\n';\n  std::cout << bench::describe(bench::compare_runs(*live, *restarted)) << '\\n';\n  std::cout << std::format(\"\\\"2 5x\\\" parses: {}\\n\", bench::parse_received(\"2 5x\\n\").has_value());\n  std::cout << std::format(\"a missing file reads: {}\\n\", bench::read_received(\"/no/such/inputs.txt\").has_value());\n}"
+      },
+      {
+       "t": "output",
+       "text": "same: 4 heartbeats, 2 to 5; 0.30 s live, 0.30 s replay; replay clock -0.01 s\ndifferent: live has 4, replay has 5\ncan't compare: a run restarted\n\"2 5x\" parses: false\na missing file reads: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rule for \"the same inputs\" is the part to get right, and "
+        },
+        {
+         "t": "code",
+         "v": "compare_runs"
+        },
+        {
+         "t": "text",
+         "v": " states it in one place. Each run may miss a few heartbeats at its start, a different few each time, so a plain "
+        },
+        {
+         "t": "code",
+         "v": "diff"
+        },
+        {
+         "t": "text",
+         "v": " of the two files reports a difference that says nothing about the replay. The comparison therefore starts at the later of the two first values and ends at the earlier of the two last ones; inside that stretch, every heartbeat must match. Because one run of the heartbeat only counts up, each file is sorted by value, and the stretch is two binary searches, "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "upper_bound"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "&Received::value"
+        },
+        {
+         "t": "text",
+         "v": " as the projection. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::mismatch"
+        },
+        {
+         "t": "text",
+         "v": " with the same projection on both sides then finds the first heartbeat that differs. The check for one run, "
+        },
+        {
+         "t": "code",
+         "v": "adjacent_find"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "greater_equal"
+        },
+        {
+         "t": "text",
+         "v": ", looks for the first value that doesn't rise. A restarted heartbeat breaks the sorting, and the tool says so instead of comparing nonsense."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The result is a "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": " again, as in the monitor: agreement carries the numbers you'll look at next, a difference names the first heartbeat that one run lacks, and an unusable input says why. "
+        },
+        {
+         "t": "code",
+         "v": "Same"
+        },
+        {
+         "t": "text",
+         "v": " also carries two measurements that are not part of the verdict. "
+        },
+        {
+         "t": "code",
+         "v": "live_span"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "replay_span"
+        },
+        {
+         "t": "text",
+         "v": " are the time from the first to the last common heartbeat on each monitor's clock, and "
+        },
+        {
+         "t": "code",
+         "v": "offset"
+        },
+        {
+         "t": "text",
+         "v": " is how far the replay's clock is from the live one at the first common heartbeat. They tell you which clock the replay ran on."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the tests in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/test/replay_test.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". Here is the first:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <variant>\n\n#include <gtest/gtest.h>\n\n#include \"bench/replay.hpp\"\n\nTEST(CompareRuns, SkipsTheHeartbeatsOneRunMissedAtItsStart) {\n  const auto live = bench::parse_received(\"2 200\\n3 300\\n4 400\\n\");\n  const auto replay = bench::parse_received(\"1 100\\n2 200\\n3 300\\n4 400\\n\");\n  ASSERT_TRUE(live && replay);\n  const bench::Comparison comparison = bench::compare_runs(*live, *replay);\n  ASSERT_TRUE(std::holds_alternative<bench::Same>(comparison));\n  EXPECT_EQ(std::get<bench::Same>(comparison).count, 3);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add one case each for a heartbeat missing in the middle of the replay, a run with a restart, two runs with no value in common, and a line that doesn't parse. Each one is a line of the program's output above, turned into a check."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the tool, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/app/compare_runs.cpp"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <iostream>\n#include <variant>\n\n#include \"bench/replay.hpp\"\n\n// compare_runs LIVE_FILE REPLAY_FILE: exit code 0 when both runs heard the same heartbeats.\nint main(int argc, char** argv) {\n  if (argc != 3) { std::cerr << \"usage: compare_runs LIVE_FILE REPLAY_FILE\\n\"; return 2; }\n  const auto live = bench::read_received(argv[1]);\n  const auto replay = bench::read_received(argv[2]);\n  if (!live || !replay) { std::cerr << \"can't read or parse an inputs file\\n\"; return 2; }\n  const bench::Comparison comparison = bench::compare_runs(*live, *replay);\n  std::cout << bench::describe(comparison) << '\\n';\n  return std::holds_alternative<bench::Same>(comparison) ? 0 : 1;\n}"
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Update "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": ". The library gets its second source file, the tool is built and installed, and the test part builds one test program per test file:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "cmake_minimum_required(VERSION 3.22)\nproject(bench_core LANGUAGES CXX)\nset(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\nset(CMAKE_CXX_EXTENSIONS OFF)\n\ninclude(GNUInstallDirs)\n\nadd_library(bench_core src/odometry.cpp src/replay.cpp)\nadd_library(bench_core::bench_core ALIAS bench_core)\ntarget_include_directories(bench_core PUBLIC\n  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>\n  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)\ntarget_compile_options(bench_core PRIVATE -Wall -Wextra -Werror)\n\nadd_executable(compare_runs app/compare_runs.cpp)\ntarget_link_libraries(compare_runs PRIVATE bench_core)\ntarget_compile_options(compare_runs PRIVATE -Wall -Wextra -Werror)\n\ninstall(TARGETS bench_core EXPORT bench_coreTargets)\ninstall(TARGETS compare_runs)\ninstall(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})\ninstall(EXPORT bench_coreTargets NAMESPACE bench_core::\n        FILE bench_coreConfig.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/bench_core)\n\ninclude(CTest)\nif(BUILD_TESTING)\n  find_package(GTest REQUIRED)\n  include(GoogleTest)\n  foreach(name odometry replay)\n    add_executable(${name}_test test/${name}_test.cpp)\n    target_link_libraries(${name}_test PRIVATE bench_core GTest::gtest_main)\n    gtest_discover_tests(${name}_test)\n  endforeach()\nendif()"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "install(TARGETS compare_runs)"
+        },
+        {
+         "t": "text",
+         "v": " has no destination because CMake picks "
+        },
+        {
+         "t": "code",
+         "v": "bin"
+        },
+        {
+         "t": "text",
+         "v": " for a program by itself, from "
+        },
+        {
+         "t": "code",
+         "v": "GNUInstallDirs"
+        },
+        {
+         "t": "text",
+         "v": ". Installed into a scratch prefix with CMake 3.28, the tests switched off, the new lines of "
+        },
+        {
+         "t": "code",
+         "v": "cmake --install"
+        },
+        {
+         "t": "text",
+         "v": " are these:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "-- Installing: /tmp/core_install/bin/compare_runs\n-- Installing: /tmp/core_install/include/bench/replay.hpp\n-- Installing: /tmp/core_install/include/bench/time.hpp"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In the workspace, colcon installs it as "
+        },
+        {
+         "t": "code",
+         "v": "~/test_bench/install/bench_core/bin/compare_runs"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", then compare the two files from Build 1:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "~/test_bench/install/bench_core/bin/compare_runs ~/bags/live.txt ~/bags/replay.txt; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It should print "
+        },
+        {
+         "t": "code",
+         "v": "same:"
+        },
+        {
+         "t": "text",
+         "v": " with the bag's count of heartbeats, or a few fewer, and exit with 0. The two spans agree to a few hundredths of a second, because the player keeps the recorded spacing. The replay clock's offset is large: it is the time between the recording and the replay, because both monitors used the computer's clock."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Replay on the recording's clock. Start the monitor on simulation time, and let the player publish "
+         },
+         {
+          "t": "code",
+          "v": "/clock"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run bench_nodes monitor --ros-args -p use_sim_time:=true -p inputs_file:=$HOME/bags/replay_clock.txt\nros2 bag play ~/bags/heartbeat_run --start-paused --clock"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With "
+        },
+        {
+         "t": "code",
+         "v": "--clock"
+        },
+        {
+         "t": "text",
+         "v": ", the player publishes "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " 40 times a second, the default of the option, with the time of its playback, which is the time of the recording. The 40 Hz come from a timer on the computer's clock, while the playback runs at the rate you chose. A node with "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": " takes its time from that topic, so the monitor's clock now reads the recording's time. Run "
+        },
+        {
+         "t": "code",
+         "v": "compare_runs"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "live.txt"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "replay_clock.txt"
+        },
+        {
+         "t": "text",
+         "v": ". The offset drops to a few hundredths of a second or less: the monitor's clock moves in steps of one "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " message, which at rate 1 is 25 ms of recording time. At "
+        },
+        {
+         "t": "code",
+         "v": "--rate 2"
+        },
+        {
+         "t": "text",
+         "v": " each step is 50 ms of recording time, and in general it is 25 ms × the rate; "
+        },
+        {
+         "t": "code",
+         "v": "--clock 100"
+        },
+        {
+         "t": "text",
+         "v": " publishes 100 times a second and makes the steps 10 ms × the rate. "
+        },
+        {
+         "t": "code",
+         "v": "--start-paused"
+        },
+        {
+         "t": "text",
+         "v": " matters here too. While paused, the player already publishes "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " with the bag's start time, so the monitor's clock is set before the first heartbeat. A node on simulation time that hasn't received "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " yet reads zero, which the ROS 2 design article on clocks calls uninitialised time."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 8,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Replay at double speed, both ways:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 bag play ~/bags/heartbeat_run --start-paused --clock --rate 2     # monitor with use_sim_time:=true\nros2 bag play ~/bags/heartbeat_run --start-paused --rate 2             # monitor without it"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write each replay to its own file and compare it with "
+        },
+        {
+         "t": "code",
+         "v": "live.txt"
+        },
+        {
+         "t": "text",
+         "v": ". Both replays take half as long on your watch, and both give the same heartbeats. With "
+        },
+        {
+         "t": "code",
+         "v": "--clock"
+        },
+        {
+         "t": "text",
+         "v": ", the replay span still equals the live span, because the monitor's clock runs at double speed too. Without it, the replay span is half the live span."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That difference is the reason this topic exists. The monitor only counts, so its verdicts don't depend on time. The supervisor in the next topic decides by the age of the last odometry message and of the last command on its own clock, and a replay reproduces those decisions only when its clock follows the recording."
+        }
+       ]
+      },
+      {
+       "t": "note",
+       "c": [
+        {
+         "t": "text",
+         "v": "A bag recorded from the simulation needs one more thought. Its messages carry simulation time in their headers, while the recorder stamps each message with the computer's time when it arrived. Record with "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag record --use-sim-time"
+        },
+        {
+         "t": "text",
+         "v": ", which stamps with "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " instead, or record "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " itself and play the bag without "
+        },
+        {
+         "t": "code",
+         "v": "--clock"
+        },
+        {
+         "t": "text",
+         "v": ", so the recorded "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " is published like any other topic. With "
+        },
+        {
+         "t": "code",
+         "v": "--clock"
+        },
+        {
+         "t": "text",
+         "v": ", the player leaves out a recorded "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 9,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "compare_runs"
+         },
+         {
+          "t": "text",
+          "v": " prints "
+         },
+         {
+          "t": "code",
+          "v": "same:"
+         },
+         {
+          "t": "text",
+          "v": " and exits with 0 for all four replays;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "with "
+         },
+         {
+          "t": "code",
+          "v": "--clock"
+         },
+         {
+          "t": "text",
+          "v": ", the offset is below 0.05 s at rate 1 and below 0.1 s at rate 2, either way;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "at "
+         },
+         {
+          "t": "code",
+          "v": "--rate 2"
+         },
+         {
+          "t": "text",
+          "v": ", the spans match with "
+         },
+         {
+          "t": "code",
+          "v": "--clock"
+         },
+         {
+          "t": "text",
+          "v": " and halve without it."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a \"Record and replay\" section to "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic. Give the commands that record a run and replay it into the monitor, the format of the inputs file, and what "
+        },
+        {
+         "t": "code",
+         "v": "compare_runs"
+        },
+        {
+         "t": "text",
+         "v": " checks and what it leaves out, with the reason. Then write down the offsets and spans you measured in the four replays, and two lines on why a node that judges time must be replayed with "
+        },
+        {
+         "t": "code",
+         "v": "--clock"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation, "
+     },
+     {
+      "t": "a",
+      "v": "recording and playing back data",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Recording-And-Playing-Back-Data/Recording-And-Playing-Back-Data.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the rosbag2 "
+     },
+     {
+      "t": "a",
+      "v": "README on the Jazzy branch",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/README.md"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The rosbag2 sources on the Jazzy branch: the options of "
+     },
+     {
+      "t": "a",
+      "v": "ros2 bag play",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/ros2bag/ros2bag/verb/play.py"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ros2 bag record",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/ros2bag/ros2bag/verb/record.py"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "player",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/rosbag2_transport/src/rosbag2_transport/player.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", which starts its "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": " timer with the playback and adapts its QoS to the recorded offers."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article on "
+     },
+     {
+      "t": "a",
+      "v": "clock and time",
+      "href": "https://design.ros2.org/articles/clock_and_time.html"
+     },
+     {
+      "t": "text",
+      "v": ": time from "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": ", and zero before the first message."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Algorithms with projections instead of hand-written loops."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "ranges::mismatch",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/mismatch"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::lower_bound",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/lower_bound"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::adjacent_find",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/adjacent_find"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::from_chars",
+      "href": "https://en.cppreference.com/cpp/utility/from_chars"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -16,7 +16,7 @@
     "lang": "cpp",
     "tag": "run",
     "expect": "",
-    "text": "#include <cstdio>\n\nstruct Tracer {\n  const char* name;\n  explicit Tracer(const char* n) : name(n) { std::printf(\"make %s\\n\", name); }\n  ~Tracer() { std::printf(\"drop %s\\n\", name); }\n};\n\nTracer global(\"global\");\n\nTracer make(const char* n) { return Tracer(n); }\n\nvoid f() {\n  static Tracer once(\"static in f\");\n  Tracer local(\"local in f\");\n}\n\nint main() {\n  std::puts(\"main starts\");\n  Tracer a(\"a\");\n  f();\n  f();\n  Tracer* heap = new Tracer(\"heap\");\n  make(\"temporary\");\n  const Tracer& kept = make(\"kept by const&\");\n  std::printf(\"using %s\\n\", kept.name);\n  delete heap;\n  std::puts(\"main ends\");\n}"
+    "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <string_view>\n\nstruct Tracer {\n  explicit Tracer(std::string_view n) : name(n) { std::cout << std::format(\"make {}\\n\", name); }\n  ~Tracer() { std::cout << std::format(\"drop {}\\n\", name); }\n  Tracer(const Tracer&) = delete;\n  Tracer& operator=(const Tracer&) = delete;\n  Tracer(Tracer&&) = delete;\n  Tracer& operator=(Tracer&&) = delete;\n\n  const std::string name;\n};\n\nconst Tracer global(\"global\");\n\nTracer make(std::string_view name) { return Tracer(name); }\n\nvoid f() {\n  static const Tracer once(\"static in f\");\n  const Tracer local(\"local in f\");\n}\n\nint main() {\n  std::cout << \"main starts\\n\";\n  const Tracer a(\"a\");\n  f();\n  f();\n  auto heap = std::make_unique<Tracer>(\"heap\");\n  make(\"temporary\");\n  const Tracer& kept = make(\"kept by const&\");\n  std::cout << std::format(\"using {}\\n\", kept.name);\n  heap.reset();\n  std::cout << \"main ends\\n\";\n}"
    }
   ],
   "answer": [
@@ -25,7 +25,7 @@
     "lang": "cpp",
     "tag": "run",
     "expect": "",
-    "text": "#include <cstdio>\n\nstruct Tracer {\n  const char* name;\n  explicit Tracer(const char* n) : name(n) { std::printf(\"make %s\\n\", name); }\n  ~Tracer() { std::printf(\"drop %s\\n\", name); }\n};\n\nTracer global(\"global\");\n\nTracer make(const char* n) { return Tracer(n); }\n\nvoid f() {\n  static Tracer once(\"static in f\");\n  Tracer local(\"local in f\");\n}\n\nint main() {\n  std::puts(\"main starts\");\n  Tracer a(\"a\");\n  f();\n  f();\n  Tracer* heap = new Tracer(\"heap\");\n  make(\"temporary\");\n  const Tracer& kept = make(\"kept by const&\");\n  std::printf(\"using %s\\n\", kept.name);\n  delete heap;\n  std::puts(\"main ends\");\n}"
+    "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <string_view>\n\nstruct Tracer {\n  explicit Tracer(std::string_view n) : name(n) { std::cout << std::format(\"make {}\\n\", name); }\n  ~Tracer() { std::cout << std::format(\"drop {}\\n\", name); }\n  Tracer(const Tracer&) = delete;\n  Tracer& operator=(const Tracer&) = delete;\n  Tracer(Tracer&&) = delete;\n  Tracer& operator=(Tracer&&) = delete;\n\n  const std::string name;\n};\n\nconst Tracer global(\"global\");\n\nTracer make(std::string_view name) { return Tracer(name); }\n\nvoid f() {\n  static const Tracer once(\"static in f\");\n  const Tracer local(\"local in f\");\n}\n\nint main() {\n  std::cout << \"main starts\\n\";\n  const Tracer a(\"a\");\n  f();\n  f();\n  auto heap = std::make_unique<Tracer>(\"heap\");\n  make(\"temporary\");\n  const Tracer& kept = make(\"kept by const&\");\n  std::cout << std::format(\"using {}\\n\", kept.name);\n  heap.reset();\n  std::cout << \"main ends\\n\";\n}"
    },
    {
     "t": "output",
@@ -131,16 +131,28 @@
      ],
      [
       {
+       "t": "text",
+       "v": "The "
+      },
+      {
+       "t": "code",
+       "v": "Tracer"
+      },
+      {
+       "t": "text",
+       "v": " that "
+      },
+      {
        "t": "code",
        "v": "heap"
       },
       {
        "t": "text",
-       "v": " lives exactly from "
+       "v": " owns lives from "
       },
       {
        "t": "code",
-       "v": "new"
+       "v": "std::make_unique"
       },
       {
        "t": "text",
@@ -148,7 +160,47 @@
       },
       {
        "t": "code",
-       "v": "delete"
+       "v": "heap.reset()"
+      },
+      {
+       "t": "text",
+       "v": ". Without the "
+      },
+      {
+       "t": "code",
+       "v": "reset()"
+      },
+      {
+       "t": "text",
+       "v": ", the "
+      },
+      {
+       "t": "code",
+       "v": "std::unique_ptr"
+      },
+      {
+       "t": "text",
+       "v": " would destroy it at the end of "
+      },
+      {
+       "t": "code",
+       "v": "main"
+      },
+      {
+       "t": "text",
+       "v": ", between "
+      },
+      {
+       "t": "code",
+       "v": "drop kept by const&"
+      },
+      {
+       "t": "text",
+       "v": " and "
+      },
+      {
+       "t": "code",
+       "v": "drop a"
       },
       {
        "t": "text",
@@ -215,6 +267,84 @@
     "t": "p",
     "c": [
      {
+      "t": "code",
+      "v": "Tracer"
+     },
+     {
+      "t": "text",
+      "v": " deletes its copy and move operations so that every "
+     },
+     {
+      "t": "code",
+      "v": "drop"
+     },
+     {
+      "t": "text",
+      "v": " line belongs to exactly one "
+     },
+     {
+      "t": "code",
+      "v": "make"
+     },
+     {
+      "t": "text",
+      "v": " line. A copy would print "
+     },
+     {
+      "t": "code",
+      "v": "drop"
+     },
+     {
+      "t": "text",
+      "v": " for an object whose construction printed nothing. "
+     },
+     {
+      "t": "code",
+      "v": "make"
+     },
+     {
+      "t": "text",
+      "v": " still compiles: since C++17, "
+     },
+     {
+      "t": "code",
+      "v": "return Tracer(name);"
+     },
+     {
+      "t": "text",
+      "v": " initialises the caller's object directly, so there is no copy or move to call ("
+     },
+     {
+      "t": "a",
+      "v": "Josuttis, C++17 The Complete Guide",
+      "href": "https://leanpub.com/cpp17"
+     },
+     {
+      "t": "text",
+      "v": ", chapter 5). "
+     },
+     {
+      "t": "code",
+      "v": "make"
+     },
+     {
+      "t": "text",
+      "v": " has no "
+     },
+     {
+      "t": "code",
+      "v": "[[nodiscard]]"
+     },
+     {
+      "t": "text",
+      "v": " because the program discards one of its results on purpose."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
       "t": "text",
       "v": "You pass if every line is right and you can say why for each one. One or two wrong lines is a partial pass, and more than that is a fail."
      }
@@ -222,6 +352,117 @@
    }
   ]
  },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Storage duration is the rule that decides how long an object's memory exists, and C++ has four of them. Automatic storage holds a local variable, destroyed at the end of its block. Static storage holds a global or a function's "
+    },
+    {
+     "t": "code",
+     "v": "static"
+    },
+    {
+     "t": "text",
+     "v": " local: a global is built before "
+    },
+    {
+     "t": "code",
+     "v": "main"
+    },
+    {
+     "t": "text",
+     "v": " starts, a local "
+    },
+    {
+     "t": "code",
+     "v": "static"
+    },
+    {
+     "t": "text",
+     "v": " the first time execution reaches it, and both last until after "
+    },
+    {
+     "t": "code",
+     "v": "main"
+    },
+    {
+     "t": "text",
+     "v": " returns. Thread storage holds a "
+    },
+    {
+     "t": "code",
+     "v": "thread_local"
+    },
+    {
+     "t": "text",
+     "v": " object, built once per thread and destroyed when that thread ends. Dynamic storage holds an object an owner allocates, such as the elements of a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " or the object a "
+    },
+    {
+     "t": "code",
+     "v": "std::unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": " holds, and it lasts until that owner destroys it. An object's lifetime sits inside its storage duration: it starts once the constructor has returned and ends when the destructor starts, and using the object outside that span is undefined behaviour even while its memory is still there."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this solves is knowing exactly when an object stops being safe to touch. A temporary, an object with no name, is destroyed at the end of the full-expression that created it, the outermost expression it belongs to, which in practice means the semicolon. Miss that boundary and you read memory that is already gone, which is what the cold check on this page tests by asking you to predict the make and drop order of a small program."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism runs in a fixed order: base classes first, then members in the order the class declares them, whatever order the constructor's initialiser list names, then the constructor body. Destruction reverses that exactly. A temporary bound directly to a reference is the one exception to its short life: the language stretches it to match the reference, a rule called lifetime extension."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that lifetime extension is narrower than most people assume. It only fires when the temporary is bound straight to the reference variable. Pass it through a function parameter, through "
+    },
+    {
+     "t": "code",
+     "v": "std::min"
+    },
+    {
+     "t": "text",
+     "v": ", or through a range-for's hidden call, and it still dies at the semicolon while the reference or view now points at nothing."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the robot as the gap between a lidar scan object, which is automatic, and the range readings it owns, which sit in dynamic storage until the scan itself is destroyed, and telling that gap apart for locals, statics and temporaries alike is the question this page's title is asking."
+    }
+   ]
+  }
+ ],
  "subs": [
   {
    "id": "storage",
@@ -246,11 +487,11 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <cstdio>\n\nint next_id() {\n  static int counter = 0;  // one object for the whole program\n  return ++counter;\n}\n\nint main() {\n  for (int i = 0; i < 3; ++i) {\n    int square = i * i;    // a new object on every pass through the loop\n    std::printf(\"id %d, square %d\\n\", next_id(), square);\n  }\n  int* p = new int(42);    // lives until delete\n  std::printf(\"heap value %d\\n\", *p);\n  delete p;\n}"
+       "text": "#include <format>\n#include <iostream>\n#include <vector>\n\n[[nodiscard]] int next_id() {\n  static int counter = 0;  // static: one object for the whole program\n  return ++counter;\n}\n\nstruct Scan {\n  int id;\n  std::vector<int> ranges_mm;  // owns its elements, which live in dynamic storage\n};\n\n// One compiled function serves every beam count, so the size is known only at run time.\n[[nodiscard]] Scan read_scan(int beams) {\n  return Scan{.id = next_id(), .ranges_mm = std::vector<int>(beams, 1000)};\n}\n\nint main() {\n  for (const int beams : {360, 720, 1080}) {\n    const Scan scan = read_scan(beams);  // automatic: a new Scan on every pass\n    std::cout << std::format(\"scan {}: {} ranges\\n\", scan.id, std::ssize(scan.ranges_mm));\n  }\n}"
       },
       {
        "t": "output",
-       "text": "id 1, square 0\nid 2, square 1\nid 3, square 4\nheap value 42"
+       "text": "scan 1: 360 ranges\nscan 2: 720 ranges\nscan 3: 1080 ranges"
       },
       {
        "t": "p",
@@ -273,43 +514,36 @@
         },
         {
          "t": "code",
-         "v": "square"
+         "v": "scan"
         },
         {
          "t": "text",
-         "v": " is a new object on each pass through the loop body and is destroyed at the end of it. The "
+         "v": " is a new object on each pass through the loop body and is destroyed at the end of it. The ranges live somewhere else. "
         },
         {
          "t": "code",
-         "v": "int"
+         "v": "read_scan"
         },
         {
          "t": "text",
-         "v": " that "
+         "v": " is compiled once and has to work for any beam count, but the size of every automatic and static object is fixed when the program is compiled. So the vector puts its elements in dynamic storage: its constructor allocates them and its destructor frees them. Storage duration belongs to each object, not to a variable name: the vector object inside "
         },
         {
          "t": "code",
-         "v": "p"
+         "v": "scan"
         },
         {
          "t": "text",
-         "v": " points to lives from "
-        },
-        {
-         "t": "code",
-         "v": "new"
-        },
-        {
-         "t": "text",
-         "v": " to "
-        },
-        {
-         "t": "code",
-         "v": "delete"
-        },
+         "v": ", which holds three pointers in libstdc++, is automatic, and only the elements it points to are dynamic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
         {
          "t": "text",
-         "v": ". What differs between them is their "
+         "v": "What differs between these objects is their "
         },
         {
          "t": "i",
@@ -325,7 +559,7 @@
         },
         {
          "t": "text",
-         "v": " sits inside that: it starts when initialisation finishes, meaning the constructor has returned, and it ends when the destructor starts. Using an object outside its lifetime is undefined behaviour, even if its memory is still there."
+         "v": " sits inside that: it starts when initialisation finishes, meaning the constructor has returned, and it ends when the destructor starts. Most uses of an object outside its lifetime are undefined behaviour, even when its memory is still there."
         }
        ]
       },
@@ -389,7 +623,7 @@
          [
           {
            "t": "text",
-           "v": "local variables, parameters"
+           "v": "local variables"
           }
          ]
         ],
@@ -469,7 +703,15 @@
          [
           {
            "t": "text",
-           "v": "once per thread, when that thread first needs it"
+           "v": "once per thread. A "
+          },
+          {
+           "t": "code",
+           "v": "thread_local"
+          },
+          {
+           "t": "text",
+           "v": " local: the first time that thread reaches it"
           }
          ],
          [
@@ -499,7 +741,15 @@
          [
           {
            "t": "text",
-           "v": "at the "
+           "v": "when an owner allocates it: "
+          },
+          {
+           "t": "code",
+           "v": "std::make_unique"
+          },
+          {
+           "t": "text",
+           "v": ", a growing container, a "
           },
           {
            "t": "code",
@@ -513,25 +763,29 @@
          [
           {
            "t": "text",
-           "v": "at the matching "
-          },
-          {
-           "t": "code",
-           "v": "delete"
-          },
-          {
-           "t": "text",
-           "v": ", or never, which is a leak"
+           "v": "when its owner destroys it, or never, which is a leak"
           }
          ],
          [
           {
+           "t": "text",
+           "v": "the elements of a "
+          },
+          {
            "t": "code",
-           "v": "new T"
+           "v": "std::vector"
           },
           {
            "t": "text",
-           "v": ", and everything containers and smart pointers allocate"
+           "v": ", the object a "
+          },
+          {
+           "t": "code",
+           "v": "std::unique_ptr"
+          },
+          {
+           "t": "text",
+           "v": " owns"
           }
          ]
         ]
@@ -558,7 +812,16 @@
         },
         {
          "t": "text",
-         "v": " is initialised the first time execution reaches its declaration, and never again. Since C++11 that initialisation is thread-safe: if two threads reach it at the same time, one waits for the other. Only the initialisation is protected. Reads and writes after that need their own synchronisation."
+         "v": " is initialised the first time execution reaches its declaration, and never again. Since C++11 that initialisation is thread-safe: if two threads reach it at the same time, one waits for the other ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/language/storage_duration"
+        },
+        {
+         "t": "text",
+         "v": "). Only the initialisation is protected. Reads and writes after that need their own synchronisation."
         }
        ]
       },
@@ -567,15 +830,7 @@
        "c": [
         {
          "t": "text",
-         "v": "Globals are initialised before "
-        },
-        {
-         "t": "code",
-         "v": "main"
-        },
-        {
-         "t": "text",
-         "v": ", in the order they are defined within one source file. Between source files the order is unspecified, so a global whose constructor uses a global from another file can find it not yet constructed. This is the "
+         "v": "Globals are initialised in the order they are defined within one source file. Between source files the order is unspecified, so a global whose constructor uses a global from another file can find it not yet constructed. This is the "
         },
         {
          "t": "i",
@@ -583,7 +838,24 @@
         },
         {
          "t": "text",
-         "v": ". The usual fix is to replace the global with a function that returns a reference to a local "
+         "v": ". The standard also lets an implementation delay a global's initialisation until something in its source file is first used ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/language/initialization"
+        },
+        {
+         "t": "text",
+         "v": "). GCC runs it before "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", as the cold check showed. The usual fix for the fiasco is to replace the global with a function that returns a reference to a local "
         },
         {
          "t": "code",
@@ -591,7 +863,33 @@
         },
         {
          "t": "text",
-         "v": ", which is then built on first use."
+         "v": ", which is then built on first use. Better still, avoid the global: Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.2",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global"
+        },
+        {
+         "t": "text",
+         "v": " asks for no non-"
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " globals, and "
+        },
+        {
+         "t": "a",
+         "v": "I.22",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global-init"
+        },
+        {
+         "t": "text",
+         "v": " for no complex initialisation of the ones you keep."
         }
        ]
       },
@@ -600,7 +898,7 @@
        "c": [
         {
          "t": "text",
-         "v": "You will hear \"stack\" and \"heap\" in interviews. They describe how implementations usually provide automatic and dynamic storage, and the standard uses the longer names. Either is fine, as long as you know they mean the same thing."
+         "v": "You will hear \"stack\" and \"heap\" in interviews. They describe how implementations usually provide automatic and dynamic storage, and the standard uses the longer names. Either pair of words is fine in conversation, as long as you know which storage duration each one stands for."
         }
        ]
       },
@@ -609,7 +907,40 @@
        "c": [
         {
          "t": "text",
-         "v": "Dynamic storage is the only kind whose end you control by hand, which is why most lifetime bugs involve it. Modern C++ gives that job to an owner, such as a container or a smart pointer. Later topics cover both."
+         "v": "Dynamic storage exists for two needs the others can't meet. One is a size known only at run time, as with the scan. The other is an object that must outlive the block that creates it and can't be returned by value, because its concrete type is picked at run time or because other objects hold its address. "
+        },
+        {
+         "t": "code",
+         "v": "std::make_unique"
+        },
+        {
+         "t": "text",
+         "v": " creates such an object, and the "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " it returns is its owner, as with "
+        },
+        {
+         "t": "code",
+         "v": "heap"
+        },
+        {
+         "t": "text",
+         "v": " in the cold check. When neither need applies, use a local object: it costs no allocation and can't leak (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "R.5",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-scoped"
+        },
+        {
+         "t": "text",
+         "v": "). Dynamic storage is also the only kind whose end isn't tied to a block, a thread or the whole program, which is why most lifetime bugs involve it. Modern C++ gives that decision to an owner, such as a container or a smart pointer, and later topics cover both."
         }
        ]
       }
@@ -701,7 +1032,7 @@
          },
          {
           "t": "code",
-          "v": "std::thread"
+          "v": "std::jthread"
          },
          {
           "t": "text",
@@ -713,15 +1044,15 @@
          },
          {
           "t": "text",
-          "v": " twice and keeps the second result; the second calls it once. After "
+          "v": " twice and keeps the second result; the second calls it once. Keep the results in a "
          },
          {
           "t": "code",
-          "v": "join"
+          "v": "std::array<int, 2>"
          },
          {
           "t": "text",
-          "v": ", print both results and one more call from "
+          "v": ". After both threads have been joined, print both results and one more call from "
          },
          {
           "t": "code",
@@ -768,7 +1099,7 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <cstdio>\n#include <thread>\n\nint& counter() {\n  static int value = 0;  // made on the first call, lives until after main\n  return value;\n}\n\nint count_call() {\n  thread_local int calls = 0;  // a separate object in every thread\n  return ++calls;\n}\n\nint main() {\n  ++counter();\n  ++counter();\n  ++counter();\n  std::printf(\"counter %d\\n\", counter());\n\n  int seen[2] = {};\n  std::thread a([&] { count_call(); seen[0] = count_call(); });\n  std::thread b([&] { seen[1] = count_call(); });\n  a.join();\n  b.join();\n  std::printf(\"thread a saw %d, thread b saw %d, main sees %d\\n\", seen[0], seen[1], count_call());\n}"
+       "text": "#include <array>\n#include <format>\n#include <iostream>\n#include <thread>\n\n[[nodiscard]] int& counter() {\n  static int value = 0;  // made on the first call, lives until after main\n  return value;\n}\n\nint count_call() {\n  thread_local int calls = 0;  // a separate object in every thread\n  return ++calls;\n}\n\nint main() {\n  ++counter();\n  ++counter();\n  ++counter();\n  std::cout << std::format(\"counter {}\\n\", counter());\n\n  std::array<int, 2> seen{};\n  {\n    const std::jthread a([&seen] {\n      count_call();\n      seen[0] = count_call();\n    });\n    const std::jthread b([&seen] { seen[1] = count_call(); });\n  }  // b is joined and destroyed here, then a\n  std::cout << std::format(\"thread a saw {}, thread b saw {}, main sees {}\\n\", seen[0], seen[1], count_call());\n}"
       },
       {
        "t": "output",
@@ -806,7 +1137,15 @@
          },
          {
           "t": "text",
-          "v": " is per thread: it is destroyed when its thread ends, and main's copy after "
+          "v": " is per thread: it is destroyed when its thread ends, and main's own "
+         },
+         {
+          "t": "code",
+          "v": "calls"
+         },
+         {
+          "t": "text",
+          "v": " after "
          },
          {
           "t": "code",
@@ -814,18 +1153,10 @@
          },
          {
           "t": "text",
-          "v": " returns."
+          "v": " returns, before any static object."
          }
         ],
         [
-         {
-          "t": "code",
-          "v": "seen"
-         },
-         {
-          "t": "text",
-          "v": ", "
-         },
          {
           "t": "code",
           "v": "a"
@@ -840,15 +1171,7 @@
          },
          {
           "t": "text",
-          "v": " are automatic, destroyed at the end of "
-         },
-         {
-          "t": "code",
-          "v": "main"
-         },
-         {
-          "t": "text",
-          "v": " in reverse order: "
+          "v": " are automatic, destroyed at the end of the inner block in reverse order: "
          },
          {
           "t": "code",
@@ -856,7 +1179,7 @@
          },
          {
           "t": "text",
-          "v": ", "
+          "v": ", then "
          },
          {
           "t": "code",
@@ -864,11 +1187,46 @@
          },
          {
           "t": "text",
-          "v": ", "
+          "v": ". A "
+         },
+         {
+          "t": "code",
+          "v": "std::jthread"
+         },
+         {
+          "t": "text",
+          "v": " joins its thread in its destructor ("
+         },
+         {
+          "t": "a",
+          "v": "Core Guidelines CP.25",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-joining_thread"
+         },
+         {
+          "t": "text",
+          "v": "), which is why the block is there: after its closing brace both threads have finished, and reading "
          },
          {
           "t": "code",
           "v": "seen"
+         },
+         {
+          "t": "text",
+          "v": " is safe."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "seen"
+         },
+         {
+          "t": "text",
+          "v": " is automatic too, destroyed at the end of "
+         },
+         {
+          "t": "code",
+          "v": "main"
          },
          {
           "t": "text",
@@ -914,7 +1272,7 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <cstdio>\n\nstruct Part {\n  const char* name;\n  explicit Part(const char* n) : name(n) { std::printf(\"  make %s\\n\", name); }\n  ~Part() { std::printf(\"  drop %s\\n\", name); }\n};\n\nstruct Base {\n  Part engine{\"Base::engine\"};\n  Base() { std::puts(\"  Base body\"); }\n  ~Base() { std::puts(\"  ~Base body\"); }\n};\n\nstruct Robot : Base {\n  Part left;\n  Part right;\n  Robot() : left(\"Robot::left\"), right(\"Robot::right\") { std::puts(\"  Robot body\"); }\n  ~Robot() { std::puts(\"  ~Robot body\"); }\n};\n\nint main() {\n  std::puts(\"build:\");\n  {\n    Robot r;\n    std::puts(\"destroy:\");\n  }\n}"
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n\nstruct Tracer {\n  explicit Tracer(std::string_view n) : name(n) { std::cout << std::format(\"  make {}\\n\", name); }\n  ~Tracer() { std::cout << std::format(\"  drop {}\\n\", name); }\n  Tracer(const Tracer&) = delete;\n  Tracer& operator=(const Tracer&) = delete;\n  Tracer(Tracer&&) = delete;\n  Tracer& operator=(Tracer&&) = delete;\n\n  const std::string name;\n};\n\nclass Base {\n public:\n  Base() { std::cout << \"  Base body\\n\"; }\n\n protected:\n  ~Base() { std::cout << \"  ~Base body\\n\"; }  // protected: nothing destroys a Robot through a Base*\n\n private:\n  Tracer engine_{\"Base::engine\"};\n};\n\nclass Robot : public Base {\n public:\n  Robot() : left_(\"Robot::left\"), right_(\"Robot::right\") { std::cout << \"  Robot body\\n\"; }\n  ~Robot() { std::cout << \"  ~Robot body\\n\"; }\n\n private:\n  Tracer left_;\n  Tracer right_;\n};\n\nint main() {\n  std::cout << \"build:\\n\";\n  {\n    const Robot r;\n    std::cout << \"destroy:\\n\";\n  }\n}"
       },
       {
        "t": "output",
@@ -959,6 +1317,105 @@
        "c": [
         {
          "t": "text",
+         "v": "Two details of the classes are about correctness, not output. "
+        },
+        {
+         "t": "code",
+         "v": "Base"
+        },
+        {
+         "t": "text",
+         "v": "'s destructor is "
+        },
+        {
+         "t": "code",
+         "v": "protected"
+        },
+        {
+         "t": "text",
+         "v": ". A public base class needs either a public virtual destructor or a protected non-virtual one (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.35",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-virtual"
+        },
+        {
+         "t": "text",
+         "v": "). With a public non-virtual one, a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Base>"
+        },
+        {
+         "t": "text",
+         "v": " that owns a "
+        },
+        {
+         "t": "code",
+         "v": "Robot"
+        },
+        {
+         "t": "text",
+         "v": " would run only "
+        },
+        {
+         "t": "code",
+         "v": "~Base"
+        },
+        {
+         "t": "text",
+         "v": ", which is undefined behaviour. With the protected one, such a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " doesn't compile. And "
+        },
+        {
+         "t": "code",
+         "v": "Base"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Robot"
+        },
+        {
+         "t": "text",
+         "v": " each declare a destructor, only to print, without saying anything about copies, which Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.21",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+        },
+        {
+         "t": "text",
+         "v": " would flag. Here the copies are already deleted: the compiler deletes a class's implicit copy operations when a member's are deleted, as "
+        },
+        {
+         "t": "code",
+         "v": "Tracer"
+        },
+        {
+         "t": "text",
+         "v": "'s are. A class that declares a destructor gets no implicit moves, so neither class can be moved either."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
          "v": "The rule that catches people out is that members are built in "
         },
         {
@@ -967,7 +1424,16 @@
         },
         {
          "t": "text",
-         "v": " order, whatever order the constructor's initialiser list names them in. This class is wrong: "
+         "v": " order, whatever order the constructor's initialiser list names them in (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.47",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-order"
+        },
+        {
+         "t": "text",
+         "v": "). This class is wrong: "
         },
         {
          "t": "code",
@@ -991,7 +1457,15 @@
         },
         {
          "t": "text",
-         "v": " has a value. GCC warns about the mismatch with "
+         "v": " has a value. With "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Werror"
+        },
+        {
+         "t": "text",
+         "v": ", GCC 13 refuses it twice: "
         },
         {
          "t": "code",
@@ -999,15 +1473,23 @@
         },
         {
          "t": "text",
-         "v": ", which is part of "
+         "v": " reports the order mismatch, and "
         },
         {
          "t": "code",
-         "v": "-Wall"
+         "v": "-Wuninitialized"
         },
         {
          "t": "text",
-         "v": ", and that is one reason to build with "
+         "v": " reports the read of "
+        },
+        {
+         "t": "code",
+         "v": "width"
+        },
+        {
+         "t": "text",
+         "v": ". That is one reason to build with "
         },
         {
          "t": "code",
@@ -1022,9 +1504,43 @@
       {
        "t": "code",
        "lang": "cpp",
-       "tag": "fragment",
-       "expect": "",
-       "text": "struct Window {\n  int area;   // declared first, so initialised first\n  int width;\n  Window(int w) : width(w), area(width * width) {}  // reads width before it is set\n};"
+       "tag": "compile-fail",
+       "expect": "will be initialized after",
+       "text": "struct Window {\n  int area;   // declared first, so initialised first\n  int width;\n  explicit Window(int w) : width(w), area(width * width) {}  // reads width before it is set\n};\n\nint main() {\n  const Window w(3);\n  return w.area;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The constructor is "
+        },
+        {
+         "t": "code",
+         "v": "explicit"
+        },
+        {
+         "t": "text",
+         "v": ", as a constructor with one argument should be unless you want the implicit conversion from "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.46",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-explicit"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
       }
      ]
     },
@@ -1060,11 +1576,11 @@
          },
          {
           "t": "code",
-          "v": "Part"
+          "v": "Tracer"
          },
          {
           "t": "text",
-          "v": "-style members;"
+          "v": " members;"
          }
         ],
         [
@@ -1086,7 +1602,15 @@
          },
          {
           "t": "text",
-          "v": " and has one member whose own class has a member;"
+          "v": " and has one member whose own class has a "
+         },
+         {
+          "t": "code",
+          "v": "Tracer"
+         },
+         {
+          "t": "text",
+          "v": " member;"
          }
         ],
         [
@@ -1153,7 +1677,7 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <cstdio>\n\nstruct Part {\n  const char* name;\n  explicit Part(const char* n) : name(n) { std::printf(\"make %s\\n\", name); }\n  ~Part() { std::printf(\"drop %s\\n\", name); }\n};\n\nstruct Lens {\n  Part glass{\"glass\"};\n};\n\nstruct Sensor {\n  Part chip{\"chip\"};\n  Part clock{\"clock\"};\n};\n\nstruct Camera : Sensor {\n  Lens lens;\n};\n\nCamera front;\n\nvoid use_back() {\n  static Camera back;\n}\n\nint main() {\n  std::puts(\"main\");\n  use_back();\n  use_back();\n  std::puts(\"main ends\");\n}"
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n\nstruct Tracer {\n  explicit Tracer(std::string_view n) : name(n) { std::cout << std::format(\"make {}\\n\", name); }\n  ~Tracer() { std::cout << std::format(\"drop {}\\n\", name); }\n  Tracer(const Tracer&) = delete;\n  Tracer& operator=(const Tracer&) = delete;\n  Tracer(Tracer&&) = delete;\n  Tracer& operator=(Tracer&&) = delete;\n\n  const std::string name;\n};\n\nstruct Lens {\n  Tracer glass{\"glass\"};\n};\n\nstruct Sensor {\n  Tracer chip{\"chip\"};\n  Tracer clock{\"clock\"};\n};\n\nstruct Camera : Sensor {\n  Lens lens;\n};\n\nconst Camera front;\n\nvoid use_back() {\n  static const Camera back;\n}\n\nint main() {\n  std::cout << \"main\\n\";\n  use_back();\n  use_back();\n  std::cout << \"main ends\\n\";\n}"
       },
       {
        "t": "output",
@@ -1212,7 +1736,48 @@
         },
         {
          "t": "text",
-         "v": ", each in the reverse of its build order."
+         "v": ", each in the reverse of its build order. "
+        },
+        {
+         "t": "code",
+         "v": "Lens"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Camera"
+        },
+        {
+         "t": "text",
+         "v": " declare no special members at all. The compiler writes their destructors, which destroy the members in reverse order, and their "
+        },
+        {
+         "t": "code",
+         "v": "Tracer"
+        },
+        {
+         "t": "text",
+         "v": " members make them impossible to copy (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.20",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-zero"
+        },
+        {
+         "t": "text",
+         "v": ")."
         }
        ]
       }
@@ -1255,7 +1820,7 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <cstdio>\n#include <string>\n\nstd::string make_name() { return \"robot-7\"; }\n\nint main() {\n  std::printf(\"%zu\\n\", make_name().size());\n  const std::string& kept = make_name();\n  std::string&& also_kept = make_name();\n  std::printf(\"%s %s\\n\", kept.c_str(), also_kept.c_str());\n}"
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n\n[[nodiscard]] std::string make_name() { return \"robot-7\"; }\n\nint main() {\n  std::cout << std::format(\"{}\\n\", make_name().size());\n  const std::string& kept = make_name();\n  std::string&& also_kept = make_name();\n  std::cout << std::format(\"{} {}\\n\", kept, also_kept);\n}"
       },
       {
        "t": "output",
@@ -1298,15 +1863,7 @@
         },
         {
          "t": "text",
-         "v": " condition. So the first call's string is destroyed after "
-        },
-        {
-         "t": "code",
-         "v": "printf"
-        },
-        {
-         "t": "text",
-         "v": " has read its size, before the next line starts."
+         "v": " condition. So the first call's string is destroyed at the end of its line, after its size has been printed."
         }
        ]
       },
@@ -1364,6 +1921,64 @@
        "c": [
         {
          "t": "text",
+         "v": "\"Directly\" includes naming a data member of the temporary. If "
+        },
+        {
+         "t": "code",
+         "v": "Robot"
+        },
+        {
+         "t": "text",
+         "v": " had a public data member "
+        },
+        {
+         "t": "code",
+         "v": "ids_"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "const auto& ids = make_robot().ids_;"
+        },
+        {
+         "t": "text",
+         "v": " would keep alive the whole "
+        },
+        {
+         "t": "code",
+         "v": "Robot"
+        },
+        {
+         "t": "text",
+         "v": " that "
+        },
+        {
+         "t": "code",
+         "v": "make_robot()"
+        },
+        {
+         "t": "text",
+         "v": " returned, with all its other members ("
+        },
+        {
+         "t": "a",
+         "v": "O'Dwyer",
+         "href": "https://quuxplusone.github.io/blog/2020/11/16/lifetime-extension-tidbit/"
+        },
+        {
+         "t": "text",
+         "v": "). It excludes anything that passes through a function, because the compiler doesn't look inside a function to see which object the reference it returns refers to."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
          "v": "That is the whole rule, and it is narrower than most people remember. The common belief is that any "
         },
         {
@@ -1382,7 +1997,7 @@
         [
          {
           "t": "text",
-          "v": "A temporary passed to a reference parameter lives until the end of the caller's full-expression. The parameter doesn't extend it. A function or constructor that stores the reference, in a reference member for example, leaves it dangling from the next statement on. The exercise below is this bug, and it is the version you will meet most often in real code."
+          "v": "A temporary passed to a reference parameter lives until the end of the caller's full-expression. The parameter doesn't extend it. A function or constructor that stores the reference, in a reference member for example, leaves it dangling from the next statement on. The exercise below is this bug."
          }
         ],
         [
@@ -1442,7 +2057,7 @@
          },
          {
           "t": "code",
-          "v": "for (auto x : make().items())"
+          "v": "for (const int id : make_robot().ids())"
          },
          {
           "t": "text",
@@ -1450,11 +2065,46 @@
          },
          {
           "t": "code",
-          "v": "make()"
+          "v": "make_robot()"
          },
          {
           "t": "text",
-          "v": " before the first iteration, so the loop walks a member of a dead object. C++23 extends the lifetime of temporaries in the range expression. This course compiles as C++20."
+          "v": " before the first iteration, because "
+         },
+         {
+          "t": "code",
+          "v": "ids()"
+         },
+         {
+          "t": "text",
+          "v": " is a function that returns a reference into it. The loop walks a member of a dead object. C++23 fixes this case: P2644R1, adopted as the wording paper "
+         },
+         {
+          "t": "a",
+          "v": "P2718R0",
+          "href": "https://wg21.link/p2718r0"
+         },
+         {
+          "t": "text",
+          "v": ", extends every temporary in the range expression until the end of the loop. GCC implements it from GCC 15 and Clang from Clang 20 ("
+         },
+         {
+          "t": "a",
+          "v": "GCC",
+          "href": "https://gcc.gnu.org/projects/cxx-status.html"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "a",
+          "v": "Clang",
+          "href": "https://clang.llvm.org/cxx_status.html"
+         },
+         {
+          "t": "text",
+          "v": "). This course compiles as C++20 with GCC 13, which doesn't implement the fix in any mode."
          }
         ],
         [
@@ -1473,7 +2123,7 @@
          {
           "t": "a",
           "v": "cppreference",
-          "href": "https://en.cppreference.com/w/cpp/language/reference_initialization"
+          "href": "https://en.cppreference.com/cpp/language/reference_initialization"
          },
          {
           "t": "text",
@@ -1495,7 +2145,16 @@
        "c": [
         {
          "t": "text",
-         "v": "When you review code, a reference bound to a function's return value should raise one question: what keeps that object alive?"
+         "v": "Abseil's "
+        },
+        {
+         "t": "a",
+         "v": "tip #107",
+         "href": "https://abseil.io/tips/107"
+        },
+        {
+         "t": "text",
+         "v": " walks through the same boundary. When you review code, a reference bound to a function's return value should raise one question: what keeps that object alive?"
         }
        ]
       }
@@ -1648,15 +2307,31 @@
         },
         {
          "t": "text",
-         "v": " on the "
+         "v": ". Frame #0 of its stack trace is "
         },
         {
          "t": "code",
-         "v": "printf"
+         "v": "basic_string::size() const"
         },
         {
          "t": "text",
-         "v": " line. The string returned by "
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "basic_string.h"
+        },
+        {
+         "t": "text",
+         "v": ", and frame #1 is "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", on the line that prints. The string returned by "
         },
         {
          "t": "code",
@@ -1689,7 +2364,7 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "asan:stack-use-after-scope",
-       "text": "#include <cstdio>\n#include <string>\n\nstd::string make_name() { return \"robot-7 with a name longer than fifteen\"; }\n\nstruct View {\n  const std::string& name;\n  explicit View(const std::string& n) : name(n) {}\n};\n\nint main() {\n  View v(make_name());  // the temporary is destroyed at the end of this line\n  std::printf(\"%zu\\n\", v.name.size());\n}"
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n\n[[nodiscard]] std::string make_name() { return \"robot-7\"; }\n\nstruct View {\n  const std::string& name;\n  explicit View(const std::string& n) : name(n) {}\n};\n\nint main() {\n  const View v(make_name());  // the temporary is destroyed at the end of this line\n  std::cout << std::format(\"{}\\n\", v.name.size());\n}"
       },
       {
        "t": "p",
@@ -1704,7 +2379,7 @@
         },
         {
          "t": "text",
-         "v": " is built, and nothing can dangle:"
+         "v": " is built from a temporary, and nothing can dangle:"
         }
        ]
       },
@@ -1713,18 +2388,92 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <cstdio>\n#include <string>\n#include <utility>\n\nstd::string make_name() { return \"robot-7 with a name longer than fifteen\"; }\n\nstruct View {\n  std::string name;\n  explicit View(std::string n) : name(std::move(n)) {}\n};\n\nint main() {\n  View v(make_name());\n  std::printf(\"%zu\\n\", v.name.size());\n}"
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <utility>\n\n[[nodiscard]] std::string make_name() { return \"robot-7\"; }\n\nstruct View {\n  std::string name;\n  explicit View(std::string n) : name(std::move(n)) {}\n};\n\nint main() {\n  const View v(make_name());\n  std::cout << std::format(\"{}\\n\", v.name.size());\n}"
       },
       {
        "t": "output",
-       "text": "39"
+       "text": "7"
       },
       {
        "t": "p",
        "c": [
         {
          "t": "text",
-         "v": "The second fix keeps the reference and deletes the constructor that a temporary would pick, so the bug becomes a compile error. It costs nothing at run time. But every caller now has to keep the string alive for as long as the "
+         "v": "The second fix keeps the reference and deletes the constructor that a temporary would pick, so passing a temporary becomes a compile error. The deleted overload takes "
+        },
+        {
+         "t": "code",
+         "v": "const std::string&&"
+        },
+        {
+         "t": "text",
+         "v": ", because a plain "
+        },
+        {
+         "t": "code",
+         "v": "std::string&&"
+        },
+        {
+         "t": "text",
+         "v": " lets a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " temporary through: a "
+        },
+        {
+         "t": "code",
+         "v": "const std::string"
+        },
+        {
+         "t": "text",
+         "v": " returned by value, which Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "F.49",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-return-const"
+        },
+        {
+         "t": "text",
+         "v": " discourages but real code has, can't bind to "
+        },
+        {
+         "t": "code",
+         "v": "std::string&&"
+        },
+        {
+         "t": "text",
+         "v": ", so it takes the "
+        },
+        {
+         "t": "code",
+         "v": "const std::string&"
+        },
+        {
+         "t": "text",
+         "v": " constructor and dangles. "
+        },
+        {
+         "t": "code",
+         "v": "std::ref"
+        },
+        {
+         "t": "text",
+         "v": " deletes its overload for temporaries the same way ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/utility/functional/ref"
+        },
+        {
+         "t": "text",
+         "v": "). The fix costs nothing at run time, but it only stops a temporary passed straight to the constructor. Every caller still has to keep a named string alive for as long as the "
         },
         {
          "t": "code",
@@ -1741,7 +2490,7 @@
        "lang": "cpp",
        "tag": "compile-fail",
        "expect": "use of deleted function",
-       "text": "#include <string>\n\nstd::string make_name() { return \"robot-7\"; }\n\nstruct View {\n  const std::string& name;\n  explicit View(const std::string& n) : name(n) {}\n  View(std::string&&) = delete;  // a temporary picks this overload and fails\n};\n\nint main() {\n  View v(make_name());\n  return static_cast<int>(v.name.size());\n}"
+       "text": "#include <string>\n\n[[nodiscard]] std::string make_name() { return \"robot-7\"; }\n[[nodiscard]] const std::string make_const_name() { return \"robot-7\"; }\n\nstruct View {\n  const std::string& name;\n  explicit View(const std::string& n) : name(n) {}\n  View(const std::string&&) = delete;  // every temporary, const or not, picks this overload and fails\n};\n\nint main() {\n  const View v(make_name());\n  const View w(make_const_name());\n  return static_cast<int>(v.name.size() + w.name.size());\n}"
       },
       {
        "t": "p",
@@ -1796,7 +2545,7 @@
        "c": [
         {
          "t": "text",
-         "v": "The same mistake shows up in four more forms. The first never gets as far as running, because "
+         "v": "The same mistake shows up in five more forms. The first never gets as far as running, because "
         },
         {
          "t": "code",
@@ -1813,7 +2562,7 @@
        "lang": "cpp",
        "tag": "compile-fail",
        "expect": "reference to local variable",
-       "text": "#include <string>\n\nconst std::string& greeting() {\n  std::string text = \"hello\";\n  return text;  // text is destroyed here and the caller gets a dangling reference\n}\n\nint main() { return static_cast<int>(greeting().size()); }"
+       "text": "#include <string>\n\nconst std::string& greeting() {\n  const std::string text = \"hello\";\n  return text;  // text is destroyed here and the caller gets a dangling reference\n}\n\nint main() { return static_cast<int>(greeting().size()); }"
       },
       {
        "t": "p",
@@ -1853,7 +2602,41 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "asan:stack-use-after-scope",
-       "text": "#include <cstdio>\n#include <vector>\n\nstruct Robot {\n  std::vector<int> ids{1, 2, 3};\n  const std::vector<int>& list() const { return ids; }\n};\n\nRobot make() { return {}; }\n\nint main() {\n  for (int id : make().list())  // C++20: the Robot is destroyed before the loop starts\n    std::printf(\"%d\\n\", id);\n}"
+       "text": "#include <format>\n#include <iostream>\n#include <vector>\n\nclass Robot {\n public:\n  [[nodiscard]] const std::vector<int>& ids() const { return ids_; }\n\n private:\n  std::vector<int> ids_{1, 2, 3};\n};\n\n[[nodiscard]] Robot make_robot() { return {}; }\n\nint main() {\n  for (const int id : make_robot().ids())  // C++20: the Robot is destroyed before the loop starts\n    std::cout << std::format(\"{}\\n\", id);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Built with GCC 13.3 and "
+        },
+        {
+         "t": "code",
+         "v": "-std=c++23"
+        },
+        {
+         "t": "text",
+         "v": ", the program fails the same way, because GCC implements P2718R0 only from GCC 15. Until your compiler has it, give the object a name in the loop's own initialiser, which C++20 allows: "
+        },
+        {
+         "t": "code",
+         "v": "for (const Robot robot = make_robot(); const int id : robot.ids())"
+        },
+        {
+         "t": "text",
+         "v": ". The Robot then lives until the end of the loop ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/language/range-for"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
       },
       {
        "t": "p",
@@ -1881,7 +2664,7 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "asan:stack-use-after-scope",
-       "text": "#include <algorithm>\n#include <cstdio>\n#include <string>\n\nint main() {\n  const std::string& first = std::min(std::string(\"a long temporary string, number one\"),\n                                      std::string(\"a long temporary string, number two\"));\n  std::printf(\"%zu\\n\", first.size());\n}"
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <string>\n\nint main() {\n  const std::string& first = std::min(std::string(\"a long temporary string, number one\"),\n                                      std::string(\"a long temporary string, number two\"));\n  std::cout << std::format(\"{}\\n\", first.size());\n}"
       },
       {
        "t": "p",
@@ -1905,7 +2688,88 @@
        "lang": "cpp",
        "tag": "compile-fail",
        "expect": "only persists until the constructor exits",
-       "text": "#include <string>\n\nstruct Label {\n  const std::string& text;\n  Label() : text(std::string(\"robot\")) {}  // a temporary bound straight to a reference member\n};\n\nint main() {\n  Label l;\n  return static_cast<int>(l.text.size());\n}"
+       "text": "#include <string>\n\nstruct Label {\n  const std::string& text;\n  Label() : text(std::string(\"robot\")) {}  // a temporary bound straight to a reference member\n};\n\nint main() {\n  const Label l;\n  return static_cast<int>(l.text.size());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Reference members are uncommon, because they make a class impossible to assign. The same bug more often arrives as a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " member, and GCC 13 compiles that without a warning. The string that "
+        },
+        {
+         "t": "code",
+         "v": "make_name()"
+        },
+        {
+         "t": "text",
+         "v": " returns is destroyed at the end of the line that builds "
+        },
+        {
+         "t": "code",
+         "v": "v"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "v.name"
+        },
+        {
+         "t": "text",
+         "v": " still points into the buffer that string freed:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n\n[[nodiscard]] std::string make_name() { return \"robot-7 with a name longer than fifteen\"; }\n\nstruct View {\n  std::string_view name;  // borrows the characters, and nothing checks for how long\n};\n\nint main() {\n  const View v{.name = make_name()};  // the string is destroyed at the end of this line\n  std::cout << std::format(\"{}\\n\", v.name);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The name is longer than 15 characters so that the characters live in dynamic storage. With "
+        },
+        {
+         "t": "code",
+         "v": "\"robot-7\""
+        },
+        {
+         "t": "text",
+         "v": ", libstdc++ keeps them inside the string object itself, and AddressSanitizer reports "
+        },
+        {
+         "t": "code",
+         "v": "stack-use-after-scope"
+        },
+        {
+         "t": "text",
+         "v": " instead. The fix is the first fix from the exercise: store a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": ". The next topic is about when a view is safe to keep."
+        }
+       ]
       },
       {
        "t": "note",
@@ -1958,6 +2822,12 @@
     [
      {
       "t": "text",
+      "v": "Give the two reasons to put an object in dynamic storage, and say what owns it when you do."
+     }
+    ],
+    [
+     {
+      "t": "text",
       "v": "In what order are bases, members and the constructor body run? And in what order destroyed?"
      }
     ],
@@ -1976,6 +2846,20 @@
     [
      {
       "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "for (const int id : make_robot().ids())"
+     },
+     {
+      "t": "text",
+      "v": " dangle in C++20, and what did C++23 change?"
+     }
+    ],
+    [
+     {
+      "t": "text",
       "v": "From a blank file: a "
      },
      {
@@ -1985,6 +2869,441 @@
      {
       "t": "text",
       "v": " class and a program that shows const& lifetime extension and the end of a temporary's life."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Thamara Andrade, C++ Object Lifetime, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Object_Lifetime.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=XN__qATWExc"
+     },
+     {
+      "t": "text",
+      "v": ". When a lifetime starts and ends, and temporaries bound to "
+     },
+     {
+      "t": "code",
+      "v": "const&"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Phil Nash, Back to Basics: Lifetime Management, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Lifetime_Management.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=aMvIv6blzBs"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bob Steagall, Back to Basics: The Abstract Machine, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_the_abstract_machine/back_to_basics_the_abstract_machine__bob_steagall__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ZAji7PkXaKY"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Andreas Fertig, Back to Basics: static, inline, const, and constexpr, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Back_To_Basics_static_inline_const_and_constexpr.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=hLakx0KYiR0"
+     },
+     {
+      "t": "text",
+      "v": ". Static storage and when it is initialised."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gabor Horvath, Lifetime Safety in C++, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Lifetime_Safety_in_Cpp.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=PTdy65m_gRE"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jason Turner, C++ Weekly episode 498 on the lifetimes of local variables: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=F-gRrU-g22k"
+     },
+     {
+      "t": "text",
+      "v": "; and episode 438 on the C++23 range-for fix: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=G6FTtZCtFXU"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "R.5",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-scoped"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "I.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "I.22",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global-init"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-zero"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.35",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-virtual"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.46",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-explicit"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.47",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-order"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.25",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-joining_thread"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.43",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-dangle"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ES.65",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-deref"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bjarne Stroustrup, A Tour of C++, 3rd edition, section 1.5 on scope and lifetime: "
+     },
+     {
+      "t": "a",
+      "v": "contents",
+      "href": "https://www.stroustrup.com/tour3toc.pdf"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, C++17 The Complete Guide, chapter 5 on guaranteed copy elision: "
+     },
+     {
+      "t": "a",
+      "v": "book",
+      "href": "https://leanpub.com/cpp17"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tips "
+     },
+     {
+      "t": "a",
+      "v": "#107",
+      "href": "https://abseil.io/tips/107"
+     },
+     {
+      "t": "text",
+      "v": " on reference lifetime extension and "
+     },
+     {
+      "t": "a",
+      "v": "#101",
+      "href": "https://abseil.io/tips/101"
+     },
+     {
+      "t": "text",
+      "v": " on return values, references and lifetimes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, "
+     },
+     {
+      "t": "a",
+      "v": "lifetime extension applies to whole objects",
+      "href": "https://quuxplusone.github.io/blog/2020/11/16/lifetime-extension-tidbit/"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "value category is not lifetime",
+      "href": "https://quuxplusone.github.io/blog/2019/03/11/value-category-is-not-lifetime/"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "lifetime",
+      "href": "https://en.cppreference.com/cpp/language/lifetime"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "storage duration",
+      "href": "https://en.cppreference.com/cpp/language/storage_duration"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "reference initialization",
+      "href": "https://en.cppreference.com/cpp/language/reference_initialization"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "range-for",
+      "href": "https://en.cppreference.com/cpp/language/range-for"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The C++23 range-for fix: "
+     },
+     {
+      "t": "a",
+      "v": "P2644R1",
+      "href": "https://wg21.link/p2644r1"
+     },
+     {
+      "t": "text",
+      "v": ", adopted as the wording paper "
+     },
+     {
+      "t": "a",
+      "v": "P2718R0",
+      "href": "https://wg21.link/p2718r0"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "P2012R2",
+      "href": "https://wg21.link/p2012r2"
+     },
+     {
+      "t": "text",
+      "v": ", the earlier proposal that made the case for it. Compiler support: "
+     },
+     {
+      "t": "a",
+      "v": "GCC",
+      "href": "https://gcc.gnu.org/projects/cxx-status.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Clang",
+      "href": "https://clang.llvm.org/cxx_status.html"
+     },
+     {
+      "t": "text",
+      "v": "."
      }
     ]
    ]

@@ -1,0 +1,1444 @@
+{
+ "id": "sim-modeling",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A link in a robot model has a visual shape, so that it shows up in the Gazebo window. List everything else the link needs before the physics engine can simulate it correctly, and say in one line each what goes wrong without it. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A collision shape, which is what contacts, friction and the ground act on; without it the link falls through the floor and nothing can touch it. A mass in kilograms. An inertia tensor in kg m², about the centre of mass, together with the pose of the centre of mass in the link frame; without them SDF quietly gives the link 1 kg and 1 kg m² on every axis, and URDF gives it nothing, so Gazebo drops the link. A pose, which places the link frame in the model and defines the axes that the inertia, the shapes and the joint axis refer to. A joint to its parent, with a type and an axis in a known frame, because a link without one is a separate free body. Everything in SI units: metres, kilograms, seconds and radians."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you had the collision shape, the mass, the inertia about the centre of mass and a frame to express them in, with a consequence for each. Missing the frame, the joint or the units is a partial pass. Missing the collision shape or the inertia is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A link needs more than the shape a camera in the viewer sees: a separate collision shape, what contacts, friction and the ground actually act on; a mass; an inertia tensor about the centre of mass, the rotational equivalent of mass; a pose, fixing the frame every one of those numbers is expressed in; and a joint to a parent, without which it is a separate free body rather than part of the robot. Every number is expected in SI units, metres, kilograms, seconds and radians, and no format checks that."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that a model can look correct in the viewer while being physically meaningless, because the visual shape a person sees and the numbers physics uses are two separate things nothing forces to agree. A link with a visual shape and nothing else renders perfectly and falls straight through the floor, since there is no collision shape for the ground to act on."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The collision shape and the visual shape have separate jobs: physics only sees collisions, and a camera or a lidar only sees visuals, which is why a detailed visual mesh is normally paired with a plain box or cylinder as its collision. Inertia for a simple shape has a closed formula from its mass and dimensions, and a genuine inertia tensor also satisfies the triangle inequality, no one principal moment larger than the sum of the other two, which a hand-typed value can violate unnoticed until checked."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What goes wrong under pressure is that nothing in the format checks any of this against reality. A mesh authored in millimetres and read as metres produces a building-sized robot that passes every validity check, since a huge box is still a physically legal one. A link with no inertia block is not an error either: one format quietly substitutes a default mass and inertia, the other drops the link and everything below it, and either way the simulation keeps running as if nothing were wrong. A checker catching a broken inertia tensor has no idea what your robot's true masses are; only the datasheet catches a wrong, legal number."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: naming everything besides the visual shape a link needs before physics can simulate it correctly, a collision shape, a mass, an inertia about the centre of mass, a frame and a joint, and saying what breaks without each."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "model",
+   "title": "Geometry, frames, collision, joints, mass, inertia, units",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is one wheel of a small differential-drive robot in SDF, the format Gazebo reads:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<link name=\"left_wheel\">\n  <pose>0.07 0.12 0.05 -1.5708 0 0</pose>            <!-- in the model frame: x y z roll pitch yaw -->\n  <inertial>\n    <mass>0.2</mass>                                   <!-- kg -->\n    <inertia>                                          <!-- kg m^2, about the centre of mass -->\n      <ixx>0.00014</ixx> <ixy>0</ixy> <ixz>0</ixz>\n      <iyy>0.00014</iyy> <iyz>0</iyz> <izz>0.00025</izz>\n    </inertia>\n  </inertial>\n  <collision name=\"collision\">\n    <geometry><cylinder><radius>0.05</radius><length>0.03</length></cylinder></geometry>\n  </collision>\n  <visual name=\"visual\">\n    <geometry><cylinder><radius>0.05</radius><length>0.03</length></cylinder></geometry>\n  </visual>\n</link>\n<joint name=\"left_wheel_joint\" type=\"revolute\">\n  <parent>chassis</parent>\n  <child>left_wheel</child>\n  <axis><xyz>0 0 1</xyz></axis>                        <!-- in the joint frame, here the wheel's own frame -->\n</joint>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "model"
+        },
+        {
+         "t": "text",
+         "v": " is a set of "
+        },
+        {
+         "t": "i",
+         "v": "links"
+        },
+        {
+         "t": "text",
+         "v": ", which are rigid bodies, connected by "
+        },
+        {
+         "t": "i",
+         "v": "joints"
+        },
+        {
+         "t": "text",
+         "v": ". A link has a pose, an "
+        },
+        {
+         "t": "code",
+         "v": "<inertial>"
+        },
+        {
+         "t": "text",
+         "v": " block, and any number of "
+        },
+        {
+         "t": "code",
+         "v": "<collision>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "<visual>"
+        },
+        {
+         "t": "text",
+         "v": " elements, each with its own geometry and optional pose. The geometry is a primitive, such as a box, a cylinder, a sphere or a capsule, or a mesh file. A joint names a parent and a child, a type ("
+        },
+        {
+         "t": "code",
+         "v": "revolute"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "continuous"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "prismatic"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "fixed"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ball"
+        },
+        {
+         "t": "text",
+         "v": " and a few more), and for the one-axis types an "
+        },
+        {
+         "t": "code",
+         "v": "<axis>"
+        },
+        {
+         "t": "text",
+         "v": " with limits and dynamics. The SDF specification describes every element with its default."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Units are SI throughout, as REP 103 fixes for ROS: metres, kilograms, seconds and radians, so inertia is in kg m². No file format checks this. A mesh is the usual place where millimetres get in. An STL file has no unit at all, so a chassis exported from CAD in millimetres is 300 m long in Gazebo unless its "
+        },
+        {
+         "t": "code",
+         "v": "<mesh>"
+        },
+        {
+         "t": "text",
+         "v": " has "
+        },
+        {
+         "t": "code",
+         "v": "<scale>0.001 0.001 0.001</scale>"
+        },
+        {
+         "t": "text",
+         "v": ". A COLLADA file declares its unit, and Gazebo applies it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every pose is relative to a frame. A link's "
+        },
+        {
+         "t": "code",
+         "v": "<pose>"
+        },
+        {
+         "t": "text",
+         "v": " is relative to the model frame unless it names another with "
+        },
+        {
+         "t": "code",
+         "v": "relative_to"
+        },
+        {
+         "t": "text",
+         "v": ". The "
+        },
+        {
+         "t": "code",
+         "v": "-1.5708"
+        },
+        {
+         "t": "text",
+         "v": " roll turns the wheel's frame by −90° about x, so its z axis, which is also a cylinder's axis, points along the model's +y: the wheel stands upright with its axle across the robot. A joint's frame is its child link's frame unless the joint has a pose of its own, and the axis "
+        },
+        {
+         "t": "code",
+         "v": "0 0 1"
+        },
+        {
+         "t": "text",
+         "v": " is written in the joint frame. That is the axle. Written as "
+        },
+        {
+         "t": "code",
+         "v": "0 1 0"
+        },
+        {
+         "t": "text",
+         "v": " in the same frame it would be the wheel frame's y axis, which the roll has turned to point down, and the wheel would spin like a turntable. "
+        },
+        {
+         "t": "code",
+         "v": "<xyz expressed_in=\"__model__\">0 1 0</xyz>"
+        },
+        {
+         "t": "text",
+         "v": " is the other correct way to say \"along the model's y\". The inertia is expressed in the frame of the inertial "
+        },
+        {
+         "t": "code",
+         "v": "<pose>"
+        },
+        {
+         "t": "text",
+         "v": ", which here is the link frame, so "
+        },
+        {
+         "t": "code",
+         "v": "izz"
+        },
+        {
+         "t": "text",
+         "v": " is the moment about the axle."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "URDF, the format of ROS's "
+        },
+        {
+         "t": "code",
+         "v": "robot_description"
+        },
+        {
+         "t": "text",
+         "v": ", says the same with different conventions:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<link name=\"left_wheel\">\n  <inertial>\n    <mass value=\"0.2\"/>\n    <inertia ixx=\"0.00014\" ixy=\"0\" ixz=\"0\" iyy=\"0.00014\" iyz=\"0\" izz=\"0.00025\"/>\n  </inertial>\n  <collision><geometry><cylinder radius=\"0.05\" length=\"0.03\"/></geometry></collision>\n  <visual><geometry><cylinder radius=\"0.05\" length=\"0.03\"/></geometry></visual>\n</link>\n<joint name=\"left_wheel_joint\" type=\"continuous\">\n  <parent link=\"chassis\"/>\n  <child link=\"left_wheel\"/>\n  <origin xyz=\"0.07 0.12 -0.03\" rpy=\"-1.5708 0 0\"/>   <!-- the child's frame in the parent's frame -->\n  <axis xyz=\"0 0 1\"/>\n</joint>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A URDF link has no pose of its own. The joint's "
+        },
+        {
+         "t": "code",
+         "v": "<origin>"
+        },
+        {
+         "t": "text",
+         "v": " places the child link's frame in the parent link's frame, so the wheel sits at z = −0.03 m from the chassis centre, which is 0.08 m above the ground. The joint frame is the child's frame, and an "
+        },
+        {
+         "t": "code",
+         "v": "<axis>"
+        },
+        {
+         "t": "text",
+         "v": " left out defaults to (1, 0, 0). URDF describes one robot as a tree of links: it has no world, no closed loops and no nested models, and it carries simulator settings only inside "
+        },
+        {
+         "t": "code",
+         "v": "<gazebo>"
+        },
+        {
+         "t": "text",
+         "v": " extension tags. Gazebo converts a URDF to SDF when it loads it. On the way, links joined by "
+        },
+        {
+         "t": "code",
+         "v": "fixed"
+        },
+        {
+         "t": "text",
+         "v": " joints are merged into their parent, and a link without an "
+        },
+        {
+         "t": "code",
+         "v": "<inertial>"
+        },
+        {
+         "t": "text",
+         "v": " block, or with a mass of zero, is dropped, together with its joint and everything below it, with warnings that the link \"is not modeled in sdf\". In a typical ROS setup one xacro file produces the URDF, "
+        },
+        {
+         "t": "code",
+         "v": "robot_state_publisher"
+        },
+        {
+         "t": "text",
+         "v": " publishes its frames, and "
+        },
+        {
+         "t": "code",
+         "v": "ros_gz_sim create -topic robot_description"
+        },
+        {
+         "t": "text",
+         "v": " spawns the same description into Gazebo."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The inertia of a primitive has a closed form. For a solid box of mass m and sides x, y and z, "
+        },
+        {
+         "t": "code",
+         "v": "ixx = m (y² + z²) / 12"
+        },
+        {
+         "t": "text",
+         "v": ", and the others follow by symmetry. For a solid cylinder of radius r and length h along z, "
+        },
+        {
+         "t": "code",
+         "v": "izz = m r² / 2"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "ixx = iyy = m (3r² + h²) / 12"
+        },
+        {
+         "t": "text",
+         "v": ". For a solid sphere, all three are "
+        },
+        {
+         "t": "code",
+         "v": "2 m r² / 5"
+        },
+        {
+         "t": "text",
+         "v": ". A physical tensor also obeys the "
+        },
+        {
+         "t": "i",
+         "v": "triangle inequality"
+        },
+        {
+         "t": "text",
+         "v": ": no principal moment is larger than the sum of the other two. This program computes the robot's links and prints them as SDF values:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string_view>\n\n// Principal moments of inertia about the centre of mass, in kg m^2.\nstruct Inertia {\n  double ixx;\n  double iyy;\n  double izz;\n};\n\nstruct Box {\n  double x_m;\n  double y_m;\n  double z_m;\n};\n\n// A cylinder's axis is its own z axis, in SDF and in URDF.\nstruct Cylinder {\n  double radius_m;\n  double length_m;\n};\n\n[[nodiscard]] constexpr Inertia solid_box(double mass_kg, Box b) {\n  return {.ixx = mass_kg / 12.0 * (b.y_m * b.y_m + b.z_m * b.z_m),\n          .iyy = mass_kg / 12.0 * (b.x_m * b.x_m + b.z_m * b.z_m),\n          .izz = mass_kg / 12.0 * (b.x_m * b.x_m + b.y_m * b.y_m)};\n}\n\n[[nodiscard]] constexpr Inertia solid_cylinder(double mass_kg, Cylinder c) {\n  const double across = mass_kg / 12.0 * (3.0 * c.radius_m * c.radius_m + c.length_m * c.length_m);\n  return {.ixx = across, .iyy = across, .izz = mass_kg / 2.0 * c.radius_m * c.radius_m};\n}\n\n[[nodiscard]] constexpr Inertia solid_sphere(double mass_kg, double radius_m) {\n  const double i = 2.0 / 5.0 * mass_kg * radius_m * radius_m;\n  return {.ixx = i, .iyy = i, .izz = i};\n}\n\n// Positive moments, and none larger than the sum of the other two.\n[[nodiscard]] constexpr bool physical(Inertia i) {\n  return i.ixx > 0 && i.iyy > 0 && i.izz > 0 && i.ixx + i.iyy >= i.izz && i.iyy + i.izz >= i.ixx &&\n         i.izz + i.ixx >= i.iyy;\n}\n\nvoid print_sdf(std::string_view link, double mass_kg, Inertia i) {\n  std::cout << std::format(\"{:<13} <mass>{}</mass> <ixx>{:.6g}</ixx> <iyy>{:.6g}</iyy> <izz>{:.6g}</izz>  {}\\n\", link,\n                           mass_kg, i.ixx, i.iyy, i.izz, physical(i) ? \"physical\" : \"NOT physical\");\n}\n\nint main() {\n  print_sdf(\"chassis\", 4.0, solid_box(4.0, {.x_m = 0.30, .y_m = 0.20, .z_m = 0.10}));\n  print_sdf(\"wheel\", 0.2, solid_cylinder(0.2, {.radius_m = 0.05, .length_m = 0.03}));\n  print_sdf(\"caster\", 0.05, solid_sphere(0.05, 0.025));\n  print_sdf(\"chassis in mm\", 4.0, solid_box(4.0, {.x_m = 300, .y_m = 200, .z_m = 100}));\n  print_sdf(\"typo\", 1.0, {.ixx = 0.01, .iyy = 0.01, .izz = 0.1});\n}"
+      },
+      {
+       "t": "output",
+       "text": "chassis       <mass>4</mass> <ixx>0.0166667</ixx> <iyy>0.0333333</iyy> <izz>0.0433333</izz>  physical\nwheel         <mass>0.2</mass> <ixx>0.00014</ixx> <iyy>0.00014</iyy> <izz>0.00025</izz>  physical\ncaster        <mass>0.05</mass> <ixx>1.25e-05</ixx> <iyy>1.25e-05</iyy> <izz>1.25e-05</izz>  physical\nchassis in mm <mass>4</mass> <ixx>16666.7</ixx> <iyy>33333.3</iyy> <izz>43333.3</izz>  physical\ntypo          <mass>1</mass> <ixx>0.01</ixx> <iyy>0.01</iyy> <izz>0.1</izz>  NOT physical"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last two lines are the reason to compute rather than guess. A chassis measured in millimetres gets an inertia a million times too large, and it passes every check, because a 300 m box is physical. A mistyped "
+        },
+        {
+         "t": "code",
+         "v": "izz"
+        },
+        {
+         "t": "text",
+         "v": " breaks the triangle inequality, which sdformat does check: it reports that the link \"has invalid inertia\", and by default Gazebo then refuses to load the world. Real links aren't solid primitives, and a CAD tool gives better numbers for a real part. For a primitive, SDF 1.11, which Gazebo Harmonic reads, can compute the values itself: "
+        },
+        {
+         "t": "code",
+         "v": "<inertial auto=\"true\"/>"
+        },
+        {
+         "t": "text",
+         "v": " takes the link's collision shapes and a "
+        },
+        {
+         "t": "code",
+         "v": "<density>"
+        },
+        {
+         "t": "text",
+         "v": " in kg/m³, 1000 by default, and overwrites any mass and inertia you wrote."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The collision shape and the visual shape have separate jobs, and Gazebo uses each in different places. The physics engine sees only collisions: contacts, friction, the ground under the wheels. Cameras and the GPU lidar are rendered, so they see only visuals. A detailed visual mesh with a box or cylinder as its collision is the usual choice, because contact checks between meshes cost far more than between primitives."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Xacro removes the repetition. It is a macro language for XML that the "
+        },
+        {
+         "t": "code",
+         "v": "xacro"
+        },
+        {
+         "t": "text",
+         "v": " command expands into plain URDF, with properties, arithmetic in "
+        },
+        {
+         "t": "code",
+         "v": "${}"
+        },
+        {
+         "t": "text",
+         "v": " and macros with parameters. A macro that computes a cylinder's inertia from its size means the numbers can't drift apart from the geometry:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<xacro:macro name=\"cylinder_inertial\" params=\"mass radius length\">\n  <inertial>\n    <mass value=\"${mass}\"/>\n    <inertia ixx=\"${mass * (3 * radius * radius + length * length) / 12}\" ixy=\"0\" ixz=\"0\"\n             iyy=\"${mass * (3 * radius * radius + length * length) / 12}\" iyz=\"0\"\n             izz=\"${mass * radius * radius / 2}\"/>\n  </inertial>\n</xacro:macro>\n\n<xacro:cylinder_inertial mass=\"0.2\" radius=\"0.05\" length=\"0.03\"/>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "xacro robot.urdf.xacro > robot.urdf"
+        },
+        {
+         "t": "text",
+         "v": " writes the result, and a launch file usually runs "
+        },
+        {
+         "t": "code",
+         "v": "xacro"
+        },
+        {
+         "t": "text",
+         "v": " through a "
+        },
+        {
+         "t": "code",
+         "v": "Command"
+        },
+        {
+         "t": "text",
+         "v": " substitution instead."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Behaviour comes from systems, the plugins of the Gazebo topic. A model names its own in "
+        },
+        {
+         "t": "code",
+         "v": "<plugin filename=\"gz-sim-diff-drive-system\" name=\"gz::sim::systems::DiffDrive\">"
+        },
+        {
+         "t": "text",
+         "v": " with parameters inside, and a URDF puts the same element inside a "
+        },
+        {
+         "t": "code",
+         "v": "<gazebo>"
+        },
+        {
+         "t": "text",
+         "v": " tag. Sensors are declared inside links, and a world-level system such as "
+        },
+        {
+         "t": "code",
+         "v": "gz-sim-sensors-system"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "gz-sim-imu-system"
+        },
+        {
+         "t": "text",
+         "v": " makes them produce data. The parameters of a system are a second description of the model, and nothing checks that the two agree. DiffDrive converts a commanded speed into wheel speeds with its own "
+        },
+        {
+         "t": "code",
+         "v": "wheel_radius"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "wheel_separation"
+        },
+        {
+         "t": "text",
+         "v": ", and computes odometry from the wheel joint angles with the same numbers, while the physics rolls the wheels on their collision cylinders. If the two radii differ, the robot drives at the wrong speed and the odometry reports the speed that was asked for."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fix",
+   "title": "Find and fix a wrong inertia or unit in a model",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. A colleague wrote a model of a small robot from this datasheet:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Part"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Shape"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Size"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Mass"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Position of its centre"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "chassis"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "solid box"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0.30 × 0.20 × 0.10 m"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4.0 kg"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0.08 m above the ground"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "left and right wheel"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "solid cylinders"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "radius 0.05 m, width 0.03 m"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0.2 kg each"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "x = 0.07 m, y = ±0.12 m, on the ground"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "caster"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "solid sphere"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "radius 0.025 m"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0.05 kg"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "x = −0.11 m, on the ground"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The model, "
+        },
+        {
+         "t": "code",
+         "v": "bench_bot.sdf"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<?xml version=\"1.0\"?>\n<sdf version=\"1.11\">\n  <model name=\"bench_bot\">\n    <link name=\"chassis\">\n      <pose>0 0 0.08 0 0 0</pose>\n      <inertial>\n        <mass>4000</mass>\n        <inertia>\n          <ixx>0.0166667</ixx> <ixy>0</ixy> <ixz>0</ixz>\n          <iyy>0.0333333</iyy> <iyz>0</iyz> <izz>0.0433333</izz>\n        </inertia>\n      </inertial>\n      <collision name=\"collision\">\n        <geometry><box><size>0.30 0.20 0.10</size></box></geometry>\n      </collision>\n      <visual name=\"visual\">\n        <geometry><box><size>0.30 0.20 0.10</size></box></geometry>\n      </visual>\n    </link>\n\n    <link name=\"left_wheel\">\n      <pose>0.07 0.12 0.05 -1.5708 0 0</pose>\n      <collision name=\"collision\">\n        <geometry><cylinder><radius>0.05</radius><length>0.03</length></cylinder></geometry>\n      </collision>\n      <visual name=\"visual\">\n        <geometry><cylinder><radius>0.05</radius><length>0.03</length></cylinder></geometry>\n      </visual>\n    </link>\n\n    <link name=\"right_wheel\">\n      <pose>0.07 -0.12 0.05 -1.5708 0 0</pose>\n      <inertial>\n        <mass>0.2</mass>\n        <inertia>\n          <ixx>0.00014</ixx> <ixy>0</ixy> <ixz>0</ixz>\n          <iyy>0.00014</iyy> <iyz>0</iyz> <izz>0.00025</izz>\n        </inertia>\n      </inertial>\n      <collision name=\"collision\">\n        <geometry><cylinder><radius>0.5</radius><length>0.03</length></cylinder></geometry>\n      </collision>\n      <visual name=\"visual\">\n        <geometry><cylinder><radius>0.05</radius><length>0.03</length></cylinder></geometry>\n      </visual>\n    </link>\n\n    <link name=\"caster\">\n      <pose>-0.11 0 0.025 0 0 0</pose>\n      <inertial>\n        <mass>0.05</mass>\n        <inertia>\n          <ixx>1.25e-05</ixx> <ixy>0</ixy> <ixz>0</ixz>\n          <iyy>1.25e-05</iyy> <iyz>0</iyz> <izz>1.25e-05</izz>\n        </inertia>\n      </inertial>\n      <collision name=\"collision\">\n        <geometry><sphere><radius>0.025</radius></sphere></geometry>\n      </collision>\n      <visual name=\"visual\">\n        <geometry><sphere><radius>0.025</radius></sphere></geometry>\n      </visual>\n    </link>\n\n    <joint name=\"left_wheel_joint\" type=\"revolute\">\n      <parent>chassis</parent>\n      <child>left_wheel</child>\n      <axis><xyz>0 1 0</xyz></axis>\n    </joint>\n    <joint name=\"right_wheel_joint\" type=\"revolute\">\n      <parent>chassis</parent>\n      <child>right_wheel</child>\n      <axis><xyz>0 0 1</xyz></axis>\n    </joint>\n    <joint name=\"caster_joint\" type=\"ball\">\n      <parent>chassis</parent>\n      <child>caster</child>\n    </joint>\n\n    <plugin filename=\"gz-sim-diff-drive-system\" name=\"gz::sim::systems::DiffDrive\">\n      <left_joint>left_wheel_joint</left_joint>\n      <right_joint>right_wheel_joint</right_joint>\n      <wheel_separation>0.24</wheel_separation>\n      <wheel_radius>0.05</wheel_radius>\n    </plugin>\n  </model>\n</sdf>"
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "gz sdf -k bench_bot.sdf"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "gz sdf --inertial-stats bench_bot.sdf"
+         },
+         {
+          "t": "text",
+          "v": ". Note what they report, and decide what they can't tell you."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Compare every link and joint with the datasheet. There are four errors: at least one in an inertial, one in a unit and one in a frame."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Fix each one, and say what the robot would have done in Gazebo with it, when you command 0.2 m/s straight ahead."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "If Gazebo is at hand, check your predictions. Start "
+         },
+         {
+          "t": "code",
+          "v": "gz sim -s -r empty.sdf"
+         },
+         {
+          "t": "text",
+          "v": ", spawn the model with "
+         },
+         {
+          "t": "code",
+          "v": "gz service -s /world/empty/create --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean --timeout 1000 --req 'sdf_filename: \"/full/path/to/bench_bot.sdf\", name: \"bench_bot\"'"
+         },
+         {
+          "t": "text",
+          "v": ", and drive it with "
+         },
+         {
+          "t": "code",
+          "v": "gz topic -t /model/bench_bot/cmd_vel -m gz.msgs.Twist -p \"linear: {x: 0.2}\""
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "gz sdf -k"
+        },
+        {
+         "t": "text",
+         "v": " prints "
+        },
+        {
+         "t": "code",
+         "v": "Valid."
+        },
+        {
+         "t": "text",
+         "v": " for the broken file, because all four errors are legal SDF. "
+        },
+        {
+         "t": "code",
+         "v": "--inertial-stats"
+        },
+        {
+         "t": "text",
+         "v": " sums the link masses: 4001.25 kg here, against 4.45 kg on the datasheet, which points straight at the first error. Neither tool knows the datasheet, so neither can find a wrong radius or a wrong axis. That is the reason to compare the file with the source of its numbers line by line."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The chassis mass is in grams: "
+         },
+         {
+          "t": "code",
+          "v": "<mass>4000</mass>"
+         },
+         {
+          "t": "text",
+          "v": " for a 4.0 kg part, while its inertia is the right one for 4 kg. Fix it to "
+         },
+         {
+          "t": "code",
+          "v": "<mass>4.0</mass>"
+         },
+         {
+          "t": "text",
+          "v": ". The effect is smaller than you'd expect while driving straight, and that is what makes it dangerous. DiffDrive commands wheel velocities, and these joints have no "
+         },
+         {
+          "t": "code",
+          "v": "<effort>"
+         },
+         {
+          "t": "text",
+          "v": " limit, so the joint servos apply whatever torque it takes, and a 4-tonne robot reaches 0.2 m/s like a 4 kg one. The error shows in everything else: collisions, where it shoves obstacles aside, the load on the caster, and the first time someone adds a realistic effort limit, after which the motors can't move it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The left wheel has no "
+         },
+         {
+          "t": "code",
+          "v": "<inertial>"
+         },
+         {
+          "t": "text",
+          "v": " block, so SDF gives it the defaults: 1 kg, and 1 kg m² about every axis, five times the wheel's mass and 4000 times its inertia about the axle. Fix it with the right wheel's block. With the chassis mass corrected, the robot's inertia about the vertical axis grows from about 0.05 kg m² to about 1.07, some 20 times, so a turn needs 20 times the torque from the wheels' friction. When the friction can't provide it, the wheels slip, and the odometry, which counts wheel turns, reports more rotation than happened. The same omission in a URDF would have made Gazebo drop the wheel and its joint, and DiffDrive would have found no "
+         },
+         {
+          "t": "code",
+          "v": "left_wheel_joint"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The right wheel's collision radius is 0.5 m, a slip of the decimal point for 0.05 m, while its visual is right. Fix it to 0.05. With it, the collision cylinder starts 0.45 m deep in the ground, so expect the contact solver to push it out in the first steps, after which the robot rests tipped steeply towards its left, its right axle 0.45 m higher than its left. If it drives at all, DiffDrive turns both wheels at 0.2 / 0.05 = 4 rad/s, which moves a 0.5 m wheel at 2 m/s and a 0.05 m wheel at 0.2 m/s, so it turns instead of driving straight, while its odometry, computed with 0.05 m, reports a straight line at 0.2 m/s. The Gazebo window shows a small wheel, because it draws visuals."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The left joint's axis is "
+         },
+         {
+          "t": "code",
+          "v": "0 1 0"
+         },
+         {
+          "t": "text",
+          "v": " in the joint frame, which is the wheel's frame, turned −90° about x. Its y axis points down, so the left wheel spins about the vertical like a turntable and never rolls. The robot pivots about the left wheel, and the odometry again reports a straight line, because it only reads joint angles. Fix it to "
+         },
+         {
+          "t": "code",
+          "v": "<xyz>0 0 1</xyz>"
+         },
+         {
+          "t": "text",
+          "v": ", as on the right, or keep "
+         },
+         {
+          "t": "code",
+          "v": "0 1 0"
+         },
+         {
+          "t": "text",
+          "v": " and add "
+         },
+         {
+          "t": "code",
+          "v": "expressed_in=\"__model__\""
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "After the fixes, "
+        },
+        {
+         "t": "code",
+         "v": "--inertial-stats"
+        },
+        {
+         "t": "text",
+         "v": " reports 4.45 kg, the sum of the datasheet masses. Three of the four errors would also have produced odometry that disagrees with the motion, which is why a simulation test should compare the robot's true pose in Gazebo with what the robot's own software believes."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Visual versus collision shapes; zero inertia",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Visual and collision shapes that disagree give the robot's sensors and its body two different worlds. A wall with a visual but no collision shows up in the lidar scan and the camera, and the robot drives through it. A wall with a collision but no visual stops the robot, and the lidar, which is rendered, never sees it. The same holds for the robot itself: a collision box larger than the chassis makes it catch on door frames that its visual clears. To see the collision shapes, right-click a model in the Gazebo window and pick Collisions from its View menu, which also draws the centre of mass, the inertia, the joints and the frames."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Missing or zero inertia fails in three different ways. An SDF link without "
+        },
+        {
+         "t": "code",
+         "v": "<inertial>"
+        },
+        {
+         "t": "text",
+         "v": " silently gets 1 kg and 1 kg m², as in the exercise. A URDF link without it, or with zero mass, disappears in the conversion, with a warning from "
+        },
+        {
+         "t": "code",
+         "v": "urdf2sdf"
+        },
+        {
+         "t": "text",
+         "v": " that the link has no "
+        },
+        {
+         "t": "code",
+         "v": "<inertial>"
+        },
+        {
+         "t": "text",
+         "v": " block and \"is not modeled in sdf\", unless a fixed joint merges it into its parent. A link with mass but zero moments passes the SDF check, because zero moments are still positive semi-definite, and then DART warns that the value \"should be positive and greater than zero\" and that results might not be physically meaningful. The physics shows why. The angular acceleration is torque divided by moment of inertia, so a 0.01 N m contact torque over one 1 ms step changes the wheel's spin by 0.01 × 0.001 / 0.00025 = 0.04 rad/s with the right inertia, and by 10 000 rad/s with a moment of 10⁻⁹ kg m². Tiny moments make links jitter and spin up; zero ones leave the result undefined."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Placeholder values survive in real models, so check the ones you inherit. The Jazzy URDF tutorial gives its 10 kg cylinder of radius 0.2 m and length 0.6 m an inertia of 10⁻³ kg m² on every axis. The formulas give 0.4 kg m² across and 0.2 kg m² about the axis, 400 and 200 times more. The TurtleBot3 Waffle in "
+        },
+        {
+         "t": "code",
+         "v": "nav2_minimal_tb3_sim"
+        },
+        {
+         "t": "text",
+         "v": ", the robot the Test Bench drives, gives each 0.1 kg wheel of radius 0.033 m 0.001 kg m² on every axis, where a solid cylinder has 5.4 × 10⁻⁵ about its axle, about 18 times less. With velocity-controlled wheels and no effort limit, that one hardly changes how the robot drives; it would matter as soon as the wheels were driven by torque."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. List what a link needs besides its visual, the units, and the formulas for the inertia of a box, a cylinder and a sphere with the triangle inequality. Say which frame a link pose, a joint axis and an inertia are expressed in, in SDF and in URDF. Name who sees collision shapes and who sees visual shapes, and what happens to a link without inertia in SDF, in URDF, and with zero moments. End with the four errors of the exercise and how each showed up."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does SDF assume for a link without "
+     },
+     {
+      "t": "code",
+      "v": "<inertial>"
+     },
+     {
+      "t": "text",
+      "v": ", and what does Gazebo do with a URDF link without one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give the moments of inertia of a solid cylinder of mass m, radius r and length h, and name the axis each is about."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which frame is a joint axis written in by default in SDF, and in URDF?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A robot drives in circles in Gazebo while its odometry reports a straight line. Name two model errors that do this."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does the lidar see a wall that the robot drives through?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which inertia errors does "
+     },
+     {
+      "t": "code",
+      "v": "gz sdf -k"
+     },
+     {
+      "t": "text",
+      "v": " catch, and which does it not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: the SDF for a wheel link with its inertial, collision, visual and joint."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "SDFormat specification 1.11: the "
+     },
+     {
+      "t": "a",
+      "v": "link",
+      "href": "https://sdformat.org/spec?ver=1.11&elem=link"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "joint",
+      "href": "https://sdformat.org/spec?ver=1.11&elem=joint"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "collision",
+      "href": "https://sdformat.org/spec?ver=1.11&elem=collision"
+     },
+     {
+      "t": "text",
+      "v": " elements, with the "
+     },
+     {
+      "t": "a",
+      "v": "pose frame semantics",
+      "href": "https://sdformat.org/tutorials?tut=pose_frame_semantics"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "a",
+      "v": "URDF extensions",
+      "href": "https://sdformat.org/tutorials?tut=sdformat_urdf_extensions"
+     },
+     {
+      "t": "text",
+      "v": " that control fixed-joint merging."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "sdformat 14, the Harmonic release, on GitHub: "
+     },
+     {
+      "t": "a",
+      "v": "Link.cc",
+      "href": "https://github.com/gazebosim/sdformat/blob/sdf14/src/Link.cc"
+     },
+     {
+      "t": "text",
+      "v": " for the default inertial and the invalid-inertia error, "
+     },
+     {
+      "t": "a",
+      "v": "parser_urdf.cc",
+      "href": "https://github.com/gazebosim/sdformat/blob/sdf14/src/parser_urdf.cc"
+     },
+     {
+      "t": "text",
+      "v": " for dropped massless links, and "
+     },
+     {
+      "t": "a",
+      "v": "gz.cc",
+      "href": "https://github.com/gazebosim/sdformat/blob/sdf14/src/gz.cc"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "gz sdf -k"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "--inertial-stats"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "gz-math, "
+     },
+     {
+      "t": "a",
+      "v": "MassMatrix3.hh",
+      "href": "https://github.com/gazebosim/gz-math/blob/gz-math7/include/gz/math/MassMatrix3.hh"
+     },
+     {
+      "t": "text",
+      "v": ", for the positivity and triangle-inequality checks, and DART 6.13, "
+     },
+     {
+      "t": "a",
+      "v": "Inertia.cpp",
+      "href": "https://github.com/dartsim/dart/blob/v6.13.2/dart/dynamics/Inertia.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", for the warning on zero moments."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo Harmonic tutorials: "
+     },
+     {
+      "t": "a",
+      "v": "building your own robot",
+      "href": "https://gazebosim.org/docs/harmonic/building_robot"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "spawning a URDF",
+      "href": "https://gazebosim.org/docs/harmonic/spawn_urdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "automatic inertia calculation",
+      "href": "https://gazebosim.org/api/sim/8/auto_inertia_calculation.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo's "
+     },
+     {
+      "t": "a",
+      "v": "DiffDrive system",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/diff_drive/DiffDrive.cc"
+     },
+     {
+      "t": "text",
+      "v": ", which uses its own "
+     },
+     {
+      "t": "code",
+      "v": "wheel_radius"
+     },
+     {
+      "t": "text",
+      "v": " for commands and odometry, and the "
+     },
+     {
+      "t": "a",
+      "v": "COLLADA loader",
+      "href": "https://github.com/gazebosim/gz-common/blob/gz-common5/graphics/src/ColladaLoader.cc"
+     },
+     {
+      "t": "text",
+      "v": ", which applies a file's unit."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The Jazzy URDF tutorials on "
+     },
+     {
+      "t": "a",
+      "v": "physical and collision properties",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/URDF/Adding-Physical-and-Collision-Properties-to-a-URDF-Model.html"
+     },
+     {
+      "t": "text",
+      "v": " and on "
+     },
+     {
+      "t": "a",
+      "v": "xacro",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/URDF/Using-Xacro-to-Clean-Up-a-URDF-File.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "REP 103",
+      "href": "https://www.ros.org/reps/rep-0103.html"
+     },
+     {
+      "t": "text",
+      "v": ", on units of measure and coordinate conventions."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot3 Waffle model in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_tb3_sim",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/jazzy/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+     },
+     {
+      "t": "text",
+      "v": ", jazzy branch."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": ", on precisely and strongly typed interfaces, which the named fields and designated initialisers of the inertia program follow."
+     }
+    ]
+   ]
+  }
+ ]
+}

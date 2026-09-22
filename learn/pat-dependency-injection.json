@@ -1,0 +1,1917 @@
+{
+ "id": "pat-dependency-injection",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "From memory, write a "
+     },
+     {
+      "t": "code",
+      "v": "BatteryMonitor"
+     },
+     {
+      "t": "text",
+      "v": " that warns when a charge percentage falls below a limit. Write it twice. The first version builds its own logger, which prints to "
+     },
+     {
+      "t": "code",
+      "v": "std::cout"
+     },
+     {
+      "t": "text",
+      "v": "; say what a test of that version can check. The second takes a logger in its constructor, through an interface the monitor declares. Then write a "
+     },
+     {
+      "t": "code",
+      "v": "RecordingLogger"
+     },
+     {
+      "t": "text",
+      "v": " that keeps the lines in a vector, and use it to show which lines a run produced. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <vector>\n\n// The version that builds its own logger. Nothing outside it can see what it logged.\nclass ConsoleLogger {\n public:\n  void warn(std::string_view line) const { std::cout << std::format(\"[warn] {}\\n\", line); }\n};\n\nclass WiredMonitor {\n public:\n  explicit WiredMonitor(int limit_percent) : limit_percent_(limit_percent) {}\n  void on_charge(int percent) const {\n    if (percent < limit_percent_) logger_.warn(std::format(\"battery at {}%\", percent));\n  }\n\n private:\n  ConsoleLogger logger_;\n  int limit_percent_;\n};\n\n// The injected version. The interface belongs to the monitor, not to the console.\nclass Logger {\n public:\n  Logger() = default;\n  Logger(const Logger&) = delete;\n  Logger& operator=(const Logger&) = delete;\n  virtual ~Logger() = default;\n  virtual void warn(std::string_view line) = 0;\n};\n\nclass BatteryMonitor {\n public:\n  BatteryMonitor(Logger& logger, int limit_percent) : logger_(logger), limit_percent_(limit_percent) {}\n  void on_charge(int percent) const {\n    if (percent < limit_percent_) logger_.warn(std::format(\"battery at {}%\", percent));\n  }\n\n private:\n  Logger& logger_;\n  int limit_percent_;\n};\n\nclass RecordingLogger final : public Logger {\n public:\n  void warn(std::string_view line) override { lines_.emplace_back(line); }\n  [[nodiscard]] const std::vector<std::string>& lines() const { return lines_; }\n\n private:\n  std::vector<std::string> lines_;\n};\n\nint main() {\n  const WiredMonitor wired(20);\n  wired.on_charge(15);  // the only place this line can be read is stdout\n\n  RecordingLogger fake;\n  const BatteryMonitor monitor(fake, 20);\n  monitor.on_charge(55);\n  monitor.on_charge(15);\n  monitor.on_charge(4);\n  std::cout << std::format(\"fake logger saw {} lines\\n\", fake.lines().size());\n  for (const std::string& line : fake.lines()) std::cout << std::format(\"  {}\\n\", line);\n}"
+   },
+   {
+    "t": "output",
+    "text": "[warn] battery at 15%\nfake logger saw 2 lines\n  battery at 15%\n  battery at 4%"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A test of "
+     },
+     {
+      "t": "code",
+      "v": "WiredMonitor"
+     },
+     {
+      "t": "text",
+      "v": " can call "
+     },
+     {
+      "t": "code",
+      "v": "on_charge"
+     },
+     {
+      "t": "text",
+      "v": " and check that the program does not crash. To check the text, it has to redirect "
+     },
+     {
+      "t": "code",
+      "v": "std::cout"
+     },
+     {
+      "t": "text",
+      "v": " and parse what came back, and that test breaks the moment someone adds another line anywhere in the process. "
+     },
+     {
+      "t": "code",
+      "v": "BatteryMonitor"
+     },
+     {
+      "t": "text",
+      "v": " hands the test the lines as a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<std::string>"
+     },
+     {
+      "t": "text",
+      "v": ", which is data a test can compare."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Two details are worth saying out loud. "
+     },
+     {
+      "t": "code",
+      "v": "on_charge"
+     },
+     {
+      "t": "text",
+      "v": " is "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " and still calls the non-const "
+     },
+     {
+      "t": "code",
+      "v": "warn"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " on a member function applies to the reference, not to the object it refers to, so a reference member is a hole in a class's constness. And "
+     },
+     {
+      "t": "code",
+      "v": "Logger"
+     },
+     {
+      "t": "text",
+      "v": " deletes its copy operations, because a polymorphic base that can be copied slices, which is what the previous topic showed."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the second version takes the logger through a base class in its constructor, the fake records instead of printing, and you say that the test reads the recorded lines. Writing the interface but keeping a "
+     },
+     {
+      "t": "code",
+      "v": "ConsoleLogger"
+     },
+     {
+      "t": "text",
+      "v": " member as a default is a partial pass. Passing a "
+     },
+     {
+      "t": "code",
+      "v": "ConsoleLogger&"
+     },
+     {
+      "t": "text",
+      "v": " rather than a "
+     },
+     {
+      "t": "code",
+      "v": "Logger&"
+     },
+     {
+      "t": "text",
+      "v": " is a fail: the monitor still depends on the concrete class."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Dependency injection is one sentence: an object is given what it needs instead of building it. What it needs is a "
+    },
+    {
+     "t": "i",
+     "v": "dependency"
+    },
+    {
+     "t": "text",
+     "v": ", anything the class calls out to but doesn't compute itself: a clock, a logger, a database. Injected, that dependency arrives as a constructor parameter, a setter, or a parameter of the method that uses it; left uninjected, the class names a concrete type inside its own body and builds it there."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that a class which builds its own dependency can only be tested through whatever that dependency really does. A watchdog reading the system clock inside its own logic can only be tested by waiting: to see it fire, sleep past its timeout. Some questions survive no amount of sleeping, such as what a test should see when the clock stands still or jumps backward. The trouble isn't that the class is hard to test. It's that the one part worth testing has no handle a test can move."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "How it works is that the dependency is named as an interface the depending class owns, not a concrete class from whichever library implements it, and that interface is a constructor parameter and a member, so the object is never in a state where the dependency is missing. A test then builds the object with a fake implementing the same interface: a fake clock the test moves by hand instead of a real one it has to wait on, a fake logger recording lines in a vector instead of printing them."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is a decision about where the dependency lives and how long it must survive: a reference member can't be null but needs the caller to keep the real object alive at least as long, and a class needing far more dependencies than a test can reasonably fake usually does too many things, not a case for bundling them into one parameter struct. Injection is also the wrong tool for a member that never varies, or a pure function, whose arguments already are its dependencies."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this the moment a robot's node has to be tested off the real clock and outside a ROS graph, and it's the interview question itself: take a class that builds its own logger, change it so the logger is passed in, and write a test against a fake that proves what it logged."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Constructor injection; depending on interfaces, not concrete classes",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is a watchdog that reads the clock inside its own logic, and the only test anyone can write for it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <format>\n#include <iostream>\n#include <thread>\n\nusing namespace std::chrono_literals;\n\nclass WiredWatchdog {\n public:\n  explicit WiredWatchdog(std::chrono::milliseconds timeout)\n      : timeout_(timeout), last_(std::chrono::steady_clock::now()) {}\n\n  void on_odometry() { last_ = std::chrono::steady_clock::now(); }\n\n  [[nodiscard]] bool is_late() const { return std::chrono::steady_clock::now() - last_ > timeout_; }\n\n private:\n  std::chrono::milliseconds timeout_;\n  std::chrono::steady_clock::time_point last_;\n};\n\nint main() {\n  const WiredWatchdog fresh(200ms);\n  std::cout << std::format(\"straight after a message: late = {}\\n\", fresh.is_late());\n\n  WiredWatchdog quiet(200ms);\n  std::this_thread::sleep_for(600ms);  // the only way to reach the timeout\n  std::cout << std::format(\"after sleeping 600 ms:    late = {}\\n\", quiet.is_late());\n  quiet.on_odometry();\n  std::cout << std::format(\"after a message arrives:  late = {}\\n\", quiet.is_late());\n}"
+      },
+      {
+       "t": "output",
+       "text": "straight after a message: late = false\nafter sleeping 600 ms:    late = true\nafter a message arrives:  late = false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The test works, and it costs about 0.61 s of wall time for three checks:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -fsanitize=address,undefined wired.cpp -o wired\n/usr/bin/time -f '%e s' ./wired      # 0.61 to 0.62 s over six runs"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now ask the questions a real watchdog has to answer. Does a 30 second timeout fire? That test sleeps for 31 seconds. What happens when odometry arrives 1 ns before the deadline? No amount of sleeping hits that. What happens when the clock jumps backwards, which simulation time does at the end of every "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag play --loop"
+        },
+        {
+         "t": "text",
+         "v": "? "
+        },
+        {
+         "t": "code",
+         "v": "steady_clock"
+        },
+        {
+         "t": "text",
+         "v": " never goes backwards, so the case cannot be reached at all. The class is not hard to test. It is untestable in the part that matters, because the only lever the test holds is real time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Dependency injection"
+        },
+        {
+         "t": "text",
+         "v": " is the fix, and it is one sentence: an object is given what it needs instead of building it. The watchdog above builds its clock by naming "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::steady_clock"
+        },
+        {
+         "t": "text",
+         "v": " inside its own logic, which is the mistake the cold check's "
+        },
+        {
+         "t": "code",
+         "v": "WiredMonitor"
+        },
+        {
+         "t": "text",
+         "v": " made with its "
+        },
+        {
+         "t": "code",
+         "v": "ConsoleLogger"
+        },
+        {
+         "t": "text",
+         "v": " member. Give the watchdog a clock, and the test gives it one that stands still until the test moves it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Pete Muldoon's "
+        },
+        {
+         "t": "a",
+         "v": "CppCon 2024 talk on dependency injection",
+         "href": "https://www.youtube.com/watch?v=as5Z45G59Ws"
+        },
+        {
+         "t": "text",
+         "v": " names the three places a dependency can enter an object, and the differences between them decide the design."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Constructor injection: the dependency is a constructor parameter and a member. The object is complete the moment it exists, the member can be "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": ", and there is no state in which the dependency is missing."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Setter injection: a "
+         },
+         {
+          "t": "code",
+          "v": "set_clock"
+         },
+         {
+          "t": "text",
+          "v": " function, called after construction. The signature of the class does not change, which makes it the cheap way into code you inherited, and Muldoon points out that the setter is often never called in production. The price is a window between the constructor and the setter where the member is empty, so every use has to check, and nothing stops a caller from swapping the dependency halfway through a run."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Method injection: the dependency is a parameter of the function that uses it. No member, no lifetime question, and the signature of every call changes."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Constructor injection is the default. Take the other two when something blocks it: setter injection for a class you cannot change the construction of yet, method injection when the caller already holds the value. The ROS 2 time topic used method injection for exactly that reason: a subscription callback already knows what time it is, so "
+        },
+        {
+         "t": "code",
+         "v": "Freshness::is_stale(Stamp now)"
+        },
+        {
+         "t": "text",
+         "v": " takes the time per call rather than holding a clock. A watchdog driven by its own timer has no such caller, so it holds a clock."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What you inject matters as much as where. "
+        },
+        {
+         "t": "code",
+         "v": "BatteryMonitor"
+        },
+        {
+         "t": "text",
+         "v": " takes a "
+        },
+        {
+         "t": "code",
+         "v": "Logger&"
+        },
+        {
+         "t": "text",
+         "v": ", not a "
+        },
+        {
+         "t": "code",
+         "v": "ConsoleLogger&"
+        },
+        {
+         "t": "text",
+         "v": ", and that "
+        },
+        {
+         "t": "code",
+         "v": "Logger"
+        },
+        {
+         "t": "text",
+         "v": " is declared next to the monitor, by the code that needs logging. Klaus Iglberger's "
+        },
+        {
+         "t": "a",
+         "v": "CppCon 2020 talk on the SOLID principles",
+         "href": "https://www.youtube.com/watch?v=Ntraj80qN2k"
+        },
+        {
+         "t": "text",
+         "v": " is built on this point: the Dependency Inversion Principle is satisfied only when the abstraction belongs to the high-level code. An interface that ships with the logging library, and grows whenever that library grows, leaves you depending on the library through one more hop. His book, C++ Software Design, makes the same argument as Guideline 9, on the ownership of abstractions. Guideline 4, design for testability, takes it one step further: its answer to \"how do I test this private member function\" is that the function is a separate concern in disguise, and that pulling it into a class of its own is both the design fix and the test fix."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four ways to hold the injected dependency come up, and the failure cases section measures what each costs."
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A reference or a raw pointer to an interface: the caller owns the object and guarantees it outlives yours (Core Guidelines "
+         },
+         {
+          "t": "a",
+          "v": "F.60",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-ptr-ref"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "a",
+          "v": "R.3",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+         },
+         {
+          "t": "text",
+          "v": ", which say a raw pointer or reference is non-owning). A reference cannot be null and cannot be reseated; a pointer allows both, which is what setter injection needs."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr"
+         },
+         {
+          "t": "text",
+          "v": " to an interface: your object owns the dependency, and the caller decides the concrete type. This is what a factory hands back, which the Factory Method topic picks up."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A callable held by value, usually "
+         },
+         {
+          "t": "code",
+          "v": "std::function"
+         },
+         {
+          "t": "text",
+          "v": ": the dependency is one operation rather than a set of them, and the object stays copyable."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A template parameter: the type is fixed where the object is built, there is no indirect call, and the whole class moves into a header."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two cases are not dependency injection and should not be turned into it. A member the class owns outright and that never varies, such as the "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " a buffer keeps, is an implementation detail; injecting it publishes a decision nobody wants to make. And a pure function needs nothing injected, because its arguments already are its dependencies. Bilal Gill's "
+        },
+        {
+         "t": "a",
+         "v": "CppCon 2023 talk on testable ROS 2 code",
+         "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+        },
+        {
+         "t": "text",
+         "v": " pushes as much of a node as possible into that shape first, and injects only what is left: the clock, the transport and the log."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the watchdog with its clock and its logger injected. The test drives a seven-step timeline and a 30 second timeout in one instant."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <vector>\n\nusing namespace std::chrono_literals;\n\n// Everything the watchdog needs from a clock, and nothing else.\nclass Clock {\n public:\n  Clock() = default;\n  Clock(const Clock&) = delete;\n  Clock& operator=(const Clock&) = delete;\n  virtual ~Clock() = default;\n  [[nodiscard]] virtual std::chrono::nanoseconds now() const = 0;\n};\n\nclass SteadyClock final : public Clock {  // what the node passes in production\n public:\n  [[nodiscard]] std::chrono::nanoseconds now() const override {\n    return std::chrono::steady_clock::now().time_since_epoch();\n  }\n};\n\nclass FakeClock final : public Clock {  // what the test passes\n public:\n  [[nodiscard]] std::chrono::nanoseconds now() const override { return now_; }\n  void advance(std::chrono::nanoseconds step) { now_ += step; }\n\n private:\n  std::chrono::nanoseconds now_{};\n};\n\nclass Logger {\n public:\n  Logger() = default;\n  Logger(const Logger&) = delete;\n  Logger& operator=(const Logger&) = delete;\n  virtual ~Logger() = default;\n  virtual void warn(std::string_view line) = 0;\n};\n\nclass RecordingLogger final : public Logger {\n public:\n  void warn(std::string_view line) override { lines_.emplace_back(line); }\n  [[nodiscard]] const std::vector<std::string>& lines() const { return lines_; }\n\n private:\n  std::vector<std::string> lines_;\n};\n\nclass Watchdog {\n public:\n  Watchdog(const Clock& clock, Logger& logger, std::chrono::nanoseconds timeout)\n      : clock_(clock), logger_(logger), timeout_(timeout) {}\n\n  void on_odometry() { last_ = clock_.now(); }\n\n  // How long since the last message, or nothing when none has arrived.\n  [[nodiscard]] std::optional<std::chrono::nanoseconds> silence() const {\n    if (!last_) return std::nullopt;\n    return clock_.now() - *last_;\n  }\n\n  void poll() {\n    const std::optional<std::chrono::nanoseconds> quiet = silence();\n    const bool late = quiet && *quiet > timeout_;\n    if (late && !late_)\n      logger_.warn(std::format(\"no odometry for {}\", std::chrono::duration_cast<std::chrono::milliseconds>(*quiet)));\n    late_ = late;\n  }\n\n  [[nodiscard]] bool is_late() const { return late_; }\n\n private:\n  const Clock& clock_;\n  Logger& logger_;\n  std::chrono::nanoseconds timeout_;\n  std::optional<std::chrono::nanoseconds> last_;\n  bool late_ = false;\n};\n\nint main() {\n  FakeClock clock;\n  RecordingLogger log;\n  Watchdog dog(clock, log, 200ms);\n\n  const auto step = [&](std::chrono::milliseconds by, bool message) {\n    clock.advance(by);\n    if (message) dog.on_odometry();\n    dog.poll();\n    std::cout << std::format(\"t = {:>6}: {}{}\\n\", std::chrono::duration_cast<std::chrono::milliseconds>(clock.now()),\n                             dog.is_late() ? \"late\" : \"fresh\", message ? \", odometry arrived\" : \"\");\n  };\n\n  step(0ms, true);\n  step(100ms, false);\n  step(150ms, false);\n  step(150ms, false);\n  step(0ms, true);\n  step(50ms, false);\n  step(300ms, false);\n\n  // A 30 second timeout, tested in the same instant.\n  FakeClock slow_clock;\n  RecordingLogger slow_log;\n  Watchdog slow(slow_clock, slow_log, 30s);\n  slow.on_odometry();\n  slow_clock.advance(31s);\n  slow.poll();\n\n  std::cout << std::format(\"recorded {} warnings from the 200 ms watchdog:\\n\", log.lines().size());\n  for (const std::string& line : log.lines()) std::cout << std::format(\"  {}\\n\", line);\n  std::cout << std::format(\"the 30 s watchdog recorded: {}\\n\", slow_log.lines().front());\n}"
+      },
+      {
+       "t": "output",
+       "text": "t =    0ms: fresh, odometry arrived\nt =  100ms: fresh\nt =  250ms: late\nt =  400ms: late\nt =  400ms: fresh, odometry arrived\nt =  450ms: fresh\nt =  750ms: late\nrecorded 2 warnings from the 200 ms watchdog:\n  no odometry for 250ms\n  no odometry for 350ms\nthe 30 s watchdog recorded: no odometry for 31000ms"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Built with the same sanitizer flags as the sleeping version above and timed the same way, this program takes about 0.01 s against that one's 0.61 s, and it walks a seven-step timeline and a 30 second timeout rather than checking three states. The 30 second one costs nothing, because 31 s of fake time is one addition."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "poll"
+         },
+         {
+          "t": "text",
+          "v": " warns on the edge, not on every call. Steps three and four are both late and only the first logs, which is a rule about state over time. Sleeping cannot check it, because the sleep has to be long enough to pass the deadline and there is no way to stand still afterwards."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Clock::now"
+         },
+         {
+          "t": "text",
+          "v": " returns a "
+         },
+         {
+          "t": "code",
+          "v": "std::chrono::nanoseconds"
+         },
+         {
+          "t": "text",
+          "v": " since an origin the clock picks, rather than a "
+         },
+         {
+          "t": "code",
+          "v": "std::chrono::steady_clock::time_point"
+         },
+         {
+          "t": "text",
+          "v": ". A "
+         },
+         {
+          "t": "code",
+          "v": "time_point"
+         },
+         {
+          "t": "text",
+          "v": " names its clock in its type, and a fake returning "
+         },
+         {
+          "t": "code",
+          "v": "steady_clock::time_point{500ms}"
+         },
+         {
+          "t": "text",
+          "v": " compiles while claiming a reading from a clock it never touched, so the type would say something false to every reader. "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::Time"
+         },
+         {
+          "t": "text",
+          "v": " carries its clock type as a run-time field for the same reason, and the ROS 2 time topic's "
+         },
+         {
+          "t": "code",
+          "v": "Stamp"
+         },
+         {
+          "t": "text",
+          "v": " holds a plain "
+         },
+         {
+          "t": "code",
+          "v": "std::int64_t"
+         },
+         {
+          "t": "text",
+          "v": " of nanoseconds."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The watchdog takes "
+         },
+         {
+          "t": "code",
+          "v": "const Clock&"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "Logger&"
+         },
+         {
+          "t": "text",
+          "v": ". It owns neither, and both have to outlive it; the failure cases section shows what happens when one does not."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "silence()"
+         },
+         {
+          "t": "text",
+          "v": " returns "
+         },
+         {
+          "t": "code",
+          "v": "std::optional"
+         },
+         {
+          "t": "text",
+          "v": ", so \"no message has ever arrived\" is a state of its own rather than a zero that means two different things."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "SteadyClock"
+         },
+         {
+          "t": "text",
+          "v": " appears and is never used here. That is the production half, and the test never mentions it. The node's constructor is the only place that names a concrete clock."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "logger",
+   "title": "Service receiving a logger, with a fake logger in tests",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. A "
+        },
+        {
+         "t": "code",
+         "v": "JointGuard"
+        },
+        {
+         "t": "text",
+         "v": " sits between the planner and a motor driver. It clamps each joint velocity command to a limit and logs a warning when it clamps, but at most one warning per quiet period, so a planner asking for too much 200 times a second does not fill the log."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write it with constructor injection and test it with fakes."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "code",
+          "v": "Clock"
+         },
+         {
+          "t": "text",
+          "v": " interface with "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::chrono::nanoseconds now() const"
+         },
+         {
+          "t": "text",
+          "v": ", and a "
+         },
+         {
+          "t": "code",
+          "v": "Logger"
+         },
+         {
+          "t": "text",
+          "v": " interface with "
+         },
+         {
+          "t": "code",
+          "v": "void warn(std::string_view)"
+         },
+         {
+          "t": "text",
+          "v": ". Both are polymorphic bases, so give each one the destructor and the copy operations that rule requires."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "JointGuard(const Clock& clock, Logger& logger, Limit limit, std::chrono::nanoseconds quiet)"
+         },
+         {
+          "t": "text",
+          "v": ", where "
+         },
+         {
+          "t": "code",
+          "v": "Limit"
+         },
+         {
+          "t": "text",
+          "v": " is a struct with one named field "
+         },
+         {
+          "t": "code",
+          "v": "max_mdeg_per_s"
+         },
+         {
+          "t": "text",
+          "v": ", built with a designated initialiser so the limit and the quiet period cannot be passed in the wrong order."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::int32_t apply(std::int32_t command_mdeg_per_s)"
+         },
+         {
+          "t": "text",
+          "v": " returns the command clamped to "
+         },
+         {
+          "t": "code",
+          "v": "[-max, +max]"
+         },
+         {
+          "t": "text",
+          "v": ", in millidegrees per second, and warns when it changed the value and the quiet period has passed."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::optional<std::chrono::nanoseconds> since_last_warning() const"
+         },
+         {
+          "t": "text",
+          "v": " returns how long since the last warning, and nothing when none has been logged."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "code",
+          "v": "FakeClock"
+         },
+         {
+          "t": "text",
+          "v": " the test advances by hand and a "
+         },
+         {
+          "t": "code",
+          "v": "RecordingLogger"
+         },
+         {
+          "t": "text",
+          "v": " that keeps the lines."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then run four checks and print what the logger saw: a command inside the limit passes through and logs nothing; five commands over the limit, 5 ms apart, are all clamped and log one line; a sixth after the quiet period logs a second line; a command below the negative limit is clamped to the negative limit. Watch the evaluation order when one "
+        },
+        {
+         "t": "code",
+         "v": "std::format"
+        },
+        {
+         "t": "text",
+         "v": " argument calls "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": " and another reads the log: the order of function arguments is unspecified."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer three questions in writing. Which of the four checks could you still make with a "
+        },
+        {
+         "t": "code",
+         "v": "JointGuard"
+        },
+        {
+         "t": "text",
+         "v": " that called "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::steady_clock::now()"
+        },
+        {
+         "t": "text",
+         "v": " itself? What breaks if "
+        },
+        {
+         "t": "code",
+         "v": "JointGuard"
+        },
+        {
+         "t": "text",
+         "v": " takes "
+        },
+        {
+         "t": "code",
+         "v": "Logger&"
+        },
+        {
+         "t": "text",
+         "v": " and the caller destroys the logger first? Where in a ROS 2 node does the one line that names "
+        },
+        {
+         "t": "code",
+         "v": "SteadyClock"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "RosLogger"
+        },
+        {
+         "t": "text",
+         "v": " belong?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <chrono>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <vector>\n\nusing namespace std::chrono_literals;\n\nstruct Limit {\n  std::int32_t max_mdeg_per_s;\n};\n\nclass Clock {\n public:\n  Clock() = default;\n  Clock(const Clock&) = delete;\n  Clock& operator=(const Clock&) = delete;\n  virtual ~Clock() = default;\n  [[nodiscard]] virtual std::chrono::nanoseconds now() const = 0;\n};\n\nclass Logger {\n public:\n  Logger() = default;\n  Logger(const Logger&) = delete;\n  Logger& operator=(const Logger&) = delete;\n  virtual ~Logger() = default;\n  virtual void warn(std::string_view line) = 0;\n};\n\nclass JointGuard {\n public:\n  JointGuard(const Clock& clock, Logger& logger, Limit limit, std::chrono::nanoseconds quiet)\n      : clock_(clock), logger_(logger), limit_(limit), quiet_(quiet) {}\n\n  [[nodiscard]] std::int32_t apply(std::int32_t command_mdeg_per_s) {\n    const std::int32_t clamped = std::clamp(command_mdeg_per_s, -limit_.max_mdeg_per_s, limit_.max_mdeg_per_s);\n    if (clamped != command_mdeg_per_s && ready_to_warn()) {\n      last_warning_ = clock_.now();\n      logger_.warn(std::format(\"clamped {} to {} mdeg/s\", command_mdeg_per_s, clamped));\n    }\n    return clamped;\n  }\n\n  // How long since the last warning, or nothing when none has been logged.\n  [[nodiscard]] std::optional<std::chrono::nanoseconds> since_last_warning() const {\n    if (!last_warning_) return std::nullopt;\n    return clock_.now() - *last_warning_;\n  }\n\n private:\n  [[nodiscard]] bool ready_to_warn() const {\n    const std::optional<std::chrono::nanoseconds> age = since_last_warning();\n    return !age || *age >= quiet_;\n  }\n\n  const Clock& clock_;\n  Logger& logger_;\n  Limit limit_;\n  std::chrono::nanoseconds quiet_;\n  std::optional<std::chrono::nanoseconds> last_warning_;\n};\n\nclass FakeClock final : public Clock {\n public:\n  [[nodiscard]] std::chrono::nanoseconds now() const override { return now_; }\n  void advance(std::chrono::nanoseconds step) { now_ += step; }\n\n private:\n  std::chrono::nanoseconds now_{};\n};\n\nclass RecordingLogger final : public Logger {\n public:\n  void warn(std::string_view line) override { lines_.emplace_back(line); }\n  [[nodiscard]] const std::vector<std::string>& lines() const { return lines_; }\n\n private:\n  std::vector<std::string> lines_;\n};\n\nint main() {\n  FakeClock clock;\n  RecordingLogger log;\n  JointGuard guard(clock, log, Limit{.max_mdeg_per_s = 1500}, 1s);\n\n  // apply() runs first and the count is read afterwards: the order of two arguments would be unspecified.\n  const auto report = [&](std::string_view step, std::int32_t asked, std::int32_t got) {\n    std::cout << std::format(\"{}: apply({:>5}) = {:>5}, warnings so far {}\\n\", step, asked, got, log.lines().size());\n  };\n\n  report(\"1. inside the limit      \", 900, guard.apply(900));\n\n  for (int k = 0; k < 5; ++k) {\n    clock.advance(5ms);\n    const std::int32_t got = guard.apply(2400);\n    if (k == 0) report(\"2. first over the limit  \", 2400, got);\n    if (k == 4) report(\"2. fifth over the limit  \", 2400, got);\n  }\n\n  clock.advance(1s);\n  const std::int32_t after_quiet = guard.apply(2400);\n  report(\"3. after the quiet period\", 2400, after_quiet);\n\n  clock.advance(2s);\n  const std::int32_t below = guard.apply(-9000);\n  report(\"4. below the low limit   \", -9000, below);\n\n  clock.advance(250ms);\n  std::cout << \"the fake logger recorded:\\n\";\n  for (const std::string& line : log.lines()) std::cout << std::format(\"  {}\\n\", line);\n  std::cout << std::format(\"since the last warning: {}\\n\",\n                           std::chrono::duration_cast<std::chrono::milliseconds>(*guard.since_last_warning()));\n}"
+      },
+      {
+       "t": "output",
+       "text": "1. inside the limit      : apply(  900) =   900, warnings so far 0\n2. first over the limit  : apply( 2400) =  1500, warnings so far 1\n2. fifth over the limit  : apply( 2400) =  1500, warnings so far 1\n3. after the quiet period: apply( 2400) =  1500, warnings so far 2\n4. below the low limit   : apply(-9000) = -1500, warnings so far 3\nthe fake logger recorded:\n  clamped 2400 to 1500 mdeg/s\n  clamped 2400 to 1500 mdeg/s\n  clamped -9000 to -1500 mdeg/s\nsince the last warning: 250ms"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three answers. A guard that reads "
+        },
+        {
+         "t": "code",
+         "v": "steady_clock"
+        },
+        {
+         "t": "text",
+         "v": " itself can still check the clamping, because clamping does not involve time: checks one and four survive. Check two needs five calls to land inside one quiet period, which a real clock makes likely rather than certain, and check three needs a real second of sleeping per run. The rate limit is the part worth testing and the part real time takes away."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "If the caller destroys the logger first, "
+        },
+        {
+         "t": "code",
+         "v": "logger_"
+        },
+        {
+         "t": "text",
+         "v": " dangles and the next "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": " that clamps writes through it. That is the bug the failure cases section reproduces. The fix is either ownership, a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Logger>"
+        },
+        {
+         "t": "text",
+         "v": " member, or an order that is written down: in a ROS 2 node both the clock and the logger are members of the node declared before the guard, so they are destroyed after it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The line that names "
+        },
+        {
+         "t": "code",
+         "v": "SteadyClock"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "RosLogger"
+        },
+        {
+         "t": "text",
+         "v": " belongs in the node's constructor, in the member initialiser list, and nowhere else. Everything below it takes interfaces, so "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " keeps compiling without rclcpp and the guard's tests run without a ROS graph."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "alternatives",
+   "title": "Template injection versus virtual interfaces; too many parameters",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start with what each way of holding a dependency costs in bytes. Each struct below holds one clock and one 8-byte timeout:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n\nclass Clock {\n public:\n  Clock() = default;\n  Clock(const Clock&) = delete;\n  Clock& operator=(const Clock&) = delete;\n  virtual ~Clock() = default;\n  [[nodiscard]] virtual std::chrono::nanoseconds now() const = 0;\n};\n\nclass SteadyClock final : public Clock {\n public:\n  [[nodiscard]] std::chrono::nanoseconds now() const override {\n    return std::chrono::steady_clock::now().time_since_epoch();\n  }\n};\n\n// The same clock with no base class, for the template version.\nstruct PlainSteadyClock {\n  [[nodiscard]] std::chrono::nanoseconds now() const { return std::chrono::steady_clock::now().time_since_epoch(); }\n};\n\nstruct ByReference {\n  const Clock& clock;\n  std::int64_t timeout_ns;\n};\n\nstruct ByOwner {\n  std::unique_ptr<Clock> clock;\n  std::int64_t timeout_ns;\n};\n\nstruct ByCallable {\n  std::function<std::chrono::nanoseconds()> clock;\n  std::int64_t timeout_ns;\n};\n\ntemplate <typename C>\nstruct ByTemplate {\n  [[no_unique_address]] C clock;\n  std::int64_t timeout_ns;\n};\n\nint main() {\n  std::cout << std::format(\"reference to an interface:  {} bytes, plus the object the caller owns\\n\",\n                           sizeof(ByReference));\n  std::cout << std::format(\"unique_ptr to an interface: {} bytes, plus {} on the heap\\n\", sizeof(ByOwner),\n                           sizeof(SteadyClock));\n  std::cout << std::format(\"std::function:              {} bytes\\n\", sizeof(ByCallable));\n  std::cout << std::format(\"template parameter:         {} bytes, nothing else\\n\",\n                           sizeof(ByTemplate<PlainSteadyClock>));\n  std::cout << std::format(\"the timeout on its own:     {} bytes\\n\", sizeof(std::int64_t));\n}"
+      },
+      {
+       "t": "output",
+       "text": "reference to an interface:  16 bytes, plus the object the caller owns\nunique_ptr to an interface: 16 bytes, plus 8 on the heap\nstd::function:              40 bytes\ntemplate parameter:         8 bytes, nothing else\nthe timeout on its own:     8 bytes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The template version costs nothing at all: a "
+        },
+        {
+         "t": "code",
+         "v": "PlainSteadyClock"
+        },
+        {
+         "t": "text",
+         "v": " has no members, and "
+        },
+        {
+         "t": "code",
+         "v": "[[no_unique_address]]"
+        },
+        {
+         "t": "text",
+         "v": " lets it share the address of the timeout, so the struct is the size of its data. The interface versions add 8 bytes for the pointer, and the owning one adds a heap object whose only member is its vptr. The "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " costs 40 bytes for one operation, which is the number the polymorphism topic measured and explained: 32 bytes of "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " plus the timeout."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Speed follows the same split, and the gap is small. A template call is an ordinary call the compiler can inline; a call through "
+        },
+        {
+         "t": "code",
+         "v": "Clock&"
+        },
+        {
+         "t": "text",
+         "v": " is an indirect call it can inline only when it can prove the dynamic type; a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " call is an indirect call it can almost never prove. Here is the loop that measures it. The clock keeps the index and advances it on every call, so each call depends on the one before and the compiler cannot vectorise any version away:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "struct PlainReplayClock {  // the same body behind all three holders\n  std::span<const std::int64_t> stamps;\n  mutable std::int64_t at = 0;\n  [[nodiscard]] std::chrono::nanoseconds now() const {\n    at = (at + 1) & 2047;  // 2048 stamps, 16 KB, resident in L1\n    return std::chrono::nanoseconds{stamps[static_cast<std::size_t>(at)]};\n  }\n};\n// The timed loop, written once per holder; only the type of `clock` changes.\nstd::int64_t acc = 0;\nfor (std::int64_t k = 0; k < 50'000'000; ++k) acc += clock.now().count();"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rest of the program is the interface and the "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " holding the same body, the clock behind "
+        },
+        {
+         "t": "code",
+         "v": "Clock&"
+        },
+        {
+         "t": "text",
+         "v": " chosen at run time so the compiler cannot see its type, a timing loop that keeps the best of eleven, and a check that all three rows return the same "
+        },
+        {
+         "t": "code",
+         "v": "acc"
+        },
+        {
+         "t": "text",
+         "v": ", which they do: 25,160,771,666,165, or a mean stamp of 503,215."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -O2 -Wall -Wextra clock_cost.cpp -o clock_cost\n./clock_cost     # best of eleven for each row"
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "The clock is held as"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Best of eleven, 50 million calls, over 16 runs of the program"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "a template parameter"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "13 to 16 ms"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "const Clock&"
+          },
+          {
+           "t": "text",
+           "v": ", or "
+          },
+          {
+           "t": "code",
+           "v": "std::function<nanoseconds()>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "37 to 41 ms"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two indirect forms share a row because the measurement does not separate them. Their ranges overlap here, and the gap between them is not stable anywhere: in the Strategy topic's version of this benchmark, changing how the loop added up its result, which is work outside the call and is not timed differently, was enough to swap which of the two came out ahead. Treat them as one thing. On this machine, an Intel Core i7-14700HX with GCC 13.3, a call the compiler cannot inline costs roughly 0.4 to 0.9 ns more than one it can, counting both this measurement and the Strategy topic's. Put that where it belongs: a control loop reading the clock at 1 kHz pays under a microsecond a second for either."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three warnings come with the number. These are at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", and every example on this page builds unoptimised with sanitizers, where all the rows are slower and the gap between them changes. They are one machine in one session: the same binary run while the machine had other work on it put the first row at 20 to 22 ms rather than 13 to 16. And a benchmark of this shape is delicate: an earlier version of this loop let the compiler fold the inlined row to a constant and reported a difference that was not there. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "Per.6",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+        },
+        {
+         "t": "text",
+         "v": " is the rule to apply before letting any of this decide a design. Inbal Levi's "
+        },
+        {
+         "t": "a",
+         "v": "CppCon 2019 talk on virtual dispatch and its alternatives",
+         "href": "https://www.youtube.com/watch?v=jBnIMEb2GhA"
+        },
+        {
+         "t": "text",
+         "v": " benchmarks these against each other properly, and finds the ranking moves with the compiler and the optimisation level."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So why is the interface ever right? Because the template version moves the decision to compile time, and everything that follows from that is a cost:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "does not satisfy return-type-requirement",
+       "text": "#include <chrono>\n#include <concepts>\n#include <utility>\n\ntemplate <typename C>\nconcept MonotonicClock = requires(const C& clock) {\n  { clock.now() } -> std::same_as<std::chrono::nanoseconds>;\n};\n\ntemplate <MonotonicClock C>\nclass Watchdog {\n public:\n  explicit Watchdog(C clock, std::chrono::nanoseconds timeout) : clock_(std::move(clock)), timeout_(timeout) {}\n  [[nodiscard]] bool is_late(std::chrono::nanoseconds last) const { return clock_.now() - last > timeout_; }\n\n private:\n  [[no_unique_address]] C clock_;\n  std::chrono::nanoseconds timeout_;\n};\n\n// The fake the test writes, with the clock spelled in milliseconds by mistake.\nstruct FakeClock {\n  std::chrono::milliseconds stamp{};\n  [[nodiscard]] std::chrono::milliseconds now() const { return stamp; }\n};\n\nint main() {\n  const Watchdog dog(FakeClock{}, std::chrono::nanoseconds{200});\n  return dog.is_late(std::chrono::nanoseconds{0}) ? 1 : 0;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 reports "
+        },
+        {
+         "t": "code",
+         "v": "template constraint failure"
+        },
+        {
+         "t": "text",
+         "v": ", then the line that matters: "
+        },
+        {
+         "t": "code",
+         "v": "‘clock.now()’ does not satisfy return-type-requirement"
+        },
+        {
+         "t": "text",
+         "v": ". Without the concept the same mistake produces a wall of errors from inside "
+        },
+        {
+         "t": "code",
+         "v": "is_late"
+        },
+        {
+         "t": "text",
+         "v": ", so a template dependency needs a concept the way a virtual one needs a base class; Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "T.10",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-concepts"
+        },
+        {
+         "t": "text",
+         "v": " asks for constraints on every template argument. Even with the concept, four costs stay. "
+        },
+        {
+         "t": "code",
+         "v": "Watchdog"
+        },
+        {
+         "t": "text",
+         "v": " is a template, so its definition lives in a header and every user recompiles when it changes. Its type now carries the clock, so whatever holds a "
+        },
+        {
+         "t": "code",
+         "v": "Watchdog"
+        },
+        {
+         "t": "text",
+         "v": " becomes a template too, which Muldoon's slide calls templates all the way down. The clock cannot be chosen from a ROS parameter at start-up, because the choice happens at compile time. And a dependency that crosses a shared library boundary, such as a plugin, cannot be a template argument at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take a template parameter when the type is known where the object is built, the call is on a hot path, and you own the whole call chain. Take an interface when the choice is made at run time, the dependency crosses a binary boundary, or you are adding tests to code you cannot turn into templates. Muldoon's list of drawbacks for interfaces is honest about the other side: the interface accumulates functions, a fake has to stub out every pure virtual one even when the test touches two, and every call pays the indirect hop."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is about lifetime. A non-owning "
+        },
+        {
+         "t": "code",
+         "v": "Logger&"
+        },
+        {
+         "t": "text",
+         "v": " is a promise by the caller, and nothing in the type system checks it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <string_view>\n#include <vector>\n\nclass Logger {\n public:\n  Logger() = default;\n  Logger(const Logger&) = delete;\n  Logger& operator=(const Logger&) = delete;\n  virtual ~Logger() = default;\n  virtual void warn(std::string_view line) = 0;\n};\n\nclass RecordingLogger final : public Logger {\n public:\n  void warn(std::string_view line) override { lines_.emplace_back(line); }\n  [[nodiscard]] std::size_t count() const { return lines_.size(); }\n\n private:\n  std::vector<std::string> lines_;\n};\n\nclass BatteryMonitor {\n public:\n  explicit BatteryMonitor(Logger& logger) : logger_(logger) {}\n  void on_charge(int percent) const {\n    if (percent < 20) logger_.warn(std::format(\"battery at {}%\", percent));\n  }\n\n private:\n  Logger& logger_;  // the monitor does not own this\n};\n\nint main() {\n  auto log = std::make_unique<RecordingLogger>();\n  const BatteryMonitor monitor(*log);\n  monitor.on_charge(15);\n  std::cout << std::format(\"logged {} line\\n\", log->count());\n  log.reset();           // the owner tears the logger down first\n  monitor.on_charge(4);  // and the monitor writes into it anyway\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports "
+        },
+        {
+         "t": "code",
+         "v": "heap-use-after-free"
+        },
+        {
+         "t": "text",
+         "v": " on the read of the vptr inside "
+        },
+        {
+         "t": "code",
+         "v": "on_charge"
+        },
+        {
+         "t": "text",
+         "v": ". The fix is a decision, not a cast: either the monitor owns the logger through a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Logger>"
+        },
+        {
+         "t": "text",
+         "v": ", or the owner is declared before the monitor in the same class so that destruction, which runs in reverse, takes the monitor down first. Setter injection makes this worse, because the member has to be a pointer that starts null, and every use needs a check that a reference member would have made unnecessary."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last failure is the one that turns up in real code. Injection makes dependencies visible, and a class with eight of them says so:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "Processor(Database& db, Transport& com, FileLoader& loader, Calculator& calc,\n          Cache& cache, Clock& clock, Logger& log, const Config& config);"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The tempting fix is a "
+        },
+        {
+         "t": "code",
+         "v": "struct Context"
+        },
+        {
+         "t": "text",
+         "v": " holding all eight, passed as one parameter. Muldoon's slide on that reads NOPE: an unstructured bucket moves the problem somewhere else and now every test has to fill a bucket. A struct of coupled data of simple types is fine; a struct whose job is to shorten a parameter list is not. Eight dependencies is a measurement, and what it measures is that the class does eight things. Split it, and each piece takes the one or two it needs. That is the same reading Iglberger gives a hard-to-test private member function in Guideline 4, and the same reason Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.2",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "I.3",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-singleton"
+        },
+        {
+         "t": "text",
+         "v": " refuse the other escape route, which is to stop passing the dependency and reach for a global or a singleton instead. A singleton is a dependency that does not appear in any signature, and it is the third of the roadblocks Muldoon lists, after construction hidden inside a function and a class that gives you no handle to inject anything through."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what dependency injection is in one sentence, and what the wired watchdog's test cannot check. Name the three injection sites, which one is the default and what the other two cost. Say who owns the abstraction and why. List the four ways to hold a dependency with the bytes each costs, say what an uninlinable call cost per call in the measurement and on which machine, and give one case where a template parameter is right and one where an interface is. Finish with the two failure modes: a non-owning reference outliving its object, and a constructor with eight dependencies."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Name three questions about a 30 second watchdog that a test cannot ask when the class reads "
+     },
+     {
+      "t": "code",
+      "v": "steady_clock"
+     },
+     {
+      "t": "text",
+      "v": " itself."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the three places a dependency can enter an object, and what does each cost?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "BatteryMonitor"
+     },
+     {
+      "t": "text",
+      "v": " declare the "
+     },
+     {
+      "t": "code",
+      "v": "Logger"
+     },
+     {
+      "t": "text",
+      "v": " interface rather than using one from a logging library?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which of a reference, a "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", a "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " and a template parameter costs 8 bytes, 16 bytes and 40 bytes in the measured example, and which allocates?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "At "
+     },
+     {
+      "t": "code",
+      "v": "-O2"
+     },
+     {
+      "t": "text",
+      "v": " on the machine the page names, what did a clock call the compiler could not inline cost per call against one it could, and why do the interface and the "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " share one row?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give two cases where a template parameter beats an interface, and two where it cannot be used at all."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a concept add to template injection, and what does GCC 13 say when a fake fails it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A class needs eight injected dependencies. What is wrong, and why is a struct holding all eight not the fix?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Your class holds "
+     },
+     {
+      "t": "code",
+      "v": "Logger&"
+     },
+     {
+      "t": "text",
+      "v": ". What has the caller promised, and what does AddressSanitizer report when the promise is broken?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: a watchdog with an injected clock and logger, and a fake clock that drives a timeline in one instant."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Pete Muldoon, Dependency Injection in C++: A Practical Guide, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Dependency_Injection_in_Cpp.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=as5Z45G59Ws"
+     },
+     {
+      "t": "text",
+      "v": ", whose title differs. Constructor, setter and method injection; linking, inheritance, templates, type erasure and null objects as the mechanisms, each with its drawbacks; and the roadblocks, from hidden construction and singletons to the bucket of parameters."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Breaking Dependencies: The SOLID Principles, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/breaking_dependencies_the_solid_principles/breaking_dependencies_the_solid_principles__klaus_iglberger__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=Ntraj80qN2k"
+     },
+     {
+      "t": "text",
+      "v": ". Dependency inversion as a statement about who owns the abstraction."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, C++ Software Design, O'Reilly 2022: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+     },
+     {
+      "t": "text",
+      "v": ". Guideline 2 on designing for change, Guideline 3 on separating interfaces, Guideline 4 on designing for testability, and Guideline 9 on the ownership of abstractions."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Inbal Levi, Back to Basics: Virtual Dispatch and its Alternatives, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_virtual_dispatch_and_its_alternatives/back_to_basics_virtual_dispatch_and_its_alternatives__inbal_levi__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=jBnIMEb2GhA"
+     },
+     {
+      "t": "text",
+      "v": ". Virtual calls benchmarked against the compile-time alternatives, and how much the ranking depends on the compiler and the optimisation level."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jody Hagins, The Most Important C++ Design Guideline is Testability, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/The_Most_Important_Design_Guideline_is_Testability.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=kgE8v5M1Eoo"
+     },
+     {
+      "t": "text",
+      "v": ". Testability ranked above ease of use and speed, and what it means in practice."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". Keep the logic in plain classes, inject what is left."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "I.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "I.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-singleton"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.60",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-ptr-ref"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.67",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-copy-virtual"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "T.10",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-concepts"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "no_unique_address",
+      "href": "https://en.cppreference.com/cpp/language/attributes/no_unique_address"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "steady_clock",
+      "href": "https://en.cppreference.com/cpp/chrono/steady_clock"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::function",
+      "href": "https://en.cppreference.com/cpp/utility/functional/function"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,2060 @@
+{
+ "id": "ros-math-poses",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A robot stands at x = 4 m, y = 1 m in the world frame, with a yaw of 90°: it faces along the world's y axis. Its lidar reports a point 2 m ahead of the robot and 0.5 m to its left, which is (2, 0.5) in the robot's frame. By hand, find the point in the world frame, and write down the 3×3 homogeneous matrix you used. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Turn the point by the robot's yaw, then add the robot's position:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "text",
+    "tag": "",
+    "expect": "",
+    "text": "p_world = R(90°) · p_robot + t\n        = (cos 90°·2 − sin 90°·0.5,  sin 90°·2 + cos 90°·0.5) + (4, 1)\n        = (−0.5, 2) + (4, 1)\n        = (3.5, 3.0)\n\n| 0  −1  4 |\n| 1   0  1 |\n| 0   0  1 |"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Check it in words: 2 m ahead is 2 m along the world's y axis, so y goes from 1 to 3, and the robot's left is the world's −x, so x goes from 4 to 3.5."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with (3.5, 3.0), the rule \"rotate, then translate\", and the matrix. A sign slip with the right method is a partial pass: (4.5, 3.0) comes from a wrong sign on one sine term, and (4.5, −1.0) from turning by −90° instead of +90°. Adding the offsets without rotating, which gives (6.0, 1.5), is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A frame is an origin and a set of axes, and a pose is the position and orientation of one frame stated in another: the same physical point has different coordinates depending on which frame describes it. ROS names the robot's own frame "
+    },
+    {
+     "t": "code",
+     "v": "base_link"
+    },
+    {
+     "t": "text",
+     "v": " and the world frame of a mobile robot "
+    },
+    {
+     "t": "code",
+     "v": "map"
+    },
+    {
+     "t": "text",
+     "v": ", and every message that carries a position, such as "
+    },
+    {
+     "t": "code",
+     "v": "geometry_msgs/msg/PointStamped"
+    },
+    {
+     "t": "text",
+     "v": ", names the frame those numbers are stated in, because the numbers alone say nothing."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that a sensor reading, stated in the frame of the sensor, is useless to anything reasoning about the world unless there is a defined way to restate it in another frame. Adding a robot's position straight to a reading taken relative to the robot gives a wrong point whenever the robot doesn't face the world's own axes, because the reading's directions are the robot's, not the world's."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The fix is to turn the reading into the target frame's directions before adding the target frame's position: a rotation matrix does the turning, its columns being the child frame's axes written in the parent's, and a homogeneous transform packs rotation and translation into one matrix, so a chain of frames becomes one matrix product. Naming a transform target-first, "
+    },
+    {
+     "t": "code",
+     "v": "map_from_base"
+    },
+    {
+     "t": "text",
+     "v": ", keeps the direction straight: the inner names of a correct chain, "
+    },
+    {
+     "t": "code",
+     "v": "map_from_base"
+    },
+    {
+     "t": "text",
+     "v": " times "
+    },
+    {
+     "t": "code",
+     "v": "base_from_laser"
+    },
+    {
+     "t": "text",
+     "v": ", must meet, and a mismatch there is the only warning you get. The inverse swaps source and target with no general matrix inversion, since a rotation's inverse is its own transpose."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What this costs you is the discipline to say what kind of thing you are transforming. A point has a place and moves with translation; a vector, a velocity or an offset between two points, has only a direction and length and must only be turned, never moved, which homogeneous coordinates enforce by giving a point's fourth coordinate 1 and a vector's 0. Treating a velocity as a point silently adds the robot's own position to it, producing a place instead of a speed, with nothing to catch the mistake but the answer looking wrong."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: turning a lidar reading stated in the robot's own frame into the world frame by rotating first and translating second, exactly the discipline REP 105 relies on when it splits a robot's world position into "
+    },
+    {
+     "t": "code",
+     "v": "map"
+    },
+    {
+     "t": "text",
+     "v": ", which can jump, and "
+    },
+    {
+     "t": "code",
+     "v": "odom"
+    },
+    {
+     "t": "text",
+     "v": ", which only drifts."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "vectors",
+   "title": "Vectors, matrices, homogeneous transforms",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take the cold check's robot at (4, 1), facing along the world's y axis, and a lidar return 2 m straight ahead. Adding the numbers gives (6, 1), a point 2 m along the world's x axis, off to the robot's right. The right answer is (4, 3). \"Ahead\" means the robot's x axis, and that axis points along the world's y axis, so the reading has to be turned into the world's directions before the robot's position is added."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "frame"
+        },
+        {
+         "t": "text",
+         "v": " is an origin and a set of axes. The obstacle has coordinates (2, 0) in the robot's frame and (4, 3) in the world frame: the point is the same, only the frame that describes it differs. That is why ROS messages that carry positions and velocities name their frames: "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/PointStamped"
+        },
+        {
+         "t": "text",
+         "v": " names its frame in "
+        },
+        {
+         "t": "code",
+         "v": "header.frame_id"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "nav_msgs/msg/Odometry"
+        },
+        {
+         "t": "text",
+         "v": " gives the pose in "
+        },
+        {
+         "t": "code",
+         "v": "header.frame_id"
+        },
+        {
+         "t": "text",
+         "v": " and the twist in "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": ". ROS calls the world frame of a mobile robot "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ", and the robot's own frame "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": ", and this page does too."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Rotation"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Turning coordinates from a child frame into its parent is a multiplication by a "
+        },
+        {
+         "t": "i",
+         "v": "rotation matrix"
+        },
+        {
+         "t": "text",
+         "v": ". For a child frame turned by the yaw θ against its parent:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "R(θ) = | cos θ  −sin θ |          p_parent = R(θ) · p_child + t\n       | sin θ   cos θ |"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here t is the child's origin in parent coordinates. Read R by its columns: the first column, (cos θ, sin θ), is the child's x axis written in the parent frame, and the second, (−sin θ, cos θ), is its y axis. For the robot, θ = 90°, so its x axis is (0, 1) in the map, and 2 m ahead is 2·(0, 1) + (4, 1) = (4, 3)."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two properties of rotation matrices come up constantly. Their columns have length 1 and are at right angles, so the inverse of R is its transpose, and R(θ)ᵀ = R(−θ). And their determinant is +1. A matrix with determinant −1 mirrors, which turns a right-handed frame into a left-handed one, and every ROS frame is right-handed."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Homogeneous transforms"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Carrying R and t separately gets clumsy once frames chain. The lidar has a frame of its own, "
+        },
+        {
+         "t": "code",
+         "v": "laser"
+        },
+        {
+         "t": "text",
+         "v": ", mounted somewhere on the robot, so a scan point goes from "
+        },
+        {
+         "t": "code",
+         "v": "laser"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ". A "
+        },
+        {
+         "t": "i",
+         "v": "homogeneous transform"
+        },
+        {
+         "t": "text",
+         "v": " packs R and t into one 3×3 matrix and gives each point a third coordinate, 1:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "| x_map |   | cos θ  −sin θ  t_x |   | x_base |\n| y_map | = | sin θ   cos θ  t_y | · | y_base |\n|   1   |   |   0       0     1  |   |   1    |"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Multiply it out and the first two rows are R·p + t, while the last row keeps the 1. Now a chain of frames is a product of matrices, and the product of two such matrices is again one of them, so any chain collapses into a single transform."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This page names a transform after its two frames, target first. "
+        },
+        {
+         "t": "code",
+         "v": "map_from_base"
+        },
+        {
+         "t": "text",
+         "v": " is the pose of "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ", and it converts coordinates from "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ": p_map = map_from_base · p_base. Written this way, a correct chain has matching names where the transforms meet:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "map_from_laser = map_from_base · base_from_laser"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The inner names, base and base, match and drop out. Lynch and Park call this the "
+        },
+        {
+         "t": "i",
+         "v": "subscript cancellation rule"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "Modern Robotics",
+         "href": "https://hades.mech.northwestern.edu/index.php/Modern_Robotics"
+        },
+        {
+         "t": "text",
+         "v": ", section 3.3.1). Matrix products don't commute, so the order carries meaning, and "
+        },
+        {
+         "t": "code",
+         "v": "base_from_laser · map_from_base"
+        },
+        {
+         "t": "text",
+         "v": " computes something that has no meaning at all. Its inner names, laser and map, don't match, and that mismatch is the only warning you get."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "tf2 stores the same thing under different words. A "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/TransformStamped"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "header.frame_id"
+        },
+        {
+         "t": "text",
+         "v": " "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " holds the pose of "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ", which is "
+        },
+        {
+         "t": "code",
+         "v": "map_from_base"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "TransformStamped.msg",
+         "href": "https://github.com/ros2/common_interfaces/blob/jazzy/geometry_msgs/msg/TransformStamped.msg"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "code",
+         "v": "lookupTransform(\"map\", \"base_link\", time)"
+        },
+        {
+         "t": "text",
+         "v": " returns it: the first argument is the frame the data should end up in ("
+        },
+        {
+         "t": "a",
+         "v": "buffer_core.hpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/include/tf2/buffer_core.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). REP 105 calls it \"the transform from map to base_link\", naming parent then child, although it converts coordinates the other way. Variable names in the "
+        },
+        {
+         "t": "code",
+         "v": "target_from_source"
+        },
+        {
+         "t": "text",
+         "v": " form keep the direction unambiguous."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Inverse"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The inverse turns the direction around: "
+        },
+        {
+         "t": "code",
+         "v": "base_from_map"
+        },
+        {
+         "t": "text",
+         "v": " is the inverse of "
+        },
+        {
+         "t": "code",
+         "v": "map_from_base"
+        },
+        {
+         "t": "text",
+         "v": ". The common guess is (−x, −y, −θ), which puts the map's origin at (−4, −1) in the robot's frame. Work it out instead. From the robot, the map's origin is 4 m along the map's −x axis, which is the robot's left, and 1 m along the map's −y axis, which is behind it. So it sits at (−1, 4) in the robot's frame. The formula for the inverse of a rigid transform gives the same:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "| R   t |⁻¹   | Rᵀ   −Rᵀ·t |\n| 0   1 |   = | 0      1   |\n\nRᵀ = R(−90°),   −Rᵀ·(4, 1) = −(1, −4) = (−1, 4)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "No general matrix inversion is needed: the transpose takes no arithmetic and adds no rounding (Modern Robotics, proposition 3.15)."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Points and vectors"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A point has a place. A "
+        },
+        {
+         "t": "i",
+         "v": "vector"
+        },
+        {
+         "t": "text",
+         "v": " has a direction and a length and no place: a velocity, the offset from one point to another, the direction a camera looks. Moving a frame's origin changes the coordinates of every point in it and of no vector. Homogeneous coordinates keep the two apart with the last coordinate: a point gets 1 and a vector gets 0, and the 0 cancels the translation column, so a transform only turns a vector. The robot's forward velocity of 0.5 m/s is (0.5, 0) in "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " and (0, 0.5) in "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ". Treated as a point, it would come out as (4, 1.5), which is a place and not a velocity. The difference of two points is a vector, a point plus a vector is a point, and a point plus a point has no meaning."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Re-expressing a velocity in another frame's axes is a rotation. The velocity of a different point on a turning robot, such as the lidar, is a different quantity: it adds the turn rate times the lever arm."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "ROS messages make the same split. "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/Point"
+        },
+        {
+         "t": "text",
+         "v": " is a point, and the definition of "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/Vector3"
+        },
+        {
+         "t": "text",
+         "v": " says that a transform applies only its rotation to it ("
+        },
+        {
+         "t": "a",
+         "v": "Vector3.msg",
+         "href": "https://github.com/ros2/common_interfaces/blob/jazzy/geometry_msgs/msg/Vector3.msg"
+        },
+        {
+         "t": "text",
+         "v": "). A "
+        },
+        {
+         "t": "code",
+         "v": "Twist"
+        },
+        {
+         "t": "text",
+         "v": " holds two "
+        },
+        {
+         "t": "code",
+         "v": "Vector3"
+        },
+        {
+         "t": "text",
+         "v": "s. "
+        },
+        {
+         "t": "code",
+         "v": "tf2_geometry_msgs"
+        },
+        {
+         "t": "text",
+         "v": " follows the messages: its "
+        },
+        {
+         "t": "code",
+         "v": "doTransform"
+        },
+        {
+         "t": "text",
+         "v": " turns a "
+        },
+        {
+         "t": "code",
+         "v": "Vector3"
+        },
+        {
+         "t": "text",
+         "v": " and turns and moves a "
+        },
+        {
+         "t": "code",
+         "v": "Point"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "tf2_geometry_msgs.hpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_geometry_msgs/include/tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). The math types don't. Multiplying a "
+        },
+        {
+         "t": "code",
+         "v": "tf2::Transform"
+        },
+        {
+         "t": "text",
+         "v": " by a "
+        },
+        {
+         "t": "code",
+         "v": "tf2::Vector3"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "Transform.hpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/include/tf2/LinearMath/Transform.hpp"
+        },
+        {
+         "t": "text",
+         "v": "), or an Eigen "
+        },
+        {
+         "t": "code",
+         "v": "Isometry3d"
+        },
+        {
+         "t": "text",
+         "v": " by a "
+        },
+        {
+         "t": "code",
+         "v": "Vector3d"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "Eigen's Transform",
+         "href": "https://libeigen.gitlab.io/eigen/docs-nightly/classEigen_1_1Transform.html"
+        },
+        {
+         "t": "text",
+         "v": "), treats the argument as a point and adds the translation. For a direction, multiply by the rotation alone: "
+        },
+        {
+         "t": "code",
+         "v": "getBasis()"
+        },
+        {
+         "t": "text",
+         "v": " in tf2, "
+        },
+        {
+         "t": "code",
+         "v": "linear()"
+        },
+        {
+         "t": "text",
+         "v": " in Eigen, as the "
+        },
+        {
+         "t": "a",
+         "v": "Eigen geometry tutorial",
+         "href": "https://libeigen.gitlab.io/eigen/docs-nightly/group__TutorialGeometry.html"
+        },
+        {
+         "t": "text",
+         "v": " shows."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three dimensions"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nothing above depends on the plane. In 3D, R is 3×3, t has three entries, the homogeneous transform is 4×4 with 0 0 0 1 as its last row, and a point is (x, y, z, 1). Composition, the inverse with Rᵀ and −Rᵀ·t, and the 0 for vectors all carry over unchanged. A turn by yaw about z is the 2D matrix with a 1 added for z:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "Rz(θ) = | cos θ  −sin θ  0 |\n        | sin θ   cos θ  0 |\n        |   0       0    1 |"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The column rule still holds: each column of R is one axis of the child frame, written in the parent frame. That is often the fastest way to write a rotation down, and the worked example does so for a camera. Rotations about x and y, and the quaternions that ROS messages use for orientation, are the next topic."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Conventions"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A correct formula still gives wrong answers when the data arrives in other units or axes. "
+        },
+        {
+         "t": "a",
+         "v": "REP 103",
+         "href": "https://www.ros.org/reps/rep-0103.html"
+        },
+        {
+         "t": "text",
+         "v": " fixes them for ROS:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Question"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "REP 103"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Units"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "SI: metres, kilograms, seconds, and derived units such as radians and hertz"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Handedness"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "every frame is right-handed"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Axes of a body such as a robot"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "x forward, y left, z up"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Positive yaw"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "counterclockwise seen from above, by the right-hand rule about z"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "A local map on the Earth"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "x east, y north, z up (ENU), so yaw 0 points east"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "A camera's "
+          },
+          {
+           "t": "code",
+           "v": "_optical"
+          },
+          {
+           "t": "text",
+           "v": " frame"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "z forward, x right, y down"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last two rows differ from habits outside ROS. A compass heading is 0 at north and grows clockwise, while a ROS yaw is 0 at east and grows counterclockwise, so yaw = 90° − heading, and REP 103 asks drivers to convert before they publish. An image has x to the right and y down, so points seen by a camera are described in its optical frame, and a fixed rotation connects that frame to the camera's body frame."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "a",
+         "v": "REP 105",
+         "href": "https://www.ros.org/reps/rep-0105.html"
+        },
+        {
+         "t": "text",
+         "v": " names the frames of a mobile robot. "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " is fixed to the robot. "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " is fixed to the world, and the robot's pose in it changes smoothly but drifts without bound, because odometry adds up small errors. "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " is also fixed to the world, and the robot's pose in it doesn't drift but can jump when localisation corrects it. The frames form a tree, "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " → "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " → "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": ", because a frame can have only one parent. Odometry publishes "
+        },
+        {
+         "t": "code",
+         "v": "odom_from_base"
+        },
+        {
+         "t": "text",
+         "v": ". Localisation works out "
+        },
+        {
+         "t": "code",
+         "v": "map_from_base"
+        },
+        {
+         "t": "text",
+         "v": ", but it publishes "
+        },
+        {
+         "t": "code",
+         "v": "map_from_odom"
+        },
+        {
+         "t": "text",
+         "v": ", the correction that makes the chain come out right: map_from_odom = map_from_base · odom_from_base⁻¹. The exercise computes it, and the frames topic shows these transforms flowing through tf2."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program follows one point from a camera to the map, in 3D. The robot is at (4, 1) in the map, facing along the map's y axis. Its camera sits 0.1 m ahead of "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " and 0.3 m up, and the camera describes what it sees in its optical frame. It sees a point 2 m in front of the lens, 0.5 m right of the image centre and 0.2 m below it, so (0.5, 0.2, 2.0) in the optical frame."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Work out the answer before running it. The point is 2 m ahead of the camera, which is 0.1 m ahead of "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": ", so it is 2.1 m along the map's y axis from the robot: y = 3.1. Right of a robot facing +y is +x, so x = 4.5. The height is 0.3 m minus 0.2 m, so z = 0.1."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cmath>\n#include <format>\n#include <iostream>\n#include <numbers>\n#include <string>\n\nusing Vec4 = std::array<double, 4>;  // homogeneous coordinates: w = 1 for a point, w = 0 for a vector\n\n// A rigid transform as a 4x4 matrix: the rotation R in the top-left 3x3 block,\n// the translation t in the last column, and 0 0 0 1 in the last row.\nstruct Transform {\n  std::array<Vec4, 4> m{};\n};\n\n[[nodiscard]] Transform operator*(const Transform& a, const Transform& b) {\n  Transform r;\n  for (int i = 0; i < 4; ++i)\n    for (int j = 0; j < 4; ++j)\n      for (int k = 0; k < 4; ++k) r.m[i][j] += a.m[i][k] * b.m[k][j];\n  return r;\n}\n\n[[nodiscard]] Vec4 operator*(const Transform& t, const Vec4& v) {\n  Vec4 r{};\n  for (int i = 0; i < 4; ++i)\n    for (int k = 0; k < 4; ++k) r[i] += t.m[i][k] * v[k];\n  return r;\n}\n\n// The inverse of a rigid transform is R^T with translation -R^T t; no general matrix inverse needed.\n[[nodiscard]] Transform inverse(const Transform& t) {\n  Transform r;\n  for (int i = 0; i < 3; ++i) {\n    for (int j = 0; j < 3; ++j) r.m[i][j] = t.m[j][i];\n    for (int k = 0; k < 3; ++k) r.m[i][3] -= t.m[k][i] * t.m[k][3];\n  }\n  r.m[3][3] = 1.0;\n  return r;\n}\n\nstruct PlanarPose {\n  double x = 0.0;  // metres\n  double y = 0.0;\n  double z = 0.0;\n  double yaw = 0.0;  // radians, counterclockwise seen from above (REP 103)\n};\n\n// A turn about z by yaw, then a translation.\n[[nodiscard]] Transform to_transform(const PlanarPose& p) {\n  const double c = std::cos(p.yaw);\n  const double s = std::sin(p.yaw);\n  return {{{\n      {c, -s, 0.0, p.x},\n      {s, c, 0.0, p.y},\n      {0.0, 0.0, 1.0, p.z},\n      {0.0, 0.0, 0.0, 1.0},\n  }}};\n}\n\n// Three decimals. A value within 1e-9 of zero prints as 0: std::cos(pi / 2) is 6.1e-17, not 0.\n[[nodiscard]] std::string show(double v) { return std::format(\"{:.3f}\", std::abs(v) < 1e-9 ? 0.0 : v); }\n[[nodiscard]] std::string show(const Vec4& v) { return std::format(\"({}, {}, {})\", show(v[0]), show(v[1]), show(v[2])); }\n\nint main() {\n  const Transform map_from_base = to_transform({.x = 4.0, .y = 1.0, .yaw = std::numbers::pi / 2});\n  const Transform base_from_camera = to_transform({.x = 0.1, .z = 0.3});\n  // REP 103 optical frame: z forward, x right, y down. Each column is one optical axis in camera_link.\n  const Transform camera_from_optical{{{\n      {0.0, 0.0, 1.0, 0.0},\n      {-1.0, 0.0, 0.0, 0.0},\n      {0.0, -1.0, 0.0, 0.0},\n      {0.0, 0.0, 0.0, 1.0},\n  }}};\n\n  const Vec4 seen{0.5, 0.2, 2.0, 1.0};  // 2 m in front of the lens, 0.5 m right, 0.2 m down\n  std::cout << \"step by step: \" << show(map_from_base * (base_from_camera * (camera_from_optical * seen))) << '\\n';\n\n  const Transform map_from_optical = map_from_base * base_from_camera * camera_from_optical;\n  std::cout << \"chained:      \" << show(map_from_optical * seen) << '\\n';\n  for (int i = 0; i < 3; ++i) {\n    const Vec4& row = map_from_optical.m[i];\n    std::cout << std::format(\"  [{:>6} {:>6} {:>6} | {:>6}]\\n\", show(row[0]), show(row[1]), show(row[2]), show(row[3]));\n  }\n\n  const Vec4 forward_as_vector{0.0, 0.0, 1.0, 0.0};\n  const Vec4 forward_as_point{0.0, 0.0, 1.0, 1.0};\n  std::cout << \"optical z as a vector: \" << show(map_from_optical * forward_as_vector) << '\\n';\n  std::cout << \"optical z as a point:  \" << show(map_from_optical * forward_as_point) << '\\n';\n\n  const Vec4 in_map = map_from_optical * seen;\n  std::cout << \"back to optical: \" << show(inverse(map_from_optical) * in_map) << '\\n';\n  std::cout << \"wrong order:     \" << show(camera_from_optical * base_from_camera * map_from_base * seen) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "step by step: (4.500, 3.100, 0.100)\nchained:      (4.500, 3.100, 0.100)\n  [ 1.000  0.000  0.000 |  4.000]\n  [ 0.000  0.000  1.000 |  1.100]\n  [ 0.000 -1.000  0.000 |  0.300]\noptical z as a vector: (0.000, 1.000, 0.000)\noptical z as a point:  (4.000, 2.100, 0.300)\nback to optical: (0.500, 0.200, 2.000)\nwrong order:     (2.300, -3.900, -1.500)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Three steps and one chained transform give the same point. The chain collapsed into a single matrix, which is what tf2 hands you when a lookup crosses several frames."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Nobody wrote the rotation block of "
+         },
+         {
+          "t": "code",
+          "v": "map_from_optical"
+         },
+         {
+          "t": "text",
+          "v": "; the product built it. Read it by columns: the optical x axis, right in the image, is the map's +x; the optical y axis, down in the image, is the map's −z; and the optical z axis, where the camera looks, is the map's +y. The last column, (4.0, 1.1, 0.3), is the camera's position in the map."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The same three numbers mean different things as a vector and as a point. With w = 0, the optical z axis comes out as (0, 1, 0), the direction the camera looks. With w = 1, it is (4.0, 2.1, 0.3), the place 1 m in front of the lens."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The inverse, built from the transpose, brings the map point back to (0.5, 0.2, 2.0)."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The wrong order runs without complaint and prints a plausible point. Its inner names don't meet: optical against base, and camera against map. The names are the only check there is."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "show"
+         },
+         {
+          "t": "text",
+          "v": " prints a value within 1e-9 of zero as 0. "
+         },
+         {
+          "t": "code",
+          "v": "std::cos(std::numbers::pi / 2)"
+         },
+         {
+          "t": "text",
+          "v": " is 6.1e-17, not 0, and without that step the first entry of the matrix's second row prints as "
+         },
+         {
+          "t": "code",
+          "v": "-0.000"
+         },
+         {
+          "t": "text",
+          "v": ". Poses are floating point, so compare them with a tolerance, never with "
+         },
+         {
+          "t": "code",
+          "v": "=="
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "camera_from_optical"
+        },
+        {
+         "t": "text",
+         "v": " is the same rotation the bench's TurtleBot3 model gives its camera in the URDF, where it is written as roll −1.57 and yaw −1.57, with 1.57 standing in for π/2 ("
+        },
+        {
+         "t": "a",
+         "v": "turtlebot3_waffle.urdf",
+         "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/jazzy/nav2_minimal_tb3_sim/urdf/turtlebot3_waffle.urdf"
+        },
+        {
+         "t": "text",
+         "v": "). Roll, pitch and yaw are the next topic."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "transform",
+   "title": "Transform a point between frames by hand and in C++",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes, in three parts."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "By hand, in 10 minutes. A robot's pose in "
+         },
+         {
+          "t": "code",
+          "v": "map"
+         },
+         {
+          "t": "text",
+          "v": " is x = 2.0 m, y = 3.0 m, yaw = 30°. Its lidar sits 0.2 m ahead of "
+         },
+         {
+          "t": "code",
+          "v": "base_link"
+         },
+         {
+          "t": "text",
+          "v": ", facing forward. The lidar reports a range of 1.5 m at a bearing of +60°, counterclockwise from the lidar's x axis as in "
+         },
+         {
+          "t": "a",
+          "v": "sensor_msgs/msg/LaserScan",
+          "href": "https://github.com/ros2/common_interfaces/blob/jazzy/sensor_msgs/msg/LaserScan.msg"
+         },
+         {
+          "t": "text",
+          "v": ". Where is the point in "
+         },
+         {
+          "t": "code",
+          "v": "map"
+         },
+         {
+          "t": "text",
+          "v": "? Use cos 30° = 0.866, sin 30° = 0.5, cos 60° = 0.5 and sin 60° = 0.866."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "In C++, in 15 minutes. Write a 2D pose type with x, y and yaw, and three operations: compose two poses, invert a pose, and apply a pose to a point. Give points and vectors their own types, so that a pose applied to a vector only turns it and adding two points doesn't compile. Then write "
+         },
+         {
+          "t": "code",
+          "v": "to_point"
+         },
+         {
+          "t": "text",
+          "v": ", which turns a lidar reading into a "
+         },
+         {
+          "t": "code",
+          "v": "std::optional"
+         },
+         {
+          "t": "text",
+          "v": " point in the lidar frame, empty when the range is outside the lidar's limits or isn't a finite number. Check part 1 with it, and try a reading of 0.05 m and one of infinity against limits of 0.12 m and 3.5 m."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "REP 105, in 5 minutes. Odometry reports "
+         },
+         {
+          "t": "code",
+          "v": "odom_from_base"
+         },
+         {
+          "t": "text",
+          "v": " as x = 1.8 m, y = 2.9 m, yaw = 25°, while localisation says the robot is at the pose from part 1. Compute "
+         },
+         {
+          "t": "code",
+          "v": "map_from_odom"
+         },
+         {
+          "t": "text",
+          "v": ", the transform localisation publishes, and check that composing it with "
+         },
+         {
+          "t": "code",
+          "v": "odom_from_base"
+         },
+         {
+          "t": "text",
+          "v": " gives the map pose back."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Part 1, by hand. The reading in the lidar frame is (1.5 cos 60°, 1.5 sin 60°) = (0.75, 1.299). The lidar is 0.2 m ahead, so in "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " it is (0.95, 1.299). Then rotate by 30° and add the robot's position:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "x = 2.0 + 0.866·0.95 − 0.5·1.299   = 2.0 + 0.823 − 0.650 = 2.173\ny = 3.0 + 0.5·0.95   + 0.866·1.299 = 3.0 + 0.475 + 1.125 = 4.600"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "There is a check that needs no matrix. The bearing and the yaw add up to 90°, so the ray points straight along the map's y axis, and the point is 1.5 m above the lidar in y. The lidar itself is at (2.0 + 0.2·0.866, 3.0 + 0.2·0.5) = (2.173, 3.1), so the point is (2.173, 4.6)."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Parts 2 and 3 in C++:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cmath>\n#include <format>\n#include <iostream>\n#include <limits>\n#include <numbers>\n#include <optional>\n#include <string>\n\nstruct Vector2 {\n  double x = 0.0;\n  double y = 0.0;\n};\n\nstruct Point2 {\n  double x = 0.0;\n  double y = 0.0;\n};\n\n// A point plus a vector is a point, and the difference of two points is a vector.\n// There is no point plus point: it has no meaning, so it doesn't compile.\n[[nodiscard]] constexpr Point2 operator+(Point2 p, Vector2 v) { return {p.x + v.x, p.y + v.y}; }\n[[nodiscard]] constexpr Vector2 operator-(Point2 a, Point2 b) { return {a.x - b.x, a.y - b.y}; }\n\n// The pose of a child frame in its parent frame. As a transform, it converts coordinates\n// from the child frame to the parent frame, so a variable is named parent_from_child.\nstruct Pose2 {\n  double x = 0.0;    // metres\n  double y = 0.0;    // metres\n  double yaw = 0.0;  // radians, counterclockwise (REP 103)\n};\n\n[[nodiscard]] constexpr double radians(double degrees) { return degrees * std::numbers::pi / 180.0; }\n[[nodiscard]] double wrap(double angle) { return std::remainder(angle, 2.0 * std::numbers::pi); }  // into [-pi, pi]\n\n// A vector only turns.\n[[nodiscard]] Vector2 operator*(const Pose2& t, Vector2 v) {\n  const double c = std::cos(t.yaw);\n  const double s = std::sin(t.yaw);\n  return {c * v.x - s * v.y, s * v.x + c * v.y};\n}\n\n// A point turns, then moves by the translation.\n[[nodiscard]] Point2 operator*(const Pose2& t, Point2 p) { return Point2{t.x, t.y} + t * Vector2{p.x, p.y}; }\n\n// a_from_c = a_from_b * b_from_c: c's origin goes through a_from_b, and the yaws add.\n[[nodiscard]] Pose2 operator*(const Pose2& a_from_b, const Pose2& b_from_c) {\n  const Point2 origin = a_from_b * Point2{b_from_c.x, b_from_c.y};\n  return {.x = origin.x, .y = origin.y, .yaw = wrap(a_from_b.yaw + b_from_c.yaw)};\n}\n\n// b_from_a: turn back by the yaw, and move by -R^T t.\n[[nodiscard]] Pose2 inverse(const Pose2& a_from_b) {\n  const Vector2 origin = Pose2{.yaw = -a_from_b.yaw} * Vector2{-a_from_b.x, -a_from_b.y};\n  return {.x = origin.x, .y = origin.y, .yaw = -a_from_b.yaw};\n}\n\nstruct Reading {\n  double range_m = 0.0;\n  double bearing_rad = 0.0;  // counterclockwise from the lidar's x axis, as in sensor_msgs/msg/LaserScan\n};\n\nstruct RangeLimits {\n  double min_m = 0.0;\n  double max_m = 0.0;\n};\n\n// The reading as a point in the lidar frame, or nothing when the range is outside the limits or not finite.\n[[nodiscard]] std::optional<Point2> to_point(const Reading& r, const RangeLimits& limits) {\n  if (!std::isfinite(r.range_m) || r.range_m < limits.min_m || r.range_m > limits.max_m) return std::nullopt;\n  return Point2{r.range_m * std::cos(r.bearing_rad), r.range_m * std::sin(r.bearing_rad)};\n}\n\n[[nodiscard]] std::string show(Point2 p) { return std::format(\"({:.3f}, {:.3f})\", p.x, p.y); }\n[[nodiscard]] std::string show(const Pose2& p) {\n  return std::format(\"x {:.3f}, y {:.3f}, yaw {:.1f} deg\", p.x, p.y, p.yaw * 180.0 / std::numbers::pi);\n}\n\nint main() {\n  const Pose2 map_from_base{.x = 2.0, .y = 3.0, .yaw = radians(30.0)};\n  const Pose2 base_from_laser{.x = 0.2};\n  const Pose2 map_from_laser = map_from_base * base_from_laser;\n  const RangeLimits limits{.min_m = 0.12, .max_m = 3.5};\n\n  for (const Reading& reading : {Reading{.range_m = 1.5, .bearing_rad = radians(60.0)}, Reading{.range_m = 0.05},\n                                 Reading{.range_m = std::numeric_limits<double>::infinity()}}) {\n    const std::optional<Point2> in_laser = to_point(reading, limits);\n    std::cout << std::format(\"{:.2f} m: {}\\n\", reading.range_m,\n                             in_laser ? show(map_from_laser * *in_laser) : std::string(\"discarded\"));\n  }\n\n  // REP 105: localisation knows map_from_base, odometry publishes odom_from_base,\n  // and localisation publishes the difference, map_from_odom.\n  const Pose2 odom_from_base{.x = 1.8, .y = 2.9, .yaw = radians(25.0)};\n  const Pose2 map_from_odom = map_from_base * inverse(odom_from_base);\n  std::cout << \"map_from_odom:                  \" << show(map_from_odom) << '\\n';\n  std::cout << \"map_from_odom * odom_from_base: \" << show(map_from_odom * odom_from_base) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "1.50 m: (2.173, 4.600)\n0.05 m: discarded\ninf m: discarded\nmap_from_odom:                  x 0.460, y -0.046, yaw 5.0 deg\nmap_from_odom * odom_from_base: x 2.000, y 3.000, yaw 30.0 deg"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Compare your version on these points."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Composition in the compact (x, y, yaw) form is the 3×3 matrix product written out: the child's origin goes through the parent transform like any point, and in 2D the yaws add, because two turns about the same axis add. "
+        },
+        {
+         "t": "code",
+         "v": "wrap"
+        },
+        {
+         "t": "text",
+         "v": " keeps the sum in [−π, π] with "
+        },
+        {
+         "t": "code",
+         "v": "std::remainder"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/numeric/math/remainder"
+        },
+        {
+         "t": "text",
+         "v": "). The inverse is Rᵀ and −Rᵀ·t again, where Rᵀ is the turn by −yaw."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two types stop the commonest mistake at compile time. An offset from the dock to an approach point declared as a "
+        },
+        {
+         "t": "code",
+         "v": "Point2"
+        },
+        {
+         "t": "text",
+         "v": " can't be added to the dock:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "operand types are",
+       "text": "struct Point2 {\n  double x = 0.0;\n  double y = 0.0;\n};\n\nstruct Vector2 {\n  double x = 0.0;\n  double y = 0.0;\n};\n\n[[nodiscard]] constexpr Point2 operator+(Point2 p, Vector2 v) { return {p.x + v.x, p.y + v.y}; }\n\nint main() {\n  const Point2 dock{.x = 2.0, .y = 3.0};\n  const Point2 approach{.x = -0.5, .y = 0.0};  // an offset from the dock, declared as a point\n  const Point2 goal = dock + approach;\n  return goal.x > 0.0 ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 reports "
+        },
+        {
+         "t": "code",
+         "v": "no match for 'operator+'"
+        },
+        {
+         "t": "text",
+         "v": " for two "
+        },
+        {
+         "t": "code",
+         "v": "const Point2"
+        },
+        {
+         "t": "text",
+         "v": " operands. Declared as a "
+        },
+        {
+         "t": "code",
+         "v": "Vector2"
+        },
+        {
+         "t": "text",
+         "v": ", the offset adds, and "
+        },
+        {
+         "t": "code",
+         "v": "map_from_dock * approach"
+        },
+        {
+         "t": "text",
+         "v": " would then turn it without moving it, which is what an offset needs. This is Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.4",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+        },
+        {
+         "t": "text",
+         "v": ", interfaces that are precisely and strongly typed, applied to geometry. The designated initialisers do the same for x, y and yaw: "
+        },
+        {
+         "t": "code",
+         "v": "{.x = 2.0, .y = 3.0, .yaw = radians(30.0)}"
+        },
+        {
+         "t": "text",
+         "v": " can't swap the three by accident."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "to_point"
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " because a reading outside the limits has no point at all, and 0 or −1 would be a real place. "
+        },
+        {
+         "t": "code",
+         "v": "std::isfinite"
+        },
+        {
+         "t": "text",
+         "v": " rejects infinity and NaN. A NaN fails every comparison, so without that test it would pass both limit checks and turn into a NaN point."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "map_from_odom"
+        },
+        {
+         "t": "text",
+         "v": " is x 0.460, y −0.046, yaw 5.0°: odometry has drifted by 5°. The translation isn't the difference between the two robot poses, which is only 0.2 m in x and 0.1 m in y. The drift turns the whole "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " frame about its origin, and the robot is 3.4 m from that origin, where a turn of 5° alone moves it by about 0.3 m. Composing "
+        },
+        {
+         "t": "code",
+         "v": "map_from_odom"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "odom_from_base"
+        },
+        {
+         "t": "text",
+         "v": " gives the localised pose back, which is how the chain "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " → "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " → "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " in tf2 ends up at the right place."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what "
+        },
+        {
+         "t": "code",
+         "v": "a_from_b"
+        },
+        {
+         "t": "text",
+         "v": " means, how two transforms compose and why their names must meet, and the inverse in terms of R and t. Explain what the columns of a rotation matrix are, and why a vector gets w = 0. Give the REP 103 axes and units, the optical frame, and which REP 105 frame drifts, which jumps, and who publishes "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What do the columns of a rotation matrix tell you?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Write the inverse of a rigid transform in terms of R and t. Why is it not (−x, −y, −θ)?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A transform is applied to a lidar hit, a velocity, the offset between two points and a camera's viewing direction. Which does it move, and which does it only turn?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In "
+     },
+     {
+      "t": "code",
+      "v": "a_from_b · b_from_c"
+     },
+     {
+      "t": "text",
+      "v": ", which frame goes in and which comes out? What does "
+     },
+     {
+      "t": "code",
+      "v": "b_from_c · a_from_b"
+     },
+     {
+      "t": "text",
+      "v": " compute?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "tf2::Transform * tf2::Vector3"
+     },
+     {
+      "t": "text",
+      "v": " do with the translation, and how do you turn a direction instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which way do x, y and z point on a robot, and on a camera's optical frame? Where does yaw 0 point in an ENU map?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does localisation publish "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " to "
+     },
+     {
+      "t": "code",
+      "v": "odom"
+     },
+     {
+      "t": "text",
+      "v": " rather than "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " to "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": ", and how does it compute it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "By hand: a robot at (4, 1) faces along the map's y axis. Where is the map's origin in its frame?"
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "a",
+      "v": "REP 103",
+      "href": "https://www.ros.org/reps/rep-0103.html"
+     },
+     {
+      "t": "text",
+      "v": ", on units of measure and coordinate conventions: SI units, right-handed frames, x forward, y left, z up, ENU, and the "
+     },
+     {
+      "t": "code",
+      "v": "_optical"
+     },
+     {
+      "t": "text",
+      "v": " suffix."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "REP 105",
+      "href": "https://www.ros.org/reps/rep-0105.html"
+     },
+     {
+      "t": "text",
+      "v": ", on coordinate frames for mobile platforms: "
+     },
+     {
+      "t": "code",
+      "v": "base_link"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "odom"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": ", the tree between them, and who publishes each transform."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Kevin Lynch and Frank Park, Modern Robotics, Cambridge University Press 2017, chapter 3, section 3.3.1 on homogeneous transformation matrices, their inverse and the subscript cancellation rule: "
+     },
+     {
+      "t": "a",
+      "v": "the book's page",
+      "href": "https://hades.mech.northwestern.edu/index.php/Modern_Robotics"
+     },
+     {
+      "t": "text",
+      "v": ", with a "
+     },
+     {
+      "t": "a",
+      "v": "free preprint",
+      "href": "https://hades.mech.northwestern.edu/images/7/7f/MR.pdf"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "geometry_msgs on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "Vector3.msg",
+      "href": "https://github.com/ros2/common_interfaces/blob/jazzy/geometry_msgs/msg/Vector3.msg"
+     },
+     {
+      "t": "text",
+      "v": ", which only rotates, and "
+     },
+     {
+      "t": "a",
+      "v": "TransformStamped.msg",
+      "href": "https://github.com/ros2/common_interfaces/blob/jazzy/geometry_msgs/msg/TransformStamped.msg"
+     },
+     {
+      "t": "text",
+      "v": ", the pose of "
+     },
+     {
+      "t": "code",
+      "v": "child_frame_id"
+     },
+     {
+      "t": "text",
+      "v": " in "
+     },
+     {
+      "t": "code",
+      "v": "header.frame_id"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "tf2 on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "buffer_core.hpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/include/tf2/buffer_core.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "lookupTransform"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Transform.hpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/include/tf2/LinearMath/Transform.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "tf2::Transform"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "tf2_geometry_msgs.hpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_geometry_msgs/include/tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "doTransform"
+     },
+     {
+      "t": "text",
+      "v": "; and the Jazzy concept page "
+     },
+     {
+      "t": "a",
+      "v": "about tf2",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Tf2.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Eigen's "
+     },
+     {
+      "t": "a",
+      "v": "geometry tutorial",
+      "href": "https://libeigen.gitlab.io/eigen/docs-nightly/group__TutorialGeometry.html"
+     },
+     {
+      "t": "text",
+      "v": " and its "
+     },
+     {
+      "t": "a",
+      "v": "Transform class",
+      "href": "https://libeigen.gitlab.io/eigen/docs-nightly/classEigen_1_1Transform.html"
+     },
+     {
+      "t": "text",
+      "v": ", with "
+     },
+     {
+      "t": "code",
+      "v": "Isometry"
+     },
+     {
+      "t": "text",
+      "v": " for rotations and translations only."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": ", on precisely and strongly typed interfaces."
+     }
+    ]
+   ]
+  }
+ ]
+}

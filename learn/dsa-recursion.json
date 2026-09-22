@@ -1,0 +1,2241 @@
+{
+ "id": "dsa-recursion",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "subsets(values)"
+     },
+     {
+      "t": "text",
+      "v": ", which returns every subset of a set of distinct "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": "s as a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<std::vector<int>>"
+     },
+     {
+      "t": "text",
+      "v": ". Build them with recursion rather than with bit masks. Test "
+     },
+     {
+      "t": "code",
+      "v": "{1, 2, 3}"
+     },
+     {
+      "t": "text",
+      "v": " and the empty set, and say how many subsets there are for n values, how long the function takes, and how much memory it uses beyond the result. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <vector>\n\n// Appends every subset of values[from, end) to out, each one combined with the values already chosen.\nvoid collect(std::span<const int> values, std::ptrdiff_t from, std::vector<int>& chosen,\n             std::vector<std::vector<int>>& out) {\n  if (from == std::ssize(values)) {  // every value has been decided\n    out.push_back(chosen);\n    return;\n  }\n  chosen.push_back(values[from]);          // choose values[from]\n  collect(values, from + 1, chosen, out);  // explore what follows that choice\n  chosen.pop_back();                       // un-choose, so the next branch starts clean\n  collect(values, from + 1, chosen, out);  // explore the branch that leaves it out\n}\n\n[[nodiscard]] std::vector<std::vector<int>> subsets(std::span<const int> values) {\n  std::vector<std::vector<int>> out;\n  std::vector<int> chosen;\n  chosen.reserve(values.size());\n  collect(values, 0, chosen, out);\n  return out;\n}\n\n[[nodiscard]] std::string show(std::span<const int> subset) {\n  std::string out;\n  for (const int v : subset) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", v);\n  return \"{\" + out + \"}\";\n}\n\nint main() {\n  const std::vector<int> three{1, 2, 3};\n  std::string line;\n  for (const std::vector<int>& s : subsets(three)) line += std::format(\"{}{}\", line.empty() ? \"\" : \" \", show(s));\n  std::cout << line << '\\n';\n  std::cout << std::format(\"{} subsets of 3 values, {} of none\\n\", subsets(three).size(), subsets({}).size());\n}"
+   },
+   {
+    "t": "output",
+    "text": "{1 2 3} {1 2} {1 3} {1} {2 3} {2} {3} {}\n8 subsets of 3 values, 1 of none"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Each call decides one value: take it or leave it. That gives 2ⁿ subsets for n values, and the empty set has one subset, the empty one, which the base case produces by copying an empty "
+     },
+     {
+      "t": "code",
+      "v": "chosen"
+     },
+     {
+      "t": "text",
+      "v": ". The three lines in the middle are the pattern the rest of this page uses. "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " chooses, the recursive call explores everything that follows that choice, and "
+     },
+     {
+      "t": "code",
+      "v": "pop_back"
+     },
+     {
+      "t": "text",
+      "v": " un-chooses so the second branch starts from the same state the first one did. Without the "
+     },
+     {
+      "t": "code",
+      "v": "pop_back"
+     },
+     {
+      "t": "text",
+      "v": ", the second branch would inherit the first branch's choices."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Building the answer costs O(n·2ⁿ) time, because each of the 2ⁿ subsets is copied into "
+     },
+     {
+      "t": "code",
+      "v": "out"
+     },
+     {
+      "t": "text",
+      "v": " and a copy is up to n long. Beyond the result, the function uses "
+     },
+     {
+      "t": "code",
+      "v": "chosen"
+     },
+     {
+      "t": "text",
+      "v": ", which never holds more than n values, and the call stack, which is n + 1 frames deep: O(n) extra space. Interviewers ask for both numbers, and the recursion stack is the half that people leave out."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with a recursion that handles the empty input, says 2ⁿ, and counts the stack in the space. Correct code with \"O(2ⁿ) space\" and no mention of the stack depth is a partial pass. A version that forgets the un-choose, or that answers 2ⁿ − 1 because it skips the empty subset, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Recursion is a function that calls itself, and each live call owns a stack frame, a block on the thread's stack holding its parameters, locals and the address to return to, so every recursion has two numbers, not one: how many calls it makes, the time, and how deep the calls nest at once, the memory. They move independently. A search that fans out into millions of calls can still nest only a few dozen deep, while a plain \"process one element, then recurse on the rest\" makes exactly as many calls as it nests."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "It's the right reach for a genuine tree of decisions: subsets, permutations, bracket generation, any search where you choose one option, explore everything that follows, then undo the choice so the next option starts from the same state, the choose-explore-unchoose rhythm. That undo is what lets one shared, mutable container serve the whole search instead of a fresh copy at every node. It's the wrong reach, dressed as recursion, when the shape is really a straight line down the input: its depth grows with the input size, and C++ gives no guarantee that the compiler turns it back into a loop, tail call or not; that depends on the compiler and the flags."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Every recursion needs a base case it answers without calling itself, and progress toward it on every call; missing either is a crash, not a wrong answer. Backtracking adds pruning: a test that rejects a partial answer before its subtree is built, which leaves the worst case unchanged but lowers what real inputs cost."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake that shows up under pressure is a recursion whose depth tracks the input size, correct at every base case and step, that a reviewer signs off on because nothing looks wrong. It runs fine in every test, because the tests are short, then runs out of stack the day the input is long, crashing at a line that reads like ordinary arithmetic. The fix moves the pending work off the call stack: a one-call-per-level recursion becomes a plain loop, and a branching one becomes a loop over an explicit stack kept on the heap, where the depth can no longer overflow anything."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: generate every subset of a small set by recursion, and give both numbers an interviewer expects, the call count and the stack depth, not one alone."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Base cases, the call stack, choose-explore-unchoose",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four recursions, instrumented so that each one reports how many calls it made and how deep the calls nested:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string_view>\n#include <vector>\n\nstruct Trace {\n  std::int64_t calls = 0;\n  std::int64_t live = 0;  // frames of this function on the stack right now\n  std::int64_t deepest = 0;\n};\n\n// Counts one call for as long as it exists, and records the deepest nesting reached.\nclass Level {\n public:\n  explicit Level(Trace& trace) : trace_(trace) {\n    ++trace_.calls;\n    ++trace_.live;\n    trace_.deepest = std::max(trace_.deepest, trace_.live);\n  }\n  Level(const Level&) = delete;\n  Level& operator=(const Level&) = delete;\n  ~Level() { --trace_.live; }\n\n private:\n  Trace& trace_;\n};\n\nstd::int64_t sum_to(std::int64_t n, Trace& trace) {  // one call per level\n  const Level level{trace};\n  return n <= 0 ? 0 : n + sum_to(n - 1, trace);  // <= rather than ==, for the reason below\n}\n\nstd::int64_t halvings(std::int64_t n, Trace& trace) {  // one call per level, on half the input\n  const Level level{trace};\n  return n <= 1 ? 0 : 1 + halvings(n / 2, trace);\n}\n\nstd::int64_t fib(int n, Trace& trace) {  // two calls per level\n  const Level level{trace};\n  return n < 2 ? n : fib(n - 1, trace) + fib(n - 2, trace);\n}\n\nstd::int64_t subsets(std::span<const int> values, std::ptrdiff_t from, Trace& trace) {  // take it or leave it\n  const Level level{trace};\n  if (from == std::ssize(values)) return 1;\n  return subsets(values, from + 1, trace) + subsets(values, from + 1, trace);\n}\n\nvoid row(std::string_view shape, std::int64_t answer, const Trace& trace) {\n  std::cout << std::format(\"{:<26}{:>10}{:>12}{:>8}\\n\", shape, answer, trace.calls, trace.deepest);\n}\n\nint main() {\n  std::cout << std::format(\"{:<26}{:>10}{:>12}{:>8}\\n\", \"shape\", \"answer\", \"calls\", \"depth\");\n  Trace linear;\n  row(\"sum_to(20)\", sum_to(20, linear), linear);\n  Trace halved;\n  row(\"halvings(1048576)\", halvings(1'048'576, halved), halved);\n  Trace tree;\n  row(\"fib(20)\", fib(20, tree), tree);\n  Trace branching;\n  const std::vector<int> twenty(20, 0);\n  row(\"subsets of 20 values\", subsets(twenty, 0, branching), branching);\n}"
+      },
+      {
+       "t": "output",
+       "text": "shape                         answer       calls   depth\nsum_to(20)                       210          21      21\nhalvings(1048576)                 20          21      21\nfib(20)                         6765       21891      20\nsubsets of 20 values         1048576     2097151      21"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "fib(20)"
+        },
+        {
+         "t": "text",
+         "v": " makes 21,891 calls and never nests more than 20 of them. The subset walk makes two million calls and nests 21. That gap is the one thing to keep straight about recursion: the number of calls is the time, and the depth of the nesting is the memory. They are different numbers, and code review usually looks at the wrong one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The memory is real because every live call owns a "
+        },
+        {
+         "t": "i",
+         "v": "stack frame"
+        },
+        {
+         "t": "text",
+         "v": ", a block on the thread's stack holding its parameters, its locals, the address to return to, and whatever registers the caller wants back. The frame lives from the call until the return, so the frames of all the live calls are on the stack at once. "
+        },
+        {
+         "t": "code",
+         "v": "Level"
+        },
+        {
+         "t": "text",
+         "v": " above is an ordinary RAII guard over that fact: its constructor runs on the way in, its destructor on the way out, and "
+        },
+        {
+         "t": "code",
+         "v": "live"
+        },
+        {
+         "t": "text",
+         "v": " is the number of frames of that function currently on the stack (Kostur's "
+        },
+        {
+         "t": "a",
+         "v": "talk on RAII",
+         "href": "https://www.youtube.com/watch?v=Rfu06XAhx90"
+        },
+        {
+         "t": "text",
+         "v": ", CppCon 2022)."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every recursion needs two things, and getting either wrong is a crash rather than a wrong answer. It needs a "
+        },
+        {
+         "t": "i",
+         "v": "base case"
+        },
+        {
+         "t": "text",
+         "v": ", a state it answers without calling itself, and it needs "
+        },
+        {
+         "t": "i",
+         "v": "progress"
+        },
+        {
+         "t": "text",
+         "v": ", an argument that moves towards that base case on every call. In "
+        },
+        {
+         "t": "code",
+         "v": "sum_to"
+        },
+        {
+         "t": "text",
+         "v": " above the base case is "
+        },
+        {
+         "t": "code",
+         "v": "n <= 0"
+        },
+        {
+         "t": "text",
+         "v": " and the progress is "
+        },
+        {
+         "t": "code",
+         "v": "n - 1"
+        },
+        {
+         "t": "text",
+         "v": ". In "
+        },
+        {
+         "t": "code",
+         "v": "collect"
+        },
+        {
+         "t": "text",
+         "v": " from the cold check, the base case is "
+        },
+        {
+         "t": "code",
+         "v": "from == std::ssize(values)"
+        },
+        {
+         "t": "text",
+         "v": " and the progress is "
+        },
+        {
+         "t": "code",
+         "v": "from + 1"
+        },
+        {
+         "t": "text",
+         "v": ". A missing base case recurses until the stack runs out. So does a base case that the steps walk past, which is why "
+        },
+        {
+         "t": "code",
+         "v": "sum_to"
+        },
+        {
+         "t": "text",
+         "v": " tests "
+        },
+        {
+         "t": "code",
+         "v": "n <= 0"
+        },
+        {
+         "t": "text",
+         "v": " rather than "
+        },
+        {
+         "t": "code",
+         "v": "n == 0"
+        },
+        {
+         "t": "text",
+         "v": ": write it with "
+        },
+        {
+         "t": "code",
+         "v": "n == 0"
+        },
+        {
+         "t": "text",
+         "v": ", call it with −1, and it goes to −2, then −3, and on downwards, because "
+        },
+        {
+         "t": "code",
+         "v": "n == 0"
+        },
+        {
+         "t": "text",
+         "v": " names one value and "
+        },
+        {
+         "t": "code",
+         "v": "n - 1"
+        },
+        {
+         "t": "text",
+         "v": " never lands on it from below. Write the base case as the end of a range rather than as a point whenever the argument can start anywhere. "
+        },
+        {
+         "t": "code",
+         "v": "collect"
+        },
+        {
+         "t": "text",
+         "v": " can stay a point, because "
+        },
+        {
+         "t": "code",
+         "v": "from"
+        },
+        {
+         "t": "text",
+         "v": " always starts at 0 and climbs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The depth follows from the shape, and these four cover most interview problems:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Shape"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Depth"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Calls"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Measured above"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "one call per level, one step down"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "n + 1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "n + 1"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "sum_to(20)"
+          },
+          {
+           "t": "text",
+           "v": ": 21 deep, 21 calls"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "one call per level, halving"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "log₂ n + 1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "log₂ n + 1"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "halvings(2²⁰)"
+          },
+          {
+           "t": "text",
+           "v": ": 21 deep, 21 calls"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "two calls per level, n levels"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "n"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "up to 2ⁿ − 1"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "fib(20)"
+          },
+          {
+           "t": "text",
+           "v": ": 20 deep, 21,891 calls"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "one decision per element"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "n + 1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2ⁿ⁺¹ − 1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "subsets of 20: 21 deep, 2,097,151 calls"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Depth turns into bytes through the frame size. On the WSL machine these numbers come from, "
+        },
+        {
+         "t": "code",
+         "v": "ulimit -s"
+        },
+        {
+         "t": "text",
+         "v": " prints 8192, so the main thread gets 8 MB. A recursion that sums a "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const std::int64_t>"
+        },
+        {
+         "t": "text",
+         "v": " one element per call, built at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " with no sanitizers, returned for 130,000 elements and crashed at 140,000, which puts its frame at about 64 bytes. Built the way this page's examples are built, at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " with both sanitizers, the same function returned at 42,000 and crashed at 44,000, so its frames cost roughly three times as much. The sanitizer's shadow memory is not what does that: the shadow holds one byte for every eight bytes of memory and lives in a mapping of its own, never a copy of the frame. The stack grows because AddressSanitizer aligns each stack object up and puts a redzone around it, so the function reserves more room on entry. In the same "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " build, GCC reserved 40 bytes of stack for that function without the sanitizers and 136 bytes with them. Those reservations are the locals alone, and the rest of the frame is what closes the gap to the numbers above. The plain prologue is "
+        },
+        {
+         "t": "code",
+         "v": "pushq %rbp"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "pushq %rbx"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "subq $40, %rsp"
+        },
+        {
+         "t": "text",
+         "v": ", so two saved registers and the call's return address bring the frame to 64 bytes, and 8 MB over 130,000 levels is 64.5. The sanitized prologue pushes six registers before "
+        },
+        {
+         "t": "code",
+         "v": "subq $136, %rsp"
+        },
+        {
+         "t": "text",
+         "v": ", which makes 192, and 8 MB over 44,000 levels is 190.6. Neither number is a property of the algorithm. Change the compiler, the optimisation level or the locals in the function, and the limit moves. What you can rely on is the shape: a depth that grows with the input size will eventually hit the stack, and a depth of log n never will."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Tail recursion"
+        },
+        {
+         "t": "text",
+         "v": " is the usual answer to that, and C++ does not promise it. A call is in tail position when its result is returned without any further work, as in "
+        },
+        {
+         "t": "code",
+         "v": "return sum_to(n - 1, acc + n);"
+        },
+        {
+         "t": "text",
+         "v": ". A compiler may then reuse the current frame instead of stacking a new one, which turns the recursion into a loop. The standard requires nothing of the sort, so it is a question about your compiler and your flags, which you can answer in four commands. "
+        },
+        {
+         "t": "code",
+         "v": "tail.cpp"
+        },
+        {
+         "t": "text",
+         "v": " holds that two-argument "
+        },
+        {
+         "t": "code",
+         "v": "sum_to"
+        },
+        {
+         "t": "text",
+         "v": ", which carries the running total instead of adding on the way back, and nothing else; "
+        },
+        {
+         "t": "code",
+         "v": "deep.cpp"
+        },
+        {
+         "t": "text",
+         "v": " adds a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that calls "
+        },
+        {
+         "t": "code",
+         "v": "sum_to(100'000'000, 0)"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -O1 -S tail.cpp -o - | grep -c 'call.*sum_to'  # 1: the frame is stacked\ng++ -std=c++20 -O2 -S tail.cpp -o - | grep -c 'call.*sum_to'  # 0: the call became a jump\ng++ -std=c++20 -O1 deep.cpp -o deep && ./deep                 # Segmentation fault (core dumped)\ng++ -std=c++20 -O2 deep.cpp -o deep && ./deep                 # 5000000050000000"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "At "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " GCC 13.3 ran 100 million levels of that recursion in constant stack. At "
+        },
+        {
+         "t": "code",
+         "v": "-O1"
+        },
+        {
+         "t": "text",
+         "v": " the same source still stacked a frame per level: it returned at 500,000 and crashed at 700,000. The flag that makes the difference is "
+        },
+        {
+         "t": "code",
+         "v": "-foptimize-sibling-calls"
+        },
+        {
+         "t": "text",
+         "v": ", which "
+        },
+        {
+         "t": "a",
+         "v": "GCC's optimisation options",
+         "href": "https://gcc.gnu.org/onlinedocs/gcc-13.3.0/gcc/Optimize-Options.html"
+        },
+        {
+         "t": "text",
+         "v": " describe as optimising sibling and tail recursive calls, enabled at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "-O3"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "-Os"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "g++ -Q -O1 --help=optimizers"
+        },
+        {
+         "t": "text",
+         "v": " reports it disabled and "
+        },
+        {
+         "t": "code",
+         "v": "g++ -Q -O2 --help=optimizers"
+        },
+        {
+         "t": "text",
+         "v": " reports it enabled, and adding "
+        },
+        {
+         "t": "code",
+         "v": "-O1 -foptimize-sibling-calls"
+        },
+        {
+         "t": "text",
+         "v": " by hand removed the call from the assembly and ran the 100-million-level version. So: a debug build of a tail-recursive function has the depth of the input, an optimised build may not, and a function whose depth follows the input size should be written as a loop rather than left to the optimiser. Say that in an interview and you have answered the question behind the question."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That leaves the pattern for search problems. "
+        },
+        {
+         "t": "i",
+         "v": "Backtracking"
+        },
+        {
+         "t": "text",
+         "v": " walks a tree of partial answers, and each call owns one decision. It writes the decision into a shared state object, recurses to decide the rest, then undoes the decision before it tries the next value, which is the "
+        },
+        {
+         "t": "i",
+         "v": "choose, explore, un-choose"
+        },
+        {
+         "t": "text",
+         "v": " rhythm:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "for (const Move& move : moves_from(state)) {\n  apply(state, move);        // choose\n  search(state, out);        // explore everything that follows\n  undo(state, move);         // un-choose: state is exactly as it was\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The invariant is one sentence, and it is worth saying out loud in an interview: when "
+        },
+        {
+         "t": "code",
+         "v": "search"
+        },
+        {
+         "t": "text",
+         "v": " returns, the state is byte for byte what it was when "
+        },
+        {
+         "t": "code",
+         "v": "search"
+        },
+        {
+         "t": "text",
+         "v": " was called. That is what makes one shared "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " legal for the whole search, instead of a fresh copy per node. Copying the partial answer into every call is correct too, and costs O(n) per node in time and memory, which turns an O(2ⁿ) walk into O(n·2ⁿ) of copying. The other half of backtracking is "
+        },
+        {
+         "t": "i",
+         "v": "pruning"
+        },
+        {
+         "t": "text",
+         "v": ": a test that rejects a partial answer before its whole subtree is built. The worked example measures what one cut is worth."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A test rig has a list of checks, each with a duration, and a fixed slot to fill. Which sets of checks add up to exactly the slot? This is subset sum with the answers reported rather than counted, and the program prints the trace of every call so the choose and un-choose steps are visible:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\nstruct Check {\n  std::string name;\n  std::int64_t seconds = 0;\n};\n\nstruct Search {\n  explicit Search(std::span<const Check> all) : checks(all) {}\n\n  std::span<const Check> checks;\n  std::vector<std::string_view> taken;  // the checks chosen on the path to here\n  std::vector<std::string> found;       // one entry per set that fills the budget exactly\n  std::int64_t calls = 0;\n};\n\n[[nodiscard]] std::string path_of(std::span<const std::string_view> names) {\n  std::string out;\n  for (const std::string_view name : names) out += std::format(\"{}{}\", out.empty() ? \"\" : \"+\", name);\n  return out.empty() ? \"(none)\" : out;\n}\n\n// Finds every set of checks[from, end) whose durations add up to exactly `left` seconds.\n// prune(left) says whether a branch can be dropped; report(from, taken, left, note) logs one call.\n// The reporter gets the chosen names rather than a built path: the silent run below makes 131,071\n// calls, and building a string for each would cost more than the search it measures.\ntemplate <typename Prune, typename Report>\nvoid explore(Search& search, std::ptrdiff_t from, std::int64_t left, Prune prune, Report report) {\n  ++search.calls;\n  if (prune(left)) {\n    report(from, search.taken, left, \"over budget\");\n    return;\n  }\n  if (from == std::ssize(search.checks)) {\n    const bool exact = left == 0;\n    if (exact) search.found.push_back(path_of(search.taken));\n    report(from, search.taken, left, exact ? \"fills the budget\" : \"short\");\n    return;\n  }\n  report(from, search.taken, left, \"\");\n  const Check& check = search.checks[from];\n  search.taken.push_back(check.name);                              // choose\n  explore(search, from + 1, left - check.seconds, prune, report);  // explore\n  search.taken.pop_back();                                         // un-choose\n  explore(search, from + 1, left, prune, report);                  // the branch that skips it\n}\n\nint main() {\n  const auto over_budget = [](std::int64_t left) { return left < 0; };\n  const std::vector<Check> three{{\"lidar\", 3}, {\"imu\", 2}, {\"odom\", 2}};\n  Search traced{three};\n  explore(traced, 0, 5, over_budget,\n          [](std::ptrdiff_t from, std::span<const std::string_view> taken, std::int64_t left,\n             std::string_view note) {\n            const std::string tail = note.empty() ? \"\" : std::format(\"  {}\", note);\n            std::cout << std::format(\"{:{}}{:<16}{:>3} s left{}\\n\", \"\", 2 * from, path_of(taken), left, tail);\n          });\n  std::cout << std::format(\"{} calls, {} sets fill 5 s exactly\\n\", traced.calls, traced.found.size());\n\n  std::vector<Check> sixteen;\n  for (int i = 0; i < 16; ++i) sixteen.push_back({.name = std::format(\"c{}\", i), .seconds = 3 + i});\n  const auto never = [](std::int64_t) { return false; };\n  const auto silent = [](std::ptrdiff_t, std::span<const std::string_view>, std::int64_t, std::string_view) {};\n  Search pruned{sixteen};\n  explore(pruned, 0, 20, over_budget, silent);\n  Search everything{sixteen};\n  explore(everything, 0, 20, never, silent);\n  std::cout << std::format(\"16 checks, budget 20 s: {} sets, {} calls with the cut, {} without\\n\",\n                           pruned.found.size(), pruned.calls, everything.calls);\n}"
+      },
+      {
+       "t": "output",
+       "text": "(none)            5 s left\n  lidar             2 s left\n    lidar+imu         0 s left\n      lidar+imu+odom   -2 s left  over budget\n      lidar+imu         0 s left  fills the budget\n    lidar             2 s left\n      lidar+odom        0 s left  fills the budget\n      lidar             2 s left  short\n  (none)            5 s left\n    imu               3 s left\n      imu+odom          1 s left  short\n      imu               3 s left  short\n    (none)            5 s left\n      odom              3 s left  short\n      (none)            5 s left  short\n15 calls, 2 sets fill 5 s exactly\n16 checks, budget 20 s: 19 sets, 1959 calls with the cut, 131071 without"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the indentation as the depth: each level is one more check decided, and a line's text is the path that reached it. Line 3 stands at "
+        },
+        {
+         "t": "code",
+         "v": "lidar+imu"
+        },
+        {
+         "t": "text",
+         "v": " with 0 seconds left. Line 4 takes "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " as well and goes 2 seconds over. Line 5 is the same node as line 3, reached after the un-choose, and with all three checks decided it reports a hit. Then look at lines 6 and 9: the path is back to "
+        },
+        {
+         "t": "code",
+         "v": "lidar"
+        },
+        {
+         "t": "text",
+         "v": " and then to "
+        },
+        {
+         "t": "code",
+         "v": "(none)"
+        },
+        {
+         "t": "text",
+         "v": ", exactly the states their parents were in. That is the invariant, printed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "explore"
+        },
+        {
+         "t": "text",
+         "v": " keeps its state in one "
+        },
+        {
+         "t": "code",
+         "v": "Search"
+        },
+        {
+         "t": "text",
+         "v": " object rather than in six parameters, and the two things that vary per call, the position "
+        },
+        {
+         "t": "code",
+         "v": "from"
+        },
+        {
+         "t": "text",
+         "v": " and the budget "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": ", stay parameters, because they have to be restored on the way out and a parameter restores itself. "
+        },
+        {
+         "t": "code",
+         "v": "prune"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "report"
+        },
+        {
+         "t": "text",
+         "v": " come in as callables rather than as flags, which keeps Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.4",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+        },
+        {
+         "t": "text",
+         "v": " happy and lets the same function serve the traced run and the two counting runs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The cut is one line, "
+        },
+        {
+         "t": "code",
+         "v": "if (prune(left)) return;"
+        },
+        {
+         "t": "text",
+         "v": ", and the last row of the output is what it buys. With 16 checks the full tree has 2¹⁷ − 1 = 131,071 nodes, and every one of them gets visited when nothing is cut. Rejecting a path as soon as it passes the budget brought that down to 1,959 calls, 67 times fewer, for the same 19 answers. Pruning does not change the worst case, which is still exponential; it changes what the search does on the inputs you actually have. When you design a backtracking solution, name the cut before you write the loop, because the cut is the part an interviewer is waiting for."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One check per call is an ordering choice that matters. This program decides the checks left to right, so each set is found once. The permutation problems in the exercises decide "
+        },
+        {
+         "t": "i",
+         "v": "positions"
+        },
+        {
+         "t": "text",
+         "v": " instead, and try every unused value at each position, so a value can appear at any position and the tree is n! leaves rather than 2ⁿ."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Permutations; valid bracket generation",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "permutations(values)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns every ordering of a "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const int>"
+        },
+        {
+         "t": "text",
+         "v": " of distinct values as a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::vector<int>>"
+        },
+        {
+         "t": "text",
+         "v": ", built by backtracking. When the input is sorted, the output must be in lexicographic order, so "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 3}"
+        },
+        {
+         "t": "text",
+         "v": " gives 123, 132, 213, 231, 312, 321 in that order."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 3}"
+        },
+        {
+         "t": "text",
+         "v": " by printing all six, the single value "
+        },
+        {
+         "t": "code",
+         "v": "{5}"
+        },
+        {
+         "t": "text",
+         "v": ", and the empty input, which has one permutation: the empty one. Then check 8 distinct values against the standard library: "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::next_permutation"
+        },
+        {
+         "t": "text",
+         "v": " walks a sorted range through every ordering, so collecting its results has to give the same vector, in the same order. Say how many calls the recursion makes, what the stack depth is, and how much space it uses beyond the result."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The position being filled is the depth, and the choice at each position is any value not already used. A "
+        },
+        {
+         "t": "code",
+         "v": "used"
+        },
+        {
+         "t": "text",
+         "v": " flag per value is what keeps the branches apart, and scanning the values left to right at every position is what makes the output lexicographic for sorted input:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Builder {\n  std::span<const int> values;\n  std::vector<char> used;   // used[i] is 1 while values[i] sits on the current path\n  std::vector<int> chosen;  // the path built so far\n  std::vector<std::vector<int>> out;\n};\n\nvoid extend(Builder& b) {\n  if (std::ssize(b.chosen) == std::ssize(b.values)) {  // every position is filled\n    b.out.push_back(b.chosen);\n    return;\n  }\n  for (std::ptrdiff_t i = 0; i < std::ssize(b.values); ++i) {\n    if (b.used[static_cast<std::size_t>(i)] != 0) continue;\n    b.used[static_cast<std::size_t>(i)] = 1;  // choose values[i] for this position\n    b.chosen.push_back(b.values[i]);\n    extend(b);                                // explore\n    b.chosen.pop_back();                      // un-choose\n    b.used[static_cast<std::size_t>(i)] = 0;\n  }\n}\n\n[[nodiscard]] std::vector<std::vector<int>> permutations(std::span<const int> values) {\n  Builder b{.values = values, .used = std::vector<char>(values.size(), 0), .chosen = {}, .out = {}};\n  b.chosen.reserve(values.size());\n  extend(b);\n  return b.out;\n}\n\n[[nodiscard]] std::string show(std::span<const int> row) {\n  std::string out;\n  for (const int v : row) out += std::format(\"{}\", v);\n  return out;\n}\n\nint main() {\n  const std::vector<int> three{1, 2, 3};\n  std::string line;\n  for (const std::vector<int>& p : permutations(three)) line += std::format(\"{}{}\", line.empty() ? \"\" : \" \", show(p));\n  std::cout << line << '\\n';\n  std::cout << std::format(\"one value: {}, no values: {} (the empty permutation)\\n\",\n                           permutations(std::vector<int>{5}).size(), permutations({}).size());\n\n  std::vector<int> eight(8);\n  std::iota(eight.begin(), eight.end(), 1);\n  const std::vector<std::vector<int>> all = permutations(eight);\n  std::vector<std::vector<int>> expected;\n  std::vector<int> rolling = eight;\n  do {\n    expected.push_back(rolling);\n  } while (std::ranges::next_permutation(rolling).found);\n  std::cout << std::format(\"8 values: {} permutations, same as next_permutation: {}\\n\", all.size(), all == expected);\n}"
+      },
+      {
+       "t": "output",
+       "text": "123 132 213 231 312 321\none value: 1, no values: 1 (the empty permutation)\n8 values: 40320 permutations, same as next_permutation: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The tree has n! leaves and the internal nodes add less than a factor of e, so the number of calls is Θ(n!). Each leaf copies n values into "
+        },
+        {
+         "t": "code",
+         "v": "out"
+        },
+        {
+         "t": "text",
+         "v": ", which makes the whole thing O(n·n!) time: 40,320 permutations for n = 8, and 3.6 million for n = 10, which is where this stops being a reasonable thing to build. The depth is n + 1 frames, and beyond the result the function holds "
+        },
+        {
+         "t": "code",
+         "v": "used"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "chosen"
+        },
+        {
+         "t": "text",
+         "v": ", both n long, so the extra space is O(n)."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two details are worth defending out loud. The scan starts at "
+        },
+        {
+         "t": "code",
+         "v": "i = 0"
+        },
+        {
+         "t": "text",
+         "v": " at every position rather than at the last index used, because a value skipped at position 0 must still be available at position 3. And "
+        },
+        {
+         "t": "code",
+         "v": "used"
+        },
+        {
+         "t": "text",
+         "v": " is a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<char>"
+        },
+        {
+         "t": "text",
+         "v": " rather than "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<bool>"
+        },
+        {
+         "t": "text",
+         "v": ", whose "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": " returns a proxy object instead of a reference ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/container/vector_bool"
+        },
+        {
+         "t": "text",
+         "v": "); for a flag array that is read and written this often, the plain bytes are the simpler thing to reason about."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The swap-based version is the other common answer: recurse on a position "
+        },
+        {
+         "t": "code",
+         "v": "k"
+        },
+        {
+         "t": "text",
+         "v": ", and for each "
+        },
+        {
+         "t": "code",
+         "v": "i"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "k"
+        },
+        {
+         "t": "text",
+         "v": " to n − 1 swap "
+        },
+        {
+         "t": "code",
+         "v": "v[k]"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "v[i]"
+        },
+        {
+         "t": "text",
+         "v": ", recurse on "
+        },
+        {
+         "t": "code",
+         "v": "k + 1"
+        },
+        {
+         "t": "text",
+         "v": ", then swap back. It uses no "
+        },
+        {
+         "t": "code",
+         "v": "used"
+        },
+        {
+         "t": "text",
+         "v": " array and no "
+        },
+        {
+         "t": "code",
+         "v": "chosen"
+        },
+        {
+         "t": "text",
+         "v": ", because the prefix of "
+        },
+        {
+         "t": "code",
+         "v": "v"
+        },
+        {
+         "t": "text",
+         "v": " "
+        },
+        {
+         "t": "i",
+         "v": "is"
+        },
+        {
+         "t": "text",
+         "v": " the partial answer, and it is the version to reach for when the values are expensive to copy. It does not produce lexicographic order, though, because swapping disturbs the tail. If the interviewer asks for order, either sort the output afterwards or keep the "
+        },
+        {
+         "t": "code",
+         "v": "used"
+        },
+        {
+         "t": "text",
+         "v": " form."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In production code neither version is what you would write. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::next_permutation"
+        },
+        {
+         "t": "text",
+         "v": " turns a range into the next ordering in place and reports whether one existed, so the loop in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " above produces every permutation with no recursion and no extra memory at all ("
+        },
+        {
+         "t": "a",
+         "v": "ranges::next_permutation",
+         "href": "https://en.cppreference.com/cpp/algorithm/ranges/next_permutation"
+        },
+        {
+         "t": "text",
+         "v": "). Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.1",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+        },
+        {
+         "t": "text",
+         "v": " asks for exactly that: the library first, hand-written loops when the loop is the point. Here the loop is the point, and the library call is the test oracle."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "generate(pairs)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns every string of "
+        },
+        {
+         "t": "code",
+         "v": "pairs"
+        },
+        {
+         "t": "text",
+         "v": " opening and "
+        },
+        {
+         "t": "code",
+         "v": "pairs"
+        },
+        {
+         "t": "text",
+         "v": " closing brackets that is balanced, meaning every "
+        },
+        {
+         "t": "code",
+         "v": ")"
+        },
+        {
+         "t": "text",
+         "v": " closes a "
+        },
+        {
+         "t": "code",
+         "v": "("
+        },
+        {
+         "t": "text",
+         "v": " that is still open and nothing is left open at the end. For "
+        },
+        {
+         "t": "code",
+         "v": "pairs = 3"
+        },
+        {
+         "t": "text",
+         "v": " there are five: "
+        },
+        {
+         "t": "code",
+         "v": "((()))"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "(()())"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "(())()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "()(())"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "()()()"
+        },
+        {
+         "t": "text",
+         "v": ". Return them in lexicographic order with "
+        },
+        {
+         "t": "code",
+         "v": "("
+        },
+        {
+         "t": "text",
+         "v": " before "
+        },
+        {
+         "t": "code",
+         "v": ")"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The point of the exercise is to prune inside the recursion rather than to generate all 2^(2·pairs) strings and filter. Build the string one character at a time and reject a character before you append it, not afterwards. Test "
+        },
+        {
+         "t": "code",
+         "v": "pairs"
+        },
+        {
+         "t": "text",
+         "v": " from 0 to 4, print the results for each, and check the count for "
+        },
+        {
+         "t": "code",
+         "v": "pairs = 8"
+        },
+        {
+         "t": "text",
+         "v": " against the number of calls your recursion makes. Say what the base case is, what makes a "
+        },
+        {
+         "t": "code",
+         "v": "("
+        },
+        {
+         "t": "text",
+         "v": " legal, what makes a "
+        },
+        {
+         "t": "code",
+         "v": ")"
+        },
+        {
+         "t": "text",
+         "v": " legal, and what the stack depth is."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Carry two counters: how many brackets may still be opened, and how many are open and waiting to be closed. A "
+        },
+        {
+         "t": "code",
+         "v": "("
+        },
+        {
+         "t": "text",
+         "v": " is legal while the first is above zero, and a "
+        },
+        {
+         "t": "code",
+         "v": ")"
+        },
+        {
+         "t": "text",
+         "v": " is legal while the second is above zero. Those two tests are the whole pruning, and they make every leaf a valid string, so nothing is generated and thrown away:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string>\n#include <vector>\n\nstruct Gen {\n  std::string current;\n  std::vector<std::string> out;\n  std::int64_t calls = 0;\n};\n\n// open: brackets that may still be opened. unclosed: brackets opened and waiting for their ')'.\nvoid build(Gen& g, std::int64_t open, std::int64_t unclosed) {\n  ++g.calls;\n  if (open == 0 && unclosed == 0) {  // nothing left to place and nothing left open\n    g.out.push_back(g.current);\n    return;\n  }\n  if (open > 0) {\n    g.current.push_back('(');  // choose\n    build(g, open - 1, unclosed + 1);\n    g.current.pop_back();      // un-choose\n  }\n  if (unclosed > 0) {\n    g.current.push_back(')');\n    build(g, open, unclosed - 1);\n    g.current.pop_back();\n  }\n}\n\n[[nodiscard]] Gen generate(std::int64_t pairs) {\n  Gen g;\n  g.current.reserve(static_cast<std::size_t>(2 * pairs));\n  build(g, pairs, 0);\n  return g;\n}\n\nint main() {\n  for (const std::int64_t n : {0, 1, 2, 3, 4}) {\n    const Gen g = generate(n);\n    std::string joined;\n    for (const std::string& s : g.out)\n      joined += std::format(\"{}{}\", joined.empty() ? \"\" : \" \", s.empty() ? \"\\\"\\\"\" : s);\n    std::cout << std::format(\"n = {}: {:>2} strings  {}\\n\", n, g.out.size(), joined);\n  }\n  const Gen eight = generate(8);\n  std::cout << std::format(\"n = 8: {} strings from {} calls\\n\", eight.out.size(), eight.calls);\n}"
+      },
+      {
+       "t": "output",
+       "text": "n = 0:  1 strings  \"\"\nn = 1:  1 strings  ()\nn = 2:  2 strings  (()) ()()\nn = 3:  5 strings  ((())) (()()) (())() ()(()) ()()()\nn = 4: 14 strings  (((()))) ((()())) ((())()) ((()))() (()(())) (()()()) (()())() (())(()) (())()() ()((())) ()(()()) ()(())() ()()(()) ()()()()\nn = 8: 1430 strings from 6917 calls"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The counts 1, 1, 2, 5, 14 and 1430 are the Catalan numbers, and the n-th one is about 4ⁿ/(n^1.5·√π), so this grows fast but far slower than the 2^(2n) = 65,536 strings of length 16 that a generate-and-filter solution would build for n = 8. The measured ratio is the argument for pruning inside the recursion: 6,917 calls produced 1,430 answers, so fewer than five calls per answer, and not one of them ended in a rejected string. Lexicographic order comes free from trying "
+        },
+        {
+         "t": "code",
+         "v": "("
+        },
+        {
+         "t": "text",
+         "v": " before "
+        },
+        {
+         "t": "code",
+         "v": ")"
+        },
+        {
+         "t": "text",
+         "v": ", because "
+        },
+        {
+         "t": "code",
+         "v": "("
+        },
+        {
+         "t": "text",
+         "v": " sorts before "
+        },
+        {
+         "t": "code",
+         "v": ")"
+        },
+        {
+         "t": "text",
+         "v": " in ASCII and the recursion explores the first branch completely before the second."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The base case is \"nothing left to open and nothing left unclosed\". Testing only "
+        },
+        {
+         "t": "code",
+         "v": "open == 0"
+        },
+        {
+         "t": "text",
+         "v": " would emit "
+        },
+        {
+         "t": "code",
+         "v": "((( "
+        },
+        {
+         "t": "text",
+         "v": " prefixes with brackets still open, and testing "
+        },
+        {
+         "t": "code",
+         "v": "current.size() == 2 * pairs"
+        },
+        {
+         "t": "text",
+         "v": " works too but says less about why. The depth is 2·pairs + 1 frames, one per character placed, so it stays small however many strings come out: this is the shape from the theory table whose call count explodes while its depth barely moves."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "current"
+        },
+        {
+         "t": "text",
+         "v": " is one shared "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " that grows and shrinks, which is why "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "generate"
+        },
+        {
+         "t": "text",
+         "v": " is the only allocation it makes for the buffer. Passing "
+        },
+        {
+         "t": "code",
+         "v": "std::string current"
+        },
+        {
+         "t": "text",
+         "v": " by value into each call would be correct and allocate at every node. The same trade-off runs through every backtracking problem: one mutable state with an un-choose step, or a fresh copy per node."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Duplicates and stack depth",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Feed the permutation code from Exercise 1 a set with a repeated value, and it still returns n! rows. The rows are no longer distinct:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <set>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Builder {\n  std::span<const int> values;\n  std::vector<char> used;\n  std::vector<int> chosen;\n  std::vector<std::vector<int>> out;\n};\n\nvoid extend_all(Builder& b) {\n  if (std::ssize(b.chosen) == std::ssize(b.values)) {\n    b.out.push_back(b.chosen);\n    return;\n  }\n  for (std::ptrdiff_t i = 0; i < std::ssize(b.values); ++i) {\n    if (b.used[static_cast<std::size_t>(i)] != 0) continue;\n    b.used[static_cast<std::size_t>(i)] = 1;\n    b.chosen.push_back(b.values[i]);\n    extend_all(b);\n    b.chosen.pop_back();\n    b.used[static_cast<std::size_t>(i)] = 0;\n  }\n}\n\nvoid extend_distinct(Builder& b) {\n  if (std::ssize(b.chosen) == std::ssize(b.values)) {\n    b.out.push_back(b.chosen);\n    return;\n  }\n  for (std::ptrdiff_t i = 0; i < std::ssize(b.values); ++i) {\n    if (b.used[static_cast<std::size_t>(i)] != 0) continue;\n    // Among equal values, only the leftmost unused one may start a branch.\n    if (i > 0 && b.values[i] == b.values[i - 1] && b.used[static_cast<std::size_t>(i - 1)] == 0) continue;\n    b.used[static_cast<std::size_t>(i)] = 1;\n    b.chosen.push_back(b.values[i]);\n    extend_distinct(b);\n    b.chosen.pop_back();\n    b.used[static_cast<std::size_t>(i)] = 0;\n  }\n}\n\ntemplate <typename Extend>\n[[nodiscard]] std::vector<std::vector<int>> permutations(std::vector<int> values, Extend extend) {\n  std::ranges::sort(values);  // equal values end up next to each other\n  Builder b{.values = values, .used = std::vector<char>(values.size(), 0), .chosen = {}, .out = {}};\n  extend(b);\n  return b.out;\n}\n\n[[nodiscard]] std::string show(std::span<const std::vector<int>> rows) {\n  std::string out;\n  for (const std::vector<int>& row : rows) {\n    out += out.empty() ? \"\" : \" \";\n    for (const int v : row) out += std::format(\"{}\", v);\n  }\n  return out;\n}\n\nint main() {\n  for (const std::vector<int>& input : {std::vector{1, 1, 2}, std::vector{1, 1, 2, 2}}) {\n    const std::vector<std::vector<int>> all = permutations(input, extend_all);\n    const std::vector<std::vector<int>> distinct = permutations(input, extend_distinct);\n    const std::set<std::vector<int>> unique(all.begin(), all.end());\n    std::cout << std::format(\"{} values: {} rows, {} distinct, the skip rule gives {}\\n\", input.size(), all.size(),\n                             unique.size(), distinct.size());\n  }\n  std::cout << show(permutations({1, 1, 2}, extend_all)) << '\\n';\n  std::cout << show(permutations({1, 1, 2}, extend_distinct)) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "3 values: 6 rows, 3 distinct, the skip rule gives 3\n4 values: 24 rows, 6 distinct, the skip rule gives 6\n112 121 112 121 211 211\n112 121 211"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two 1s are different "
+        },
+        {
+         "t": "i",
+         "v": "positions"
+        },
+        {
+         "t": "text",
+         "v": " and the same "
+        },
+        {
+         "t": "i",
+         "v": "value"
+        },
+        {
+         "t": "text",
+         "v": ", so swapping them produces the same row twice. Collecting the rows in a "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " afterwards gives the right answer and pays for every duplicate first; with ten values, six of them equal, that is 3.6 million rows for 5,040 distinct ones. The fix is the one extra line in "
+        },
+        {
+         "t": "code",
+         "v": "extend_distinct"
+        },
+        {
+         "t": "text",
+         "v": ": sort the input so equal values are neighbours, then at each position accept a value only if the equal value to its left is already used. That fixes an order among equal values, so the branch that would place the second 1 before the first never starts. It removes the duplicates instead of filtering them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The other failure is the one that reaches production. This function does nothing a reviewer would stop at:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-overflow",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <vector>\n\n// The length of a logged path, one frame per segment.\n[[nodiscard]] std::int64_t total_mm(std::span<const std::int64_t> segments, std::ptrdiff_t from) {\n  if (from == std::ssize(segments)) return 0;\n  return segments[from] + total_mm(segments, from + 1);\n}\n\nint main() {\n  const std::vector<std::int64_t> segments(1'000'000, 3);\n  std::cout << std::format(\"path length {} mm\\n\", total_mm(segments, 0));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports a stack-overflow with a backtrace of a little under 250 identical "
+        },
+        {
+         "t": "code",
+         "v": "total_mm"
+        },
+        {
+         "t": "text",
+         "v": " frames, between 244 and 248 over repeated runs. It keeps at most 256 entries and the unwinder gives up a few short of that, so the exact count drifts with the stack layout. Either way, what you see is the top of the pile, and the million frames below it are never printed. The base case and the progress are both correct, so no test on a short path fails; the depth is the length of the input, and this input is a million long. The numbers from the theory section apply: the same function returned at 42,000 segments under the sanitizers and at 130,000 without them. A robot that logs its path for an hour and then asks for its length crashes at a line that looks like arithmetic. Stack overflow is not something the language detects: built without the sanitizers, the same program dies with the shell printing "
+        },
+        {
+         "t": "code",
+         "v": "Segmentation fault (core dumped)"
+        },
+        {
+         "t": "text",
+         "v": " and nothing else, while "
+        },
+        {
+         "t": "a",
+         "v": "AddressSanitizer",
+         "href": "https://clang.llvm.org/docs/AddressSanitizer.html"
+        },
+        {
+         "t": "text",
+         "v": " turns the same fault into a named report with the repeating frames underneath it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both repairs are the same idea: move the pending work off the stack. A recursion with one call per level becomes a loop, and "
+        },
+        {
+         "t": "code",
+         "v": "total_mm"
+        },
+        {
+         "t": "text",
+         "v": " above is "
+        },
+        {
+         "t": "code",
+         "v": "std::accumulate"
+        },
+        {
+         "t": "text",
+         "v": " over the span. A recursion that branches becomes a loop with an explicit stack, which lives on the heap and can hold millions of entries:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Check {\n  std::string name;\n  std::int64_t seconds = 0;\n};\n\nstruct Frame {\n  std::ptrdiff_t from = 0;              // the next check to decide\n  std::int64_t left = 0;                // seconds still to fill\n  std::ptrdiff_t path_size = 0;         // how long the path was at the parent\n  std::optional<std::ptrdiff_t> taken;  // the check appended on the way into this node, if any\n};\n\nstruct Walk {\n  std::vector<std::string> found;\n  std::ptrdiff_t deepest = 0;  // the most frames the stack ever held\n};\n\n[[nodiscard]] Walk fill_budget(std::span<const Check> checks, std::int64_t budget) {\n  Walk walk;\n  std::vector<Frame> stack{Frame{.from = 0, .left = budget, .path_size = 0, .taken = std::nullopt}};\n  std::vector<std::ptrdiff_t> path;  // indices chosen on the way to the current node\n  while (!stack.empty()) {\n    const Frame frame = stack.back();\n    stack.pop_back();\n    path.resize(static_cast<std::size_t>(frame.path_size));  // back out of the branch just finished\n    if (frame.taken) path.push_back(*frame.taken);           // and into this one\n    if (frame.left < 0) continue;\n    if (frame.from == std::ssize(checks)) {\n      if (frame.left == 0) {\n        std::string names;\n        for (const std::ptrdiff_t i : path) names += std::format(\"{}{}\", names.empty() ? \"\" : \"+\", checks[i].name);\n        walk.found.push_back(names);\n      }\n      continue;\n    }\n    const std::ptrdiff_t size = std::ssize(path);\n    stack.push_back({.from = frame.from + 1, .left = frame.left, .path_size = size, .taken = std::nullopt});\n    stack.push_back({.from = frame.from + 1,\n                     .left = frame.left - checks[frame.from].seconds,\n                     .path_size = size,\n                     .taken = frame.from});\n    walk.deepest = std::max(walk.deepest, std::ssize(stack));\n  }\n  return walk;\n}\n\nint main() {\n  const std::vector<std::int64_t> segments(1'000'000, 3);\n  std::cout << std::format(\"path length {} mm, no recursion\\n\",\n                           std::accumulate(segments.begin(), segments.end(), std::int64_t{0}));\n\n  std::vector<Check> sixteen;\n  for (int i = 0; i < 16; ++i) sixteen.push_back({.name = std::format(\"c{}\", i), .seconds = 3 + i});\n  const Walk walk = fill_budget(sixteen, 20);\n  std::cout << std::format(\"{} sets fill 20 s, deepest stack {} frames, first set {}\\n\", walk.found.size(),\n                           walk.deepest, walk.found.front());\n}"
+      },
+      {
+       "t": "output",
+       "text": "path length 3000000 mm, no recursion\n19 sets fill 20 s, deepest stack 6 frames, first set c0+c1+c2+c5"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "fill_budget"
+        },
+        {
+         "t": "text",
+         "v": " finds the same 19 sets as the recursion in the worked example, in the same order, with no call frames at all. What was implicit in the recursion is now a field: "
+        },
+        {
+         "t": "code",
+         "v": "from"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " were parameters, and "
+        },
+        {
+         "t": "code",
+         "v": "path_size"
+        },
+        {
+         "t": "text",
+         "v": " is the un-choose, because truncating "
+        },
+        {
+         "t": "code",
+         "v": "path"
+        },
+        {
+         "t": "text",
+         "v": " to the size it had at the parent restores the state that the return from a recursive call used to restore. Pushing the skip branch before the take branch keeps the order, as a stack hands back the last thing pushed. The "
+        },
+        {
+         "t": "code",
+         "v": "deepest"
+        },
+        {
+         "t": "text",
+         "v": " counter is what the rewrite buys: the pending work sits in a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " on the heap, which never held more than 6 frames here, because the over-budget cut removed branches before they could grow. Without the cut the same walk would hold 17. Either way the ceiling is the allocator rather than the 8 MB stack, so the depth stops being a crash waiting for a longer input."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a recursion needs besides a recursive call, and give the two numbers that describe one: the call count and the depth, with "
+        },
+        {
+         "t": "code",
+         "v": "fib(20)"
+        },
+        {
+         "t": "text",
+         "v": "'s 21,891 calls at depth 20 as the example. Give the depth of the four shapes in the table. Write the three lines of choose, explore and un-choose, and state the invariant they keep. Say what pruning did to the 16-check search, and what the skip rule does for duplicate values. Say why a tail call is not a guarantee, with the optimisation level where GCC 13.3 turned one into a loop, and name the two rewrites that take a deep recursion off the stack."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "A recursion makes 21,891 calls and nests 20 deep. Which number is the time, which is the memory, and why?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give the stack depth of: summing a list, binary search, walking a binary tree of height h, and generating all subsets of n values."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Write the three lines of choose, explore and un-choose, and say what state looks like when the recursive call returns."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which C++ compiler and flags turn a tail call into a loop, and what does the standard promise about it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does sorting first and skipping a value whose equal left neighbour is unused remove duplicate permutations, instead of filtering them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What goes into the frames of an explicit stack when you rewrite a backtracking recursion as a loop?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: generate every balanced bracket string of n pairs, pruning inside the recursion."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Functions, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Back_to_Basics_Functions_cppcon_2023.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=CpHX1Du5R0Q"
+     },
+     {
+      "t": "text",
+      "v": ". Calls, parameters and what a stack frame holds."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bob Steagall, Back to Basics: The Abstract Machine, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_the_abstract_machine/back_to_basics_the_abstract_machine__bob_steagall__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ZAji7PkXaKY"
+     },
+     {
+      "t": "text",
+      "v": ". Automatic storage and the stack the frames live on."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh and Adam Segoli Schubert, Back to Basics: Algorithmic Complexity, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Algorithmic_Complexity.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=AY2FqpDCBGs"
+     },
+     {
+      "t": "text",
+      "v": ". Counting the work of recursive code, and the recursion stack as extra space."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Andre Kostur, Back to Basics: RAII in C++, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/Cppcon-2022-Back-to-Basics-RAII.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=Rfu06XAhx90"
+     },
+     {
+      "t": "text",
+      "v": ". The guard object that counts a call for as long as its frame exists."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": " on reaching for the library first, "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " on parameters that say what they mean, "
+     },
+     {
+      "t": "a",
+      "v": "ES.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-always"
+     },
+     {
+      "t": "text",
+      "v": " on initialising every object, and "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": " on measuring before claiming."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "GCC's optimisation options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc-13.3.0/gcc/Optimize-Options.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "-foptimize-sibling-calls"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "its instrumentation options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc-13.3.0/gcc/Instrumentation-Options.html"
+     },
+     {
+      "t": "text",
+      "v": " for the sanitizers. "
+     },
+     {
+      "t": "code",
+      "v": "g++ -Q -O<n> --help=optimizers"
+     },
+     {
+      "t": "text",
+      "v": " reports which of them a given level turns on."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "AddressSanitizer",
+      "href": "https://clang.llvm.org/docs/AddressSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": ", which reports a stack overflow with the repeating backtrace instead of a bare segmentation fault."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "ranges::next_permutation",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/next_permutation"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "accumulate",
+      "href": "https://en.cppreference.com/cpp/algorithm/accumulate"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "the bool specialisation of vector",
+      "href": "https://en.cppreference.com/cpp/container/vector_bool"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1583 @@
+{
+ "id": "sd-data-flow",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A camera frame is 1280 × 720 × 3 bytes, and the camera delivers 30 frames a second. It passes through three stages:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "struct Frame {\n  std::int64_t stamp_ns;\n  std::vector<std::uint8_t> pixels;  // 2,764,800 bytes\n};\n\n[[nodiscard]] Frame capture();                  // stage 1: the camera\n[[nodiscard]] Frame watermark(Frame frame);     // stage 2: marks the frame and returns it\nvoid record(const Frame& frame);                // stage 3: writes it to disk\n\nvoid on_camera_tick(std::deque<Frame>& to_recorder) {\n  const Frame frame = capture();\n  const Frame marked = watermark(frame);\n  to_recorder.push_back(marked);                // the recorder later calls record(front) and pop_front\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Say on which lines the pixels are copied, how many bytes that is per second, and who owns the pixels after each line. Then change the function so that nothing is copied. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Two lines copy. "
+     },
+     {
+      "t": "code",
+      "v": "watermark(frame)"
+     },
+     {
+      "t": "text",
+      "v": " copies "
+     },
+     {
+      "t": "code",
+      "v": "frame"
+     },
+     {
+      "t": "text",
+      "v": " into the parameter, because "
+     },
+     {
+      "t": "code",
+      "v": "frame"
+     },
+     {
+      "t": "text",
+      "v": " is an lvalue. "
+     },
+     {
+      "t": "code",
+      "v": "push_back(marked)"
+     },
+     {
+      "t": "text",
+      "v": " copies again, because "
+     },
+     {
+      "t": "code",
+      "v": "marked"
+     },
+     {
+      "t": "text",
+      "v": " is a "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " lvalue, and a "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " object can't be moved from. The other steps copy nothing. "
+     },
+     {
+      "t": "code",
+      "v": "capture()"
+     },
+     {
+      "t": "text",
+      "v": " returns a prvalue that initializes "
+     },
+     {
+      "t": "code",
+      "v": "frame"
+     },
+     {
+      "t": "text",
+      "v": " directly, the "
+     },
+     {
+      "t": "code",
+      "v": "return frame;"
+     },
+     {
+      "t": "text",
+      "v": " in "
+     },
+     {
+      "t": "code",
+      "v": "watermark"
+     },
+     {
+      "t": "text",
+      "v": " moves the parameter into "
+     },
+     {
+      "t": "code",
+      "v": "marked"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "code",
+      "v": "record"
+     },
+     {
+      "t": "text",
+      "v": " borrows through "
+     },
+     {
+      "t": "code",
+      "v": "const&"
+     },
+     {
+      "t": "text",
+      "v": ". That is 2 × 2,764,800 = 5,529,600 bytes per frame, and 165,888,000 bytes a second at 30 Hz, before any real work."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The owner is "
+     },
+     {
+      "t": "code",
+      "v": "frame"
+     },
+     {
+      "t": "text",
+      "v": " after the first line. After the second, "
+     },
+     {
+      "t": "code",
+      "v": "frame"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "marked"
+     },
+     {
+      "t": "text",
+      "v": " each own a buffer, and after the third, the queue owns a third one while the other two wait for the end of the function. So each image exists three times for a moment. The queue's copy lives until the recorder's "
+     },
+     {
+      "t": "code",
+      "v": "pop_front"
+     },
+     {
+      "t": "text",
+      "v": ", and the recorder only borrows it while "
+     },
+     {
+      "t": "code",
+      "v": "record"
+     },
+     {
+      "t": "text",
+      "v": " runs."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "With no copies, the function body is one line: "
+     },
+     {
+      "t": "code",
+      "v": "to_recorder.push_back(watermark(capture()));"
+     },
+     {
+      "t": "text",
+      "v": ". The prvalue from "
+     },
+     {
+      "t": "code",
+      "v": "capture"
+     },
+     {
+      "t": "text",
+      "v": " initializes the parameter, the return moves it out, and "
+     },
+     {
+      "t": "code",
+      "v": "push_back(Frame&&)"
+     },
+     {
+      "t": "text",
+      "v": " moves it into the queue. One buffer, allocated once, freed at "
+     },
+     {
+      "t": "code",
+      "v": "pop_front"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you found both copies, counted no copy at either "
+     },
+     {
+      "t": "code",
+      "v": "return"
+     },
+     {
+      "t": "text",
+      "v": ", and wrote a version without copies. Missing one copy, or counting a return as a copy, is a partial pass. Not being able to say who owns the buffer is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Data flow through a pipeline is a chain of stages handing a buffer to the next, and it is correct exactly when every buffer has an owner, the object whose destructor frees it, at every moment, and every other user finishes before that owner goes away. There are four ways to hand a buffer onward. A copy gives the next stage an owner of its own, at a cost of size times rate. A move hands ownership over and leaves the source valid but unspecified, never to be read again. Sharing, through a "
+    },
+    {
+     "t": "code",
+     "v": "std::shared_ptr<const T>"
+    },
+    {
+     "t": "text",
+     "v": ", fits two consumers that both need the data with neither sure which finishes last, because the last owner frees it. A borrow, through a "
+    },
+    {
+     "t": "code",
+     "v": "const&"
+    },
+    {
+     "t": "text",
+     "v": ", a "
+    },
+    {
+     "t": "code",
+     "v": "span"
+    },
+    {
+     "t": "text",
+     "v": " or a "
+    },
+    {
+     "t": "code",
+     "v": "string_view"
+    },
+    {
+     "t": "text",
+     "v": ", uses the data without owning it, safe for the length of the call and nothing longer."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this solves is copying nobody asked for. A stage taking and returning its argument by value copies a buffer at every boundary, because an lvalue can't be moved from without saying so, and for a 2.76 MB camera frame at 30 Hz that is real bandwidth spent before any actual work happens. The other half is rate: a producer faster than its consumer grows a queue by the difference every second, and no queue size fixes a rate mismatch alone."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is naming, at each line, who owns the buffer right now, and choosing the cheapest handoff that keeps that answer true. "
+    },
+    {
+     "t": "code",
+     "v": "push_back(watermark(capture()))"
+    },
+    {
+     "t": "text",
+     "v": " moves a value through every step because none of it is bound to a named variable, so nothing is copied. A bounded queue makes the rate problem explicit the same way: block the producer, drop the oldest item, or refuse the new one, but always count what is dropped."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs, at the failure end, is silence. An unbounded queue fails slowly: every item still gets processed, only later and later, so a short test passes and the system runs out of memory an hour into a real shift. A borrow stored past the call it arrived in fails the same way any dangling reference does, reading memory its owner already freed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: say which lines copy a message's data as it crosses three pipeline stages, how many bytes a second that costs, and who owns it after each line, then rewrite the pipeline so nothing copies."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "flow",
+   "title": "Buffer lifetime, copies, borrowing, bounded memory",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the same three-stage pipeline written three ways. The "
+        },
+        {
+         "t": "code",
+         "v": "Frame"
+        },
+        {
+         "t": "text",
+         "v": " class counts the bytes its copy constructor copies:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <utility>\n#include <vector>\n\nconstexpr std::ptrdiff_t frame_bytes = 1280 * 720 * 3;\n\n// Adds up the bytes of pixels copied, so the output shows where copies happen.\nstruct CopyMeter {\n  std::int64_t bytes = 0;\n};\n\n// A camera frame whose copy constructor reports to a meter. Moves are free and not counted.\nclass Frame {\n public:\n  Frame(std::int64_t stamp_ns, CopyMeter& meter)\n      : stamp_ns_(stamp_ns), pixels_(static_cast<std::size_t>(frame_bytes)), meter_(&meter) {}\n  Frame(const Frame& other) : stamp_ns_(other.stamp_ns_), pixels_(other.pixels_), meter_(other.meter_) {\n    meter_->bytes += std::ssize(pixels_);\n  }\n  Frame& operator=(const Frame&) = delete;  // not needed here\n  Frame(Frame&&) noexcept = default;\n  Frame& operator=(Frame&&) noexcept = default;\n  ~Frame() = default;\n\n  void mark() { pixels_.front() = 0xff; }\n  [[nodiscard]] std::int64_t stamp_ns() const { return stamp_ns_; }\n\n private:\n  std::int64_t stamp_ns_;\n  std::vector<std::uint8_t> pixels_;\n  CopyMeter* meter_;  // borrowed: the meter outlives every frame\n};\n\n[[nodiscard]] Frame watermark(Frame frame) {\n  frame.mark();\n  return frame;\n}\n\n[[nodiscard]] std::int64_t by_value(std::int64_t frames) {\n  CopyMeter meter;\n  std::deque<Frame> queue;\n  for (std::int64_t i = 0; i < frames; ++i) {\n    const Frame captured(i, meter);\n    const Frame marked = watermark(captured);  // copies into the parameter\n    queue.push_back(marked);                   // copies into the queue\n  }\n  return meter.bytes;\n}\n\n[[nodiscard]] std::int64_t by_move(std::int64_t frames) {\n  CopyMeter meter;\n  std::deque<Frame> queue;\n  for (std::int64_t i = 0; i < frames; ++i) {\n    Frame captured(i, meter);\n    Frame marked = watermark(std::move(captured));\n    queue.push_back(std::move(marked));\n  }\n  return meter.bytes;\n}\n\nstruct SharedRun {\n  std::int64_t bytes_copied;\n  std::int64_t owners;\n};\n\n[[nodiscard]] SharedRun shared(std::int64_t frames) {\n  CopyMeter meter;\n  std::deque<std::shared_ptr<const Frame>> to_recorder;\n  std::deque<std::shared_ptr<const Frame>> to_viewer;\n  for (std::int64_t i = 0; i < frames; ++i) {\n    const auto marked = std::make_shared<const Frame>(watermark(Frame(i, meter)));\n    to_recorder.push_back(marked);  // copies a pointer and counts an owner\n    to_viewer.push_back(marked);\n  }\n  return SharedRun{.bytes_copied = meter.bytes, .owners = to_viewer.front().use_count()};\n}\n\nint main() {\n  std::cout << std::format(\"by value: {} bytes copied for 3 frames\\n\", by_value(3));\n  std::cout << std::format(\"by move:  {} bytes copied for 3 frames\\n\", by_move(3));\n  const auto [bytes, owners] = shared(3);\n  std::cout << std::format(\"shared:   {} bytes copied for 3 frames, {} owners of each frame\\n\", bytes, owners);\n}"
+      },
+      {
+       "t": "output",
+       "text": "by value: 16588800 bytes copied for 3 frames\nby move:  0 bytes copied for 3 frames\nshared:   0 bytes copied for 3 frames, 2 owners of each frame"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The code of the three versions is almost the same, and the cost is not. Passing by value copies each frame twice, 16,588,800 bytes for three frames. At 30 Hz that is 166 MB of copying a second, as much as the two raw cameras in the requirements topic's exercise send to disk. Moving copies nothing, and neither does sharing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each version answers one question for every buffer: who owns it? The "
+        },
+        {
+         "t": "i",
+         "v": "owner"
+        },
+        {
+         "t": "text",
+         "v": " is the object whose destructor frees the buffer, and a data flow is correct when every buffer has an owner at every moment and every other user is done before the owner goes away. There are four ways to hand data to the next stage:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A copy gives the next stage an owner of its own. It is the simplest to get right, and its cost is size times rate. For a 16-byte odometry sample it is nothing; for a camera frame it dominates."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A move hands ownership over and leaves the pixels where they are. The buffer belongs to the destination afterwards, and the source is left valid but unspecified, as the copy and move topic showed: the producer may still destroy it, assign a new frame to it or ask a container whether it is empty, and it must not read the value it held. Treating a moved-from input as gone is the rule you want for a pipeline stage anyway. An empty source is guaranteed only where the type promises it: a moved-from "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr"
+         },
+         {
+          "t": "text",
+          "v": " holds "
+         },
+         {
+          "t": "code",
+          "v": "nullptr"
+         },
+         {
+          "t": "text",
+          "v": ". A function that takes ownership says so in its signature, with a by-value parameter or a "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr"
+         },
+         {
+          "t": "text",
+          "v": " ("
+         },
+         {
+          "t": "a",
+          "v": "F.18",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-consume"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "a",
+          "v": "R.32",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-uniqueptrparam"
+         },
+         {
+          "t": "text",
+          "v": ")."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Sharing, with "
+         },
+         {
+          "t": "code",
+          "v": "std::shared_ptr<const Frame>"
+         },
+         {
+          "t": "text",
+          "v": ", fits fan-out: a recorder and a viewer both need the frame, and neither knows which finishes last. The last owner frees it. The "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": " matters: data shared between stages, and so between threads, must not change while others read it ("
+         },
+         {
+          "t": "a",
+          "v": "R.34",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-sharedptrparam-owner"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "a",
+          "v": "CP.32",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-shared"
+         },
+         {
+          "t": "text",
+          "v": "). The price is a reference count that every copy of the pointer updates atomically."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A borrow, through "
+         },
+         {
+          "t": "code",
+          "v": "const Frame&"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "std::span"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "std::string_view"
+         },
+         {
+          "t": "text",
+          "v": ", uses the data without owning it. It is the right parameter type for a stage that only reads ("
+         },
+         {
+          "t": "a",
+          "v": "F.16",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-in"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "a",
+          "v": "F.24",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-range"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "a",
+          "v": "SL.str.2",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rstr-view"
+         },
+         {
+          "t": "text",
+          "v": "), and it is safe for exactly as long as the call. Stored in a member or a queue, a borrow outlives the call, and nothing ties it to the owner's lifetime. Abseil's "
+         },
+         {
+          "t": "a",
+          "v": "tip #180",
+          "href": "https://abseil.io/tips/180"
+         },
+         {
+          "t": "text",
+          "v": " puts it as views being safe as parameters and risky when stored."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Copies are not always wrong. "
+        },
+        {
+         "t": "a",
+         "v": "CP.31",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-data-by-value"
+        },
+        {
+         "t": "text",
+         "v": " prefers passing small data between threads by value, because a copy has no lifetime to get wrong. The decision is a number, size times rate: moving a 16-byte odometry sample saves nothing, and copying camera frames costs 166 MB a second."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second half of a data flow is rates. Every queue has a producer and a consumer, and each has a rate. When the producer is faster, the queue grows by the difference: a camera at 30 Hz and a recorder at 25 Hz add 5 frames, 13.8 MB, to the queue every second, with no end. No queue size fixes a rate mismatch. Only three things do: make the consumer faster, slow the producer down, or drop data on purpose."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "bounded queue"
+        },
+        {
+         "t": "text",
+         "v": " makes that choice explicit, because it has to decide what happens when it is full:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Block the producer until there is room. The consumer's pace then pushes back up the pipeline, which is "
+         },
+         {
+          "t": "i",
+          "v": "backpressure"
+         },
+         {
+          "t": "text",
+          "v": ". It fits a producer that can wait, such as a file converter, and not a camera, which can't pause the scene."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Drop the oldest item. The queue always holds the newest data, which fits sensor streams and control, where an old measurement is worth less than a new one."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Refuse the new item and tell the producer, which fits jobs and requests that someone must retry or report."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Whichever you choose, count the drops, or the loss is invisible. The size of the bound comes from the requirements: the longest stall to survive times the data rate. The logger in the requirements topic buffers 2 s at 93 KB/s, 186 KB, and drops the oldest data when a stall lasts longer. The memory bound of a pipeline is then the sum over its queues of capacity times item size, plus the items each stage holds while it works."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "ROS 2 has the same pieces. A subscription's history depth is a bounded queue that keeps the newest messages: with "
+        },
+        {
+         "t": "code",
+         "v": "KEEP_LAST"
+        },
+        {
+         "t": "text",
+         "v": " and depth 10, the eleventh unread message pushes out the oldest ("
+        },
+        {
+         "t": "a",
+         "v": "QoS settings",
+         "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html"
+        },
+        {
+         "t": "text",
+         "v": "). Between processes, with the default settings, the publisher serializes each message into the middleware's format and each subscriber deserializes it into its own message, so every hop costs at least a copy on each side. Within one process, with "
+        },
+        {
+         "t": "code",
+         "v": "use_intra_process_comms(true)"
+        },
+        {
+         "t": "text",
+         "v": " and both sides using "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", a single subscriber receives the publisher's own buffer with no copy. With two such subscribers, one gets the original and the other a copy. The "
+        },
+        {
+         "t": "a",
+         "v": "intra-process demo",
+         "href": "https://docs.ros.org/en/jazzy/Tutorials/Demos/Intra-Process-Communication.html"
+        },
+        {
+         "t": "text",
+         "v": " shows both cases, and notes that publishing and subscribing with "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " works but without the zero-copy path."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "trace",
+   "title": "Trace copies and lifetimes through a three-stage pipeline",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. The program below runs a camera at 30 Hz, a watermark stage and a recorder at 25 Hz for 2 simulated seconds, on a clock of 150 ticks a second, so that both rates are whole numbers of ticks. It uses the counting "
+        },
+        {
+         "t": "code",
+         "v": "Frame"
+        },
+        {
+         "t": "text",
+         "v": " from the theory. Without running it, answer:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "On which lines are a frame's pixels copied, and how many bytes are copied in the 2 s?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Where is each of the buffers belonging to one captured frame freed?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "How many frames does the queue hold at its largest, and what is the most pixel memory alive at one moment?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Change the program so that no pixels are copied and the queue holds at most 5 frames, dropping the oldest when it is full and counting the drops. How many frames are dropped in the 2 s?"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then run it and compare."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <vector>\n\nconstexpr std::ptrdiff_t frame_bytes = 1280 * 720 * 3;\nconstexpr std::int64_t ticks_per_second = 150;  // one tick is 1/150 s, so 30 Hz and 25 Hz are whole ticks\nconstexpr std::int64_t camera_period = 5;       // 30 Hz\nconstexpr std::int64_t recorder_period = 6;     // 25 Hz\n\nstruct CopyMeter {\n  std::int64_t bytes = 0;\n};\n\nclass Frame {\n public:\n  Frame(std::int64_t stamp_ns, CopyMeter& meter)\n      : stamp_ns_(stamp_ns), pixels_(static_cast<std::size_t>(frame_bytes)), meter_(&meter) {}\n  Frame(const Frame& other) : stamp_ns_(other.stamp_ns_), pixels_(other.pixels_), meter_(other.meter_) {\n    meter_->bytes += std::ssize(pixels_);\n  }\n  Frame& operator=(const Frame&) = delete;\n  Frame(Frame&&) noexcept = default;\n  Frame& operator=(Frame&&) noexcept = default;\n  ~Frame() = default;\n\n  void mark() { pixels_.front() = 0xff; }\n  [[nodiscard]] std::int64_t stamp_ns() const { return stamp_ns_; }\n\n private:\n  std::int64_t stamp_ns_;\n  std::vector<std::uint8_t> pixels_;\n  CopyMeter* meter_;\n};\n\n[[nodiscard]] Frame watermark(Frame frame) {\n  frame.mark();\n  return frame;\n}\n\nvoid enqueue(std::deque<Frame>& queue, const Frame& frame) { queue.push_back(frame); }\n\nint main() {\n  CopyMeter meter;\n  std::deque<Frame> queue;\n  std::int64_t captured = 0;\n  std::int64_t recorded = 0;\n  std::ptrdiff_t peak = 0;\n  for (std::int64_t tick = 0; tick < 2 * ticks_per_second; ++tick) {\n    if (tick % camera_period == 0) {\n      const Frame frame(tick * 1'000'000'000 / ticks_per_second, meter);\n      const Frame marked = watermark(frame);\n      enqueue(queue, marked);\n      ++captured;\n    }\n    peak = std::max(peak, std::ssize(queue));\n    if (tick % recorder_period == 0 && !queue.empty()) {\n      queue.pop_front();  // stands for writing the frame to disk\n      ++recorded;\n    }\n  }\n  std::cout << std::format(\"captured {}, recorded {}, still queued {}\\n\", captured, recorded, queue.size());\n  std::cout << std::format(\"pixels copied: {} bytes\\n\", meter.bytes);\n  std::cout << std::format(\"queue peak: {} frames, {} bytes\\n\", peak, peak * frame_bytes);\n}"
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Two copies per frame. "
+         },
+         {
+          "t": "code",
+          "v": "watermark(frame)"
+         },
+         {
+          "t": "text",
+          "v": " copies into the parameter, and "
+         },
+         {
+          "t": "code",
+          "v": "enqueue"
+         },
+         {
+          "t": "text",
+          "v": " copies inside, at "
+         },
+         {
+          "t": "code",
+          "v": "queue.push_back(frame)"
+         },
+         {
+          "t": "text",
+          "v": ": taking "
+         },
+         {
+          "t": "code",
+          "v": "const Frame&"
+         },
+         {
+          "t": "text",
+          "v": " avoided a copy at the call and moved it one line further down. In 2 s the camera captures 60 frames, so the program prints "
+         },
+         {
+          "t": "code",
+          "v": "pixels copied: 331776000 bytes"
+         },
+         {
+          "t": "text",
+          "v": ", which is 60 × 2 × 2,764,800, or 166 MB a second."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Each captured frame owns three buffers in turn. The one in "
+         },
+         {
+          "t": "code",
+          "v": "frame"
+         },
+         {
+          "t": "text",
+          "v": " and the one in "
+         },
+         {
+          "t": "code",
+          "v": "marked"
+         },
+         {
+          "t": "text",
+          "v": " are freed at the closing brace of the camera block, and the queue's copy is freed by "
+         },
+         {
+          "t": "code",
+          "v": "pop_front"
+         },
+         {
+          "t": "text",
+          "v": ", when the recorder has written it. The "
+         },
+         {
+          "t": "code",
+          "v": "return frame;"
+         },
+         {
+          "t": "text",
+          "v": " inside "
+         },
+         {
+          "t": "code",
+          "v": "watermark"
+         },
+         {
+          "t": "text",
+          "v": " moves the parameter's buffer into "
+         },
+         {
+          "t": "code",
+          "v": "marked"
+         },
+         {
+          "t": "text",
+          "v": ", so it is not a fourth one."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The queue grows by one frame every 0.2 s, because in every 30 ticks the camera adds 6 frames and the recorder takes 5. It peaks at 10 frames, 27,648,000 bytes, and the program prints "
+         },
+         {
+          "t": "code",
+          "v": "queue peak: 10 frames, 27648000 bytes"
+         },
+         {
+          "t": "text",
+          "v": ". At the moment the tenth frame is queued, "
+         },
+         {
+          "t": "code",
+          "v": "frame"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "marked"
+         },
+         {
+          "t": "text",
+          "v": " are still alive, so 12 frames, 33,177,600 bytes, exist at once."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The camera block becomes one line, and the queue gets its bound:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <utility>\n#include <vector>\n\nconstexpr std::ptrdiff_t frame_bytes = 1280 * 720 * 3;\nconstexpr std::int64_t ticks_per_second = 150;\nconstexpr std::int64_t camera_period = 5;    // 30 Hz\nconstexpr std::int64_t recorder_period = 6;  // 25 Hz\n\nstruct CopyMeter {\n  std::int64_t bytes = 0;\n};\n\nclass Frame {\n public:\n  Frame(std::int64_t stamp_ns, CopyMeter& meter)\n      : stamp_ns_(stamp_ns), pixels_(static_cast<std::size_t>(frame_bytes)), meter_(&meter) {}\n  Frame(const Frame& other) : stamp_ns_(other.stamp_ns_), pixels_(other.pixels_), meter_(other.meter_) {\n    meter_->bytes += std::ssize(pixels_);\n  }\n  Frame& operator=(const Frame&) = delete;\n  Frame(Frame&&) noexcept = default;\n  Frame& operator=(Frame&&) noexcept = default;\n  ~Frame() = default;\n\n  void mark() { pixels_.front() = 0xff; }\n  [[nodiscard]] std::int64_t stamp_ns() const { return stamp_ns_; }\n\n private:\n  std::int64_t stamp_ns_;\n  std::vector<std::uint8_t> pixels_;\n  CopyMeter* meter_;\n};\n\n[[nodiscard]] Frame watermark(Frame frame) {\n  frame.mark();\n  return frame;\n}\n\n// A FIFO that holds at most `capacity` items; a push into a full queue drops the oldest and counts it.\n// Pre: capacity >= 1.\ntemplate <typename T>\nclass DropOldestQueue {\n public:\n  explicit DropOldestQueue(std::ptrdiff_t capacity) : capacity_(capacity) {}\n\n  void push(T item) {\n    if (std::ssize(items_) == capacity_) {\n      items_.pop_front();\n      ++dropped_;\n    }\n    items_.push_back(std::move(item));\n  }\n\n  [[nodiscard]] std::optional<T> pop() {\n    if (items_.empty()) return std::nullopt;\n    T item = std::move(items_.front());\n    items_.pop_front();\n    return item;\n  }\n\n  [[nodiscard]] std::ptrdiff_t size() const { return std::ssize(items_); }\n  [[nodiscard]] std::int64_t dropped() const { return dropped_; }\n\n private:\n  std::ptrdiff_t capacity_;\n  std::deque<T> items_;\n  std::int64_t dropped_ = 0;\n};\n\nint main() {\n  CopyMeter meter;\n  DropOldestQueue<Frame> queue(5);\n  std::int64_t captured = 0;\n  std::int64_t recorded = 0;\n  std::ptrdiff_t peak = 0;\n  for (std::int64_t tick = 0; tick < 2 * ticks_per_second; ++tick) {\n    if (tick % camera_period == 0) {\n      queue.push(watermark(Frame(tick * 1'000'000'000 / ticks_per_second, meter)));\n      ++captured;\n    }\n    peak = std::max(peak, queue.size());\n    if (tick % recorder_period == 0 && queue.pop()) ++recorded;\n  }\n  std::cout << std::format(\"captured {}, recorded {}, dropped {}, still queued {}\\n\", captured, recorded,\n                           queue.dropped(), queue.size());\n  std::cout << std::format(\"pixels copied: {} bytes\\n\", meter.bytes);\n  std::cout << std::format(\"queue peak: {} frames, {} bytes\\n\", peak, peak * frame_bytes);\n}"
+      },
+      {
+       "t": "output",
+       "text": "captured 60, recorded 50, dropped 5, still queued 5\npixels copied: 0 bytes\nqueue peak: 5 frames, 13824000 bytes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each frame now has one buffer from capture to "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " takes its parameter by value and moves it into the deque, so a caller that passes a temporary pays nothing and a caller that passes an lvalue sees the copy at its own call site. "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " returns the frame by value, so the recorder owns what it writes, and nothing it holds points into the queue."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bound caps the memory at 5 frames, 13,824,000 bytes, and it makes the loss explicit: 5 frames dropped and counted, where the unbounded version hid a queue that never stops growing. It doesn't make the recorder faster. At 30 frames in and 25 out, any bound fills, and from then on 5 frames a second are dropped. That is a requirement to settle rather than a bug to fix: record at 25 Hz by design and skip every sixth frame on purpose, or make the recorder keep up, for example by compressing, as in the requirements topic's camera exercise."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Unbounded buffers; borrowing past the owner",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An unbounded queue fails slowly. This program runs the camera and the recorder from the exercise for 60 s, queueing only the stamps and computing the pixel memory they stand for:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <limits>\n#include <optional>\n#include <utility>\n\nconstexpr std::ptrdiff_t frame_bytes = 1280 * 720 * 3;\nconstexpr std::int64_t ticks_per_second = 150;\nconstexpr std::int64_t camera_period = 5;    // 30 Hz\nconstexpr std::int64_t recorder_period = 6;  // 25 Hz\n\n// A FIFO that holds at most `capacity` items; a push into a full queue drops the oldest and counts it.\n// Pre: capacity >= 1.\ntemplate <typename T>\nclass DropOldestQueue {\n public:\n  explicit DropOldestQueue(std::ptrdiff_t capacity) : capacity_(capacity) {}\n\n  void push(T item) {\n    if (std::ssize(items_) == capacity_) {\n      items_.pop_front();\n      ++dropped_;\n    }\n    items_.push_back(std::move(item));\n  }\n\n  [[nodiscard]] std::optional<T> pop() {\n    if (items_.empty()) return std::nullopt;\n    T item = std::move(items_.front());\n    items_.pop_front();\n    return item;\n  }\n\n  [[nodiscard]] std::ptrdiff_t size() const { return std::ssize(items_); }\n  [[nodiscard]] std::int64_t dropped() const { return dropped_; }\n\n private:\n  std::ptrdiff_t capacity_;\n  std::deque<T> items_;\n  std::int64_t dropped_ = 0;\n};\n\nstruct Outcome {\n  std::int64_t recorded;\n  std::ptrdiff_t peak;\n  std::int64_t dropped;\n};\n\n// Runs the camera and the recorder for `seconds`, queueing frame stamps only, and reports the queue.\n[[nodiscard]] Outcome run(std::ptrdiff_t capacity, std::int64_t seconds) {\n  DropOldestQueue<std::int64_t> queue(capacity);\n  std::int64_t recorded = 0;\n  std::ptrdiff_t peak = 0;\n  for (std::int64_t tick = 0; tick < seconds * ticks_per_second; ++tick) {\n    if (tick % camera_period == 0) queue.push(tick);\n    peak = std::max(peak, queue.size());\n    if (tick % recorder_period == 0 && queue.pop()) ++recorded;\n  }\n  return Outcome{.recorded = recorded, .peak = peak, .dropped = queue.dropped()};\n}\n\nint main() {\n  constexpr std::ptrdiff_t no_bound = std::numeric_limits<std::ptrdiff_t>::max();\n  for (const std::ptrdiff_t capacity : {no_bound, std::ptrdiff_t{30}}) {\n    const auto [recorded, peak, dropped] = run(capacity, 60);\n    std::cout << std::format(\"{:<10}recorded {}, dropped {}, queue peak {} frames = {} bytes\\n\",\n                             capacity == no_bound ? \"no bound\" : \"bound 30\", recorded, dropped, peak, peak * frame_bytes);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "no bound  recorded 1500, dropped 0, queue peak 300 frames = 829440000 bytes\nbound 30  recorded 1500, dropped 270, queue peak 30 frames = 82944000 bytes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Without a bound, the queue holds 829 MB after one minute and keeps growing by 13.8 MB a second until the process runs out of memory. Nothing fails before that: every frame is still recorded, only later and later, so a short test passes, and the robot falls over an hour into a shift. With a bound of 30 frames, 1 s of camera, the memory stays at 83 MB and the same mismatch shows up as 270 counted drops, which a test and an operator can see. Both versions record the same 1500 frames, because the recorder's rate decides that. The bound only decides what the other 300 cost."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Unbounded queues hide in ordinary code: a "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": " member that a callback appends to, a ROS subscription with "
+        },
+        {
+         "t": "code",
+         "v": "KEEP_ALL"
+        },
+        {
+         "t": "text",
+         "v": " history, which is limited only by the middleware's resource limits, a logger's memory buffer, or a thread pool's task list. For each one, write down its producer, its consumer, both rates and its bound."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is a borrow that outlives its owner. This recorder was written to save a copy:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <vector>\n\n// Meant to save a copy: keeps views of the pixels and writes them all at the next flush.\nclass Recorder {\n public:\n  void enqueue(std::span<const std::uint8_t> pixels) { pending_.push_back(pixels); }\n\n  [[nodiscard]] std::int64_t flush() {\n    std::int64_t checksum = 0;\n    for (const auto pixels : pending_) checksum += pixels.front();  // stands for writing to disk\n    pending_.clear();\n    return checksum;\n  }\n\n private:\n  std::vector<std::span<const std::uint8_t>> pending_;\n};\n\nint main() {\n  Recorder recorder;\n  for (std::uint8_t shade = 1; shade <= 3; ++shade) {\n    const std::vector<std::uint8_t> pixels(1024, shade);\n    recorder.enqueue(pixels);\n  }  // each vector is destroyed here, at the end of its iteration\n  std::cout << std::format(\"checksum {}\\n\", recorder.flush());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer stops in "
+        },
+        {
+         "t": "code",
+         "v": "flush"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "heap-use-after-free"
+        },
+        {
+         "t": "text",
+         "v": ": it reads the first byte of a vector that the loop freed. The "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": " parameter of "
+        },
+        {
+         "t": "code",
+         "v": "enqueue"
+        },
+        {
+         "t": "text",
+         "v": " was fine, because a span is a good way to take pixels a function only reads during the call. Storing it turned the borrow into a claim on memory that "
+        },
+        {
+         "t": "code",
+         "v": "Recorder"
+        },
+        {
+         "t": "text",
+         "v": " doesn't own and can't keep alive. Without the sanitizer the program may well print a plausible checksum, which is worse. There are two fixes, and both change the signature so that the contract is visible:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "take ownership: "
+         },
+         {
+          "t": "code",
+          "v": "void enqueue(std::vector<std::uint8_t> pixels)"
+         },
+         {
+          "t": "text",
+          "v": ", stored with "
+         },
+         {
+          "t": "code",
+          "v": "std::move"
+         },
+         {
+          "t": "text",
+          "v": ", and called with "
+         },
+         {
+          "t": "code",
+          "v": "std::move(pixels)"
+         },
+         {
+          "t": "text",
+          "v": ", which costs no copy;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "share: "
+         },
+         {
+          "t": "code",
+          "v": "void enqueue(std::shared_ptr<const Frame> frame)"
+         },
+         {
+          "t": "text",
+          "v": ", when the producer also keeps using the frame."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same bug has other shapes: a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " member that points into a message owned by a callback's argument, a lambda that captures a local by reference and is handed to a timer or a thread, or a pointer into a buffer that the producer reuses for the next frame. In each case, ask who owns the memory and whether the borrower is certainly done before the owner goes away."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the four ways to pass data between stages, with the cost and the right use of each, and the rule that makes a borrow safe. Give the formula for the growth of a queue whose producer is faster than its consumer, and the three fixes that address the rate itself. Name the three policies of a bounded queue with a robotics example each, and say how to size the bound from the requirements. Say where ROS 2 copies a message between processes and within one."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Which lines copy in "
+     },
+     {
+      "t": "code",
+      "v": "const Frame f = capture(); queue.push_back(watermark(f));"
+     },
+     {
+      "t": "text",
+      "v": "? What changes if "
+     },
+     {
+      "t": "code",
+      "v": "f"
+     },
+     {
+      "t": "text",
+      "v": " isn't "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " and you write "
+     },
+     {
+      "t": "code",
+      "v": "std::move(f)"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When is "
+     },
+     {
+      "t": "code",
+      "v": "std::shared_ptr<const Frame>"
+     },
+     {
+      "t": "text",
+      "v": " the right way to pass a frame, and what does it cost?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A camera produces 30 frames a second of 2.76 MB and the recorder writes 25. How much memory does an unbounded queue hold after 10 minutes, and what are the three real fixes?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the three policies for a full bounded queue, and give a robotics example of each."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How many copies does ROS 2 make of a message sent to another process, and when does a message within one process travel without a copy?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is a "
+     },
+     {
+      "t": "code",
+      "v": "std::span"
+     },
+     {
+      "t": "text",
+      "v": " parameter safe and a "
+     },
+     {
+      "t": "code",
+      "v": "std::span"
+     },
+     {
+      "t": "text",
+      "v": " member risky?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page: trace the buffers through a lidar, a filter and a logger, and bound the pipeline's memory."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines on passing and owning: "
+     },
+     {
+      "t": "a",
+      "v": "F.16",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-in"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.18",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-consume"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.24",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-range"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.32",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-uniqueptrparam"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.34",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-sharedptrparam-owner"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "SL.str.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rstr-view"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.31",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-data-by-value"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "CP.32",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-shared"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil "
+     },
+     {
+      "t": "a",
+      "v": "tip #180",
+      "href": "https://abseil.io/tips/180"
+     },
+     {
+      "t": "text",
+      "v": ", on dangling references and views that are stored."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Phil Nash, Back to Basics: Lifetime Management, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Lifetime_Management.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=aMvIv6blzBs"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: Value Semantics, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/Back-to-Basics-Value-Semantics-Klaus-Iglberger-CppCon-2022.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=G9MxNwUoSt0"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh, Back to Basics: Rvalues and Move Semantics, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Rvalues_and_Move_Semantics.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=i_Z_o9T2fNE"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jasmine Lopez and Prithvi Okade, string_view, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Unraveling_string_view.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=PEvkBmuMIr8"
+     },
+     {
+      "t": "text",
+      "v": ". Views that are stored, returned or bound to temporaries."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy: "
+     },
+     {
+      "t": "a",
+      "v": "intra-process communication",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Demos/Intra-Process-Communication.html"
+     },
+     {
+      "t": "text",
+      "v": ", where "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " gives zero-copy delivery to one subscriber, and "
+     },
+     {
+      "t": "a",
+      "v": "QoS settings",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html"
+     },
+     {
+      "t": "text",
+      "v": " for history depth."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::span",
+      "href": "https://en.cppreference.com/cpp/container/span"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::basic_string_view",
+      "href": "https://en.cppreference.com/cpp/string/basic_string_view"
+     },
+     {
+      "t": "text",
+      "v": ", including when a view becomes dangling."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,847 @@
+{
+ "id": "ros-inspect-replay",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write down, from memory, the command for each of these. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "List the running nodes."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "List the topics together with their message types."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Show which nodes publish and subscribe to one topic, with their QoS settings."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Print the messages on a topic as they arrive."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Measure how often a topic publishes."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Record two topics into a bag."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Show what a bag contains."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Play a bag back."
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "sh",
+    "tag": "",
+    "expect": "",
+    "text": "ros2 node list\nros2 topic list -t\nros2 topic info -v /turtle1/pose\nros2 topic echo /turtle1/pose\nros2 topic hz /turtle1/pose\nros2 bag record -o drive --topics /turtle1/cmd_vel /turtle1/pose\nros2 bag info drive\nros2 bag play drive"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with seven or eight right, allowing for small differences in the options. Five or six is a partial pass, and fewer is a fail. Topics given to "
+     },
+     {
+      "t": "code",
+      "v": "ros2 bag record"
+     },
+     {
+      "t": "text",
+      "v": " without "
+     },
+     {
+      "t": "code",
+      "v": "--topics"
+     },
+     {
+      "t": "text",
+      "v": " still work on Jazzy, but print a deprecation warning. Every subcommand answers "
+     },
+     {
+      "t": "code",
+      "v": "--help"
+     },
+     {
+      "t": "text",
+      "v": ", as in "
+     },
+     {
+      "t": "code",
+      "v": "ros2 topic echo --help"
+     },
+     {
+      "t": "text",
+      "v": ", which is where the options live."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The "
+    },
+    {
+     "t": "code",
+     "v": "ros2"
+    },
+    {
+     "t": "text",
+     "v": " command line is organised by the thing you're asking about: "
+    },
+    {
+     "t": "code",
+     "v": "node"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "topic"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "service"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "param"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "interface"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "bag"
+    },
+    {
+     "t": "text",
+     "v": ". It lets you inspect a running system without reading its code: which names a node actually uses after remapping, what type and QoS sit on each end of a topic, what messages look like as they arrive, and how often they come. RViz draws whatever a topic contains, everything placed relative to one chosen "
+    },
+    {
+     "t": "i",
+     "v": "fixed frame"
+    },
+    {
+     "t": "text",
+     "v": " that has to exist in the transform tree. "
+    },
+    {
+     "t": "code",
+     "v": "ros2 bag"
+    },
+    {
+     "t": "text",
+     "v": " records topics to a file and can publish them again later."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem these tools solve is that a running system can differ from what its source promises: a name after remapping, a QoS profile a driver actually offers, a rate that has drifted, are facts about the running process, not the code, and reading the code cannot answer them. A scenario that only happens once, on real hardware, also needs to be captured before it can be studied, rather than reasoned about afterward from memory."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Debugging a silent subscriber follows one order, each step ruling out a layer before moving up. Is the data published at all: "
+    },
+    {
+     "t": "code",
+     "v": "ros2 topic echo"
+    },
+    {
+     "t": "text",
+     "v": " on the topic. Is the name right: the node's own subscriptions from "
+    },
+    {
+     "t": "code",
+     "v": "ros2 node info"
+    },
+    {
+     "t": "text",
+     "v": " against the publisher count "
+    },
+    {
+     "t": "code",
+     "v": "ros2 topic info"
+    },
+    {
+     "t": "text",
+     "v": " reports for that exact name. Is the type right, then is the QoS compatible, then is the rate what you expect. Recording follows the same shape: "
+    },
+    {
+     "t": "code",
+     "v": "ros2 bag record"
+    },
+    {
+     "t": "text",
+     "v": " with the topics named writes a file, and "
+    },
+    {
+     "t": "code",
+     "v": "ros2 bag info"
+    },
+    {
+     "t": "text",
+     "v": " reports its storage format, its duration and, per topic, the type and the message count. Playback republishes the recorded messages with their original spacing."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What replay does not give back is the outcome, only the inputs: the receiving node still runs on its own timer and its own state, so the same commands played at the same intervals can still land at a slightly different point in that timer's cycle and drift from the original run. Anything never recorded, a parameter, a node's internal state, a topic left out, is not reproduced at all, only absent. And replaying a topic a live node is still publishing gives every subscriber two sources of the same data at once, interleaved with no warning that anything is wrong."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: naming, from memory, the commands to list topics, echo one, measure its rate, record two of them, inspect the bag and play it back."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "cli",
+   "title": "ros2 node, topic, service, param; RViz basics",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start turtlesim, which comes with the desktop install, and look at it from the outside:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run turtlesim turtlesim_node        # terminal 1: a window with a turtle\nros2 node list                           # /turtlesim\nros2 node info /turtlesim                # its subscribers, publishers, services and actions\nros2 topic list -t                       # /turtle1/cmd_vel [geometry_msgs/msg/Twist], /turtle1/pose [turtlesim/msg/Pose], ...\nros2 service call /spawn turtlesim/srv/Spawn \"{x: 2.0, y: 2.0, theta: 0.0, name: 'turtle2'}\"\nros2 param get /turtlesim background_r   # Integer value is: 69\nros2 param set /turtlesim background_r 150"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "ros2"
+        },
+        {
+         "t": "text",
+         "v": " command is organised by the thing you're asking about: "
+        },
+        {
+         "t": "code",
+         "v": "node"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "topic"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "service"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "action"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "param"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "interface"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "bag"
+        },
+        {
+         "t": "text",
+         "v": ". That means you can inspect a running system without reading its code, which is the first thing to do when something doesn't work. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 node info"
+        },
+        {
+         "t": "text",
+         "v": " shows the graph from one node's point of view: the names it actually uses after namespaces and remapping, which may not be the names in its source. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info -v"
+        },
+        {
+         "t": "text",
+         "v": " shows every endpoint of a topic, with its QoS. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 interface show"
+        },
+        {
+         "t": "text",
+         "v": " prints a message, service or action definition, so you never have to guess a field name."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "RViz, started with "
+        },
+        {
+         "t": "code",
+         "v": "rviz2"
+        },
+        {
+         "t": "text",
+         "v": ", draws what topics contain in 3D: laser scans, point clouds, poses, paths, maps and the robot model. Everything it draws is placed relative to one "
+        },
+        {
+         "t": "i",
+         "v": "fixed frame"
+        },
+        {
+         "t": "text",
+         "v": ", which you choose at the top left and which must exist in the transform tree. The most common first problem, a warning that the fixed frame doesn't exist, means exactly that: the frame you chose isn't published. The topic on frames with tf2 covers transforms. Save a working RViz setup with File, Save Config, so you don't have to rebuild it every time."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A subscriber receives nothing. Here is how to find out why with the CLI alone, before you open the code. Assume the counter from the topics topic is running, together with a watcher that logs nothing."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Is the data there at all? "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic echo /count"
+         },
+         {
+          "t": "text",
+          "v": " prints numbers, so the publisher works."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Does the watcher listen where you think? "
+         },
+         {
+          "t": "code",
+          "v": "ros2 node info /watcher"
+         },
+         {
+          "t": "text",
+          "v": " lists its subscriptions. Suppose it shows "
+         },
+         {
+          "t": "code",
+          "v": "/counts"
+         },
+         {
+          "t": "text",
+          "v": ", with an "
+         },
+         {
+          "t": "code",
+          "v": "s"
+         },
+         {
+          "t": "text",
+          "v": ". The name is wrong, and "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic info /counts"
+         },
+         {
+          "t": "text",
+          "v": " confirms it with "
+         },
+         {
+          "t": "code",
+          "v": "Publisher count: 0"
+         },
+         {
+          "t": "text",
+          "v": ". "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic list"
+         },
+         {
+          "t": "text",
+          "v": " would still list "
+         },
+         {
+          "t": "code",
+          "v": "/counts"
+         },
+         {
+          "t": "text",
+          "v": ", because the watcher's subscription is enough to make a topic appear."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "If the name had been right, the next check is the type. "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic list -t"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic info -v /count"
+         },
+         {
+          "t": "text",
+          "v": " shows the type of every endpoint, and a mismatch there also means nothing arrives."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "After that, check QoS. "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic info -v"
+         },
+         {
+          "t": "text",
+          "v": " prints the reliability and durability of each endpoint. Incompatible settings are the subject of the QoS topic."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Finally, the rate. "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic hz /count"
+         },
+         {
+          "t": "text",
+          "v": " tells you whether messages arrive at the expected rate, or only occasionally."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The order matters. Each step rules out one layer, from the data itself up to the node's configuration. In an interview, describing this sequence shows that you debug systematically rather than by guessing."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bag",
+   "title": "Record and replay a bag; read its metadata",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes, with turtlesim running."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Reset the turtle with "
+         },
+         {
+          "t": "code",
+          "v": "ros2 service call /reset std_srvs/srv/Empty"
+         },
+         {
+          "t": "text",
+          "v": ". Then record "
+         },
+         {
+          "t": "code",
+          "v": "/turtle1/cmd_vel"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "/turtle1/pose"
+         },
+         {
+          "t": "text",
+          "v": " while you drive the turtle for about 20 seconds with "
+         },
+         {
+          "t": "code",
+          "v": "ros2 run turtlesim turtle_teleop_key"
+         },
+         {
+          "t": "text",
+          "v": ", which reads the arrow keys in its own terminal."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "ros2 bag info"
+         },
+         {
+          "t": "text",
+          "v": " on the recording. Note the storage format, the duration and the message count of each topic, and work out the average rate of "
+         },
+         {
+          "t": "code",
+          "v": "/turtle1/pose"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Reset the turtle again, then play back only the command topic. Predict whether the turtle ends up exactly where it did the first time, then check."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Explain why you should not play back "
+         },
+         {
+          "t": "code",
+          "v": "/turtle1/pose"
+         },
+         {
+          "t": "text",
+          "v": " while turtlesim is running."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 service call /reset std_srvs/srv/Empty\nros2 bag record -o drive --topics /turtle1/cmd_vel /turtle1/pose\nros2 bag info drive\nros2 service call /reset std_srvs/srv/Empty\nros2 bag play drive --topics /turtle1/cmd_vel"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "On Jazzy, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag info"
+        },
+        {
+         "t": "text",
+         "v": " reports the storage id "
+        },
+        {
+         "t": "code",
+         "v": "mcap"
+        },
+        {
+         "t": "text",
+         "v": ", the default format since Iron. It also gives the duration, the start and end times, and, for each topic, the type, the message count and the serialization format "
+        },
+        {
+         "t": "code",
+         "v": "cdr"
+        },
+        {
+         "t": "text",
+         "v": ". The average rate is the pose count divided by the duration."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The turtle traces nearly the same path, but not exactly. A bag stores the inputs with their timestamps, and playback publishes them again with the same spacing. The outcome still depends on the node that receives them. turtlesim moves the turtle on its own timer, so each command lands at a slightly different point in that timer's cycle, and the small differences add up. So replay reproduces inputs, not results. Anything that wasn't recorded isn't reproduced at all: parameters, the node's internal state, and messages on topics you left out."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Playing "
+        },
+        {
+         "t": "code",
+         "v": "/turtle1/pose"
+        },
+        {
+         "t": "text",
+         "v": " back while turtlesim runs gives the topic two publishers, the bag and turtlesim, and every subscriber receives both interleaved. To replay recorded sensor data, stop or leave out the node that normally produces it. When the receiving nodes use simulation time, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag play --clock"
+        },
+        {
+         "t": "text",
+         "v": " also publishes "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " from the bag's timestamps, so that their time follows the recording."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the CLI commands for looking at nodes, topics, services and parameters, and the order in which you check why a subscriber receives nothing. Describe what "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag info"
+        },
+        {
+         "t": "text",
+         "v": " tells you, and what a replay reproduces and what it doesn't."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Which command shows the topic names a node really uses after remapping?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In what order do you check a subscriber that receives nothing, and why that order?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does RViz's fixed frame mean, and what does the warning that it doesn't exist tell you?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why doesn't replaying commands reproduce the exact same result?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: record two topics, inspect the bag, and replay one topic only."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": null
+}

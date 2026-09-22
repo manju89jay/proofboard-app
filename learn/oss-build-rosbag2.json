@@ -1,0 +1,1336 @@
+{
+ "id": "oss-build-rosbag2",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage is about a codebase we did not write: rosbag2, cloned into its own workspace so a source build never sits on top of the debian install, which the project's own guide calls undefined behaviour if the two mix. Building it with its own command builds the whole dependency graph in one pass, and listing the packages afterward gives four layers, storage, the C++ core, the transport nodes and the command line, the same split the bench's own code follows."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is checking which build a terminal is actually running before trusting anything else. "
+    },
+    {
+     "t": "code",
+     "v": "ros2 pkg prefix rosbag2_transport"
+    },
+    {
+     "t": "text",
+     "v": " says whether a shell is pointed at the workspace or at "
+    },
+    {
+     "t": "code",
+     "v": "/opt/ros"
+    },
+    {
+     "t": "text",
+     "v": ", and the two answering differently in two terminals is the ordinary shape of an afternoon lost to a fix that was never loaded."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What this leaves us able to do: run the whole suite the project's own way, then narrow to one test by name from a rebuild of a single package in under a minute; read a unit test next to the fixture that fakes its reader and see exactly what it does and does not exercise; and break a named test on purpose, watch it fail with a message that explains itself, and put the file back with a clean "
+    },
+    {
+     "t": "code",
+     "v": "git status"
+    },
+    {
+     "t": "text",
+     "v": " to prove the change was ours and not left behind."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "build",
+   "title": "Build rosbag2 and run its tests",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, rosbag2 is built from source in a workspace of its own, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag"
+        },
+        {
+         "t": "text",
+         "v": " runs from your build rather than from the debian packages, and you have written down how long the build took and what it produced."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The skill here is not rosbag2. It is being able to take a codebase you did not write, build it, run its tests and find your way around it, which is what the first week of a new job looks like and what an interviewer is really asking when they ask about open source. rosbag2 is a good one to practise on for three reasons: the bench already leans on it, so a bug in it is a bug you have met; it is a normal size, about two dozen packages rather than two or two thousand; and it is tested with the same tools the bench uses, so you can read its tests without learning a new framework."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One warning comes from the project itself. Its developer guide says that building rosbag2 from source on top of a debian install of "
+        },
+        {
+         "t": "code",
+         "v": "ros-$ROS_DISTRO-rosbag2"
+        },
+        {
+         "t": "text",
+         "v": " has undefined behaviour. So this gets a workspace of its own, away from "
+        },
+        {
+         "t": "code",
+         "v": "~/test_bench"
+        },
+        {
+         "t": "text",
+         "v": ", and you source one or the other in a terminal and never both."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Make the workspace and clone the branch that matches your ROS 2:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "mkdir -p ~/rosbag2_ws/src && cd ~/rosbag2_ws/src\ngit clone https://github.com/ros2/rosbag2.git -b jazzy\ncd ~/rosbag2_ws"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The branch matters more than it looks. "
+        },
+        {
+         "t": "code",
+         "v": "rolling"
+        },
+        {
+         "t": "text",
+         "v": " is built against the development version of ROS 2 and will fail against Jazzy in ways that have nothing to do with your machine. Every command in the next three topics assumes the branch you cloned here."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Install what it needs, the way its CI does:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "source /opt/ros/jazzy/setup.bash\nrosdep update\nrosdep install --from-paths src --ignore-src -y"
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Build it with the project's own command, and time it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "time colcon build --packages-up-to rosbag2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "--packages-up-to rosbag2"
+        },
+        {
+         "t": "text",
+         "v": " builds the "
+        },
+        {
+         "t": "code",
+         "v": "rosbag2"
+        },
+        {
+         "t": "text",
+         "v": " metapackage and everything it depends on, which here is the whole clone. Write down the wall time and the number of packages. That number decides how you work from now on: a full build is a coffee, "
+        },
+        {
+         "t": "code",
+         "v": "--packages-select <one>"
+        },
+        {
+         "t": "text",
+         "v": " is a minute, and knowing which to reach for is most of the difference between a productive afternoon and a lost one."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Look at what you built, because a map now saves an hour later:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "colcon list --names-only"
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Package"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What it holds"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "ros2bag"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the "
+          },
+          {
+           "t": "code",
+           "v": "ros2 bag"
+          },
+          {
+           "t": "text",
+           "v": " verbs: "
+          },
+          {
+           "t": "code",
+           "v": "record"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "play"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "info"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "convert"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "rosbag2_transport"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the player and the recorder, the nodes those verbs start"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "rosbag2_cpp"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the reader and writer a C++ program uses directly"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "rosbag2_storage"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the storage interface, with "
+          },
+          {
+           "t": "code",
+           "v": "rosbag2_storage_mcap"
+          },
+          {
+           "t": "text",
+           "v": " and "
+          },
+          {
+           "t": "code",
+           "v": "rosbag2_storage_sqlite3"
+          },
+          {
+           "t": "text",
+           "v": " behind it"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "rosbag2_py"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the Python bindings the command line sits on"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "rosbag2_tests"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "end-to-end tests that run the real command line"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "mcap_vendor"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "sqlite3_vendor"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "zstd_vendor"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "liblz4_vendor"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "third-party code the project builds for itself"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The split is worth a minute of thought, because it is the split the bench has too. "
+        },
+        {
+         "t": "code",
+         "v": "rosbag2_cpp"
+        },
+        {
+         "t": "text",
+         "v": " is logic with no ROS node in it, "
+        },
+        {
+         "t": "code",
+         "v": "rosbag2_transport"
+        },
+        {
+         "t": "text",
+         "v": " wraps it in nodes, and "
+        },
+        {
+         "t": "code",
+         "v": "ros2bag"
+        },
+        {
+         "t": "text",
+         "v": " wraps those in a command line. The bench's "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "run_scenario.sh"
+        },
+        {
+         "t": "text",
+         "v": " are the same three layers."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that the build is the one you are running:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "source ~/rosbag2_ws/install/setup.bash\nros2 pkg prefix rosbag2_transport     # your workspace, not /opt/ros/jazzy\nros2 bag --help"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Open a second terminal, don't source the overlay, and run "
+        },
+        {
+         "t": "code",
+         "v": "ros2 pkg prefix rosbag2_transport"
+        },
+        {
+         "t": "text",
+         "v": " again. It prints "
+        },
+        {
+         "t": "code",
+         "v": "/opt/ros/jazzy"
+        },
+        {
+         "t": "text",
+         "v": ". Those two terminals hold two different rosbag2s, and the difference between them is the single commonest cause of an afternoon spent debugging a fix that was never loaded."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Record and play something with it, so that \"it built\" becomes \"it works\":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run demo_nodes_cpp talker                       # terminal 1, without the overlay\nros2 bag record -o /tmp/oss_check --topics /chatter   # terminal 2, with the overlay\nros2 bag info /tmp/oss_check                          # terminal 2, after Ctrl+C"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when "
+        },
+        {
+         "t": "code",
+         "v": "colcon build --packages-up-to rosbag2"
+        },
+        {
+         "t": "text",
+         "v": " finishes without errors, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 pkg prefix rosbag2_transport"
+        },
+        {
+         "t": "text",
+         "v": " points at your workspace, and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag info"
+        },
+        {
+         "t": "text",
+         "v": " reads a bag your own build recorded. Write the wall time and the package count down now; the summary step needs them."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, rosbag2's tests run on your machine, you have run a single test file on its own, and you can say of one test what it fakes and what it really exercises."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Running someone else's tests is the fastest way to learn what a project believes about itself. The names tell you which behaviours the maintainers thought worth protecting, and the fixtures tell you where they drew the line between a unit test and an integration test. You also need them working before the next topic: a reproduction is only believable if the suite was green before you touched anything."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run the suite with the project's own commands:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/rosbag2_ws\ncolcon test --packages-up-to rosbag2 --return-code-on-test-failure\ncolcon test-result --verbose"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Expect it to take longer than the build and to be noisier. Some of these tests start processes, publish on real topics and wait on timing, which the bench met in its own exchange test. A released branch on a supported platform should come out green. A failure that repeats is a finding; a failure that does not repeat is a flaky test, which is also a finding, and the number of times out of ten is the part a maintainer wants."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Narrow it down, because the loop above is too slow to work in:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "colcon test --packages-select rosbag2_transport\ncolcon test-result --verbose --test-result-base build/rosbag2_transport\ncd build/rosbag2_transport\nctest -N                                   # the test names, without running them\nctest -R test_play_timing --output-on-failure"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ctest -R"
+        },
+        {
+         "t": "text",
+         "v": " takes a regular expression over the test names, so "
+        },
+        {
+         "t": "code",
+         "v": "-R test_play"
+        },
+        {
+         "t": "text",
+         "v": " runs the whole family. This is the loop for the rest of this track: change one file, "
+        },
+        {
+         "t": "code",
+         "v": "colcon build --packages-select <package>"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ctest -R <name>"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Read one test and one fixture. Open "
+         },
+         {
+          "t": "code",
+          "v": "rosbag2_transport/test/rosbag2_transport/test_play.cpp"
+         },
+         {
+          "t": "text",
+          "v": " next to "
+         },
+         {
+          "t": "code",
+          "v": "rosbag2_play_test_fixture.hpp"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "mock_sequential_reader.hpp"
+         },
+         {
+          "t": "text",
+          "v": " in the same folder. Notice what is faked: the player is handed a reader that holds messages the test made in memory, so no bag file is opened and no disk is touched, and the test then checks what the player published. That is the shape the supervisor topic used for "
+         },
+         {
+          "t": "code",
+          "v": "bench::Supervisor"
+         },
+         {
+          "t": "text",
+          "v": ", arrived at independently by another team, and seeing it twice is worth more than reading it once."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then open "
+        },
+        {
+         "t": "code",
+         "v": "rosbag2_tests/test/rosbag2_tests/test_rosbag2_play_end_to_end.cpp"
+        },
+        {
+         "t": "text",
+         "v": ", which starts the real command line in a subprocess and watches the topics. It catches the wiring that the unit tests cannot, and it is slower and flakier. Write down, in one line each, which of the two you would add a test to for a bug in the player's timing, and which for a bug in "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag play --start-paused"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Learn to find things without reading everything. These four moves answer most questions:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "grep -rn \"start-paused\" src/rosbag2 --include=*.cpp --include=*.py\ngit -C src/rosbag2 log --oneline -20 -- rosbag2_transport/src/rosbag2_transport/player.cpp\ngit -C src/rosbag2 log -S \"clock_publish_frequency\" --oneline\ngit -C src/rosbag2 blame -L 100,140 rosbag2_transport/src/rosbag2_transport/player.cpp"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "grep"
+        },
+        {
+         "t": "text",
+         "v": " finds where a name is used, and the first log finds who has been changing a file lately. "
+        },
+        {
+         "t": "code",
+         "v": "log -S"
+        },
+        {
+         "t": "text",
+         "v": " is the one people forget: it finds the commits where the count of a string changed, so it lands on the commit that introduced an option rather than on every commit that touched the file. From a commit you get its pull request, and from the pull request you get the argument that produced the behaviour you are looking at. "
+        },
+        {
+         "t": "code",
+         "v": "blame"
+        },
+        {
+         "t": "text",
+         "v": " is for one stubborn line, once the other three have failed."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove you can break a test on purpose, which is the only way to know the suite is watching the thing you think it is. Pick a named test from step 2, find the code it exercises, change one number or one condition, rebuild that package alone, and watch that test fail with a message you can read. Then put it back:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "git -C src/rosbag2 status\ngit -C src/rosbag2 restore rosbag2_transport/src/rosbag2_transport/player.cpp\ncolcon build --packages-select rosbag2_transport"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Check "
+        },
+        {
+         "t": "code",
+         "v": "git status"
+        },
+        {
+         "t": "text",
+         "v": " is clean before you move on. The next topic starts from an unmodified clone."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "colcon test --packages-up-to rosbag2"
+         },
+         {
+          "t": "text",
+          "v": " runs to the end and "
+         },
+         {
+          "t": "code",
+          "v": "colcon test-result --verbose"
+         },
+         {
+          "t": "text",
+          "v": " shows the result of every package;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "you can run one test by name in under a minute from a one-package rebuild;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "you made a named test fail on purpose and put the file back, with "
+         },
+         {
+          "t": "code",
+          "v": "git status"
+         },
+         {
+          "t": "text",
+          "v": " clean."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "notes",
+   "title": "Notes on failures and fixes",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "These are the ones most people meet on this build. Compare them with what happened to you, and add yours."
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "i",
+          "v": "`rosdep` says it cannot locate a key."
+         },
+         {
+          "t": "text",
+          "v": " Run "
+         },
+         {
+          "t": "code",
+          "v": "rosdep update"
+         },
+         {
+          "t": "text",
+          "v": " first. If a key is still missing, the branch does not match your distro: a Jazzy machine needs the "
+         },
+         {
+          "t": "code",
+          "v": "jazzy"
+         },
+         {
+          "t": "text",
+          "v": " branch, and "
+         },
+         {
+          "t": "code",
+          "v": "rolling"
+         },
+         {
+          "t": "text",
+          "v": " asks for packages Ubuntu 24.04 does not have."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "The build is killed, or the machine freezes."
+         },
+         {
+          "t": "text",
+          "v": " colcon builds several packages at once and each one starts several compiler jobs, and a few of rosbag2's dependencies are heavy. On a small machine, "
+         },
+         {
+          "t": "code",
+          "v": "MAKEFLAGS=\"-j2\" colcon build --packages-up-to rosbag2 --executor sequential"
+         },
+         {
+          "t": "text",
+          "v": " trades time for memory."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "`ros2 bag` behaves differently in two terminals."
+         },
+         {
+          "t": "text",
+          "v": " One has the overlay sourced and the other does not. "
+         },
+         {
+          "t": "code",
+          "v": "ros2 pkg prefix rosbag2_transport"
+         },
+         {
+          "t": "text",
+          "v": " answers it in one line. This also explains the version of the bug where a fix seems to have no effect."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "A test passes under `ctest` and fails under `colcon test`."
+         },
+         {
+          "t": "text",
+          "v": " Tests from several packages run at once and share a "
+         },
+         {
+          "t": "code",
+          "v": "ROS_DOMAIN_ID"
+         },
+         {
+          "t": "text",
+          "v": ", so one test's topics reach another's node. The bench met this in the first-nodes topic and answered it with "
+         },
+         {
+          "t": "code",
+          "v": "ament_add_ros_isolated_gtest"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "A test fails about one time in ten."
+         },
+         {
+          "t": "text",
+          "v": " Run it ten times with "
+         },
+         {
+          "t": "code",
+          "v": "ctest -R <name> --repeat until-fail:10"
+         },
+         {
+          "t": "text",
+          "v": " before you call it anything. The count is the finding, not the single failure."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "`colcon test` finishes and the shell reports success although a test failed."
+         },
+         {
+          "t": "text",
+          "v": " "
+         },
+         {
+          "t": "code",
+          "v": "colcon test"
+         },
+         {
+          "t": "text",
+          "v": " reports the failure in its summary and still exits 0 unless you pass "
+         },
+         {
+          "t": "code",
+          "v": "--return-code-on-test-failure"
+         },
+         {
+          "t": "text",
+          "v": ", which is the flag the bench's own "
+         },
+         {
+          "t": "code",
+          "v": "check.sh"
+         },
+         {
+          "t": "text",
+          "v": " carries for the same reason."
+         }
+        ],
+        [
+         {
+          "t": "i",
+          "v": "The clone is dirty and you cannot remember why."
+         },
+         {
+          "t": "text",
+          "v": " "
+         },
+         {
+          "t": "code",
+          "v": "git -C src/rosbag2 diff"
+         },
+         {
+          "t": "text",
+          "v": " before anything else. An experiment left in the tree is the reason a reproduction \"stops reproducing\" in the next topic."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write "
+        },
+        {
+         "t": "code",
+         "v": "docs/upstream-rosbag2.md"
+        },
+        {
+         "t": "text",
+         "v": " in the bench repository. It is the proof for this topic, and the next three topics add to the same file. It lives with your own work rather than in the clone, because the clone is somebody else's and will be reset, rebased and thrown away."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the commands in order, from the clone to a green test run, with the branch you used and the versions from "
+        },
+        {
+         "t": "code",
+         "v": "docs/environment.md"
+        },
+        {
+         "t": "text",
+         "v": ". Then the two numbers: the wall time of a full build and of a full test run on your machine, which are what tell you whether to build everything or one package. Then the map: the four layers of the project in one line each, and where the tests for each of them live."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "End with what broke and how you fixed it, in the six-line shape from your debugging notes, and one line you will want in three months: the command that tells you whether this terminal is running your build or the debian one."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The rosbag2 repository on the jazzy branch: its "
+     },
+     {
+      "t": "a",
+      "v": "README",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/README.md"
+     },
+     {
+      "t": "text",
+      "v": ", the "
+     },
+     {
+      "t": "a",
+      "v": "developer guide",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/DEVELOPING.md"
+     },
+     {
+      "t": "text",
+      "v": " with the build and test commands and the warning about overlaying a source build on the debian packages, and "
+     },
+     {
+      "t": "a",
+      "v": "CONTRIBUTING.md",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/CONTRIBUTING.md"
+     },
+     {
+      "t": "text",
+      "v": ", which asks for a "
+     },
+     {
+      "t": "code",
+      "v": "Signed-off-by"
+     },
+     {
+      "t": "text",
+      "v": " line on every commit under the "
+     },
+     {
+      "t": "a",
+      "v": "Developer Certificate of Origin",
+      "href": "https://developercertificate.org/"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 "
+     },
+     {
+      "t": "a",
+      "v": "developer guide",
+      "href": "https://docs.ros.org/en/jazzy/The-ROS2-Project/Contributing/Developer-Guide.html"
+     },
+     {
+      "t": "text",
+      "v": ", for how the project expects changes and reports to arrive."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "building from source",
+      "href": "https://docs.ros.org/en/jazzy/Installation/Alternatives/Ubuntu-Development-Setup.html"
+     },
+     {
+      "t": "text",
+      "v": " and on "
+     },
+     {
+      "t": "a",
+      "v": "workspace overlays",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-Client-Libraries/Creating-A-Workspace/Creating-A-Workspace.html"
+     },
+     {
+      "t": "text",
+      "v": ", which is why one terminal must hold one workspace."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "colcon's documentation",
+      "href": "https://colcon.readthedocs.io/en/released/reference/verb/test.html"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "test"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "test-result"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "CTest",
+      "href": "https://cmake.org/cmake/help/latest/manual/ctest.1.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "-R"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "-N"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "--repeat"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The test files this topic reads: "
+     },
+     {
+      "t": "a",
+      "v": "test_play.cpp",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/rosbag2_transport/test/rosbag2_transport/test_play.cpp"
+     },
+     {
+      "t": "text",
+      "v": " with its "
+     },
+     {
+      "t": "a",
+      "v": "mock reader",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/rosbag2_transport/test/rosbag2_transport/mock_sequential_reader.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", and the end-to-end "
+     },
+     {
+      "t": "a",
+      "v": "test_rosbag2_play_end_to_end.cpp",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/rosbag2_tests/test/rosbag2_tests/test_rosbag2_play_end_to_end.cpp"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,3429 @@
+{
+ "id": "cpp-algorithms-lambdas",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Rewrite this loop with a standard algorithm and a lambda. Then say what would change if the lambda captured "
+     },
+     {
+      "t": "code",
+      "v": "limit_m"
+     },
+     {
+      "t": "text",
+      "v": " by reference instead of by value, and when that difference matters. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "int count_close(const std::vector<double>& ranges_m, double limit_m) {\n  int n = 0;\n  for (std::size_t i = 0; i < ranges_m.size(); ++i) {\n    if (ranges_m[i] > 0.0 && ranges_m[i] < limit_m) ++n;  // 0 means the beam saw nothing\n  }\n  return n;\n}"
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <vector>\n\n// Counts the returns closer than limit_m; a range of 0 means the beam saw nothing.\n[[nodiscard]] std::ptrdiff_t count_close(std::span<const double> ranges_m, double limit_m) {\n  return std::ranges::count_if(ranges_m, [limit_m](double r) { return r > 0.0 && r < limit_m; });\n}\n\nint main() {\n  const std::vector<double> scan{0.0, 0.4, 1.2, 0.8, 3.5};\n  std::cout << std::format(\"close returns: {}\\n\", count_close(scan, 1.0));\n\n  double limit_m = 1.0;\n  const auto by_value = [limit_m](double r) { return r > 0.0 && r < limit_m; };       // copies 1.0 now\n  const auto by_reference = [&limit_m](double r) { return r > 0.0 && r < limit_m; };  // reads limit_m at each call\n  limit_m = 2.0;\n  std::cout << std::format(\"by value: {}, by reference: {}\\n\", std::ranges::count_if(scan, by_value),\n                           std::ranges::count_if(scan, by_reference));\n}"
+   },
+   {
+    "t": "output",
+    "text": "close returns: 2\nby value: 2, by reference: 3"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "std::ranges::count_if"
+     },
+     {
+      "t": "text",
+      "v": " names what the loop does, and it has no index to get wrong. The parameter becomes a "
+     },
+     {
+      "t": "code",
+      "v": "std::span<const double>"
+     },
+     {
+      "t": "text",
+      "v": ", which accepts a vector, an array or a part of either, and the result is the algorithm's own type, a signed "
+     },
+     {
+      "t": "code",
+      "v": "std::ptrdiff_t"
+     },
+     {
+      "t": "text",
+      "v": ", instead of an "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " that could overflow."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A capture by value copies "
+     },
+     {
+      "t": "code",
+      "v": "limit_m"
+     },
+     {
+      "t": "text",
+      "v": " into the lambda when the lambda is created. A capture by reference stores a reference, and each call reads the variable as it is at that moment. Inside "
+     },
+     {
+      "t": "code",
+      "v": "count_close"
+     },
+     {
+      "t": "text",
+      "v": " they give the same answer, because nothing changes "
+     },
+     {
+      "t": "code",
+      "v": "limit_m"
+     },
+     {
+      "t": "text",
+      "v": " while the algorithm runs. The difference shows in two cases. When the variable changes between creating the lambda and calling it, as in the second half of the program, the two lambdas see 1.0 and 2.0. And when the lambda outlives the variable, because it is returned, stored or handed to another thread, a reference capture dangles. The Core Guidelines turn this into two rules: capture by reference for a lambda used locally, such as one passed to an algorithm ("
+     },
+     {
+      "t": "a",
+      "v": "F.52",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-reference-capture"
+     },
+     {
+      "t": "text",
+      "v": "), and don't capture by reference in a lambda that leaves the scope ("
+     },
+     {
+      "t": "a",
+      "v": "F.53",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-value-capture"
+     },
+     {
+      "t": "text",
+      "v": "). For a "
+     },
+     {
+      "t": "code",
+      "v": "double"
+     },
+     {
+      "t": "text",
+      "v": ", a copy costs nothing, so by value is the simpler choice here."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with a correct "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::count_if"
+     },
+     {
+      "t": "text",
+      "v": ", with or without a projection, and an explanation that names both cases: a later change to the variable, and a lambda that outlives it. A correct rewrite with only one of the two is a partial pass. A rewrite that keeps an index loop, or an answer that says reference capture is always faster, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A standard algorithm is a function in "
+    },
+    {
+     "t": "code",
+     "v": "<algorithm>"
+    },
+    {
+     "t": "text",
+     "v": " or "
+    },
+    {
+     "t": "code",
+     "v": "<numeric>"
+    },
+    {
+     "t": "text",
+     "v": " that names an operation over a range instead of leaving you to write its loop again: "
+    },
+    {
+     "t": "code",
+     "v": "sort"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "count_if"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "accumulate"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "partition"
+    },
+    {
+     "t": "text",
+     "v": ". A lambda is an unnamed function object you write inline and pass to the algorithm; the compiler turns it into a class of its own, with one member per captured variable and a call operator built from its body. A comparator is a callable an algorithm or a sorted container asks \"must a come before b\", and it has to be a "
+    },
+    {
+     "t": "i",
+     "v": "strict weak ordering"
+    },
+    {
+     "t": "text",
+     "v": ", a set of rules the sorting topic gives, or the behaviour is undefined."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this solves is a loop that hides what it does until you read every line of it, carries its own index to get wrong, and has no complexity guarantee beyond what you can prove yourself. Naming the operation instead, "
+    },
+    {
+     "t": "code",
+     "v": "std::ranges::stable_partition(ds, confident)"
+    },
+    {
+     "t": "text",
+     "v": " for instance, tells the reader the intent before they read the lambda, and it can't forget a "
+    },
+    {
+     "t": "code",
+     "v": "break"
+    },
+    {
+     "t": "text",
+     "v": " or run off the end."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is the projection and the capture. Most range algorithms take a "
+    },
+    {
+     "t": "i",
+     "v": "projection"
+    },
+    {
+     "t": "text",
+     "v": ", a function applied to each element before it is compared, such as "
+    },
+    {
+     "t": "code",
+     "v": "&Detection::range_m"
+    },
+    {
+     "t": "text",
+     "v": ", so a call like "
+    },
+    {
+     "t": "code",
+     "v": "std::ranges::sort(ds, {}, &Detection::range_m)"
+    },
+    {
+     "t": "text",
+     "v": " needs no comparison lambda to write or get wrong. Where a lambda is still the argument, what it captures decides what it reads. A capture by value copies the variable into the lambda's own member when the lambda is created; a capture by reference stores a reference and reads the variable fresh on every call."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is two ways to get this wrong. A reference capture that is then stored, returned, or handed to another thread outlives the variable it reads, and dangles once that variable is gone. And a lambda carrying state, such as a counter, breaks what the range algorithms require of a predicate, that calling it twice with the same argument gives the same answer, so its results depend on how often the library copies it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet both in the robot: a debounce lambda keeping state between calls must be passed by reference or with "
+    },
+    {
+     "t": "code",
+     "v": "std::ref"
+    },
+    {
+     "t": "text",
+     "v": " to an iterator algorithm, never to a range one, and the interview question is exactly the capture choice: rewrite a raw loop over lidar ranges with "
+    },
+    {
+     "t": "code",
+     "v": "count_if"
+    },
+    {
+     "t": "text",
+     "v": " and a lambda, then say what changes if it captures its limit by reference instead of by value."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "algorithms",
+   "title": "The core algorithms and the erase-remove idiom",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every algorithm call in this program replaces a loop you have written many times. The data are a camera's detections of obstacles:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <numeric>\n#include <string_view>\n#include <vector>\n\nstruct Detection {\n  std::int64_t id;\n  double range_m;\n  double confidence;\n};\n\nvoid show(std::string_view label, const std::vector<Detection>& ds) {\n  std::cout << label << ':';\n  for (const Detection& d : ds) std::cout << std::format(\" {}@{}m\", d.id, d.range_m);\n  std::cout << '\\n';\n}\n\nint main() {\n  std::vector<Detection> ds{{.id = 1, .range_m = 4.2, .confidence = 0.95}, {.id = 2, .range_m = 0.8, .confidence = 0.40},\n                            {.id = 3, .range_m = 2.5, .confidence = 0.91}, {.id = 4, .range_m = 1.7, .confidence = 0.88},\n                            {.id = 5, .range_m = 6.0, .confidence = 0.30}};\n\n  const auto confident = [](const Detection& d) { return d.confidence >= 0.5; };\n  std::cout << std::format(\"confident: {} of {}, any closer than 1 m: {}\\n\", std::ranges::count_if(ds, confident),\n                           ds.size(), std::ranges::any_of(ds, [](const Detection& d) { return d.range_m < 1.0; }));\n\n  const auto best = std::ranges::max_element(ds, {}, &Detection::confidence);  // projection: compare confidences\n  std::cout << std::format(\"most confident: {}\\n\", best->id);\n\n  std::ranges::sort(ds, {}, &Detection::range_m);  // nearest first\n  show(\"by range\", ds);\n  const auto from_2m = std::ranges::lower_bound(ds, 2.0, {}, &Detection::range_m);  // needs the same order\n  std::cout << std::format(\"first at or beyond 2 m: {}\\n\", from_2m->id);\n\n  std::ranges::stable_partition(ds, confident);  // confident first, each group still nearest first\n  show(\"confident first\", ds);\n\n  const double total_m = std::accumulate(ds.begin(), ds.end(), 0.0, [](double sum, const Detection& d) { return sum + d.range_m; });\n  std::vector<std::int64_t> ids;\n  std::ranges::transform(ds, std::back_inserter(ids), &Detection::id);\n  std::cout << std::format(\"sum of ranges {:.1f} m, {} ids copied\\n\", total_m, ids.size());\n\n  const auto erased = std::erase_if(ds, [](const Detection& d) { return d.confidence < 0.5; });\n  show(std::format(\"erased {}\", erased), ds);\n}"
+      },
+      {
+       "t": "output",
+       "text": "confident: 3 of 5, any closer than 1 m: true\nmost confident: 1\nby range: 2@0.8m 4@1.7m 3@2.5m 1@4.2m 5@6m\nfirst at or beyond 2 m: 3\nconfident first: 4@1.7m 3@2.5m 1@4.2m 2@0.8m 5@6m\nsum of ranges 15.2 m, 5 ids copied\nerased 2: 4@1.7m 3@2.5m 1@4.2m"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The argument for them is not fewer lines. A call names its intent, so the reader knows what "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::stable_partition"
+        },
+        {
+         "t": "text",
+         "v": " does before reading the lambda, while a loop has to be read to the end. It has no index to get wrong, no early "
+        },
+        {
+         "t": "code",
+         "v": "break"
+        },
+        {
+         "t": "text",
+         "v": " to forget, and a documented complexity. Klaus Iglberger's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on (range) algorithms",
+         "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2023) makes this case, and the Core Guidelines state it as prefer the standard library to hand-written code ("
+        },
+        {
+         "t": "a",
+         "v": "ES.1",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+        },
+        {
+         "t": "text",
+         "v": "). Conor Hoekstra's "
+        },
+        {
+         "t": "a",
+         "v": "Algorithm Intuition",
+         "href": "https://www.youtube.com/watch?v=pUEnO6SvAMo"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019) trains the other half: seeing the algorithm inside a loop you are about to write. These are the ones to know by sight:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "The loop you would write"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The algorithm"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Cost for n elements"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "find the first element that matches"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "find"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "find_if"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "count the matches; does any, all or none match"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "count_if"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "any_of"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "all_of"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "none_of"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "the smallest or largest, by some field"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "min_element"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "max_element"
+          },
+          {
+           "t": "text",
+           "v": " with a projection"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "sort by a field"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "sort"
+          },
+          {
+           "t": "text",
+           "v": " with a projection; "
+          },
+          {
+           "t": "code",
+           "v": "stable_sort"
+          },
+          {
+           "t": "text",
+           "v": " keeps equal elements in order"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n log n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "first position at or after a value, in sorted data"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "lower_bound"
+          },
+          {
+           "t": "text",
+           "v": "; "
+          },
+          {
+           "t": "code",
+           "v": "upper_bound"
+          },
+          {
+           "t": "text",
+           "v": "; "
+          },
+          {
+           "t": "code",
+           "v": "equal_range"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(log n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "matches first, the rest after"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "partition"
+          },
+          {
+           "t": "text",
+           "v": "; "
+          },
+          {
+           "t": "code",
+           "v": "stable_partition"
+          },
+          {
+           "t": "text",
+           "v": " keeps the order in both groups"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n); "
+          },
+          {
+           "t": "code",
+           "v": "stable_partition"
+          },
+          {
+           "t": "text",
+           "v": " O(n log n) without spare memory"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "sum, or fold into one value"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::accumulate"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "std::reduce"
+          },
+          {
+           "t": "text",
+           "v": " from "
+          },
+          {
+           "t": "code",
+           "v": "<numeric>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "build one value per element"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "transform"
+          },
+          {
+           "t": "text",
+           "v": " into a "
+          },
+          {
+           "t": "code",
+           "v": "std::back_inserter"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "delete the matches"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::erase_if(container, pred)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "drop repeats next to each other"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "unique"
+          },
+          {
+           "t": "text",
+           "v": ", then erase; after a "
+          },
+          {
+           "t": "code",
+           "v": "sort"
+          },
+          {
+           "t": "text",
+           "v": ", it drops every repeat"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The ranges versions take the whole container, and most take a "
+        },
+        {
+         "t": "i",
+         "v": "projection"
+        },
+        {
+         "t": "text",
+         "v": " as their last argument: a function applied to each element before it is compared or tested. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::sort(ds, {}, &Detection::range_m)"
+        },
+        {
+         "t": "text",
+         "v": " sorts by range with the default "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::less"
+        },
+        {
+         "t": "text",
+         "v": ", written "
+        },
+        {
+         "t": "code",
+         "v": "{}"
+        },
+        {
+         "t": "text",
+         "v": ", and a pointer to the member as the projection. There is no comparison lambda to write, and so none to get wrong. "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " takes the value to find and the same projection, and it must search the order the data were sorted in: here both use "
+        },
+        {
+         "t": "code",
+         "v": "range_m"
+        },
+        {
+         "t": "text",
+         "v": ". The binary search topic shows what a mismatched order returns. "
+        },
+        {
+         "t": "code",
+         "v": "<numeric>"
+        },
+        {
+         "t": "text",
+         "v": " has no ranges versions in C++20, which is why the sum uses iterators; C++23 adds "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::fold_left"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Passing a lambda rather than a pointer to a function has a second benefit. Each lambda has its own type, so the algorithm is instantiated for that lambda and the compiler can inline the call, which it rarely can through a function pointer ("
+        },
+        {
+         "t": "a",
+         "v": "T.40",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-fo"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last line hides the most famous idiom of the old library. An algorithm sees elements through iterators, and an iterator can't remove an element from its container. So "
+        },
+        {
+         "t": "code",
+         "v": "remove"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "remove_if"
+        },
+        {
+         "t": "text",
+         "v": " don't remove. They move the elements to keep to the front and return what is left over at the back, which Nicolai Josuttis works through on slides 35 to 37 of his "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on iterators",
+         "href": "https://www.youtube.com/watch?v=26aW6aBVpk0"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2023):"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <vector>\n\nint main() {\n  std::vector<int> ranges_mm{820, 0, 1540, 0, 610};\n  const auto tail = std::ranges::remove(ranges_mm, 0);  // moves the kept values forward; removes nothing\n  std::cout << std::format(\"after remove: size {}, kept {}, leftover {}\\n\", ranges_mm.size(),\n                           std::distance(ranges_mm.begin(), tail.begin()), tail.size());\n  ranges_mm.erase(tail.begin(), tail.end());  // the erase half of erase-remove\n  std::cout << std::format(\"after erase:  size {}\\n\", ranges_mm.size());\n}"
+      },
+      {
+       "t": "output",
+       "text": "after remove: size 5, kept 3, leftover 2\nafter erase:  size 3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::ranges::remove"
+        },
+        {
+         "t": "text",
+         "v": " returns the leftover part as a "
+        },
+        {
+         "t": "code",
+         "v": "subrange"
+        },
+        {
+         "t": "text",
+         "v": ", and the elements in it are valid but unspecified. The container's "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " then cuts it off: the "
+        },
+        {
+         "t": "i",
+         "v": "erase-remove idiom"
+        },
+        {
+         "t": "text",
+         "v": ". Forgetting the second half compiles and leaves the size unchanged. The classic form is "
+        },
+        {
+         "t": "code",
+         "v": "v.erase(std::remove(v.begin(), v.end(), 0), v.end())"
+        },
+        {
+         "t": "text",
+         "v": ", and leaving out its last "
+        },
+        {
+         "t": "code",
+         "v": "v.end()"
+        },
+        {
+         "t": "text",
+         "v": " still compiles: it calls the "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " that removes one element, not the one that removes the tail. C++20's "
+        },
+        {
+         "t": "code",
+         "v": "std::erase(v, value)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::erase_if(v, pred)"
+        },
+        {
+         "t": "text",
+         "v": " do both halves and return how many elements they erased. They are not offered for every container. "
+        },
+        {
+         "t": "code",
+         "v": "std::erase"
+        },
+        {
+         "t": "text",
+         "v": " exists for "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::list"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::forward_list"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::basic_string"
+        },
+        {
+         "t": "text",
+         "v": ", the containers where removing by value means this shuffle; the ordered and unordered containers get "
+        },
+        {
+         "t": "code",
+         "v": "std::erase_if"
+        },
+        {
+         "t": "text",
+         "v": " only, because erasing by value there is "
+        },
+        {
+         "t": "code",
+         "v": "erase(key)"
+        },
+        {
+         "t": "text",
+         "v": "; "
+        },
+        {
+         "t": "code",
+         "v": "std::array"
+        },
+        {
+         "t": "text",
+         "v": " gets neither, because it can't shrink; and the three adaptors, "
+        },
+        {
+         "t": "code",
+         "v": "std::stack"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::queue"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::priority_queue"
+        },
+        {
+         "t": "text",
+         "v": ", get neither either, because they hide their elements behind "
+        },
+        {
+         "t": "code",
+         "v": "top"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "front"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": ". Use them, and recognise the idiom in older code."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. A range sensor logs "
+        },
+        {
+         "t": "code",
+         "v": "Reading{std::int64_t stamp_ms; double range_m; bool valid;}"
+        },
+        {
+         "t": "text",
+         "v": " in time order. Write each function with one standard algorithm, and return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " where there may be no answer:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "drop_invalid(readings)"
+         },
+         {
+          "t": "text",
+          "v": " removes the invalid readings from a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<Reading>"
+         },
+         {
+          "t": "text",
+          "v": " and returns how many there were."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "nearest(readings)"
+         },
+         {
+          "t": "text",
+          "v": " returns the reading with the smallest range."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "first_from(readings, stamp_ms)"
+         },
+         {
+          "t": "text",
+          "v": " returns the first reading at or after a stamp, in O(log n)."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "mean_range(readings)"
+         },
+         {
+          "t": "text",
+          "v": " returns the mean range."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "close_first(readings, limit_m)"
+         },
+         {
+          "t": "text",
+          "v": " puts the readings closer than "
+         },
+         {
+          "t": "code",
+          "v": "limit_m"
+         },
+         {
+          "t": "text",
+          "v": " first, keeps the time order within both groups, and returns how many are close."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "stamps(readings)"
+         },
+         {
+          "t": "text",
+          "v": " returns the stamps, in the current order, allocating once."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test with five readings, one of them invalid, and with an empty input where it matters."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <numeric>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Reading {\n  std::int64_t stamp_ms;\n  double range_m;\n  bool valid;\n};\n\n// 1. Removes the invalid readings and says how many there were.\n[[nodiscard]] std::ptrdiff_t drop_invalid(std::vector<Reading>& readings) {\n  return static_cast<std::ptrdiff_t>(std::erase_if(readings, [](const Reading& r) { return !r.valid; }));\n}\n\n// 2. The closest reading, if there is one.\n[[nodiscard]] std::optional<Reading> nearest(std::span<const Reading> readings) {\n  const auto it = std::ranges::min_element(readings, {}, &Reading::range_m);\n  if (it == readings.end()) return std::nullopt;\n  return *it;\n}\n\n// 3. The first reading at or after stamp_ms, in readings sorted by stamp.\n[[nodiscard]] std::optional<Reading> first_from(std::span<const Reading> readings, std::int64_t stamp_ms) {\n  const auto it = std::ranges::lower_bound(readings, stamp_ms, {}, &Reading::stamp_ms);\n  if (it == readings.end()) return std::nullopt;\n  return *it;\n}\n\n// 4. The mean range, if there are readings.\n[[nodiscard]] std::optional<double> mean_range(std::span<const Reading> readings) {\n  if (readings.empty()) return std::nullopt;\n  const double sum = std::accumulate(readings.begin(), readings.end(), 0.0,\n                                     [](double total, const Reading& r) { return total + r.range_m; });\n  return sum / static_cast<double>(readings.size());\n}\n\n// 5. Puts the readings closer than limit_m first, keeping the time order in both groups,\n//    and returns how many are close.\n[[nodiscard]] std::ptrdiff_t close_first(std::vector<Reading>& readings, double limit_m) {\n  const auto far = std::ranges::stable_partition(readings, [limit_m](const Reading& r) { return r.range_m < limit_m; });\n  return std::distance(readings.begin(), far.begin());\n}\n\n// 6. The stamps, in the current order.\n[[nodiscard]] std::vector<std::int64_t> stamps(std::span<const Reading> readings) {\n  std::vector<std::int64_t> out;\n  out.reserve(readings.size());\n  std::ranges::transform(readings, std::back_inserter(out), &Reading::stamp_ms);\n  return out;\n}\n\n[[nodiscard]] std::string show(const std::optional<Reading>& r) {\n  return r ? std::format(\"{} ms at {} m\", r->stamp_ms, r->range_m) : \"none\";\n}\n\nint main() {\n  std::vector<Reading> log{{.stamp_ms = 100, .range_m = 2.4, .valid = true}, {.stamp_ms = 200, .range_m = 0.0, .valid = false},\n                           {.stamp_ms = 300, .range_m = 0.9, .valid = true}, {.stamp_ms = 400, .range_m = 3.1, .valid = true},\n                           {.stamp_ms = 500, .range_m = 0.6, .valid = true}};\n  std::cout << std::format(\"dropped {} invalid\\n\", drop_invalid(log));\n  std::cout << std::format(\"nearest: {}\\n\", show(nearest(log)));\n  std::cout << std::format(\"first from 250 ms: {}\\n\", show(first_from(log, 250)));\n  std::cout << std::format(\"first from 600 ms: {}\\n\", show(first_from(log, 600)));\n  std::cout << std::format(\"mean range: {:.2f} m\\n\", mean_range(log).value_or(0.0));\n  std::cout << std::format(\"mean of nothing: {}\\n\", mean_range({}).has_value() ? \"a value\" : \"no value\");\n  const std::ptrdiff_t close = close_first(log, 1.0);\n  std::cout << std::format(\"{} close, stamps now:\", close);\n  for (const std::int64_t s : stamps(log)) std::cout << ' ' << s;\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "dropped 1 invalid\nnearest: 500 ms at 0.6 m\nfirst from 250 ms: 300 ms at 0.9 m\nfirst from 600 ms: none\nmean range: 1.75 m\nmean of nothing: no value\n2 close, stamps now: 300 500 100 400"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Points to check in yours. "
+        },
+        {
+         "t": "code",
+         "v": "drop_invalid"
+        },
+        {
+         "t": "text",
+         "v": " changes the size, so it takes the vector itself; the others only read, or keep the size, so they take a "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "nearest"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "first_from"
+        },
+        {
+         "t": "text",
+         "v": " compare the returned iterator with "
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": " before dereferencing, because an empty input or a stamp after the last reading returns "
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "first_from"
+        },
+        {
+         "t": "text",
+         "v": " relies on the log being in time order, which a projection states in the call: "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "stamp_ms"
+        },
+        {
+         "t": "text",
+         "v": " searches the order the log was written in. "
+        },
+        {
+         "t": "code",
+         "v": "mean_range"
+        },
+        {
+         "t": "text",
+         "v": " checks for no readings before dividing, where a 0.0 would look like a real mean. "
+        },
+        {
+         "t": "code",
+         "v": "close_first"
+        },
+        {
+         "t": "text",
+         "v": " needs "
+        },
+        {
+         "t": "code",
+         "v": "stable_partition"
+        },
+        {
+         "t": "text",
+         "v": ", not "
+        },
+        {
+         "t": "code",
+         "v": "partition"
+        },
+        {
+         "t": "text",
+         "v": ", to keep the time order: 300 before 500 among the close readings, 100 before 400 among the far ones. It returns a "
+        },
+        {
+         "t": "code",
+         "v": "subrange"
+        },
+        {
+         "t": "text",
+         "v": " for the second group, and the distance to its start is the size of the first."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "comparators",
+   "title": "Comparators and strict weak ordering",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A comparator answers one question: must a come before b? The sorting topic states the four rules it has to follow, a "
+        },
+        {
+         "t": "i",
+         "v": "strict weak ordering"
+        },
+        {
+         "t": "text",
+         "v": ", shows "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " with a "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": " comparison reading past the end of a vector of 17 equal values, and builds a small checker for the rules. This section is about writing comparators that obey the rules without having to check them, and about the containers that keep a comparator for their whole life."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three ways to state an order, from the least code to the most:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <tuple>\n#include <vector>\n\nstruct Job {\n  std::string name;\n  std::int32_t priority;  // higher runs first\n  std::int64_t deadline_ms;\n};\n\nvoid show(std::string_view label, const std::vector<Job>& jobs) {\n  std::cout << std::format(\"{:<24}\", label);\n  for (const Job& j : jobs) std::cout << ' ' << j.name;\n  std::cout << '\\n';\n}\n\nint main() {\n  const std::vector<Job> jobs{{.name = \"charge\", .priority = 1, .deadline_ms = 900},\n                              {.name = \"deliver\", .priority = 3, .deadline_ms = 500},\n                              {.name = \"inspect\", .priority = 3, .deadline_ms = 200},\n                              {.name = \"map\", .priority = 2, .deadline_ms = 100}};\n\n  auto by_deadline = jobs;\n  std::ranges::sort(by_deadline, {}, &Job::deadline_ms);  // one key: a projection and the default <\n  show(\"deadline\", by_deadline);\n\n  auto by_priority = jobs;\n  std::ranges::stable_sort(by_priority, std::ranges::greater{}, &Job::priority);  // descending; ties keep input order\n  show(\"priority, descending\", by_priority);\n\n  // Two keys: priority descending, then deadline ascending. std::tie compares the\n  // priorities first, and the deadlines only when the priorities are equal.\n  auto by_both = jobs;\n  std::ranges::sort(by_both, [](const Job& a, const Job& b) {\n    return std::tie(b.priority, a.deadline_ms) < std::tie(a.priority, b.deadline_ms);\n  });\n  show(\"priority, then deadline\", by_both);\n}"
+      },
+      {
+       "t": "output",
+       "text": "deadline                 map inspect deliver charge\npriority, descending     deliver inspect map charge\npriority, then deadline  inspect deliver map charge"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A projection with "
+        },
+        {
+         "t": "code",
+         "v": "{}"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::greater{}"
+        },
+        {
+         "t": "text",
+         "v": " borrows the ordering of "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": ", which is a strict weak ordering for everything except NaN. "
+        },
+        {
+         "t": "code",
+         "v": "stable_sort"
+        },
+        {
+         "t": "text",
+         "v": " keeps "
+        },
+        {
+         "t": "code",
+         "v": "deliver"
+        },
+        {
+         "t": "text",
+         "v": " before "
+        },
+        {
+         "t": "code",
+         "v": "inspect"
+        },
+        {
+         "t": "text",
+         "v": ", their order in the input, because their priorities are equal. For more than one key, "
+        },
+        {
+         "t": "code",
+         "v": "std::tie"
+        },
+        {
+         "t": "text",
+         "v": " builds tuples of references and compares them left to right, which is the rule people try to write by hand and get wrong; swapping "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " in one position makes that key descending. A type whose natural order is its fields in declaration order can say so once, with "
+        },
+        {
+         "t": "code",
+         "v": "auto operator<=>(const Job&) const = default;"
+        },
+        {
+         "t": "text",
+         "v": ", and then needs no comparator at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A sort uses its comparator for one call. "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::priority_queue"
+        },
+        {
+         "t": "text",
+         "v": " keep theirs as part of the type and use it on every insert and lookup, so the rules must hold for as long as an element stays in the container. That adds a requirement that no sort has: the order of two elements must not change while they are in the container. An element's key can't change through the container, because "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " hands out only "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " elements and "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " makes the key "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ". It can still change behind the container's back, when the comparator reads through a pointer, and the failure cases show what that does. To change a key, take the element out, change it and put it back. For a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": ", C++17's "
+        },
+        {
+         "t": "code",
+         "v": "extract"
+        },
+        {
+         "t": "text",
+         "v": " does that without a new allocation: "
+        },
+        {
+         "t": "code",
+         "v": "auto node = m.extract(key); node.key() = new_key; m.insert(std::move(node));"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The sorting topic's checker showed that \"by x, then by y\" written as "
+        },
+        {
+         "t": "code",
+         "v": "a.x < b.x || a.y < b.y"
+        },
+        {
+         "t": "text",
+         "v": " breaks asymmetry: it says (1, 2) comes before (2, 1), and (2, 1) before (1, 2). In a "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " that gives a wrong order. In a "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " it breaks the tree itself:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:80 byte(s) leaked in 2 allocation(s)",
+       "text": "#include <format>\n#include <iostream>\n#include <set>\n\nstruct Cell {\n  int x;\n  int y;\n};\n\n// Meant as \"by x, then by y\". It says (1, 2) < (2, 1) and (2, 1) < (1, 2).\nstruct BadLess {\n  bool operator()(const Cell& a, const Cell& b) const { return a.x < b.x || a.y < b.y; }\n};\n\nint main() {\n  const std::set<Cell, BadLess> visited{{1, 2}, {2, 1}, {0, 5}, {3, 0}};\n  std::cout << std::format(\"size {}, contains (2, 1): {}\\n\", visited.size(), visited.contains({2, 1}));\n  for (const Cell& c : visited) std::cout << std::format(\"({}, {}) \", c.x, c.y);\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run with "
+        },
+        {
+         "t": "code",
+         "v": "ASAN_OPTIONS=detect_leaks=0"
+        },
+        {
+         "t": "text",
+         "v": ", it prints "
+        },
+        {
+         "t": "code",
+         "v": "size 4, contains (2, 1): false"
+        },
+        {
+         "t": "text",
+         "v": " and then lists two cells, (2, 1) and (1, 2). With leak detection on, LeakSanitizer reports two 40-byte tree nodes that the set's destructor never freed. The initializer list inserts each cell with the hint \"at the end\", and a hinted insert trusts the comparator: when the new cell compares greater than the largest so far, it links the new node directly below that node, on the side the comparator picks. "
+        },
+        {
+         "t": "code",
+         "v": "BadLess"
+        },
+        {
+         "t": "text",
+         "v": " says each new cell is both greater and smaller than (1, 2), so the set links it as the left child of (1, 2), over the node already there, if there is one. (0, 5) overwrites (2, 1), and (3, 0) overwrites (0, 5). Two nodes end up linked to nothing: "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": " counts 4, a search from the root can't find them, and neither can the destructor. Iteration starts from the set's pointer to its smallest node, which still points at (2, 1), and that is why it lists a cell that "
+        },
+        {
+         "t": "code",
+         "v": "contains"
+        },
+        {
+         "t": "text",
+         "v": " can't find. The fix is the "
+        },
+        {
+         "t": "code",
+         "v": "std::tie"
+        },
+        {
+         "t": "text",
+         "v": " form above, or a defaulted "
+        },
+        {
+         "t": "code",
+         "v": "<=>"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "Cell"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A NaN key does something quieter. Every comparison with NaN is false, so NaN is "
+        },
+        {
+         "t": "i",
+         "v": "equivalent"
+        },
+        {
+         "t": "text",
+         "v": " to every value: neither comes before the other, and an ordered container treats equivalent keys as equal:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cmath>\n#include <compare>\n#include <format>\n#include <iostream>\n#include <limits>\n#include <set>\n\nint main() {\n  // REP 117 gives a laser reading three special values: +Inf for a beam with no return,\n  // -Inf for a target too close to measure, and a quiet NaN for a reading the driver can't trust.\n  constexpr double bad_reading = std::numeric_limits<double>::quiet_NaN();\n  std::set<double> ranges_m{bad_reading};\n  ranges_m.insert(1.5);\n  ranges_m.insert(0.7);\n  std::cout << std::format(\"size {}, contains 1.5: {}, contains 42.0: {}\\n\", ranges_m.size(), ranges_m.contains(1.5),\n                           ranges_m.contains(42.0));\n\n  // std::strong_order gives every value a place, and a NaN's sign bit decides which end it goes to.\n  const double negative_nan = std::copysign(bad_reading, -1.0);\n  const auto by_strong_order = [](double a, double b) { return std::strong_order(a, b) < 0; };\n  std::set<double, decltype(by_strong_order)> ordered(by_strong_order);\n  for (const double v : {1.5, 0.7, bad_reading, negative_nan}) ordered.insert(v);\n  std::cout << std::format(\"strong_order: size {}, sign bit of quiet_NaN() {}, of the copysign NaN {}\\n\",\n                           ordered.size(), std::signbit(bad_reading), std::signbit(negative_nan));\n  std::cout << std::format(\"first is a NaN: {}, last is a NaN: {}\\n\", std::isnan(*ordered.begin()),\n                           std::isnan(*ordered.rbegin()));\n}"
+      },
+      {
+       "t": "output",
+       "text": "size 1, contains 1.5: true, contains 42.0: true\nstrong_order: size 4, sign bit of quiet_NaN() false, of the copysign NaN true\nfirst is a NaN: true, last is a NaN: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The set refused both inserts, because each value was \"already there\", and it claims to contain any value you ask about. Filter NaNs out before they reach an ordered container, or order with "
+        },
+        {
+         "t": "code",
+         "v": "std::strong_order"
+        },
+        {
+         "t": "text",
+         "v": ", which gives every value including NaNs a place, as the sorting topic shows. Where a NaN lands depends on its sign bit: "
+        },
+        {
+         "t": "code",
+         "v": "std::strong_order"
+        },
+        {
+         "t": "text",
+         "v": " sorts a NaN with the sign bit set before every number, and one with the bit clear after every number, which is why the set above has a NaN at each end. Build the sign-set one with "
+        },
+        {
+         "t": "code",
+         "v": "std::copysign"
+        },
+        {
+         "t": "text",
+         "v": ", which says what you mean at any optimisation level. On x86-64 the division "
+        },
+        {
+         "t": "code",
+         "v": "0.0 / 0.0"
+        },
+        {
+         "t": "text",
+         "v": " also produces a sign-set NaN at run time, but GCC 13 folds that division at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " and hands "
+        },
+        {
+         "t": "code",
+         "v": "std::signbit"
+        },
+        {
+         "t": "text",
+         "v": " a positive NaN instead, so a program that prints the sign of a divided NaN reports one answer unoptimised and the other optimised."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last failure is a key that changes while it is in the container. A task queue orders pointers by the tasks' priority, and one task's priority changes:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <set>\n#include <string>\n#include <vector>\n\nstruct Task {\n  std::string name;\n  std::int32_t priority;\n};\n\nstruct ByPriority {\n  bool operator()(const Task* a, const Task* b) const { return a->priority < b->priority; }\n};\n\nint main() {\n  std::vector<Task> tasks{{.name = \"charge\", .priority = 1}, {.name = \"deliver\", .priority = 5}, {.name = \"inspect\", .priority = 9}};\n  std::set<const Task*, ByPriority> queue;\n  for (const Task& t : tasks) queue.insert(&t);\n  tasks[0].priority = 10;  // changes the key of an element that is already in the set\n  const auto erased = queue.erase(&tasks[0]);\n  std::cout << std::format(\"erased {}, {} still queued, first in order: {}\\n\", erased, queue.size(), (*queue.begin())->name);\n}"
+      },
+      {
+       "t": "output",
+       "text": "erased 0, 3 still queued, first in order: charge"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "charge"
+        },
+        {
+         "t": "text",
+         "v": " now has the highest priority and still sits first, where priority 1 belonged. The search for it compared its new priority, 10, went right at every node, and found nothing, so "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " removed nothing, and the set still holds a pointer that its owner may soon destroy. Nothing warned, because the comparator was correct: it was the data it read that changed. Erase the task from the set, change the priority, and insert it again."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lambdas",
+   "title": "Lambdas: captures, mutable, generic lambdas, std::function cost",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A lambda expression creates an object of a class that the compiler writes for you. Arthur O'Dwyer's "
+        },
+        {
+         "t": "a",
+         "v": "Lambdas from Scratch",
+         "href": "https://www.youtube.com/watch?v=3jCOwajNch0"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019) builds lambdas up from that class, and this program starts from it and then tries the other features:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <utility>\n#include <vector>\n\n// What the compiler writes for [limit_m](double r) { return r < limit_m; }, apart from the name.\nclass CloserThan {\n public:\n  explicit CloserThan(double limit_m) : limit_m_(limit_m) {}\n  bool operator()(double r) const { return r < limit_m_; }\n\n private:\n  double limit_m_;\n};\n\nint main() {\n  const std::vector<double> scan{0.4, 1.2, 0.8, 3.5};\n  const double limit_m = 1.0;\n  std::cout << std::format(\"class: {}, lambda: {}\\n\", std::ranges::count_if(scan, CloserThan(limit_m)),\n                           std::ranges::count_if(scan, [limit_m](double r) { return r < limit_m; }));\n\n  // Init capture: the lambda owns what it captures, here by moving a unique_ptr in.\n  auto buffer = std::make_unique<std::vector<double>>(scan);\n  const auto count_buffered = [owned = std::move(buffer)] { return owned->size(); };\n  std::cout << std::format(\"buffered {}, local pointer now {}\\n\", count_buffered(), buffer ? \"set\" : \"empty\");\n\n  // mutable: the call operator may change the lambda's own copy of its captures.\n  auto next_id = [id = 0]() mutable { return ++id; };\n  auto copy = next_id;  // a copy of the lambda, counter included\n  const int first = next_id();\n  const int second = next_id();\n  const int from_copy = copy();\n  std::cout << std::format(\"ids {} {}, the copy's {}\\n\", first, second, from_copy);\n\n  // Generic lambda: auto parameters make the call operator a template.\n  const auto largest = [](const auto& values) { return std::ranges::max(values); };\n  std::cout << std::format(\"largest {} and {}\\n\", largest(scan), largest(std::vector<std::string>{\"imu\", \"lidar\", \"gps\"}));\n\n  // Immediately invoked: computes a const value that needs several statements.\n  const std::vector<double> sorted_scan = [&] {\n    std::vector<double> s = scan;\n    std::ranges::sort(s);\n    return s;\n  }();\n  std::cout << std::format(\"nearest {}\\n\", sorted_scan.front());\n}"
+      },
+      {
+       "t": "output",
+       "text": "class: 2, lambda: 2\nbuffered 4, local pointer now empty\nids 1 2, the copy's 1\nlargest 3.5 and lidar\nnearest 0.4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each capture becomes a data member, initialised when the lambda is created, and the body becomes a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " call operator. Everything else follows from that. A capture by value is a copy taken at creation, and a capture by reference is a reference member, which the cold check showed. An "
+        },
+        {
+         "t": "i",
+         "v": "init capture"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "[name = expression]"
+        },
+        {
+         "t": "text",
+         "v": ", declares a member and initialises it with any expression. "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": " moves a value in, which is how a lambda comes to own a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "[&v = std::as_const(v)]"
+        },
+        {
+         "t": "text",
+         "v": " captures a reference to "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ", which Nicolai Josuttis writes out on slide 15 of his "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on lambdas",
+         "href": "https://www.youtube.com/watch?v=IgNUBw3vcO4"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2021), for the case the Core Guidelines note has no shorthand. "
+        },
+        {
+         "t": "code",
+         "v": "[this]"
+        },
+        {
+         "t": "text",
+         "v": " captures the object's address, so the members are read through a pointer, and "
+        },
+        {
+         "t": "code",
+         "v": "[*this]"
+        },
+        {
+         "t": "text",
+         "v": ", since C++17, copies the whole object into the lambda. The defaults "
+        },
+        {
+         "t": "code",
+         "v": "[=]"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "[&]"
+        },
+        {
+         "t": "text",
+         "v": " capture whatever the body uses. Globals and "
+        },
+        {
+         "t": "code",
+         "v": "static"
+        },
+        {
+         "t": "text",
+         "v": " locals are never captured: the body uses them directly, whatever the brackets say."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Because the call operator is "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ", a lambda can't change its by-value captures unless it is declared "
+        },
+        {
+         "t": "code",
+         "v": "mutable"
+        },
+        {
+         "t": "text",
+         "v": ". The state then lives in that lambda object. A copy of the lambda copies the state, so "
+        },
+        {
+         "t": "code",
+         "v": "copy"
+        },
+        {
+         "t": "text",
+         "v": " counted from 0 again while "
+        },
+        {
+         "t": "code",
+         "v": "next_id"
+        },
+        {
+         "t": "text",
+         "v": " went on to 2. A lambda with "
+        },
+        {
+         "t": "code",
+         "v": "auto"
+        },
+        {
+         "t": "text",
+         "v": " parameters is a "
+        },
+        {
+         "t": "i",
+         "v": "generic lambda"
+        },
+        {
+         "t": "text",
+         "v": ": its call operator is a template, instantiated for each argument type, which is why "
+        },
+        {
+         "t": "code",
+         "v": "largest"
+        },
+        {
+         "t": "text",
+         "v": " works for doubles and strings. C++20 also accepts an explicit template head, "
+        },
+        {
+         "t": "code",
+         "v": "[]<typename T>(const std::vector<T>& v) { ... }"
+        },
+        {
+         "t": "text",
+         "v": ", when the body needs to name "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": ". The last lambda is created and called in one expression to initialise a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " variable that takes several statements to compute, which the Core Guidelines recommend ("
+        },
+        {
+         "t": "a",
+         "v": "ES.28",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lambda-init"
+        },
+        {
+         "t": "text",
+         "v": ") and which Timur Doumler's "
+        },
+        {
+         "t": "a",
+         "v": "talk on lambda idioms",
+         "href": "https://www.youtube.com/watch?v=xBAduq0RGes"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2022) collects with other idioms. Use a lambda where a function can't do the job, to capture local state or to write a function inside a function, and a plain function otherwise ("
+        },
+        {
+         "t": "a",
+         "v": "F.50",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-capture-vs-overload"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every lambda has its own type, which no one can write down. To pass one to your own function, make the function a template, or take an "
+        },
+        {
+         "t": "code",
+         "v": "auto"
+        },
+        {
+         "t": "text",
+         "v": " parameter, which is the same thing, and the call stays as fast as a direct call. To store callables of different types in one place, such as a list of callbacks, you need one type for all of them: "
+        },
+        {
+         "t": "code",
+         "v": "std::function<R(Args...)>"
+        },
+        {
+         "t": "text",
+         "v": " holds any callable with that signature. This program measures what that costs, with GCC 13's library:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <string_view>\n\n// Whether std::function keeps its target inside its own 32 bytes or on the heap.\ntemplate <typename F>\n[[nodiscard]] bool stored_inside(const std::function<int(int)>& f) {\n  const auto begin = reinterpret_cast<std::uintptr_t>(&f);\n  const auto target = reinterpret_cast<std::uintptr_t>(f.target<F>());\n  return target >= begin && target < begin + sizeof(f);\n}\n\ntemplate <typename F>\nvoid report(std::string_view captures, const F& lambda) {\n  const std::function<int(int)> f = lambda;\n  std::cout << std::format(\"{:<16} lambda {:>2} bytes, stored {}\\n\", captures, sizeof(lambda),\n                           stored_inside<F>(f) ? \"inside\" : \"on the heap\");\n}\n\nint main() {\n  const int offset = 3;\n  const double scale = 2.0;\n  const std::array<std::int64_t, 4> table{1, 2, 3, 4};\n  const auto shared = std::make_shared<int>(4);\n  report(\"[]\", [](int x) { return x + 1; });\n  report(\"[offset]\", [offset](int x) { return x + offset; });\n  report(\"[&offset]\", [&offset](int x) { return x + offset; });\n  report(\"[offset, scale]\", [offset, scale](int x) { return static_cast<int>(x * scale) + offset; });\n  report(\"[table]\", [table](int x) { return x + static_cast<int>(table[1]); });\n  report(\"[shared]\", [shared](int x) { return x + *shared; });\n  std::cout << std::format(\"std::function<int(int)> {} bytes, a function pointer {} bytes\\n\",\n                           sizeof(std::function<int(int)>), sizeof(int (*)(int)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "[]               lambda  1 bytes, stored inside\n[offset]         lambda  4 bytes, stored inside\n[&offset]        lambda  8 bytes, stored inside\n[offset, scale]  lambda 16 bytes, stored inside\n[table]          lambda 32 bytes, stored on the heap\n[shared]         lambda 16 bytes, stored on the heap\nstd::function<int(int)> 32 bytes, a function pointer 8 bytes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A lambda is exactly as large as its captures: 1 byte for none, because every object needs an address, 4 for an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", 8 for a reference, 16 for an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " with padding. A "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " is 32 bytes whatever it holds. GCC's library keeps the callable inside those 32 bytes only when it is at most 16 bytes and trivially copyable, and allocates it on the heap otherwise: the 32-byte table, and also the 16-byte "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", which isn't trivially copyable. Other libraries draw the line elsewhere. On top of the size, each call goes through a pointer to a function the compiler can't see, which the optimiser can rarely inline, and copying a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " copies its callable, heap allocation included. None of this matters for a callback that runs ten times a second, and all of it matters in an inner loop over a million points, where the lambda passed straight to an algorithm costs nothing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " has one more requirement: its callable must be copyable, because the "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " itself is. A lambda that owns a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " is move-only, so it can't be stored in one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "std::function target must be copy-constructible",
+       "text": "#include <functional>\n#include <memory>\n\nint main() {\n  auto frame = std::make_unique<int>(42);\n  auto owner = [frame = std::move(frame)] { return *frame; };  // holds a unique_ptr, so it can't be copied\n  const std::function<int()> callback = std::move(owner);       // std::function requires a copyable target\n  return callback();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "C++23 adds "
+        },
+        {
+         "t": "code",
+         "v": "std::move_only_function"
+        },
+        {
+         "t": "text",
+         "v": " for this case. In C++20, keep the lambda's own type with a template, or share the owned object through a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ": O'Dwyer's slide 59 puts the move-only lambda on the heap behind a "
+        },
+        {
+         "t": "code",
+         "v": "std::make_shared"
+        },
+        {
+         "t": "text",
+         "v": " and captures that, in a lambda a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " will take."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. A bumper switch reports a timestamp in milliseconds each time it closes, and the contacts bounce, so one hit arrives as several events a few milliseconds apart."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "make_debouncer(std::int64_t min_gap_ms)"
+         },
+         {
+          "t": "text",
+          "v": ", which returns a lambda that takes a timestamp and returns "
+         },
+         {
+          "t": "code",
+          "v": "true"
+         },
+         {
+          "t": "text",
+          "v": " for the first event and for every event at least "
+         },
+         {
+          "t": "code",
+          "v": "min_gap_ms"
+         },
+         {
+          "t": "text",
+          "v": " after the last accepted one. Keep the state in the lambda, with no sentinel value for \"nothing accepted yet\"."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Filter "
+         },
+         {
+          "t": "code",
+          "v": "{0, 3, 7, 120, 124, 400}"
+         },
+         {
+          "t": "text",
+          "v": " with a 50 ms gap through "
+         },
+         {
+          "t": "code",
+          "v": "std::copy_if"
+         },
+         {
+          "t": "text",
+          "v": ", the iterator version. Then call the same debouncer on 405. Predict both results before you run it, and explain the second."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Change the call so that "
+         },
+         {
+          "t": "code",
+          "v": "copy_if"
+         },
+         {
+          "t": "text",
+          "v": " uses your debouncer object itself, and check that 405 is now refused."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Say why the range version, "
+         },
+         {
+          "t": "code",
+          "v": "std::ranges::copy_if"
+         },
+         {
+          "t": "text",
+          "v": ", is the wrong tool for a predicate with state."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write a generic lambda that prints any range of printable values, and call it with the accepted stamps and with a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::string>"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Store a debouncer in a "
+         },
+         {
+          "t": "code",
+          "v": "std::function<bool(std::int64_t)>"
+         },
+         {
+          "t": "text",
+          "v": ", and say from the sizes whether GCC's library keeps it inside or on the heap."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <iterator>\n#include <optional>\n#include <string>\n#include <vector>\n\n// Accepts the first event and every event at least min_gap_ms after the last accepted one.\n[[nodiscard]] auto make_debouncer(std::int64_t min_gap_ms) {\n  return [min_gap_ms, last_ms = std::optional<std::int64_t>{}](std::int64_t stamp_ms) mutable {\n    if (last_ms && stamp_ms - *last_ms < min_gap_ms) return false;\n    last_ms = stamp_ms;\n    return true;\n  };\n}\n\nint main() {\n  const std::vector<std::int64_t> bumper_ms{0, 3, 7, 120, 124, 400};\n  auto debounce = make_debouncer(50);\n\n  std::vector<std::int64_t> hits;\n  std::copy_if(bumper_ms.begin(), bumper_ms.end(), std::back_inserter(hits), debounce);  // works on a copy\n  const auto print_all = [](const auto& values) {\n    for (const auto& v : values) std::cout << v << ' ';\n    std::cout << '\\n';\n  };\n  print_all(hits);\n  std::cout << std::format(\"original debouncer accepts 405: {}\\n\", debounce(405));\n\n  std::vector<std::int64_t> shared_hits;\n  auto shared = make_debouncer(50);\n  std::copy_if(bumper_ms.begin(), bumper_ms.end(), std::back_inserter(shared_hits), std::ref(shared));  // uses shared\n  std::cout << std::format(\"shared debouncer accepts 405: {}\\n\", shared(405));\n  print_all(std::vector<std::string>{\"left\", \"right\"});\n\n  const std::function<bool(std::int64_t)> stored = make_debouncer(50);\n  std::cout << std::format(\"debouncer {} bytes, std::function {} bytes\\n\", sizeof(debounce), sizeof(stored));\n}"
+      },
+      {
+       "t": "output",
+       "text": "0 120 400 \noriginal debouncer accepts 405: true\nshared debouncer accepts 405: false\nleft right \ndebouncer 24 bytes, std::function 32 bytes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The state is an init capture of type "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::int64_t>"
+        },
+        {
+         "t": "text",
+         "v": ", empty until the first event, so no timestamp is reserved to mean \"none\". The lambda is "
+        },
+        {
+         "t": "code",
+         "v": "mutable"
+        },
+        {
+         "t": "text",
+         "v": " because it updates "
+        },
+        {
+         "t": "code",
+         "v": "last_ms"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "make_debouncer"
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "auto"
+        },
+        {
+         "t": "text",
+         "v": " because the lambda's type has no name."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "copy_if"
+        },
+        {
+         "t": "text",
+         "v": " accepted 0, 120 and 400. It takes its predicate by value, so it worked on a copy, and the copy's "
+        },
+        {
+         "t": "code",
+         "v": "last_ms"
+        },
+        {
+         "t": "text",
+         "v": " ended at 400. The original "
+        },
+        {
+         "t": "code",
+         "v": "debounce"
+        },
+        {
+         "t": "text",
+         "v": " never saw an event, so it accepts 405 as its first. Passing "
+        },
+        {
+         "t": "code",
+         "v": "std::ref(shared)"
+        },
+        {
+         "t": "text",
+         "v": " hands the algorithm a small wrapper that calls "
+        },
+        {
+         "t": "code",
+         "v": "shared"
+        },
+        {
+         "t": "text",
+         "v": " itself, so afterwards "
+        },
+        {
+         "t": "code",
+         "v": "shared"
+        },
+        {
+         "t": "text",
+         "v": " remembers 400 and refuses 405."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The range version is out of bounds for this. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::copy_if"
+        },
+        {
+         "t": "text",
+         "v": " asks its predicate for "
+        },
+        {
+         "t": "code",
+         "v": "std::indirect_unary_predicate"
+        },
+        {
+         "t": "text",
+         "v": ", which asks for "
+        },
+        {
+         "t": "code",
+         "v": "std::predicate"
+        },
+        {
+         "t": "text",
+         "v": ", which asks for "
+        },
+        {
+         "t": "code",
+         "v": "std::regular_invocable"
+        },
+        {
+         "t": "text",
+         "v": ": a call must not change the function object, and calling it twice with equal arguments must give equal answers. A debouncer breaks both promises. Nothing stops the compiler, because those are semantic requirements that no concept can check, and a program that breaks them is ill-formed with no diagnostic required, so the behaviour is whatever the library happens to do today. The iterator algorithms ask for no such promise. They are allowed to copy the predicate as often as they like, and the standard doesn't say how often, so the behaviour is defined but the answer isn't predictable: it depends on what the library does today, as the failure cases show. "
+        },
+        {
+         "t": "code",
+         "v": "std::ref"
+        },
+        {
+         "t": "text",
+         "v": " is what makes it predictable, because every copy then calls the one object. The generic "
+        },
+        {
+         "t": "code",
+         "v": "print_all"
+        },
+        {
+         "t": "text",
+         "v": " is instantiated once for the stamps and once for the strings. The debouncer is 24 bytes, 8 for the gap and 16 for the optional, which is more than the 16 bytes GCC's "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " keeps inside, so the "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " allocates it on the heap."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A predicate with state gives answers that depend on the library. The standard lets an algorithm copy its function objects as often as it likes ("
+        },
+        {
+         "t": "a",
+         "v": "algorithms.requirements",
+         "href": "https://eel.is/c++draft/algorithms.requirements"
+        },
+        {
+         "t": "text",
+         "v": "), and this lambda, meant to remove the third element, removes two:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <vector>\n\nint main() {\n  std::vector<int> ids{1, 2, 3, 4, 5, 6, 7, 8, 9};\n  // Meant to remove the third element only.\n  auto third = [calls = 0](int) mutable { return ++calls == 3; };\n  ids.erase(std::remove_if(ids.begin(), ids.end(), third), ids.end());\n  for (const int id : ids) std::cout << id << ' ';\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "1 2 4 5 7 8 9 "
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC's "
+        },
+        {
+         "t": "code",
+         "v": "std::remove_if"
+        },
+        {
+         "t": "text",
+         "v": " first calls "
+        },
+        {
+         "t": "code",
+         "v": "std::find_if"
+        },
+        {
+         "t": "text",
+         "v": " to find the first element to remove, and passes it a copy of the predicate. The copy counts to 3 and finds the 3. The scan then continues with the original, which has counted nothing, so it counts 4, 5 and 6 as its first, second and third, and removes the 6 as well. Josuttis's lambdas talk shows the same trap with "
+        },
+        {
+         "t": "code",
+         "v": "std::copy_if"
+        },
+        {
+         "t": "text",
+         "v": " on slide 16: he calls it three times with one stateful lambda and prints three different sequences."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So keep state out of predicates. When a task needs state, you have three honest options: write the loop by hand, where the state is a local variable and nothing copies it; pass "
+        },
+        {
+         "t": "code",
+         "v": "std::ref(pred)"
+        },
+        {
+         "t": "text",
+         "v": " to an iterator algorithm, so every copy calls the one object; or keep the state outside and capture it by reference. What you can't do is hand a stateful predicate to a range algorithm: "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::remove_if"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::copy_if"
+        },
+        {
+         "t": "text",
+         "v": " require a predicate that doesn't change when it is called, and the exercise's solution says what the standard does with a program that breaks that."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "[=]"
+        },
+        {
+         "t": "text",
+         "v": " in a member function looks like \"copy everything\", but it captures "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": ", so the lambda reads the members through a pointer and sees their later values, or dangles if the object is gone ("
+        },
+        {
+         "t": "a",
+         "v": "F.54",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-this-capture"
+        },
+        {
+         "t": "text",
+         "v": "). C++20 deprecates capturing "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": " that way, and GCC 13 warns by default, so "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " stops the build:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "implicit capture of",
+       "text": "#include <cstdint>\n#include <functional>\n#include <iostream>\n\nclass Odometer {\n public:\n  [[nodiscard]] std::function<std::int64_t()> reporter() const {\n    return [=] { return total_ticks_; };  // looks like a copy of total_ticks_, captures this\n  }\n\n private:\n  std::int64_t total_ticks_ = 0;\n};\n\nint main() {\n  const Odometer odometer;\n  std::cout << odometer.reporter()() << '\\n';\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC says the implicit capture of "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": " via "
+        },
+        {
+         "t": "code",
+         "v": "[=]"
+        },
+        {
+         "t": "text",
+         "v": " is deprecated in C++20 and suggests an explicit "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "*this"
+        },
+        {
+         "t": "text",
+         "v": ". Write "
+        },
+        {
+         "t": "code",
+         "v": "[this]"
+        },
+        {
+         "t": "text",
+         "v": " when the lambda must see the live object and can't outlive it, and "
+        },
+        {
+         "t": "code",
+         "v": "[*this]"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "[ticks = total_ticks_]"
+        },
+        {
+         "t": "text",
+         "v": " when it needs a snapshot that stays valid after the object is gone."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A reference capture that escapes its scope dangles, and a loop makes the scope short. Each "
+        },
+        {
+         "t": "code",
+         "v": "name"
+        },
+        {
+         "t": "text",
+         "v": " below lives for one iteration, and the callbacks run after the loop:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-use-after-scope",
+       "text": "#include <format>\n#include <functional>\n#include <iostream>\n#include <string>\n#include <vector>\n\nint main() {\n  std::vector<std::function<void()>> on_stop;\n  for (const std::string name : {\"lidar\", \"camera\", \"imu\"}) {\n    on_stop.push_back([&name] { std::cout << std::format(\"stopping {}\\n\", name); });  // name dies after this iteration\n  }\n  for (const auto& handler : on_stop) handler();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports a stack-use-after-scope on the first call: the read of the string inside the lambda, from a stack slot whose variable has ended. The borrowing topic showed the same bug with a lambda returned from a function, as a stack-use-after-return. Both break F.53, and both have the same fix: a lambda that is stored captures by value, here "
+        },
+        {
+         "t": "code",
+         "v": "[name]"
+        },
+        {
+         "t": "text",
+         "v": ", so each callback owns a copy of its sensor's name."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. List the algorithms of this topic's table with their costs, and say what a projection is and why "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " must use the order the data were sorted in. Explain why "
+        },
+        {
+         "t": "code",
+         "v": "remove"
+        },
+        {
+         "t": "text",
+         "v": " doesn't remove, and what "
+        },
+        {
+         "t": "code",
+         "v": "std::erase_if"
+        },
+        {
+         "t": "text",
+         "v": " replaces. State the four rules of a strict weak ordering, and one way each failure of this topic breaks an ordered container. Say what a lambda is, what a capture by value, by reference and by init capture become, what "
+        },
+        {
+         "t": "code",
+         "v": "mutable"
+        },
+        {
+         "t": "text",
+         "v": " changes, and what a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " costs in size and where it keeps its callable."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Rewrite in one line with a projection: sort a vector of detections by range, then find the first detection at or beyond 2 m."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::remove_if"
+     },
+     {
+      "t": "text",
+      "v": " return, what state does it leave the container in, and what does "
+     },
+     {
+      "t": "code",
+      "v": "std::erase_if"
+     },
+     {
+      "t": "text",
+      "v": " add?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is "
+     },
+     {
+      "t": "code",
+      "v": "a.x < b.x || a.y < b.y"
+     },
+     {
+      "t": "text",
+      "v": " not a strict weak ordering, and what does it do to a "
+     },
+     {
+      "t": "code",
+      "v": "std::set"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a "
+     },
+     {
+      "t": "code",
+      "v": "std::set<double>"
+     },
+     {
+      "t": "text",
+      "v": " holding a NaN claim to contain every value?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between "
+     },
+     {
+      "t": "code",
+      "v": "[x]"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "[&x]"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "[x = std::move(x)]"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "[this]"
+     },
+     {
+      "t": "text",
+      "v": ", and which of them may dangle?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why did a stateful predicate remove two elements from "
+     },
+     {
+      "t": "code",
+      "v": "std::remove_if"
+     },
+     {
+      "t": "text",
+      "v": ", and which two ways make a stateful callable safe to use with an iterator algorithm?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which requirement do the range algorithms put on a predicate that the iterator algorithms don't?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How large is a "
+     },
+     {
+      "t": "code",
+      "v": "std::function<int(int)>"
+     },
+     {
+      "t": "text",
+      "v": " in GCC 13, and when does it allocate?"
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Why algorithms beat hand-written loops, and their ranges forms."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Lambdas from Scratch, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_lambdas_from_scratch/back_to_basics_lambdas_from_scratch__arthur_odwyer__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=3jCOwajNch0"
+     },
+     {
+      "t": "text",
+      "v": ". The class behind a lambda, captures, "
+     },
+     {
+      "t": "code",
+      "v": "mutable"
+     },
+     {
+      "t": "text",
+      "v": " state, generic lambdas, and slides 58 and 59 on the lambdas a "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " can't hold and the "
+     },
+     {
+      "t": "code",
+      "v": "shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": " around that."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, Back to Basics: Lambdas, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/BackToBasics_Lambdas.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=IgNUBw3vcO4"
+     },
+     {
+      "t": "text",
+      "v": ". Captures, "
+     },
+     {
+      "t": "code",
+      "v": "std::as_const"
+     },
+     {
+      "t": "text",
+      "v": " on slide 15, and on slide 16 one stateful lambda passed three times to "
+     },
+     {
+      "t": "code",
+      "v": "std::copy_if"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Barbara Geller and Ansel Sermersheim, Back to Basics: Lambda Expressions, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_lambda_expressions/back_to_basics_lambda_expressions__barbara_geller__ansel_sermersheim__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ZIPNFcw6V9o"
+     },
+     {
+      "t": "text",
+      "v": ". Function pointers, function objects and lambdas as callbacks for algorithms and as a map's comparator."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, Back to Basics: Iterators, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=26aW6aBVpk0"
+     },
+     {
+      "t": "text",
+      "v": ". Why "
+     },
+     {
+      "t": "code",
+      "v": "remove"
+     },
+     {
+      "t": "text",
+      "v": " doesn't remove."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Conor Hoekstra, Algorithm Intuition, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "part 1",
+      "href": "https://www.youtube.com/watch?v=pUEnO6SvAMo"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "part 2",
+      "href": "https://www.youtube.com/watch?v=sEvYmb3eKsw"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Timur Doumler, C++ lambda idioms, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=xBAduq0RGes"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "F.50",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-capture-vs-overload"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.52",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-reference-capture"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.53",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-value-capture"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.54",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-this-capture"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "T.40",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-fo"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ES.28",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lambda-init"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bjarne Stroustrup, A Tour of C++, 3rd edition, chapter 13 on algorithms and chapter 14 on ranges: "
+     },
+     {
+      "t": "a",
+      "v": "contents",
+      "href": "https://www.stroustrup.com/tour3toc.pdf"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "the algorithms library",
+      "href": "https://en.cppreference.com/cpp/algorithm"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::sort",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/sort"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::remove",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/remove"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "the Compare requirements",
+      "href": "https://en.cppreference.com/cpp/named_req/Compare"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "lambda expressions",
+      "href": "https://en.cppreference.com/cpp/language/lambda"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::function",
+      "href": "https://en.cppreference.com/cpp/utility/functional/function"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

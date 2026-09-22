@@ -1,0 +1,1827 @@
+{
+ "id": "dsa-two-pointers",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "bool is_palindrome(std::string_view s)"
+     },
+     {
+      "t": "text",
+      "v": ", which ignores everything except letters and ignores case. "
+     },
+     {
+      "t": "code",
+      "v": "\"A man, a plan, a canal: Panama\""
+     },
+     {
+      "t": "text",
+      "v": " is a palindrome, "
+     },
+     {
+      "t": "code",
+      "v": "\"race a car\""
+     },
+     {
+      "t": "text",
+      "v": " is not, and the empty string is. Use O(1) extra space. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cctype>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <string_view>\n\n[[nodiscard]] bool is_palindrome(std::string_view s) {\n  // The <cctype> functions need an unsigned char value: a negative char is undefined behaviour.\n  const auto letter = [](char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; };\n  const auto lower = [](char c) { return std::tolower(static_cast<unsigned char>(c)); };\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = std::ssize(s) - 1;  // the last unchecked character; -1 for an empty string\n  while (lo < hi) {\n    if (!letter(s[lo])) {\n      ++lo;\n    } else if (!letter(s[hi])) {\n      --hi;\n    } else if (lower(s[lo]) != lower(s[hi])) {\n      return false;\n    } else {\n      ++lo;\n      --hi;\n    }\n  }\n  return true;\n}\n\nint main() {\n  std::cout << std::format(\"{} {} {} {}\\n\", is_palindrome(\"A man, a plan, a canal: Panama\"),\n                           is_palindrome(\"race a car\"), is_palindrome(\"\"), is_palindrome(\".,\"));\n}"
+   },
+   {
+    "t": "output",
+    "text": "true false true true"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Each pass of the loop moves at least one index towards the other, so it runs at most n times: O(n) time and O(1) extra space. The indices are signed, so for an empty string "
+     },
+     {
+      "t": "code",
+      "v": "hi"
+     },
+     {
+      "t": "text",
+      "v": " starts at -1 and the loop doesn't run. With "
+     },
+     {
+      "t": "code",
+      "v": "std::size_t"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "s.size() - 1"
+     },
+     {
+      "t": "text",
+      "v": " would wrap round to 18,446,744,073,709,551,615 there, and the failure section below comes back to that. Casting to "
+     },
+     {
+      "t": "code",
+      "v": "unsigned char"
+     },
+     {
+      "t": "text",
+      "v": " before "
+     },
+     {
+      "t": "code",
+      "v": "std::isalpha"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::tolower"
+     },
+     {
+      "t": "text",
+      "v": " is required, because passing them a negative "
+     },
+     {
+      "t": "code",
+      "v": "char"
+     },
+     {
+      "t": "text",
+      "v": " is undefined behaviour ("
+     },
+     {
+      "t": "a",
+      "v": "cppreference",
+      "href": "https://en.cppreference.com/cpp/string/byte/isalpha"
+     },
+     {
+      "t": "text",
+      "v": "), and every byte of a UTF-8 "
+     },
+     {
+      "t": "code",
+      "v": "\"é\""
+     },
+     {
+      "t": "text",
+      "v": " is negative on x86."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if yours skips non-letters from both ends, compares without case, casts to "
+     },
+     {
+      "t": "code",
+      "v": "unsigned char"
+     },
+     {
+      "t": "text",
+      "v": ", and handles the empty string. Copying the letters into a new string first is correct but uses O(n) space, and counts as a partial pass."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Two pointers keeps two positions in one sequence and moves them by a rule, so one pass does the work a nested loop would otherwise do. With "
+    },
+    {
+     "t": "i",
+     "v": "opposite ends"
+    },
+    {
+     "t": "text",
+     "v": ", one index starts at the front and one at the back and moves toward the other until they meet; it needs a sorted sequence, so comparing the two ends tells you which one to move. With "
+    },
+    {
+     "t": "i",
+     "v": "fast and slow"
+    },
+    {
+     "t": "text",
+     "v": ", both indices start at the front and move the same way at different speeds, one reading ahead of the other."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is a nested loop over pairs costing O(n²) when the answer is one property of the sequence read once. Checking every pair of a sorted array for one summing to a target repeats comparisons a single sweep from both ends already rules out: once the current ends sum too high, every pair keeping that high end is too high too, so moving it on loses nothing."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is an "
+    },
+    {
+     "t": "i",
+     "v": "invariant"
+    },
+    {
+     "t": "text",
+     "v": " the pointers keep true on every step, the thing you say out loud to justify the loop rather than trust it. For a sorted pair sum, it is that every pair before the low pointer or after the high one is already ruled out, so moving whichever end makes the sum too far from the target never skips the answer. For fast and slow, it is that everything before the slow pointer already holds the kept elements in order, the write-pointer idea used to compact an array in place. Either way each pointer moves at most n times, so the scan is O(n) time and O(1) extra space."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What goes wrong under pressure is the meeting point. "
+    },
+    {
+     "t": "code",
+     "v": "lo < hi"
+    },
+    {
+     "t": "text",
+     "v": " stops the loop once fewer than two elements are left; "
+    },
+    {
+     "t": "code",
+     "v": "lo <= hi"
+    },
+    {
+     "t": "text",
+     "v": " instead lets the one element in the middle pair with itself, so a sorted "
+    },
+    {
+     "t": "code",
+     "v": "{1, 5, 8}"
+    },
+    {
+     "t": "text",
+     "v": " asked for a pair summing to 10 wrongly finds 5 and 5. The technique only fits sorted data, or a question about pairs, a range, or an in-place rearrangement; finding a pair by value with no order to lean on is a hash map's job instead."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself, the palindrome check reading a string from both ends at once, and the rule to say out loud before writing any code is the same: sorted data, a question about pairs or a range, or a request to rearrange in place."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Opposite ends and fast/slow pointers; the loop invariant",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A two-pointer solution keeps two positions in one sequence and moves them according to a rule, so that one pass does the work of a nested loop. There are two shapes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With "
+        },
+        {
+         "t": "i",
+         "v": "opposite ends"
+        },
+        {
+         "t": "text",
+         "v": ", one index starts at the front and one at the back, and they move towards each other until they meet. The palindrome check is one. The pair-sum problem below is the other classic. It works because the input is sorted, so each comparison tells you which end to move."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With "
+        },
+        {
+         "t": "i",
+         "v": "fast and slow"
+        },
+        {
+         "t": "text",
+         "v": ", both indices start at the front and move in the same direction at different speeds. The write pointer from move zeros is one: "
+        },
+        {
+         "t": "code",
+         "v": "read"
+        },
+        {
+         "t": "text",
+         "v": " moves every step, and "
+        },
+        {
+         "t": "code",
+         "v": "write"
+        },
+        {
+         "t": "text",
+         "v": " only when an element is kept. Cycle detection in a linked list, a later topic, is another."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The standard library has both shapes under names. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::remove"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::unique"
+        },
+        {
+         "t": "text",
+         "v": " are fast and slow: the possible implementation of "
+        },
+        {
+         "t": "a",
+         "v": "std::unique",
+         "href": "https://en.cppreference.com/cpp/algorithm/unique"
+        },
+        {
+         "t": "text",
+         "v": " on cppreference keeps one iterator on the last kept value while another scans ahead. libstdc++'s "
+        },
+        {
+         "t": "code",
+         "v": "std::partition"
+        },
+        {
+         "t": "text",
+         "v": " for bidirectional iterators works from opposite ends: it walks in from the front past elements that belong in the first group, walks in from the back past elements that belong in the second, and swaps the pair where both stopped ("
+        },
+        {
+         "t": "a",
+         "v": "stl_algo.h",
+         "href": "https://github.com/gcc-mirror/gcc/blob/master/libstdc++-v3/include/bits/stl_algo.h"
+        },
+        {
+         "t": "text",
+         "v": "). And comparing a sequence with its reverse is an opposite-ends check with no index at all. The cold check in ranges form is this:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cctype>\n#include <format>\n#include <iostream>\n#include <ranges>\n#include <string_view>\n\n[[nodiscard]] bool is_palindrome(std::string_view s) {\n  const auto letter = [](char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; };\n  const auto lower = [](char c) { return std::tolower(static_cast<unsigned char>(c)); };\n  auto letters = s | std::views::filter(letter) | std::views::transform(lower);\n  return std::ranges::equal(letters, letters | std::views::reverse);\n}\n\nint main() {\n  std::cout << std::format(\"{} {} {} {}\\n\", is_palindrome(\"A man, a plan, a canal: Panama\"),\n                           is_palindrome(\"race a car\"), is_palindrome(\"\"), is_palindrome(\".,\"));\n}"
+      },
+      {
+       "t": "output",
+       "text": "true false true true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The views are lazy and copy nothing, so this is O(n) time and O(1) extra space too. It compares every pair twice, once from each end, which changes the constant and not the O(n). "
+        },
+        {
+         "t": "code",
+         "v": "letters"
+        },
+        {
+         "t": "text",
+         "v": " isn't "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ", because a "
+        },
+        {
+         "t": "code",
+         "v": "filter_view"
+        },
+        {
+         "t": "text",
+         "v": " remembers where its first element is the first time you ask, and that changes the view. In an interview, write the loop, because the pointer moves are what the question tests, and then name the ranges form."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each two-pointer loop rests on an invariant, and the invariant is what you explain to an interviewer. For the pair sum it is this: every pair that uses an index before "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " or after "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " has already been ruled out. From it follows why moving "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " never skips the answer, and why the loop can stop when the pointers meet. A two-pointer solution is O(n) time and O(1) extra space, because each pointer moves at most n times in one direction."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write the pointers as signed indices, "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t"
+        },
+        {
+         "t": "text",
+         "v": " compared with "
+        },
+        {
+         "t": "code",
+         "v": "std::ssize"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " then starts at -1 for an empty input, and "
+        },
+        {
+         "t": "code",
+         "v": "lo < hi"
+        },
+        {
+         "t": "text",
+         "v": " handles it without a special case (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.102",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+        },
+        {
+         "t": "text",
+         "v": "). Iterators work as well, with "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " one past the last unchecked element, so that it never has to step before "
+        },
+        {
+         "t": "code",
+         "v": "begin()"
+        },
+        {
+         "t": "text",
+         "v": ". Use a "
+        },
+        {
+         "t": "code",
+         "v": "while"
+        },
+        {
+         "t": "text",
+         "v": " loop when both pointers move inside the body. A "
+        },
+        {
+         "t": "code",
+         "v": "for"
+        },
+        {
+         "t": "text",
+         "v": " loop whose counter the body also changes is what "
+        },
+        {
+         "t": "a",
+         "v": "ES.86",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-loop-counter"
+        },
+        {
+         "t": "text",
+         "v": " warns against."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "How to recognise one: the input is sorted, or you can sort it; you're asked about pairs or a contiguous range; or you're asked to rearrange in place. When a problem looks like \"for each i, for each j > i\" on sorted data, try two pointers before anything else."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Given a sorted vector and a target, find two positions whose values add up to the target. "
+        },
+        {
+         "t": "code",
+         "v": "{1, 3, 4, 6, 8, 11}"
+        },
+        {
+         "t": "text",
+         "v": " with target 10 should give positions 2 and 3 (4 + 6)."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nusing IndexPair = std::pair<std::ptrdiff_t, std::ptrdiff_t>;\n\n[[nodiscard]] std::optional<IndexPair> pair_sum(std::span<const int> v, int target) {\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = std::ssize(v) - 1;\n  while (lo < hi) {\n    const std::int64_t sum = std::int64_t{v[lo]} + v[hi];  // two ints can pass the int limit\n    if (sum == target) return IndexPair{lo, hi};\n    if (sum < target) {\n      ++lo;  // v[lo] is too small even with the largest partner left\n    } else {\n      --hi;  // v[hi] is too large even with the smallest partner left\n    }\n  }\n  return std::nullopt;\n}\n\n[[nodiscard]] std::string show(const std::optional<IndexPair>& pair) {\n  return pair ? std::format(\"{{{}, {}}}\", pair->first, pair->second) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> v{1, 3, 4, 6, 8, 11};\n  const std::vector<int> small{1, 2};\n  const std::vector<int> empty;\n  std::cout << show(pair_sum(v, 10)) << ' ' << show(pair_sum(small, 10)) << ' ' << show(pair_sum(empty, 10)) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "{2, 3} no value no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The trace on the example shows why each move is safe:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "lo"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "hi"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "v[lo] + v[hi]"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "move"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "why the discarded value can't be in the answer"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "5"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1 + 11 = 12"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "--hi"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "11 with the smallest value left is already too big"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1 + 8 = 9"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "++lo"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1 with the largest value left is still too small"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3 + 8 = 11"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "--hi"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "8 with the smallest value left is too big"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3 + 6 = 9"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "++lo"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3 with the largest value left is too small"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4 + 6 = 10"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "found"
+          }
+         ],
+         []
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each row removes one value for good. That is the invariant at work, and it is why the loop needs at most n − 1 steps. The empty vector needs no check of its own: "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " starts at -1, and "
+        },
+        {
+         "t": "code",
+         "v": "lo < hi"
+        },
+        {
+         "t": "text",
+         "v": " is false at once. The sum is a "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " because two values near the "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " limit add up to more than an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " holds, and signed overflow is undefined behaviour. The result is a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": ", so \"no pair\" can't be mistaken for a pair of positions."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Palindrome; remove duplicates from a sorted array; pair sum in a sorted array",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "bool almost_palindrome(std::string_view s)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns true if "
+        },
+        {
+         "t": "code",
+         "v": "s"
+        },
+        {
+         "t": "text",
+         "v": " is a palindrome after deleting at most one character. Consider lowercase letters only this time. "
+        },
+        {
+         "t": "code",
+         "v": "\"abca\""
+        },
+        {
+         "t": "text",
+         "v": " gives true (delete "
+        },
+        {
+         "t": "code",
+         "v": "c"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": "), "
+        },
+        {
+         "t": "code",
+         "v": "\"abc\""
+        },
+        {
+         "t": "text",
+         "v": " gives false, and "
+        },
+        {
+         "t": "code",
+         "v": "\"deeee\""
+        },
+        {
+         "t": "text",
+         "v": " gives true. It must be O(n)."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Walk in from both ends as usual. At the first mismatch there are two choices: delete the left character or the right one. Each choice leaves a substring that must read the same both ways, with no second deletion inside it. "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view::substr"
+        },
+        {
+         "t": "text",
+         "v": " makes that substring without copying, and the plain palindrome test needs no index at all: "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::equal(s, s | std::views::reverse)"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <ranges>\n#include <string_view>\n\n[[nodiscard]] bool reads_same_reversed(std::string_view s) {\n  return std::ranges::equal(s, s | std::views::reverse);\n}\n\n[[nodiscard]] bool almost_palindrome(std::string_view s) {\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = std::ssize(s) - 1;\n  while (lo < hi && s[lo] == s[hi]) {\n    ++lo;\n    --hi;\n  }\n  if (lo >= hi) return true;\n  // s[lo] != s[hi]: delete one of them, and what is left of s[lo..hi] must read the same both ways.\n  return reads_same_reversed(s.substr(lo + 1, hi - lo)) || reads_same_reversed(s.substr(lo, hi - lo));\n}\n\nint main() {\n  std::cout << std::format(\"{} {} {} {} {}\\n\", almost_palindrome(\"abca\"), almost_palindrome(\"abc\"),\n                           almost_palindrome(\"deeee\"), almost_palindrome(\"\"), almost_palindrome(\"ab\"));\n}"
+      },
+      {
+       "t": "output",
+       "text": "true false true true true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both substrings have "
+        },
+        {
+         "t": "code",
+         "v": "hi - lo"
+        },
+        {
+         "t": "text",
+         "v": " characters: "
+        },
+        {
+         "t": "code",
+         "v": "s.substr(lo + 1, hi - lo)"
+        },
+        {
+         "t": "text",
+         "v": " drops "
+        },
+        {
+         "t": "code",
+         "v": "s[lo]"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "s.substr(lo, hi - lo)"
+        },
+        {
+         "t": "text",
+         "v": " drops "
+        },
+        {
+         "t": "code",
+         "v": "s[hi]"
+        },
+        {
+         "t": "text",
+         "v": ". At most two scans follow the first mismatch, so it stays O(n). "
+        },
+        {
+         "t": "code",
+         "v": "reads_same_reversed"
+        },
+        {
+         "t": "text",
+         "v": " compares every character with its mirror, twice as many comparisons as needed, which is still O(n). A version that tries deleting every character in turn and checks the rest is O(n²)."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "void dedupe_sorted(std::vector<int>& v)"
+        },
+        {
+         "t": "text",
+         "v": ", which removes duplicates from a sorted vector in place, keeps one copy of each value, and shrinks the vector. "
+        },
+        {
+         "t": "code",
+         "v": "{1, 1, 2, 3, 3, 3}"
+        },
+        {
+         "t": "text",
+         "v": " becomes "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 3}"
+        },
+        {
+         "t": "text",
+         "v": ". Then change it so that it keeps at most two copies of each value, which turns the same input into "
+        },
+        {
+         "t": "code",
+         "v": "{1, 1, 2, 3, 3}"
+        },
+        {
+         "t": "text",
+         "v": ". Compare the one-copy version with the standard library algorithm that does the same."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A fast and slow pair: "
+        },
+        {
+         "t": "code",
+         "v": "read"
+        },
+        {
+         "t": "text",
+         "v": " scans everything, and "
+        },
+        {
+         "t": "code",
+         "v": "write"
+        },
+        {
+         "t": "text",
+         "v": " is where the next kept value goes. A value is kept when it differs from the last kept value. For \"at most k copies\", compare with the value k places back in the kept part:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\n// Keeps at most `keep` copies of each value of a sorted vector, in order, and shrinks the vector.\nvoid dedupe_sorted(std::vector<int>& v, std::ptrdiff_t keep = 1) {\n  if (keep < 1) {  // no copies at all; the loop below needs keep >= 1\n    v.clear();\n    return;\n  }\n  std::ptrdiff_t write = 0;\n  for (std::ptrdiff_t read = 0; read < std::ssize(v); ++read)\n    if (write < keep || v[read] != v[write - keep]) v[write++] = v[read];\n  v.erase(v.begin() + write, v.end());\n}\n\n[[nodiscard]] std::string show(std::span<const int> v) {\n  std::string out = \"{\";\n  for (std::string_view separator; const int x : v) {\n    out += std::format(\"{}{}\", separator, x);\n    separator = \", \";\n  }\n  return out + \"}\";\n}\n\nint main() {\n  const std::vector<int> input{1, 1, 2, 3, 3, 3};\n  std::vector<int> once = input;\n  std::vector<int> twice = input;\n  std::vector<int> library = input;\n  std::vector<int> empty;\n  dedupe_sorted(once);\n  dedupe_sorted(twice, 2);\n  dedupe_sorted(empty);\n  const auto tail = std::ranges::unique(library);  // the named form of the one-copy version\n  library.erase(tail.begin(), tail.end());\n  std::cout << std::format(\"{} {} {} {}\\n\", show(once), show(twice), show(library), show(empty));\n}"
+      },
+      {
+       "t": "output",
+       "text": "{1, 2, 3} {1, 1, 2, 3, 3} {1, 2, 3} {}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The invariant: "
+        },
+        {
+         "t": "code",
+         "v": "v[0, write)"
+        },
+        {
+         "t": "text",
+         "v": " is the answer for the elements read so far. The function returns nothing, because the vector's new "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": " already says how many values are left, and a second copy of that number is one more thing that can disagree. LeetCode's version returns the new length instead, because in some of the languages it supports an array can't shrink."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The one-copy version is "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::unique"
+        },
+        {
+         "t": "text",
+         "v": " followed by an "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " of the tail it returns, as the program shows, and the possible implementation of "
+        },
+        {
+         "t": "code",
+         "v": "std::unique"
+        },
+        {
+         "t": "text",
+         "v": " on cppreference is this same slow and fast pair. "
+        },
+        {
+         "t": "code",
+         "v": "unique"
+        },
+        {
+         "t": "text",
+         "v": " only removes adjacent duplicates, so it too needs sorted input. The standard library has no algorithm for \"at most k copies\", so that version stays a loop."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Given a sorted vector and a target, return the sum of the pair of different elements whose sum is closest to the target, or no value when the vector has fewer than two elements. On a tie, either sum is accepted. "
+        },
+        {
+         "t": "code",
+         "v": "{-4, -1, 1, 2, 5}"
+        },
+        {
+         "t": "text",
+         "v": " with target 3 gives 3 (1 + 2), and with target 20 gives 7 (2 + 5). Return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::int64_t>"
+        },
+        {
+         "t": "text",
+         "v": ", compute the sums so that they can't overflow, and use O(n) time."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same pointer moves as the exact pair sum, with a best-so-far instead of an exact match:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <cstdlib>\n#include <format>\n#include <iostream>\n#include <limits>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\n[[nodiscard]] std::optional<std::int64_t> closest_pair_sum(std::span<const int> v, int target) {\n  std::optional<std::int64_t> best;\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = std::ssize(v) - 1;\n  while (lo < hi) {\n    const std::int64_t sum = std::int64_t{v[lo]} + v[hi];\n    if (!best || std::abs(sum - target) < std::abs(*best - target)) best = sum;\n    if (sum == target) break;\n    if (sum < target) {\n      ++lo;\n    } else {\n      --hi;\n    }\n  }\n  return best;\n}\n\n[[nodiscard]] std::string show(const std::optional<std::int64_t>& sum) {\n  return sum ? std::to_string(*sum) : \"no value\";\n}\n\nint main() {\n  constexpr int big = std::numeric_limits<int>::max();\n  const std::vector<int> v{-4, -1, 1, 2, 5};\n  const std::vector<int> one{5};\n  const std::vector<int> large{big - 1, big};\n  std::cout << std::format(\"{} {} {} {}\\n\", show(closest_pair_sum(v, 3)), show(closest_pair_sum(v, 20)),\n                           show(closest_pair_sum(one, 5)), show(closest_pair_sum(large, 0)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "3 7 no value 4294967293"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each move discards a value that can't do better with any partner that is left, by the same argument as in the worked example. So the best sum is seen before the pointers meet. The last test adds 2,147,483,646 and 2,147,483,647: in "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " that is signed overflow, and in "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " it is 4,294,967,293. The "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " replaces a precondition. A version that starts from "
+        },
+        {
+         "t": "code",
+         "v": "best = v[0] + v[v.size() - 1]"
+        },
+        {
+         "t": "text",
+         "v": " needs at least two elements, and for an empty vector it reads memory that doesn't exist. Here, with fewer than two elements the loop never runs and "
+        },
+        {
+         "t": "code",
+         "v": "best"
+        },
+        {
+         "t": "text",
+         "v": " stays empty."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Off-by-one at the meeting point",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Most two-pointer bugs happen where the pointers meet. The condition "
+        },
+        {
+         "t": "code",
+         "v": "lo < hi"
+        },
+        {
+         "t": "text",
+         "v": " means \"at least two elements left\". "
+        },
+        {
+         "t": "code",
+         "v": "lo <= hi"
+        },
+        {
+         "t": "text",
+         "v": " also lets one element pair with itself. In "
+        },
+        {
+         "t": "code",
+         "v": "{1, 5, 8}"
+        },
+        {
+         "t": "text",
+         "v": " no two different elements add up to 10, but the second function below reaches "
+        },
+        {
+         "t": "code",
+         "v": "lo == hi == 1"
+        },
+        {
+         "t": "text",
+         "v": " and counts 5 + 5:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <vector>\n\n// Right: the loop stops when fewer than two elements are left.\n[[nodiscard]] bool has_pair(std::span<const int> v, int target) {\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = std::ssize(v) - 1;\n  while (lo < hi) {\n    const std::int64_t sum = std::int64_t{v[lo]} + v[hi];\n    if (sum == target) return true;\n    if (sum < target) {\n      ++lo;\n    } else {\n      --hi;\n    }\n  }\n  return false;\n}\n\n// Wrong: when lo == hi, the one element left is paired with itself.\n[[nodiscard]] bool has_pair_off_by_one(std::span<const int> v, int target) {\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = std::ssize(v) - 1;\n  while (lo <= hi) {\n    const std::int64_t sum = std::int64_t{v[lo]} + v[hi];\n    if (sum == target) return true;\n    if (sum < target) {\n      ++lo;\n    } else {\n      --hi;\n    }\n  }\n  return false;\n}\n\nint main() {\n  const std::vector<int> v{1, 5, 8};\n  std::cout << std::format(\"lo <= hi says {}, lo < hi says {}\\n\", has_pair_off_by_one(v, 10), has_pair(v, 10));\n}"
+      },
+      {
+       "t": "output",
+       "text": "lo <= hi says true, lo < hi says false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The trace: 1 + 8 = 9 moves "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " to 1, and 5 + 8 = 13 moves "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " to 1. Now "
+        },
+        {
+         "t": "code",
+         "v": "lo == hi"
+        },
+        {
+         "t": "text",
+         "v": ", and only the second function goes on to test 5 + 5."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Other mistakes show up again and again. Unsigned indices bring their own. With "
+        },
+        {
+         "t": "code",
+         "v": "std::size_t"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "hi = v.size() - 1"
+        },
+        {
+         "t": "text",
+         "v": " wraps round for an empty vector, so each function needs an emptiness check first. Inside "
+        },
+        {
+         "t": "code",
+         "v": "while (lo < hi)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " is at least 1, so "
+        },
+        {
+         "t": "code",
+         "v": "--hi"
+        },
+        {
+         "t": "text",
+         "v": " can't wrap; it wraps only in a "
+        },
+        {
+         "t": "code",
+         "v": "lo <= hi"
+        },
+        {
+         "t": "text",
+         "v": " loop. Signed indices from "
+        },
+        {
+         "t": "code",
+         "v": "std::ssize"
+        },
+        {
+         "t": "text",
+         "v": " need no emptiness check, as the functions above show. Moving both pointers after a mismatch skips pairs, so decide which single pointer the comparison allows you to move. And an unsorted input quietly breaks the pair sum, because the argument for each move relies on sorted order. Sort first, which costs O(n log n) and loses the original positions unless you sort (value, index) pairs, or use the hash map from Two Sum."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Describe the two shapes of two-pointer solution with an example of each, and a standard algorithm that has each shape. State the invariant of the sorted pair sum and why it makes each move safe. Say how you recognise a two-pointer problem, and which off-by-one mistakes to check at the meeting point."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "State the invariant of the sorted pair sum, and explain why moving "
+     },
+     {
+      "t": "code",
+      "v": "lo"
+     },
+     {
+      "t": "text",
+      "v": " never skips the answer."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between "
+     },
+     {
+      "t": "code",
+      "v": "while (lo < hi)"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "while (lo <= hi)"
+     },
+     {
+      "t": "text",
+      "v": " in a pair problem?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What goes wrong with "
+     },
+     {
+      "t": "code",
+      "v": "std::size_t hi = v.size() - 1"
+     },
+     {
+      "t": "text",
+      "v": " on an empty vector, and why do signed indices from "
+     },
+     {
+      "t": "code",
+      "v": "std::ssize"
+     },
+     {
+      "t": "text",
+      "v": " need no guard?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which standard algorithms are two-pointer loops, and which shape is each?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "closest_pair_sum"
+     },
+     {
+      "t": "text",
+      "v": " return "
+     },
+     {
+      "t": "code",
+      "v": "std::optional<std::int64_t>"
+     },
+     {
+      "t": "text",
+      "v": " instead of an "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which clues in a problem statement suggest two pointers?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: remove duplicates from a sorted vector, keeping at most two copies of each value."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Naming a loop with the algorithm it matches."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Ranges, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Back_To_Basics_Ranges.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=Q434UHWRzI0"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Conor Hoekstra, Algorithm Intuition, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "part 1",
+      "href": "https://www.youtube.com/watch?v=pUEnO6SvAMo"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "part 2",
+      "href": "https://www.youtube.com/watch?v=sEvYmb3eKsw"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.86",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-loop-counter"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.102",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ES.107",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tip "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "unique",
+      "href": "https://en.cppreference.com/cpp/algorithm/unique"
+     },
+     {
+      "t": "text",
+      "v": ", whose possible implementation is the slow and fast pair, "
+     },
+     {
+      "t": "a",
+      "v": "ranges::unique",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/unique"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::equal",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/equal"
+     },
+     {
+      "t": "text",
+      "v": " with "
+     },
+     {
+      "t": "a",
+      "v": "views::reverse",
+      "href": "https://en.cppreference.com/cpp/ranges/reverse_view"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "views::filter",
+      "href": "https://en.cppreference.com/cpp/ranges/filter_view"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "partition",
+      "href": "https://en.cppreference.com/cpp/algorithm/partition"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "isalpha",
+      "href": "https://en.cppreference.com/cpp/string/byte/isalpha"
+     },
+     {
+      "t": "text",
+      "v": ", which needs an "
+     },
+     {
+      "t": "code",
+      "v": "unsigned char"
+     },
+     {
+      "t": "text",
+      "v": " value."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "libstdc++'s "
+     },
+     {
+      "t": "a",
+      "v": "stl_algo.h",
+      "href": "https://github.com/gcc-mirror/gcc/blob/master/libstdc++-v3/include/bits/stl_algo.h"
+     },
+     {
+      "t": "text",
+      "v": ", where "
+     },
+     {
+      "t": "code",
+      "v": "__partition"
+     },
+     {
+      "t": "text",
+      "v": " for bidirectional iterators works from both ends."
+     }
+    ]
+   ]
+  }
+ ]
+}

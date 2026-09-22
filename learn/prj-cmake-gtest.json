@@ -1,0 +1,2465 @@
+{
+ "id": "prj-cmake-gtest",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A project has a library in "
+     },
+     {
+      "t": "code",
+      "v": "src/odometry.cpp"
+     },
+     {
+      "t": "text",
+      "v": " with its header in "
+     },
+     {
+      "t": "code",
+      "v": "include/bench/odometry.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", a program in "
+     },
+     {
+      "t": "code",
+      "v": "app/main.cpp"
+     },
+     {
+      "t": "text",
+      "v": " that uses the library, and GoogleTest tests in "
+     },
+     {
+      "t": "code",
+      "v": "tests/odometry_test.cpp"
+     },
+     {
+      "t": "text",
+      "v": ". From memory, write the "
+     },
+     {
+      "t": "code",
+      "v": "CMakeLists.txt"
+     },
+     {
+      "t": "text",
+      "v": " that builds all three and lets "
+     },
+     {
+      "t": "code",
+      "v": "ctest"
+     },
+     {
+      "t": "text",
+      "v": " run the tests. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cmake",
+    "tag": "",
+    "expect": "",
+    "text": "cmake_minimum_required(VERSION 3.22)\nproject(bench LANGUAGES CXX)\nset(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\nset(CMAKE_CXX_EXTENSIONS OFF)\n\nadd_library(odometry src/odometry.cpp)\ntarget_include_directories(odometry PUBLIC include)\n\nadd_executable(drive app/main.cpp)\ntarget_link_libraries(drive PRIVATE odometry)\n\nenable_testing()\nfind_package(GTest REQUIRED)\ninclude(GoogleTest)\nadd_executable(odometry_test tests/odometry_test.cpp)\ntarget_link_libraries(odometry_test PRIVATE odometry GTest::gtest_main)\ngtest_discover_tests(odometry_test)"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you had the three targets, the include directory as "
+     },
+     {
+      "t": "code",
+      "v": "PUBLIC"
+     },
+     {
+      "t": "text",
+      "v": " on the library, both other targets linking the library, and the test registered with "
+     },
+     {
+      "t": "code",
+      "v": "enable_testing()"
+     },
+     {
+      "t": "text",
+      "v": ", or "
+     },
+     {
+      "t": "code",
+      "v": "include(CTest)"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "code",
+      "v": "gtest_discover_tests"
+     },
+     {
+      "t": "text",
+      "v": " or "
+     },
+     {
+      "t": "code",
+      "v": "add_test"
+     },
+     {
+      "t": "text",
+      "v": ". Missing "
+     },
+     {
+      "t": "code",
+      "v": "enable_testing()"
+     },
+     {
+      "t": "text",
+      "v": " or GoogleTest's target is a partial pass. So is using the directory-wide "
+     },
+     {
+      "t": "code",
+      "v": "include_directories"
+     },
+     {
+      "t": "text",
+      "v": " instead of "
+     },
+     {
+      "t": "code",
+      "v": "target_include_directories"
+     },
+     {
+      "t": "text",
+      "v": ": it builds, but the library no longer says what its users need. A missing link to the library is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A CMake target is something CMake builds, made with "
+    },
+    {
+     "t": "code",
+     "v": "add_library"
+    },
+    {
+     "t": "text",
+     "v": " or "
+    },
+    {
+     "t": "code",
+     "v": "add_executable"
+    },
+    {
+     "t": "text",
+     "v": ". Everything else, sources, include directories, compile options, the other targets it needs, attaches to that target rather than to the whole directory, which is what modern CMake means: settings travel with the target that owns them, not with every file CMake happens to see. "
+    },
+    {
+     "t": "code",
+     "v": "PUBLIC"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "PRIVATE"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "INTERFACE"
+    },
+    {
+     "t": "text",
+     "v": " decide who receives a setting: the target itself, the targets that link to it, or both. A Git branch workflow puts the same discipline on changes: one branch per change, tested there, landing on "
+    },
+    {
+     "t": "code",
+     "v": "main"
+    },
+    {
+     "t": "text",
+     "v": " only through a pull request."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this solves is a build where nobody can say why a file compiles or why it doesn't. A directory-wide "
+    },
+    {
+     "t": "code",
+     "v": "include_directories"
+    },
+    {
+     "t": "text",
+     "v": " builds a library without recording what its own users actually need from it, and a warning flag meant for one target quietly reaches every target that follows it in the same directory."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is that a target's settings propagate along its links. "
+    },
+    {
+     "t": "code",
+     "v": "target_link_libraries(drive PRIVATE odometry)"
+    },
+    {
+     "t": "text",
+     "v": " puts the library on the link line and also hands "
+    },
+    {
+     "t": "code",
+     "v": "drive"
+    },
+    {
+     "t": "text",
+     "v": " whatever "
+    },
+    {
+     "t": "code",
+     "v": "odometry"
+    },
+    {
+     "t": "text",
+     "v": " declared "
+    },
+    {
+     "t": "code",
+     "v": "PUBLIC"
+    },
+    {
+     "t": "text",
+     "v": ", which is why "
+    },
+    {
+     "t": "code",
+     "v": "drive"
+    },
+    {
+     "t": "text",
+     "v": " needs no include directory of its own. "
+    },
+    {
+     "t": "code",
+     "v": "find_package(GTest REQUIRED)"
+    },
+    {
+     "t": "text",
+     "v": " defines named targets, "
+    },
+    {
+     "t": "code",
+     "v": "GTest::gtest"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "GTest::gtest_main"
+    },
+    {
+     "t": "text",
+     "v": ", and "
+    },
+    {
+     "t": "code",
+     "v": "gtest_discover_tests"
+    },
+    {
+     "t": "text",
+     "v": " registers each "
+    },
+    {
+     "t": "code",
+     "v": "TEST"
+    },
+    {
+     "t": "text",
+     "v": " case with CTest under its own name, so one failing case names itself instead of hiding inside a program that merely returned nonzero."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs you is exactly the errors that show up when a link is missing rather than a path: removing a library link makes its header disappear too, "
+    },
+    {
+     "t": "code",
+     "v": "No such file or directory"
+    },
+    {
+     "t": "text",
+     "v": ", because the include directory travelled through that same link. An undefined reference means a declaration exists with no linked definition, and a multiple definition means a function was defined, not merely declared, inside a header that more than one file includes."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: write, from memory, the "
+    },
+    {
+     "t": "code",
+     "v": "CMakeLists.txt"
+    },
+    {
+     "t": "text",
+     "v": " for a library, an executable and a test, wired so "
+    },
+    {
+     "t": "code",
+     "v": "ctest"
+    },
+    {
+     "t": "text",
+     "v": " runs it, which is the exact discipline the rest of this project's build follows from here on."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "cmake",
+   "title": "Targets, linking, find_package, ctest; a Git branch workflow",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the folder the rest of this topic works with. It is the start of the Test Bench: a small library that computes odometry from wheel encoder ticks, a program that uses it, and a test."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "bench/\n  CMakeLists.txt\n  include/bench/odometry.hpp    the types, and the declaration of bench::distance_m\n  src/odometry.cpp              the definition\n  app/main.cpp                  a program that prints a distance\n  tests/odometry_test.cpp       the tests"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Before it is split into those files, the whole library fits on one screen:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n\nnamespace bench {\n\n// Encoder ticks are an exact count, so they are an integer with a type of their own.\nstruct Ticks {\n  std::int64_t count;\n};\n\n// One reading of both wheels, written {.left = {100}, .right = {300}} so the wheels can't be swapped.\nstruct WheelTicks {\n  Ticks left;\n  Ticks right;\n};\n\n// Measured once per robot.\nstruct Wheels {\n  double metres_per_tick;\n  double base_m;  // distance between the two wheels\n};\n\n// Distance driven by the middle of the axle: the mean of both wheels.\n[[nodiscard]] double distance_m(WheelTicks ticks, const Wheels& wheels) {\n  const std::int64_t both = ticks.left.count + ticks.right.count;\n  return static_cast<double>(both) / 2.0 * wheels.metres_per_tick;\n}\n\n}  // namespace bench\n\nint main() {\n  constexpr bench::Wheels wheels{.metres_per_tick = 0.001, .base_m = 0.4};\n  std::cout << std::format(\"{:.2f} m\\n\", bench::distance_m({.left = {1000}, .right = {1000}}, wheels));\n}"
+      },
+      {
+       "t": "output",
+       "text": "1.00 m"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The types are the design. A first version is usually "
+        },
+        {
+         "t": "code",
+         "v": "double distance(double left, double right, double metres_per_tick)"
+        },
+        {
+         "t": "text",
+         "v": ", and every call to it compiles with the three numbers in any order. Here a tick count is exact, so it is an integer, and it has its own type. The two wheels travel together in "
+        },
+        {
+         "t": "code",
+         "v": "WheelTicks"
+        },
+        {
+         "t": "text",
+         "v": ", and the call names each one with a "
+        },
+        {
+         "t": "i",
+         "v": "designated initialiser"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{.left = {1000}, .right = {1000}}"
+        },
+        {
+         "t": "text",
+         "v": ", so a swap is visible in the code. The calibration is a third type, which can't be passed where ticks are expected. This is Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.4",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+        },
+        {
+         "t": "text",
+         "v": ", make interfaces precisely and strongly typed, and the theme of Jason Turner's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on API design",
+         "href": "https://www.youtube.com/watch?v=zL-vn_pGGgY"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2022): make the interface hard to use wrongly. The distance itself is a "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": ", because it is a measured length, not a count."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The split is mechanical. The types and the declaration of "
+        },
+        {
+         "t": "code",
+         "v": "distance_m"
+        },
+        {
+         "t": "text",
+         "v": ", with "
+        },
+        {
+         "t": "code",
+         "v": "#pragma once"
+        },
+        {
+         "t": "text",
+         "v": " on top, go into "
+        },
+        {
+         "t": "code",
+         "v": "include/bench/odometry.hpp"
+        },
+        {
+         "t": "text",
+         "v": ". The definition goes into "
+        },
+        {
+         "t": "code",
+         "v": "src/odometry.cpp"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " into "
+        },
+        {
+         "t": "code",
+         "v": "app/main.cpp"
+        },
+        {
+         "t": "text",
+         "v": ", each including "
+        },
+        {
+         "t": "code",
+         "v": "\"bench/odometry.hpp\""
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "target"
+        },
+        {
+         "t": "text",
+         "v": " is something CMake builds. "
+        },
+        {
+         "t": "code",
+         "v": "add_library(odometry src/odometry.cpp)"
+        },
+        {
+         "t": "text",
+         "v": " makes a library, "
+        },
+        {
+         "t": "code",
+         "v": "add_executable(drive app/main.cpp)"
+        },
+        {
+         "t": "text",
+         "v": " a program. Everything else attaches to a target: its sources, include directories, compile options, and the other targets it links to. Modern CMake is written this way, target by target, instead of with settings for the whole directory."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "target_link_libraries(drive PRIVATE odometry)"
+        },
+        {
+         "t": "text",
+         "v": " does more than put the library on the link line. "
+        },
+        {
+         "t": "code",
+         "v": "drive"
+        },
+        {
+         "t": "text",
+         "v": " also receives everything that "
+        },
+        {
+         "t": "code",
+         "v": "odometry"
+        },
+        {
+         "t": "text",
+         "v": " declared as "
+        },
+        {
+         "t": "code",
+         "v": "PUBLIC"
+        },
+        {
+         "t": "text",
+         "v": ", which here is its include directory. That is why "
+        },
+        {
+         "t": "code",
+         "v": "drive"
+        },
+        {
+         "t": "text",
+         "v": " needs no "
+        },
+        {
+         "t": "code",
+         "v": "target_include_directories"
+        },
+        {
+         "t": "text",
+         "v": " of its own. The keyword says who gets a setting:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Keyword"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The target itself"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Targets that link to it"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "PRIVATE"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "INTERFACE"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "PUBLIC"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The folder with the headers other code includes is "
+        },
+        {
+         "t": "code",
+         "v": "PUBLIC"
+        },
+        {
+         "t": "text",
+         "v": ". Warning flags such as "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " are "
+        },
+        {
+         "t": "code",
+         "v": "PRIVATE"
+        },
+        {
+         "t": "text",
+         "v": ", so the library doesn't force them on its users. A header-only library is "
+        },
+        {
+         "t": "code",
+         "v": "add_library(name INTERFACE)"
+        },
+        {
+         "t": "text",
+         "v": ", with "
+        },
+        {
+         "t": "code",
+         "v": "INTERFACE"
+        },
+        {
+         "t": "text",
+         "v": " include directories, because it has nothing to compile itself."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The language standard is the one setting most projects make for the whole directory, because every target needs the same one. A library that other projects consume should also state it on the target, with "
+        },
+        {
+         "t": "code",
+         "v": "target_compile_features(odometry PUBLIC cxx_std_20)"
+        },
+        {
+         "t": "text",
+         "v": ", so its users get it through the link. The standard needs one more line than you might expect. With only "
+        },
+        {
+         "t": "code",
+         "v": "set(CMAKE_CXX_STANDARD 20)"
+        },
+        {
+         "t": "text",
+         "v": ", GCC gets "
+        },
+        {
+         "t": "code",
+         "v": "-std=gnu++20"
+        },
+        {
+         "t": "text",
+         "v": ", which turns on GNU extensions. "
+        },
+        {
+         "t": "code",
+         "v": "set(CMAKE_CXX_EXTENSIONS OFF)"
+        },
+        {
+         "t": "text",
+         "v": " makes it "
+        },
+        {
+         "t": "code",
+         "v": "-std=c++20"
+        },
+        {
+         "t": "text",
+         "v": ". Even then GCC 13 accepts some extensions, such as a variable-length array, under "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra -Werror"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "-Wpedantic"
+        },
+        {
+         "t": "text",
+         "v": " together with "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": ", or "
+        },
+        {
+         "t": "code",
+         "v": "-pedantic-errors"
+        },
+        {
+         "t": "text",
+         "v": ", refuses them, so add one of them to a target's warning flags when portability matters."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A CMake build has three steps, each with its own command:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cmake -S . -B build                       # configure: read CMakeLists.txt, find the compiler, write build/\ncmake --build build                       # build every target that changed\nctest --test-dir build --output-on-failure  # run the tests, printing the output of failed ones"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Configure runs once. After that, "
+        },
+        {
+         "t": "code",
+         "v": "cmake --build"
+        },
+        {
+         "t": "text",
+         "v": " reruns it by itself when "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": " changes. Everything generated goes into "
+        },
+        {
+         "t": "code",
+         "v": "build/"
+        },
+        {
+         "t": "text",
+         "v": ", which you add to "
+        },
+        {
+         "t": "code",
+         "v": ".gitignore"
+        },
+        {
+         "t": "text",
+         "v": " and can delete at any time. Without a build type, CMake passes neither "
+        },
+        {
+         "t": "code",
+         "v": "-g"
+        },
+        {
+         "t": "text",
+         "v": " nor "
+        },
+        {
+         "t": "code",
+         "v": "-O"
+        },
+        {
+         "t": "text",
+         "v": " to the compiler. Configure with "
+        },
+        {
+         "t": "code",
+         "v": "-DCMAKE_BUILD_TYPE=Debug"
+        },
+        {
+         "t": "text",
+         "v": " when you want to debug, and "
+        },
+        {
+         "t": "code",
+         "v": "Release"
+        },
+        {
+         "t": "text",
+         "v": " when you measure speed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "CTest"
+        },
+        {
+         "t": "text",
+         "v": " runs whatever was registered with "
+        },
+        {
+         "t": "code",
+         "v": "add_test"
+        },
+        {
+         "t": "text",
+         "v": " and decides pass or fail by the exit code: 0 passes, anything else fails. "
+        },
+        {
+         "t": "code",
+         "v": "enable_testing()"
+        },
+        {
+         "t": "text",
+         "v": " has to be in the top-level "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", before any "
+        },
+        {
+         "t": "code",
+         "v": "add_subdirectory"
+        },
+        {
+         "t": "text",
+         "v": " that adds tests. Without it, "
+        },
+        {
+         "t": "code",
+         "v": "ctest"
+        },
+        {
+         "t": "text",
+         "v": " prints \"No tests were found!!!\" and still exits with 0, so a CI job would pass with no tests run. "
+        },
+        {
+         "t": "code",
+         "v": "ctest --no-tests=error"
+        },
+        {
+         "t": "text",
+         "v": " turns that into a failure, which is what CI should use."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "GoogleTest"
+        },
+        {
+         "t": "text",
+         "v": " adds test cases, checks with readable failure messages, and a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that runs them. On Ubuntu 24.04, "
+        },
+        {
+         "t": "code",
+         "v": "sudo apt install libgtest-dev"
+        },
+        {
+         "t": "text",
+         "v": " installs it with its CMake files. Then:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "find_package(GTest REQUIRED)"
+         },
+         {
+          "t": "text",
+          "v": " finds it, or stops the configure step with an error. It defines two targets: "
+         },
+         {
+          "t": "code",
+          "v": "GTest::gtest"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "GTest::gtest_main"
+         },
+         {
+          "t": "text",
+          "v": ", which also brings a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that runs every test."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "include(GoogleTest)"
+         },
+         {
+          "t": "text",
+          "v": " loads the CMake module that provides "
+         },
+         {
+          "t": "code",
+          "v": "gtest_discover_tests"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "gtest_discover_tests(odometry_test)"
+         },
+         {
+          "t": "text",
+          "v": " runs the test program after each build with "
+         },
+         {
+          "t": "code",
+          "v": "--gtest_list_tests"
+         },
+         {
+          "t": "text",
+          "v": ", and registers every test case with CTest under its own name. CTest then reports and reruns each case separately."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GoogleTest's own guide fetches the source with CMake's "
+        },
+        {
+         "t": "code",
+         "v": "FetchContent"
+        },
+        {
+         "t": "text",
+         "v": " instead. That works on any system but needs network access during configure. The apt package keeps the build offline. In a ROS 2 package, "
+        },
+        {
+         "t": "code",
+         "v": "ament_cmake_gtest"
+        },
+        {
+         "t": "text",
+         "v": " wraps the same library, as the first-nodes topic shows."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A test file with two test cases looks like this:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <gtest/gtest.h>\n\n#include \"bench/odometry.hpp\"\n\nconstexpr bench::Wheels wheels{.metres_per_tick = 0.001, .base_m = 0.4};\n\nTEST(Distance, ZeroTicksIsZero) {\n  EXPECT_EQ(bench::distance_m({.left = {0}, .right = {0}}, wheels), 0.0);\n}\n\nTEST(Distance, AveragesBothWheels) {\n  EXPECT_NEAR(bench::distance_m({.left = {100}, .right = {300}}, wheels), 0.2, 1e-12);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "TEST(Suite, Name)"
+        },
+        {
+         "t": "text",
+         "v": " defines a case. "
+        },
+        {
+         "t": "code",
+         "v": "EXPECT_*"
+        },
+        {
+         "t": "text",
+         "v": " records a failure and carries on, and "
+        },
+        {
+         "t": "code",
+         "v": "ASSERT_*"
+        },
+        {
+         "t": "text",
+         "v": " records it and returns from the current function. Inside a helper function, that returns only from the helper, and the test case carries on. For a computed "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": ", compare with "
+        },
+        {
+         "t": "code",
+         "v": "EXPECT_NEAR"
+        },
+        {
+         "t": "text",
+         "v": " and a tolerance, because rounding can make an exact comparison fail. A failed check prints the file, the line, the expression and both values. That works for numbers and strings. For a struct of your own, such as "
+        },
+        {
+         "t": "code",
+         "v": "Ticks"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "EXPECT_EQ"
+        },
+        {
+         "t": "text",
+         "v": " needs an "
+        },
+        {
+         "t": "code",
+         "v": "operator=="
+        },
+        {
+         "t": "text",
+         "v": ", for which "
+        },
+        {
+         "t": "code",
+         "v": "bool operator==(const Ticks&) const = default;"
+        },
+        {
+         "t": "text",
+         "v": " is enough, and GoogleTest prints the values as raw bytes unless the type also has an "
+        },
+        {
+         "t": "code",
+         "v": "operator<<"
+        },
+        {
+         "t": "text",
+         "v": " or a "
+        },
+        {
+         "t": "code",
+         "v": "PrintTo"
+        },
+        {
+         "t": "text",
+         "v": " function. Comparing the "
+        },
+        {
+         "t": "code",
+         "v": ".count"
+        },
+        {
+         "t": "text",
+         "v": " members avoids both."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bench is also a Git repository from the first day. Each change goes on its own branch, is tested there, and reaches "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " through a pull request:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "git switch -c add-heading-change          # a new branch from the current commit\ncmake --build build && ctest --test-dir build --output-on-failure\ngit add -p                                # look at each change before staging it\ngit commit -m \"Add heading_change_rad with tests\"\ngit push -u origin add-heading-change     # then open a pull request; merge when CI passes\ngit switch main && git pull               # after the merge\ngit branch -d add-heading-change         # -D if the merge was a squash"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Small commits that each build and pass their tests make "
+        },
+        {
+         "t": "code",
+         "v": "git bisect"
+        },
+        {
+         "t": "text",
+         "v": " useful later: it tests commits between a good one and a bad one to find where a failure started, and every commit that doesn't build has to be skipped, with "
+        },
+        {
+         "t": "code",
+         "v": "git bisect skip"
+        },
+        {
+         "t": "text",
+         "v": " or by exiting with code 125 from a "
+        },
+        {
+         "t": "code",
+         "v": "git bisect run"
+        },
+        {
+         "t": "text",
+         "v": " script."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build the bench and read what each command prints. The files are the ones in the theory, and the test is at first a plain program that returns 0 when its check holds. That is all CTest needs:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <cmath>\n#include <format>\n#include <iostream>\n\n#include \"bench/odometry.hpp\"\n\nint main() {\n  constexpr bench::Wheels wheels{.metres_per_tick = 0.001, .base_m = 0.4};\n  const double got = bench::distance_m({.left = {100}, .right = {300}}, wheels);\n  if (std::abs(got - 0.2) < 1e-12) return 0;\n  std::cout << std::format(\"distance_m is {}, expected 0.2\\n\", got);\n  return 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": " is the one from the cold check without GoogleTest: the three GoogleTest lines are gone, "
+        },
+        {
+         "t": "code",
+         "v": "GTest::gtest_main"
+        },
+        {
+         "t": "text",
+         "v": " is gone from the test's "
+        },
+        {
+         "t": "code",
+         "v": "target_link_libraries"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "add_test(NAME odometry_test COMMAND odometry_test)"
+        },
+        {
+         "t": "text",
+         "v": " registers the test instead. Configure and build, measured with CMake 3.28 and GCC 13.3 on Ubuntu 24.04:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "$ cmake -S . -B build\n-- The CXX compiler identification is GNU 13.3.0\n...\n-- Build files have been written to: /tmp/bench/build\n$ cmake --build build\n[ 16%] Building CXX object CMakeFiles/odometry.dir/src/odometry.cpp.o\n[ 33%] Linking CXX static library libodometry.a\n[ 33%] Built target odometry\n[ 50%] Building CXX object CMakeFiles/drive.dir/app/main.cpp.o\n[ 66%] Linking CXX executable drive\n[ 66%] Built target drive\n[ 83%] Building CXX object CMakeFiles/odometry_test.dir/tests/odometry_test.cpp.o\n[100%] Linking CXX executable odometry_test\n[100%] Built target odometry_test\n$ ./build/drive\n1.00 m"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The library was built first, because both other targets link to it. It is a static library, "
+        },
+        {
+         "t": "code",
+         "v": "libodometry.a"
+        },
+        {
+         "t": "text",
+         "v": ", because "
+        },
+        {
+         "t": "code",
+         "v": "add_library"
+        },
+        {
+         "t": "text",
+         "v": " without "
+        },
+        {
+         "t": "code",
+         "v": "STATIC"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "SHARED"
+        },
+        {
+         "t": "text",
+         "v": " makes a static one unless "
+        },
+        {
+         "t": "code",
+         "v": "BUILD_SHARED_LIBS"
+        },
+        {
+         "t": "text",
+         "v": " is set. Then the tests:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "$ ctest --test-dir build --output-on-failure\nInternal ctest changing into directory: /tmp/bench/build\nTest project /tmp/bench/build\n    Start 1: odometry_test\n1/1 Test #1: odometry_test ....................   Passed    0.00 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   0.00 sec"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now break the library on purpose: divide by 4 instead of 2 in "
+        },
+        {
+         "t": "code",
+         "v": "src/odometry.cpp"
+        },
+        {
+         "t": "text",
+         "v": ", rebuild, and run the tests again."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "$ ctest --test-dir build --output-on-failure\nInternal ctest changing into directory: /tmp/bench/build\nTest project /tmp/bench/build\n    Start 1: odometry_test\n1/1 Test #1: odometry_test ....................***Failed    0.00 sec\ndistance_m is 0.1, expected 0.2\n\n\n0% tests passed, 1 tests failed out of 1\n\nTotal Test time (real) =   0.00 sec\n\nThe following tests FAILED:\n\t  1 - odometry_test (Failed)\nErrors while running CTest\n$ echo $?\n8"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "--output-on-failure"
+        },
+        {
+         "t": "text",
+         "v": " printed what the test wrote, and "
+        },
+        {
+         "t": "code",
+         "v": "ctest"
+        },
+        {
+         "t": "text",
+         "v": " exited with a non-zero code, which is what fails a CI job. With GoogleTest, each "
+        },
+        {
+         "t": "code",
+         "v": "TEST"
+        },
+        {
+         "t": "text",
+         "v": " would appear as its own line, named "
+        },
+        {
+         "t": "code",
+         "v": "Distance.ZeroTicksIsZero"
+        },
+        {
+         "t": "text",
+         "v": " and so on, and the failure message would come from the "
+        },
+        {
+         "t": "code",
+         "v": "EXPECT"
+        },
+        {
+         "t": "text",
+         "v": " check instead of your own output. Undo the change before you go on."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "skeleton",
+   "title": "Library, executable and tests from a blank folder",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes, and don't copy from the theory: type it."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Install GoogleTest with "
+         },
+         {
+          "t": "code",
+          "v": "sudo apt install libgtest-dev"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "In an empty folder, create the bench layout from the theory, with Git: "
+         },
+         {
+          "t": "code",
+          "v": "git init -b main"
+         },
+         {
+          "t": "text",
+          "v": ", a "
+         },
+         {
+          "t": "code",
+          "v": ".gitignore"
+         },
+         {
+          "t": "text",
+          "v": " that contains "
+         },
+         {
+          "t": "code",
+          "v": "build/"
+         },
+         {
+          "t": "text",
+          "v": ", and a first commit of the layout on "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ". Without "
+         },
+         {
+          "t": "code",
+          "v": "-b main"
+         },
+         {
+          "t": "text",
+          "v": ", Git 2.43 on Ubuntu 24.04 names the first branch "
+         },
+         {
+          "t": "code",
+          "v": "master"
+         },
+         {
+          "t": "text",
+          "v": " unless "
+         },
+         {
+          "t": "code",
+          "v": "init.defaultBranch"
+         },
+         {
+          "t": "text",
+          "v": " is configured, and the workflow's "
+         },
+         {
+          "t": "code",
+          "v": "git switch main"
+         },
+         {
+          "t": "text",
+          "v": " then fails."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Add a second function to the library: "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] double heading_change_rad(WheelTicks ticks, const Wheels& wheels)"
+         },
+         {
+          "t": "text",
+          "v": ". It returns the change in heading in radians for a differential-drive robot, which is the right wheel's distance minus the left wheel's, divided by the distance between the wheels."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write at least three GoogleTest cases for it: equal ticks give 0; the right wheel turning further gives a positive value; swapping the wheels changes the sign and nothing else."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Build and run everything with the three commands from the theory. Then make one test fail on purpose and read GoogleTest's message."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch named "
+         },
+         {
+          "t": "code",
+          "v": "add-heading-change"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The declaration goes next to "
+        },
+        {
+         "t": "code",
+         "v": "distance_m"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "include/bench/odometry.hpp"
+        },
+        {
+         "t": "text",
+         "v": ", and the definition into "
+        },
+        {
+         "t": "code",
+         "v": "src/odometry.cpp"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "namespace bench {\n\ndouble heading_change_rad(WheelTicks ticks, const Wheels& wheels) {\n  const std::int64_t difference = ticks.right.count - ticks.left.count;  // exact\n  return static_cast<double>(difference) * wheels.metres_per_tick / wheels.base_m;\n}\n\n}  // namespace bench"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The tests, in "
+        },
+        {
+         "t": "code",
+         "v": "tests/odometry_test.cpp"
+        },
+        {
+         "t": "text",
+         "v": " next to the distance tests and their "
+        },
+        {
+         "t": "code",
+         "v": "wheels"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "TEST(HeadingChange, EqualTicksIsZero) {\n  EXPECT_EQ(bench::heading_change_rad({.left = {500}, .right = {500}}, wheels), 0.0);\n}\n\nTEST(HeadingChange, RightWheelFurtherTurnsLeft) {\n  EXPECT_NEAR(bench::heading_change_rad({.left = {1000}, .right = {1100}}, wheels), 0.25, 1e-12);\n}\n\nTEST(HeadingChange, SwappingWheelsFlipsSign) {\n  EXPECT_EQ(bench::heading_change_rad({.left = {1100}, .right = {1000}}, wheels),\n            -bench::heading_change_rad({.left = {1000}, .right = {1100}}, wheels));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same three checks as a plain program, so that the page's checker compiles and runs them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <iostream>\n\nnamespace bench {\nstruct Ticks {\n  std::int64_t count;\n};\nstruct WheelTicks {\n  Ticks left;\n  Ticks right;\n};\nstruct Wheels {\n  double metres_per_tick;\n  double base_m;\n};\n\n[[nodiscard]] double heading_change_rad(WheelTicks ticks, const Wheels& wheels) {\n  const std::int64_t difference = ticks.right.count - ticks.left.count;\n  return static_cast<double>(difference) * wheels.metres_per_tick / wheels.base_m;\n}\n}  // namespace bench\n\nint main() {\n  constexpr bench::Wheels wheels{.metres_per_tick = 0.001, .base_m = 0.4};\n  const double left_turn = bench::heading_change_rad({.left = {1000}, .right = {1100}}, wheels);\n  const double right_turn = bench::heading_change_rad({.left = {1100}, .right = {1000}}, wheels);\n  std::cout << bench::heading_change_rad({.left = {500}, .right = {500}}, wheels) << ' ' << left_turn << ' ' << right_turn\n            << ' ' << std::boolalpha << (right_turn == -left_turn) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "0 0.25 -0.25 true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first and the third tests compare exactly. Equal ticks give a difference of 0, and 0 times anything is exactly 0. Swapping the wheels negates the difference, and rounding to nearest treats a negative number the same way as its positive twin, so every step gives exactly the negative of the other side's result. The integer type isn't what makes these exact: the same holds with "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " ticks. It is there so a tick count can't be confused with other numbers, and so counts above 2⁵³ stay exact. The second test multiplies and divides by 0.001 and 0.4, which have no exact binary form, so it gets a tolerance. A positive heading change is a turn to the left, counter-clockwise, which is the convention ROS uses for yaw."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": " is the answer to the cold check. The build runs "
+        },
+        {
+         "t": "code",
+         "v": "odometry_test --gtest_list_tests"
+        },
+        {
+         "t": "text",
+         "v": " after linking, so a test program that crashes on start fails the build, not the test run. "
+        },
+        {
+         "t": "code",
+         "v": "ctest"
+        },
+        {
+         "t": "text",
+         "v": " lists five tests, two for "
+        },
+        {
+         "t": "code",
+         "v": "Distance"
+        },
+        {
+         "t": "text",
+         "v": " and three for "
+        },
+        {
+         "t": "code",
+         "v": "HeadingChange"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then the branch and the commit:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "git switch -c add-heading-change\ngit add CMakeLists.txt include src app tests .gitignore\ngit commit -m \"Add heading_change_rad with tests\""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "errors",
+   "title": "Link errors and missing includes",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every message below was measured with CMake 3.28, GCC 13.3 and GNU ld on Ubuntu 24.04, from the bench with one line removed or changed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Remove "
+        },
+        {
+         "t": "code",
+         "v": "target_link_libraries(drive PRIVATE odometry)"
+        },
+        {
+         "t": "text",
+         "v": ". You might expect a link error, but the build stops earlier:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "/tmp/bench/app/main.cpp:4:10: fatal error: bench/odometry.hpp: No such file or directory"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The include directory came to "
+        },
+        {
+         "t": "code",
+         "v": "drive"
+        },
+        {
+         "t": "text",
+         "v": " through the link, so without the link the header isn't found either. In a CMake project, a header that can't be found usually means a missing "
+        },
+        {
+         "t": "code",
+         "v": "target_link_libraries"
+        },
+        {
+         "t": "text",
+         "v": ", not a wrong path."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now give "
+        },
+        {
+         "t": "code",
+         "v": "drive"
+        },
+        {
+         "t": "text",
+         "v": " the include directory with "
+        },
+        {
+         "t": "code",
+         "v": "target_include_directories(drive PRIVATE include)"
+        },
+        {
+         "t": "text",
+         "v": ", but still no link. The compiler is happy and the linker isn't:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "/usr/bin/ld: CMakeFiles/drive.dir/app/main.cpp.o: in function `main':\nmain.cpp:(.text+0x5b): undefined reference to `bench::distance_m(bench::WheelTicks, bench::Wheels const&)'\ncollect2: error: ld returned 1 exit status"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Undefined reference"
+        },
+        {
+         "t": "text",
+         "v": " means a declaration was found but no definition. The fix is the link to the library that defines it, not an include. The same message appears when the function is declared but never defined, or defined with a different signature or in a different namespace, so compare the name in the message with the definition."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The opposite error comes from defining a function in a header. Put this function inside "
+        },
+        {
+         "t": "code",
+         "v": "namespace bench"
+        },
+        {
+         "t": "text",
+         "v": " in a header "
+        },
+        {
+         "t": "code",
+         "v": "bench/units.hpp"
+        },
+        {
+         "t": "text",
+         "v": ", without "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": ", and include it from both "
+        },
+        {
+         "t": "code",
+         "v": "src/odometry.cpp"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "app/main.cpp"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "double to_metres(Ticks ticks, const Wheels& wheels) { return static_cast<double>(ticks.count) * wheels.metres_per_tick; }"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "/usr/bin/ld: libodometry.a(odometry.cpp.o): in function `bench::to_metres(bench::Ticks, bench::Wheels const&)':\nodometry.cpp:(.text+0x0): multiple definition of `bench::to_metres(bench::Ticks, bench::Wheels const&)'; CMakeFiles/drive.dir/app/main.cpp.o:main.cpp:(.text+0x0): first defined here"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each "
+        },
+        {
+         "t": "code",
+         "v": ".cpp"
+        },
+        {
+         "t": "text",
+         "v": " file that includes the header gets its own definition, and the linker refuses two. Declaring the function "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " allows one definition per file, as long as they are identical, and fixes it. A static library can hide this error for a while: the linker only takes object files from "
+        },
+        {
+         "t": "code",
+         "v": "libodometry.a"
+        },
+        {
+         "t": "text",
+         "v": " that it needs, so the clash appears only once something pulls in the second object file."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two errors come from GoogleTest itself. Without "
+        },
+        {
+         "t": "code",
+         "v": "libgtest-dev"
+        },
+        {
+         "t": "text",
+         "v": " installed, "
+        },
+        {
+         "t": "code",
+         "v": "find_package(GTest REQUIRED)"
+        },
+        {
+         "t": "text",
+         "v": " stops the configure step:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "CMake Error at /usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake:230 (message):\n  Could NOT find GTest (missing: GTEST_LIBRARY GTEST_INCLUDE_DIR\n  GTEST_MAIN_LIBRARY)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With the "
+        },
+        {
+         "t": "code",
+         "v": "find_package"
+        },
+        {
+         "t": "text",
+         "v": " line left out of the cold check's file, "
+        },
+        {
+         "t": "code",
+         "v": "GTest::gtest_main"
+        },
+        {
+         "t": "text",
+         "v": " is an unknown name, and CMake says so when it generates the build:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "CMake Error at CMakeLists.txt:16 (target_link_libraries):\n  Target \"odometry_test\" links to:\n\n    GTest::gtest_main\n\n  but the target was not found.  Possible reasons include:\n\n    * There is a typo in the target name.\n    * A find_package call is missing for an IMPORTED target.\n    * An ALIAS target is missing."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A name with "
+        },
+        {
+         "t": "code",
+         "v": "::"
+        },
+        {
+         "t": "text",
+         "v": " is always a target, so CMake can tell that something is missing. Without the "
+        },
+        {
+         "t": "code",
+         "v": "::"
+        },
+        {
+         "t": "text",
+         "v": ", as in "
+        },
+        {
+         "t": "code",
+         "v": "gtest_main"
+        },
+        {
+         "t": "text",
+         "v": ", CMake would pass "
+        },
+        {
+         "t": "code",
+         "v": "-lgtest_main"
+        },
+        {
+         "t": "text",
+         "v": " to the linker and hope. That is one reason packages export their targets with a namespace."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Explain what a target is and what "
+        },
+        {
+         "t": "code",
+         "v": "PUBLIC"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "PRIVATE"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "INTERFACE"
+        },
+        {
+         "t": "text",
+         "v": " decide. Give the three commands that configure, build and test, and why CI should use "
+        },
+        {
+         "t": "code",
+         "v": "--no-tests=error"
+        },
+        {
+         "t": "text",
+         "v": ". Say why the bench counts ticks in an integer type of its own and passes both wheels as one struct. Name the lines that add GoogleTest to a project. For \"No such file or directory\", \"undefined reference\" and \"multiple definition\", say what each means and its usual fix."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "drive"
+     },
+     {
+      "t": "text",
+      "v": " find the library's header without its own "
+     },
+     {
+      "t": "code",
+      "v": "target_include_directories"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which keyword do you use for a library's include directory, and which for its warning flags? Why?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "ctest"
+     },
+     {
+      "t": "text",
+      "v": " do when "
+     },
+     {
+      "t": "code",
+      "v": "enable_testing()"
+     },
+     {
+      "t": "text",
+      "v": " is missing, and how do you make CI notice?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "gtest_discover_tests"
+     },
+     {
+      "t": "text",
+      "v": " do after each build?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between an undefined reference and a multiple definition, and how do you fix each?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "distance_m"
+     },
+     {
+      "t": "text",
+      "v": " take a "
+     },
+     {
+      "t": "code",
+      "v": "WheelTicks"
+     },
+     {
+      "t": "text",
+      "v": " built with designated initialisers, not two numbers?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank folder in 20 minutes: a library, a program and a GoogleTest test, built with CMake and run with "
+     },
+     {
+      "t": "code",
+      "v": "ctest"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Bill Hoffman, Modern CMake, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Modern_CMake.pdf"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bret Brown, Pragmatic CMake, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Pragmatic_CMake.pdf"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jason Turner, Back to Basics: C++ API Design, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/CppCon-2022-Jason-Turner-API-Design-Back-to-Basics.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=zL-vn_pGGgY"
+     },
+     {
+      "t": "text",
+      "v": ". Interfaces that are hard to use wrongly."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Phil Nash, Back to Basics: Testing, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/back_to_basics_testing.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=7_H4qzhWbnQ"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Dave Steffen, Back to Basics: Unit Testing, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Unit_Testing.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=MwoAM3sznS0"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "P.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rp-direct"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "GoogleTest "
+     },
+     {
+      "t": "a",
+      "v": "primer",
+      "href": "https://google.github.io/googletest/primer.html"
+     },
+     {
+      "t": "text",
+      "v": ", and CMake's "
+     },
+     {
+      "t": "a",
+      "v": "FindGTest",
+      "href": "https://cmake.org/cmake/help/latest/module/FindGTest.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "GoogleTest",
+      "href": "https://cmake.org/cmake/help/latest/module/GoogleTest.html"
+     },
+     {
+      "t": "text",
+      "v": " modules."
+     }
+    ]
+   ]
+  }
+ ]
+}

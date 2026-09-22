@@ -1,0 +1,1907 @@
+{
+ "id": "prj-stop-verification",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage gives the bench a second witness to whether the robot actually stopped. Wheel odometry is what the missing-odometry scenario interferes with, so asking it to also prove the stop asks the thing under test to grade itself: an encoder that stops sending freezes at its last reading, which looks exactly like a robot standing still. Gazebo's own ground truth, bridged in as "
+    },
+    {
+     "t": "code",
+     "v": "/truth_tf"
+    },
+    {
+     "t": "text",
+     "v": " through a "
+    },
+    {
+     "t": "code",
+     "v": "PosePublisher"
+    },
+    {
+     "t": "text",
+     "v": " added to a copy of the robot's model, depends on no wheel at all."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is measuring the furthest point the robot reached from where it stopped, not the distance from its first sample to its last. A robot that crept forward and rolled back reports zero by that first measure and the truth by this one, and both witnesses are asked the same question over the same stretch, so their answers sit side by side in one verdict."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: the two witnesses agree to within a couple of centimetres on an ordinary drive. Moving the robot by hand while it is meant to be stopped, with no wheel turning, fails the verdict on the simulator's line while the odometry's line still says "
+    },
+    {
+     "t": "code",
+     "v": "ok"
+    },
+    {
+     "t": "text",
+     "v": ", which is the run the bench would have called a pass before this stage existed. A new regression test also fails within seconds if the supervisor's own reaction time ever slips, with no simulator needed to catch it."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "verify",
+   "title": "Stop check from independent simulator state",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the simulator's own view of where the robot is arrives in ROS on a topic of its own, and you have measured how far it differs from the wheel odometry the bench has been trusting."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Look at what the missing-odometry scenario actually proves. It says the robot stopped because the forward speed in "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " fell below 0.01 m/s. That is already better evidence than the stop the supervisor published, which is the trap the architecture topic warned about: a message that was sent is not a robot that moved. But "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " is the bridge's copy of the DiffDrive system's odometry, and that odometry is an integration of wheel rotation. The scenario interferes with the odometry path on purpose and then asks the odometry whether the robot stopped."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Wheel odometry says the wrong thing in three ways that happen on real robots. A wheel slipping on a wet floor reports metres the robot never covered. A robot lifted onto a stand for maintenance reports the same. And an encoder that stops sending leaves its last reading in place, which reads as a robot standing still. The third one is the one this bench can produce, and it is the one that would make the missing-odometry scenario pass for the wrong reason."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Gazebo does not have to estimate anything. It knows where the robot is because it put it there, and it publishes that. This session brings that pose into ROS as a second witness."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Find it on the Gazebo side, with the bench running:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim bench.launch.py headless:=False    # terminal 1\ngz topic -l | grep pose                                   # terminal 2\ngz topic -i -t /world/<world>/dynamic_pose/info           # the message type it carries\ngz topic -e -t /world/<world>/dynamic_pose/info           # the poses themselves, then Ctrl+C"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The world's name is in the topic path that "
+        },
+        {
+         "t": "code",
+         "v": "gz topic -l"
+        },
+        {
+         "t": "text",
+         "v": " printed, and it comes from the sandbox world's SDF in "
+        },
+        {
+         "t": "code",
+         "v": "nav2_minimal_tb3_sim"
+        },
+        {
+         "t": "text",
+         "v": ". Gazebo's scene broadcaster publishes every pose in the world as a "
+        },
+        {
+         "t": "code",
+         "v": "gz.msgs.Pose_V"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "/world/<world>/pose/info"
+        },
+        {
+         "t": "text",
+         "v": ", and the ones that move on "
+        },
+        {
+         "t": "code",
+         "v": "/world/<world>/dynamic_pose/info"
+        },
+        {
+         "t": "text",
+         "v": ". The moving set is the smaller of the two and it contains the robot, so it looks like the one to bridge."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In the output of "
+        },
+        {
+         "t": "code",
+         "v": "gz topic -e"
+        },
+        {
+         "t": "text",
+         "v": " each pose carries a "
+        },
+        {
+         "t": "code",
+         "v": "name"
+        },
+        {
+         "t": "text",
+         "v": ", and one of those names is the robot's. So far so good."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Bridge that topic into ROS and look at what arrives, because this is the step that decides the rest of the session. "
+         },
+         {
+          "t": "code",
+          "v": "ros_gz_bridge"
+         },
+         {
+          "t": "text",
+          "v": " maps "
+         },
+         {
+          "t": "code",
+          "v": "gz.msgs.Pose_V"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": "tf2_msgs/msg/TFMessage"
+         },
+         {
+          "t": "text",
+          "v": ", so on paper the poses become a list of stamped transforms:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run ros_gz_bridge parameter_bridge \\\n  \"/world/<world>/dynamic_pose/info@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V\" \\\n  --ros-args -r /world/<world>/dynamic_pose/info:=/truth_tf\nros2 topic echo /truth_tf --once"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the echo before you write any code against it. Every entry comes out with an empty "
+        },
+        {
+         "t": "code",
+         "v": "frame_id"
+        },
+        {
+         "t": "text",
+         "v": ", an empty "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " and a stamp of zero, and the "
+        },
+        {
+         "t": "code",
+         "v": "name"
+        },
+        {
+         "t": "text",
+         "v": " you saw on the Gazebo side is gone. Two pieces of somebody else's code explain it, and both are worth opening. The bridge's conversion from a "
+        },
+        {
+         "t": "code",
+         "v": "gz::msgs::Pose"
+        },
+        {
+         "t": "text",
+         "v": " to a "
+        },
+        {
+         "t": "code",
+         "v": "TransformStamped"
+        },
+        {
+         "t": "text",
+         "v": ", in "
+        },
+        {
+         "t": "code",
+         "v": "ros_gz_bridge/src/convert/geometry_msgs.cpp"
+        },
+        {
+         "t": "text",
+         "v": ", walks the header's data pairs looking for one keyed "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " and never calls "
+        },
+        {
+         "t": "code",
+         "v": "gz_msg.name()"
+        },
+        {
+         "t": "text",
+         "v": ". And Gazebo's scene broadcaster, which fills "
+        },
+        {
+         "t": "code",
+         "v": "dynamic_pose/info"
+        },
+        {
+         "t": "text",
+         "v": ", sets each pose's name and id but adds no header data pairs, and stamps the "
+        },
+        {
+         "t": "code",
+         "v": "Pose_V"
+        },
+        {
+         "t": "text",
+         "v": " as a whole rather than each pose inside it. Neither is a bug. They were written for different jobs, and the meeting point drops what this bench needs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A filter on "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " against that topic would match nothing, and the sample-count check from Build 2 would fail on every run. That is a good failure, and it is the reason the count is a check at all, but it is better not to build on it."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Take the pose from a publisher that names and stamps it. Gazebo's "
+         },
+         {
+          "t": "code",
+          "v": "PosePublisher"
+         },
+         {
+          "t": "text",
+          "v": " system does exactly that: it writes "
+         },
+         {
+          "t": "code",
+          "v": "frame_id"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "child_frame_id"
+         },
+         {
+          "t": "text",
+          "v": " into the header's data pairs and a stamp beside them, which is precisely what the bridge reads. It is a model-level system, and the TurtleBot model the bench spawns loads only "
+         },
+         {
+          "t": "code",
+          "v": "DiffDrive"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "JointStatePublisher"
+         },
+         {
+          "t": "text",
+          "v": ", so the bench has to add it."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Copy the robot's description into the bench and add the system to it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "mkdir -p ~/test_bench/src/bench_sim/models\ncp \"$(ros2 pkg prefix nav2_minimal_tb3_sim)/share/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro\" \\\n   ~/test_bench/src/bench_sim/models/waffle_with_pose.sdf.xacro"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then add this next to the two plugins already in the model, and install the folder with "
+        },
+        {
+         "t": "code",
+         "v": "install(DIRECTORY config launch models rviz DESTINATION share/${PROJECT_NAME})"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<plugin filename=\"gz-sim-pose-publisher-system\" name=\"gz::sim::systems::PosePublisher\">\n  <topic>/truth_pose</topic>\n  <publish_link_pose>false</publish_link_pose>\n  <publish_model_pose>true</publish_model_pose>\n  <use_pose_vector_msg>true</use_pose_vector_msg>\n  <update_frequency>30</update_frequency>\n</plugin>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "<topic>"
+        },
+        {
+         "t": "text",
+         "v": " is the line that saves an hour. Left out, the system builds its own name from the entity's scoped name with the world included, which comes out as "
+        },
+        {
+         "t": "code",
+         "v": "/world/<world>/model/turtlebot3_waffle/pose"
+        },
+        {
+         "t": "text",
+         "v": "; a bridge written against "
+        },
+        {
+         "t": "code",
+         "v": "/model/turtlebot3_waffle/pose"
+        },
+        {
+         "t": "text",
+         "v": " then listens to a topic nobody publishes, "
+        },
+        {
+         "t": "code",
+         "v": "/truth_tf"
+        },
+        {
+         "t": "text",
+         "v": " stays silent, and the only thing that tells you is the sample-count check failing. Naming the topic here ties the bench to neither the world's name nor the robot's, and the system checks the name you give it before taking it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A copy of somebody else's file is a debt, so record it: write the package version you copied from in "
+        },
+        {
+         "t": "code",
+         "v": "docs/simulation.md"
+        },
+        {
+         "t": "text",
+         "v": ", next to the version numbers already there, and re-copy when that package updates. The alternative was to stop using their launch file altogether, which costs more."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Spawn the copy instead of the original. "
+         },
+         {
+          "t": "code",
+          "v": "spawn_tb3.launch.py"
+         },
+         {
+          "t": "text",
+          "v": " declares a "
+         },
+         {
+          "t": "code",
+          "v": "robot_sdf"
+         },
+         {
+          "t": "text",
+          "v": " argument for exactly this, so the include in "
+         },
+         {
+          "t": "code",
+          "v": "bench_sim/launch/world.launch.py"
+         },
+         {
+          "t": "text",
+          "v": " gains one line, and the bridge for the new topic goes next to it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "    robot_sdf = PathJoinSubstitution(\n        [FindPackageShare('bench_sim'), 'models', 'waffle_with_pose.sdf.xacro'])\n    truth = Node(package='ros_gz_bridge', executable='parameter_bridge',\n                 arguments=['/truth_pose@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V'],\n                 remappings=[('/truth_pose', '/truth_tf')],\n                 parameters=[{'use_sim_time': True}], output='screen')"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Pass "
+        },
+        {
+         "t": "code",
+         "v": "robot_sdf"
+        },
+        {
+         "t": "text",
+         "v": " through the existing "
+        },
+        {
+         "t": "code",
+         "v": "IncludeLaunchDescription"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "launch_arguments={'robot_sdf': robot_sdf}.items()"
+        },
+        {
+         "t": "text",
+         "v": ", and add "
+        },
+        {
+         "t": "code",
+         "v": "truth"
+        },
+        {
+         "t": "text",
+         "v": " to the description's list. Nothing else is needed, and that is the point of having named the topic in the model: no launch argument for the world, none for the robot, and "
+        },
+        {
+         "t": "code",
+         "v": "arguments"
+        },
+        {
+         "t": "text",
+         "v": " is one plain string. Where a bridge does need a name assembled at launch time, build it as one flat list of substitutions and strings, because launch normalises each element on its own and raises on a list nested inside one, while a "
+        },
+        {
+         "t": "code",
+         "v": "remappings"
+        },
+        {
+         "t": "text",
+         "v": " pair takes a list on each side since each half is normalised separately."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "spawn_tb3.launch.py"
+        },
+        {
+         "t": "text",
+         "v": " declares a "
+        },
+        {
+         "t": "code",
+         "v": "robot_name"
+        },
+        {
+         "t": "text",
+         "v": " of its own, defaulting to "
+        },
+        {
+         "t": "code",
+         "v": "turtlebot3_waffle"
+        },
+        {
+         "t": "text",
+         "v": ", and the bench leaves it alone. The model's name now reaches the bench in one place only, as the "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " you are about to write down."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "["
+        },
+        {
+         "t": "text",
+         "v": " in the middle of the argument is the direction, Gazebo to ROS only, and it matters here more than anywhere else in the bench. A bidirectional bridge on a pose topic would let anything in ROS move the robot by publishing, and a witness that can be told what to say is not a witness."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Now look again, and write the name down:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic echo /truth_tf --once\nros2 topic hz /truth_tf"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This time the entries carry a "
+        },
+        {
+         "t": "code",
+         "v": "frame_id"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " and a stamp that moves. Write down the "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " that is the robot's body. It comes from the model, not from you, so the check takes it as a parameter rather than assuming it."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Measure the gap between the two witnesses, which is the number this topic rests on:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run bench_nodes odom_relay --ros-args -p use_sim_time:=true      # terminal 2\nros2 run bench_nodes route_follower --ros-args -p use_sim_time:=true \\\n  -p goals_x:=\"[0.8, 0.8]\" -p goals_y:=\"[0.0, 0.5]\"                   # terminal 3\nros2 topic echo /odom_raw --field pose.pose.position                  # terminal 4\nros2 topic echo /truth_tf                                             # terminal 5"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Compare distances travelled and not positions. The two frames have different origins: odometry counts from where the robot spawned, so it starts at zero, while the world's origin is the world's, and the robot-world topic found the spawn point at (-2.0, -0.5). Drive the route, then work out how far each witness says the robot went. On a flat floor with no slip they should agree to a few centimetres, and that agreement is a measurement rather than an assumption: it is what makes the wheel odometry usable at all, and it is exactly what a change to the robot's model could take away."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when you have seen the world topic arrive with empty frame names and can say why; "
+        },
+        {
+         "t": "code",
+         "v": "/truth_tf"
+        },
+        {
+         "t": "text",
+         "v": " carries the robot's pose with a "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": " and a moving stamp; the bridge and the copied model start with the world; and you have both witnesses' distance for one drive of the route, with the difference between them."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " can put one question to either witness, and the runner writes both answers into the same verdict."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The question is not \"did it stop\" but \"while it was meant to be stopped, how far did it get from where it stopped\". That phrasing does two things. It works for a witness that reports only a pose, which is all the bridge gives, so no velocity is needed. And it is the question a person asks after an incident: the robot was supposed to be still, so how far did it go?"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take the furthest point rather than the distance from the first sample to the last. A robot that crept forward twenty centimetres and rolled back to where it started reports zero by first-to-last, and twenty centimetres is what happened. The window is the stretch the robot had to hold still: from the moment it came to rest, which "
+        },
+        {
+         "t": "code",
+         "v": "first_rest"
+        },
+        {
+         "t": "text",
+         "v": " already finds, to the moment its odometry came back, which is the cue plus the drop. The runner has both of those already."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the measurement to "
+         },
+         {
+          "t": "code",
+          "v": "bench/scenario.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", tests first. Here it is with a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that judges two made-up runs:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <chrono>\n#include <cmath>\n#include <compare>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nnamespace bench {\n\n// From bench/time.hpp and bench/scenario.hpp, as the earlier topics left them.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\nstruct Sample {\n  Time at;\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double speed_mps = 0.0;\n};\n\nenum class Compare { at_least, at_most };\n\nstruct Check {\n  std::string what;\n  std::string unit;\n  Compare compare;\n  double limit;\n  std::optional<double> measured;\n};\n\n[[nodiscard]] bool met(const Check& check) {\n  if (!check.measured) return false;\n  return check.compare == Compare::at_least ? *check.measured >= check.limit : *check.measured <= check.limit;\n}\n\nstruct Verdict {\n  std::string scenario;\n  std::int64_t samples;\n  bool passed;\n  std::vector<Check> checks;\n};\n\n[[nodiscard]] Verdict judge(std::string scenario, std::int64_t samples, std::vector<Check> checks) {\n  const bool passed = std::ranges::all_of(checks, met);\n  return {.scenario = std::move(scenario), .samples = samples, .passed = passed, .checks = std::move(checks)};\n}\n\nnamespace {\n\n[[nodiscard]] std::string with_unit(double value, std::string_view unit) {\n  return unit.empty() ? std::format(\"{:.2f}\", value) : std::format(\"{:.2f} {}\", value, unit);\n}\n\n[[nodiscard]] std::string line(const Check& check) {\n  const std::string measured = check.measured ? with_unit(*check.measured, check.unit) : std::string(\"not measured\");\n  return std::format(\"{:<6} {}: {}, {} {}\\n\", met(check) ? \"ok\" : \"failed\", check.what, measured,\n                     check.compare == Compare::at_least ? \"at least\" : \"at most\", with_unit(check.limit, check.unit));\n}\n\n}  // namespace\n\n[[nodiscard]] std::string describe(const Verdict& verdict) {\n  std::string text = std::format(\"{}\\nscenario: {}\\nsamples: {}\\n\", verdict.passed ? \"pass\" : \"fail\",\n                                 verdict.scenario, verdict.samples);\n  for (const Check& check : verdict.checks) text += line(check);\n  return text;\n}\n\n[[nodiscard]] std::span<const Sample> between(std::span<const Sample> run, Time from, Time to) {\n  const auto first = std::ranges::lower_bound(run, from, {}, &Sample::at);\n  const auto last = std::ranges::upper_bound(run, to, {}, &Sample::at);\n  if (first >= last) return {};\n  return {first, last};\n}\n\n// New in this topic.\n\n// The furthest the robot got from where this stretch started. A robot that crept away and came\n// back reports the creep, which a first-to-last distance would hide.\n[[nodiscard]] std::optional<double> wandered_m(std::span<const Sample> run) {\n  if (run.empty()) return std::nullopt;\n  const Sample& start = run.front();\n  return std::ranges::max(run | std::views::transform([&start](const Sample& s) {\n                            return std::hypot(s.x_m - start.x_m, s.y_m - start.y_m);\n                          }));\n}\n\n// What \"it held still\" means, asked of one witness.\nstruct StopWindow {\n  double wander_m;       // how far the robot may drift while it is meant to be stopped\n  std::int64_t samples;  // the fewest samples that make the answer worth having\n};\n\n// The same question put to one witness. The runner asks it of the simulator's own state and of\n// the wheel odometry, so both answers stand in the verdict next to each other.\n[[nodiscard]] std::vector<Check> stop_checks(std::string_view witness, std::span<const Sample> stretch,\n                                             const StopWindow& limits) {\n  return {{.what = std::format(\"{}: samples while the robot was meant to be stopped\", witness),\n           .unit = \"\",\n           .compare = Compare::at_least,\n           .limit = static_cast<double>(limits.samples),\n           .measured = static_cast<double>(std::ssize(stretch))},\n          {.what = std::format(\"{}: distance from the stop point\", witness),\n           .unit = \"m\",\n           .compare = Compare::at_most,\n           .limit = limits.wander_m,\n           .measured = wandered_m(stretch)}};\n}\n\n}  // namespace bench\n\n// One reading of a witness, 200 ms of simulated time apart.\nstruct Moment {\n  std::chrono::milliseconds t;\n  double x_m;\n};\n\n[[nodiscard]] std::vector<bench::Sample> samples(std::span<const Moment> moments) {\n  std::vector<bench::Sample> run;\n  for (const Moment& moment : moments) {\n    run.push_back({.at = {moment.t}, .x_m = moment.x_m, .y_m = 0.0, .speed_mps = 0.0});\n  }\n  return run;\n}\n\n[[nodiscard]] std::vector<bench::Sample> straight(double from_m, double step_m) {\n  std::vector<Moment> moments;\n  for (std::int64_t i = 0; i < 11; ++i) {\n    moments.push_back({.t = std::chrono::milliseconds(200 * i), .x_m = from_m + step_m * static_cast<double>(i)});\n  }\n  return samples(moments);\n}\n\nint main() {\n  using namespace std::chrono_literals;\n  constexpr bench::StopWindow limits{.wander_m = 0.05, .samples = 5};\n  const bench::Time stopped{0ms};\n  const bench::Time odometry_back{2000ms};\n\n  // The bench behaving: both witnesses say the robot held still for the two seconds it was\n  // denied its odometry.\n  const auto truth = straight(0.720, 0.0020);\n  const auto wheels = straight(0.730, 0.0030);\n  std::vector<bench::Check> agree =\n      bench::stop_checks(\"simulator\", bench::between(truth, stopped, odometry_back), limits);\n  const std::vector<bench::Check> from_wheels =\n      bench::stop_checks(\"odometry\", bench::between(wheels, stopped, odometry_back), limits);\n  agree.insert(agree.end(), from_wheels.begin(), from_wheels.end());\n  std::cout << bench::describe(bench::judge(\"missing_odom\", std::ssize(truth), std::move(agree)));\n  std::cout << '\\n';\n\n  // The wheels lying: the encoders report a robot at rest while the simulator slides it 0.18 m.\n  const auto frozen = straight(0.730, 0.0000);\n  const auto sliding = straight(0.720, 0.0180);\n  std::vector<bench::Check> disagree =\n      bench::stop_checks(\"simulator\", bench::between(sliding, stopped, odometry_back), limits);\n  const std::vector<bench::Check> from_frozen =\n      bench::stop_checks(\"odometry\", bench::between(frozen, stopped, odometry_back), limits);\n  disagree.insert(disagree.end(), from_frozen.begin(), from_frozen.end());\n  std::cout << bench::describe(bench::judge(\"missing_odom\", std::ssize(sliding), std::move(disagree)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "pass\nscenario: missing_odom\nsamples: 11\nok     simulator: samples while the robot was meant to be stopped: 11.00, at least 5.00\nok     simulator: distance from the stop point: 0.02 m, at most 0.05 m\nok     odometry: samples while the robot was meant to be stopped: 11.00, at least 5.00\nok     odometry: distance from the stop point: 0.03 m, at most 0.05 m\n\nfail\nscenario: missing_odom\nsamples: 11\nok     simulator: samples while the robot was meant to be stopped: 11.00, at least 5.00\nfailed simulator: distance from the stop point: 0.18 m, at most 0.05 m\nok     odometry: samples while the robot was meant to be stopped: 11.00, at least 5.00\nok     odometry: distance from the stop point: 0.00 m, at most 0.05 m"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second verdict is this topic in eight lines. The wheels report a robot that did not move a millimetre, and the simulator reports one that slid 18 cm while it was meant to be stopped. Before today the bench would have written "
+        },
+        {
+         "t": "code",
+         "v": "pass"
+        },
+        {
+         "t": "text",
+         "v": " on that run. The sample count is a check of its own because it is the failure that looks like a pass: a witness with nothing to say reports a wander of nothing, and a stretch with two samples in it proves nothing about two seconds."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add tests for both verdicts, plus one for a run where the robot crept out and came back, which is the case that separates "
+        },
+        {
+         "t": "code",
+         "v": "wandered_m"
+        },
+        {
+         "t": "text",
+         "v": " from a first-to-last distance."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Give the runner the second witness. It subscribes for every scenario, because a witness is worth having whether or not today's checks use it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In the constructor. The frame name comes from the model, so it is a parameter.\ntruth_frame_ = declare_parameter<std::string>(\"truth_frame\", \"turtlebot3_waffle\");\ntruth_sub_ = create_subscription<tf2_msgs::msg::TFMessage>(\n    \"truth_tf\", rclcpp::QoS(rclcpp::KeepLast(10)), [this](const tf2_msgs::msg::TFMessage& message) {\n      for (const geometry_msgs::msg::TransformStamped& t : message.transforms) {\n        if (t.child_frame_id != truth_frame_) continue;\n        truth_run_.push_back({.at = {std::chrono::nanoseconds(rclcpp::Time(t.header.stamp).nanoseconds())},\n                              .x_m = t.transform.translation.x,\n                              .y_m = t.transform.translation.y});\n      }\n    });"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In finish(), after the missing-odometry checks: the stretch the robot had to hold still.\nif (scenario_ == \"missing_odom\" && drop_cue_) {\n  const bench::Time back{drop_cue_->since_epoch + drop_};\n  const std::optional<bench::Time> rest = bench::first_rest(bench::since(run_, *drop_cue_), 0.01, 300ms);\n  const bench::Time from = rest.value_or(*drop_cue_);\n  const auto add = [&checks](std::vector<bench::Check> more) {\n    checks.insert(checks.end(), more.begin(), more.end());\n  };\n  add(bench::stop_checks(\"simulator\", bench::between(truth_run_, from, back), stop_window_));\n  add(bench::stop_checks(\"odometry\", bench::between(run_, from, back), stop_window_));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The new members are "
+        },
+        {
+         "t": "code",
+         "v": "std::string truth_frame_"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<bench::Sample> truth_run_"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "bench::StopWindow stop_window_"
+        },
+        {
+         "t": "text",
+         "v": " and the subscription, and "
+        },
+        {
+         "t": "code",
+         "v": "stop_window_"
+        },
+        {
+         "t": "text",
+         "v": " is declared from two parameters, "
+        },
+        {
+         "t": "code",
+         "v": "wander_m"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "stop_samples"
+        },
+        {
+         "t": "text",
+         "v": ", the way the other limits are. Add "
+        },
+        {
+         "t": "code",
+         "v": "<depend>tf2_msgs</depend>"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_nodes/package.xml"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "tf2_msgs"
+        },
+        {
+         "t": "text",
+         "v": " to the runner's "
+        },
+        {
+         "t": "code",
+         "v": "ament_target_dependencies"
+        },
+        {
+         "t": "text",
+         "v": " line. When the robot never came to rest, "
+        },
+        {
+         "t": "code",
+         "v": "rest"
+        },
+        {
+         "t": "text",
+         "v": " is empty and the window starts at the cue instead, so the checks still measure the stretch that mattered rather than reporting nothing."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the two limits to "
+         },
+         {
+          "t": "code",
+          "v": "missing_odom.yaml"
+         },
+         {
+          "t": "text",
+          "v": ", under "
+         },
+         {
+          "t": "code",
+          "v": "scenario_runner"
+         },
+         {
+          "t": "text",
+          "v": ": "
+         },
+         {
+          "t": "code",
+          "v": "wander_m: 0.05"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "stop_samples: 5"
+         },
+         {
+          "t": "text",
+          "v": ". Put "
+         },
+         {
+          "t": "code",
+          "v": "truth_frame"
+         },
+         {
+          "t": "text",
+          "v": " in the "
+         },
+         {
+          "t": "code",
+          "v": "/**"
+         },
+         {
+          "t": "text",
+          "v": " block with the name you wrote down in Build 1."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the new tests pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, you saw them fail before "
+        },
+        {
+         "t": "code",
+         "v": "wandered_m"
+        },
+        {
+         "t": "text",
+         "v": " existed, and the runner builds with the second subscription."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 3",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the missing-odometry scenario is judged by both witnesses, you have seen them disagree, and a test in "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes"
+        },
+        {
+         "t": "text",
+         "v": " fails if the supervisor ever stops stopping on time."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it and read the four new lines:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh\n./run_scenario.sh missing_odom; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write both distances down next to the ones from the last topic. They should agree within a couple of centimetres, and the simulator's number is the one to quote from now on: the robot moved that far while it was meant to be still."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Make the witnesses disagree, which is the experiment this whole topic is for. Run the scenario with the window open and a longer drop, so that you have time to interfere:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim scenario.launch.py scenario:=missing_odom verdict_file:=/tmp/v.txt headless:=False"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Set "
+        },
+        {
+         "t": "code",
+         "v": "drop_ms"
+        },
+        {
+         "t": "text",
+         "v": " to 8000 in "
+        },
+        {
+         "t": "code",
+         "v": "missing_odom.yaml"
+        },
+        {
+         "t": "text",
+         "v": " first. While the robot is stopped, move it without turning a wheel. Either drag the model in the Gazebo window, or call the world's own service. Ask the service what it wants before you call it, rather than trusting the line below:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "gz service -l | grep set_pose\ngz service -i -s /world/<world>/set_pose      # the request and reply types it declares\ngz service -s /world/<world>/set_pose --reqtype gz.msgs.Pose --reptype gz.msgs.Boolean \\\n  --timeout 2000 --req 'name: \"<the model name>\", position: {x: -1.5, y: -0.5, z: 0.01}'"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "set_pose"
+        },
+        {
+         "t": "text",
+         "v": " comes from Gazebo's user-commands system, and "
+        },
+        {
+         "t": "code",
+         "v": "gz service -i"
+        },
+        {
+         "t": "text",
+         "v": " is the one place that states its request and reply types for the version you are running. If the world offers no such service its SDF does not load that system, and dragging the model in the window does the same job. Either way the verdict comes back "
+        },
+        {
+         "t": "code",
+         "v": "fail"
+        },
+        {
+         "t": "text",
+         "v": " on the simulator's distance and "
+        },
+        {
+         "t": "code",
+         "v": "ok"
+        },
+        {
+         "t": "text",
+         "v": " on the odometry's, which is the robot lifted onto a stand, reported by a bench that now notices. Put "
+        },
+        {
+         "t": "code",
+         "v": "drop_ms"
+        },
+        {
+         "t": "text",
+         "v": " back to 2000 and run it once more to see it pass."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the regression test, "
+         },
+         {
+          "t": "code",
+          "v": "test_supervisor.cpp"
+         },
+         {
+          "t": "text",
+          "v": " gains a case. Everything so far proves the bench notices a stop; nothing proves the supervisor is still quick about it. The supervisor's promise has a number in it, and a number with no test drifts:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In FakeInputs, which until now kept only the speeds. sent_ is the subscription and keeps its name.\nstruct Sent {\n  rclcpp::Time at;\n  double speed_mps;\n};\n// The /cmd_vel callback, in place of speeds_.push_back(command.twist.linear.x):\nreceived_.push_back({.at = now(), .speed_mps = command.twist.linear.x});\n// And in the timer, so the test measures from the moment odometry really stopped:\nif (odometry_feed_ == Feed::on) { odometry_->publish(nav_msgs::msg::Odometry{}); last_odometry_ = now(); }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That is one new member, "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Sent> received_"
+        },
+        {
+         "t": "text",
+         "v": ", in place of "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<double> speeds_"
+        },
+        {
+         "t": "text",
+         "v": ", and one more, "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::Time last_odometry_"
+        },
+        {
+         "t": "text",
+         "v": ". The four cases the supervisor topic wrote all read "
+        },
+        {
+         "t": "code",
+         "v": "fake->speeds()"
+        },
+        {
+         "t": "text",
+         "v": ", so keep that accessor, now returning the speeds out of "
+        },
+        {
+         "t": "code",
+         "v": "received_"
+        },
+        {
+         "t": "text",
+         "v": " by value; the counts and the "
+        },
+        {
+         "t": "code",
+         "v": "views::drop"
+        },
+        {
+         "t": "text",
+         "v": " pipelines in those cases go on meaning what they meant. Add two more accessors: "
+        },
+        {
+         "t": "code",
+         "v": "last_odometry()"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "first_stop_after(const rclcpp::Time&)"
+        },
+        {
+         "t": "text",
+         "v": " returning a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<rclcpp::Time>"
+        },
+        {
+         "t": "text",
+         "v": ", the time of the first entry after that moment whose speed is zero."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "TEST_F(SupervisorTest, StopsWithinTheOdometryTimeout) {\n  fake->odometry(Feed::on);\n  fake->commands(Feed::on);\n  ASSERT_TRUE(spin_until([&] { return std::ranges::count(fake->speeds(), 0.2) >= 5; }));\n  fake->odometry(Feed::off);\n  const rclcpp::Time last = fake->last_odometry();\n  ASSERT_TRUE(spin_until([&] { return fake->first_stop_after(last).has_value(); }));\n  EXPECT_LT((*fake->first_stop_after(last) - last).seconds(), 1.0);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fixture's timeouts are 500 ms and the supervisor's timer ticks every 50 ms, so the first stop is due 500 to 550 ms after the last odometry message, and the bound of 1.0 s is a little under twice that: wide enough that a busy CI machine passes, tight enough that a supervisor which stopped checking fails. The time comes from "
+        },
+        {
+         "t": "code",
+         "v": "last_odometry_"
+        },
+        {
+         "t": "text",
+         "v": " rather than from the moment the test switched the feed off, because the fake publishes on its own 50 ms timer and those two moments are up to a tick apart."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that the test can fail, the way the supervisor topic proves its own. Give that one case "
+         },
+         {
+          "t": "code",
+          "v": "append_parameter_override(\"odom_timeout_ms\", 5000)"
+         },
+         {
+          "t": "text",
+          "v": ", run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", and watch it fail with the measured gap in the message rather than with a bare "
+         },
+         {
+          "t": "code",
+          "v": "false"
+         },
+         {
+          "t": "text",
+          "v": ". That is the regression this test exists for, and it is the same break you made by hand in the missing-input topic, now caught in seconds without a simulator. Put the override back to 500."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "./run_scenario.sh missing_odom"
+         },
+         {
+          "t": "text",
+          "v": " writes four stop lines, two per witness, and passes;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "moving the robot while it is stopped makes the simulator's line fail and leaves the odometry's passing;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "StopsWithinTheOdometryTimeout"
+         },
+         {
+          "t": "text",
+          "v": " passes in "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " and in CI, and fails within seconds when the odometry timeout is raised to 5000 ms."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Extend the \"Scenarios\" section of "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ", and add a short section of its own called \"How the bench knows the robot stopped\". It is the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the two witnesses in a line each: where "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " comes from and what it is computed from, and where "
+        },
+        {
+         "t": "code",
+         "v": "/truth_tf"
+        },
+        {
+         "t": "text",
+         "v": " comes from and why nothing in ROS can write to it. Say what the second one cost, in three lines: the world's own pose topic loses its names in the bridge, so the bench added "
+        },
+        {
+         "t": "code",
+         "v": "PosePublisher"
+        },
+        {
+         "t": "text",
+         "v": " to the robot, which meant copying the model out of "
+        },
+        {
+         "t": "code",
+         "v": "nav2_minimal_tb3_sim"
+        },
+        {
+         "t": "text",
+         "v": " and spawning the copy through the "
+        },
+        {
+         "t": "code",
+         "v": "robot_sdf"
+        },
+        {
+         "t": "text",
+         "v": " argument. Record the version you copied from, because that copy is the one piece of somebody else's work the bench now has to keep in step by hand. Then the three ways wheel odometry can say the wrong thing, and which of them this bench can produce. Then the two measurements: how far apart the witnesses were over one drive of the route, and the distance each one reported while the robot was meant to be stopped."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Finish with the experiment. What you did to the robot, what each witness said about it, and the one sentence that follows: before this topic the bench would have called that run a pass. Then name the regression test, its bound, and the arithmetic behind the bound, so that the next person to change a timeout knows which test will tell them."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Gazebo Harmonic's tutorial on "
+     },
+     {
+      "t": "a",
+      "v": "entity creation",
+      "href": "https://gazebosim.org/api/sim/8/entity_creation.html"
+     },
+     {
+      "t": "text",
+      "v": ", whose "
+     },
+     {
+      "t": "code",
+      "v": "gz service --list"
+     },
+     {
+      "t": "text",
+      "v": " output shows "
+     },
+     {
+      "t": "code",
+      "v": "/world/<world>/set_pose"
+     },
+     {
+      "t": "text",
+      "v": " alongside "
+     },
+     {
+      "t": "code",
+      "v": "create"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "remove"
+     },
+     {
+      "t": "text",
+      "v": ". It documents the request form for "
+     },
+     {
+      "t": "code",
+      "v": "create"
+     },
+     {
+      "t": "text",
+      "v": " only, which is why the page asks the service itself with "
+     },
+     {
+      "t": "code",
+      "v": "gz service -i"
+     },
+     {
+      "t": "text",
+      "v": ". The "
+     },
+     {
+      "t": "a",
+      "v": "Gazebo Transport introduction",
+      "href": "https://gazebosim.org/api/transport/13/introduction.html"
+     },
+     {
+      "t": "text",
+      "v": " is the library those tools sit on."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "PosePublisher system",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/pose_publisher/PosePublisher.cc"
+     },
+     {
+      "t": "text",
+      "v": ", which writes "
+     },
+     {
+      "t": "code",
+      "v": "frame_id"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "child_frame_id"
+     },
+     {
+      "t": "text",
+      "v": " into each pose's header data and a stamp beside them, takes a "
+     },
+     {
+      "t": "code",
+      "v": "<topic>"
+     },
+     {
+      "t": "text",
+      "v": " element after checking that the name is valid, and otherwise builds its own from "
+     },
+     {
+      "t": "code",
+      "v": "topicFromScopedName"
+     },
+     {
+      "t": "text",
+      "v": " with the world left in. "
+     },
+     {
+      "t": "a",
+      "v": "Its parameters",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/pose_publisher/PosePublisher.hh"
+     },
+     {
+      "t": "text",
+      "v": " include "
+     },
+     {
+      "t": "code",
+      "v": "publish_model_pose"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "use_pose_vector_msg"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "Util.hh",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/include/gz/sim/Util.hh"
+     },
+     {
+      "t": "text",
+      "v": " is where that world prefix is documented."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ros_gz's conversion from a Gazebo pose to a "
+     },
+     {
+      "t": "a",
+      "v": "TransformStamped",
+      "href": "https://github.com/gazebosim/ros_gz/blob/ros2/ros_gz_bridge/src/convert/geometry_msgs.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", which takes "
+     },
+     {
+      "t": "code",
+      "v": "child_frame_id"
+     },
+     {
+      "t": "text",
+      "v": " from the header's data pairs and never from the message's own "
+     },
+     {
+      "t": "code",
+      "v": "name"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "Pose_V conversion",
+      "href": "https://github.com/gazebosim/ros_gz/blob/ros2/ros_gz_bridge/src/convert/tf2_msgs.cpp"
+     },
+     {
+      "t": "text",
+      "v": " that calls it for each pose in turn."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "ros_gz_bridge documentation",
+      "href": "https://github.com/gazebosim/ros_gz/blob/ros2/ros_gz_bridge/README.md"
+     },
+     {
+      "t": "text",
+      "v": ", for the mapping between "
+     },
+     {
+      "t": "code",
+      "v": "gz.msgs.Pose_V"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "tf2_msgs/msg/TFMessage"
+     },
+     {
+      "t": "text",
+      "v": " and for the "
+     },
+     {
+      "t": "code",
+      "v": "@"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "["
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "]"
+     },
+     {
+      "t": "text",
+      "v": " direction markers."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot 3 model in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_turtlebot_simulation 1.3.0",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/1.3.0/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+     },
+     {
+      "t": "text",
+      "v": ", whose DiffDrive system computes the odometry this topic stops trusting on its own."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "testing with GTest",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Testing/Cpp.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "ament_add_ros_isolated_gtest",
+      "href": "https://github.com/ros2/ament_cmake_ros/blob/jazzy/ament_cmake_ros/cmake/ament_add_ros_isolated_gtest.cmake"
+     },
+     {
+      "t": "text",
+      "v": " the bench's topic tests use."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "ranges::max"
+     },
+     {
+      "t": "text",
+      "v": " over a projection is what "
+     },
+     {
+      "t": "code",
+      "v": "wandered_m"
+     },
+     {
+      "t": "text",
+      "v": " is."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article on "
+     },
+     {
+      "t": "a",
+      "v": "clock and time",
+      "href": "https://design.ros2.org/articles/clock_and_time.html"
+     },
+     {
+      "t": "text",
+      "v": ", for why both witnesses are stamped on the simulation clock and can be compared at all."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,3952 @@
+{
+ "id": "cpp-templates-variant",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "From memory, write a function template "
+     },
+     {
+      "t": "code",
+      "v": "larger"
+     },
+     {
+      "t": "text",
+      "v": " that returns the larger of two values of one type, and that a type without an ordering can't call. Then write "
+     },
+     {
+      "t": "code",
+      "v": "motor_id"
+     },
+     {
+      "t": "text",
+      "v": ", which looks a joint name up in a small table of joints and returns the joint's motor id as "
+     },
+     {
+      "t": "code",
+      "v": "std::optional<int>"
+     },
+     {
+      "t": "text",
+      "v": ", empty when the name isn't in the table. Call both from "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": ". Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <algorithm>\n#include <array>\n#include <concepts>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string_view>\n\ntemplate <std::totally_ordered T>\n[[nodiscard]] constexpr T larger(T a, T b) {\n  return b < a ? a : b;\n}\n\nstruct Joint {\n  std::string_view name;\n  int motor_id;\n};\n\n[[nodiscard]] std::optional<int> motor_id(std::span<const Joint> joints, std::string_view name) {\n  const auto it = std::ranges::find(joints, name, &Joint::name);\n  if (it == joints.end()) return std::nullopt;\n  return it->motor_id;\n}\n\nint main() {\n  std::cout << larger(3, 7) << ' ' << larger(2.5, -1.0) << '\\n';\n  constexpr std::array joints{Joint{\"shoulder\", 1}, Joint{\"elbow\", 2}, Joint{\"wrist\", 3}};\n  for (const std::string_view name : {\"elbow\", \"gripper\"}) {\n    if (const std::optional<int> id = motor_id(joints, name)) {\n      std::cout << name << \": motor \" << *id << '\\n';\n    } else {\n      std::cout << name << \": no motor\\n\";\n    }\n  }\n}"
+   },
+   {
+    "t": "output",
+    "text": "7 2.5\nelbow: motor 2\ngripper: no motor"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "std::totally_ordered<T>"
+     },
+     {
+      "t": "text",
+      "v": " is a concept from "
+     },
+     {
+      "t": "code",
+      "v": "<concepts>"
+     },
+     {
+      "t": "text",
+      "v": ": it holds when "
+     },
+     {
+      "t": "code",
+      "v": "T"
+     },
+     {
+      "t": "text",
+      "v": " has "
+     },
+     {
+      "t": "code",
+      "v": "<"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": ">"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "<="
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": ">="
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "=="
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "!="
+     },
+     {
+      "t": "text",
+      "v": ". Written in place of "
+     },
+     {
+      "t": "code",
+      "v": "typename"
+     },
+     {
+      "t": "text",
+      "v": ", it makes the compiler check the type at the call, before it looks at the body, so "
+     },
+     {
+      "t": "code",
+      "v": "larger"
+     },
+     {
+      "t": "text",
+      "v": " of two "
+     },
+     {
+      "t": "code",
+      "v": "std::complex<double>"
+     },
+     {
+      "t": "text",
+      "v": " is refused with \"constraints not satisfied\" instead of an error inside the template (Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "T.10",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-concepts"
+     },
+     {
+      "t": "text",
+      "v": "). "
+     },
+     {
+      "t": "code",
+      "v": "T"
+     },
+     {
+      "t": "text",
+      "v": " is deduced from both arguments, which is why "
+     },
+     {
+      "t": "code",
+      "v": "larger(3, 2.5)"
+     },
+     {
+      "t": "text",
+      "v": " doesn't compile; the first sub-topic explains that. "
+     },
+     {
+      "t": "code",
+      "v": "motor_id"
+     },
+     {
+      "t": "text",
+      "v": " takes the table as a "
+     },
+     {
+      "t": "code",
+      "v": "std::span<const Joint>"
+     },
+     {
+      "t": "text",
+      "v": ", so an array, a vector or part of either will do, and "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::find"
+     },
+     {
+      "t": "text",
+      "v": " with the projection "
+     },
+     {
+      "t": "code",
+      "v": "&Joint::name"
+     },
+     {
+      "t": "text",
+      "v": " compares each joint's name with the one asked for. "
+     },
+     {
+      "t": "code",
+      "v": "if (const std::optional<int> id = ...)"
+     },
+     {
+      "t": "text",
+      "v": " tests the result and names it in one line, and "
+     },
+     {
+      "t": "code",
+      "v": "*id"
+     },
+     {
+      "t": "text",
+      "v": " is safe inside that branch."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the template deduces "
+     },
+     {
+      "t": "code",
+      "v": "T"
+     },
+     {
+      "t": "text",
+      "v": " from its arguments and is constrained by a concept or a "
+     },
+     {
+      "t": "code",
+      "v": "requires"
+     },
+     {
+      "t": "text",
+      "v": " clause, and the lookup returns a "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": " that the caller tests before reading. An unconstrained template is a partial pass: it works, and T.10 asks for the constraint. A lookup that returns -1, 0 or a default value for a missing name is a fail, and so is reading the optional without testing it."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This page is about choices you can nail down before the program ever runs. A function template, or a class template, is not itself a function: it is a recipe the compiler uses to write one function per type you call it with, working out that type from the call's own arguments, a step called deduction. Writing the function for one type is instantiation, and what comes out is a specialization. "
+    },
+    {
+     "t": "code",
+     "v": "std::optional<T>"
+    },
+    {
+     "t": "text",
+     "v": " is a wrapper that either holds a "
+    },
+    {
+     "t": "code",
+     "v": "T"
+    },
+    {
+     "t": "text",
+     "v": " or holds nothing, and makes the caller check which before reading it. "
+    },
+    {
+     "t": "code",
+     "v": "std::variant<A, B, C>"
+    },
+    {
+     "t": "text",
+     "v": " holds exactly one of a fixed, closed set of alternative types, and knows which one through a hidden index: the type-safe form of a tagged union."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem each one solves is a different way of hiding a decision that should stay visible. Without a template, the same function is rewritten once per type, or pushed to run time to pay for a virtual call it never needed. Without "
+    },
+    {
+     "t": "code",
+     "v": "optional"
+    },
+    {
+     "t": "text",
+     "v": ", \"there is no answer\" is written as a sentinel such as -1, which nothing forces a caller to check and which is sometimes a real value in its own right. Without "
+    },
+    {
+     "t": "code",
+     "v": "variant"
+    },
+    {
+     "t": "text",
+     "v": ", \"it's one of a known handful of kinds\" is a raw union or a base class, and the compiler can't warn you when a switch or an override list forgot one of them."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "How each works is selection at compile time. A template's type is deduced and, ideally, constrained by a concept, so a type missing the operations the body needs is refused at the call, not somewhere inside it. An "
+    },
+    {
+     "t": "code",
+     "v": "optional"
+    },
+    {
+     "t": "text",
+     "v": " sits a value next to a flag, with no separate allocation. A "
+    },
+    {
+     "t": "code",
+     "v": "variant"
+    },
+    {
+     "t": "text",
+     "v": "'s alternatives share one piece of storage, and "
+    },
+    {
+     "t": "code",
+     "v": "std::visit"
+    },
+    {
+     "t": "text",
+     "v": ", called with lambdas combined into one overload set, dispatches to whichever matches the live alternative, and the compiler checks that every alternative has a match."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What each costs you: an unconstrained template reports its errors deep inside a stranger's code instead of at the call; reading an "
+    },
+    {
+     "t": "code",
+     "v": "optional"
+    },
+    {
+     "t": "text",
+     "v": " without testing it first is undefined behaviour, the same trap as an unchecked index; and a "
+    },
+    {
+     "t": "code",
+     "v": "variant"
+    },
+    {
+     "t": "text",
+     "v": " only fits types fixed when you write it, not a set that grows after the program starts."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet all three in the interview question itself: a "
+    },
+    {
+     "t": "code",
+     "v": "larger"
+    },
+    {
+     "t": "text",
+     "v": " template a type without an ordering can't call, and a joint lookup returning a motor id as "
+    },
+    {
+     "t": "code",
+     "v": "std::optional<int>"
+    },
+    {
+     "t": "text",
+     "v": ", empty when the name isn't in the table."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "templates",
+   "title": "Function and class templates: deduction and instantiation",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <string>\n\ntemplate <typename T>\n[[nodiscard]] T larger(T a, T b) {\n  return b < a ? a : b;\n}\n\nint main() {\n  std::cout << larger(3, 7) << '\\n';            // T = int\n  std::cout << larger(0.5, 0.25) << '\\n';       // T = double\n  const std::string a = \"lidar\";\n  const std::string b = \"camera\";\n  std::cout << larger(a, b) << '\\n';            // T = std::string\n  std::cout << larger<double>(3, 4.5) << '\\n';  // T named: 3 converts to 3.0\n}"
+      },
+      {
+       "t": "output",
+       "text": "7\n0.5\nlidar\n4.5"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "larger"
+        },
+        {
+         "t": "text",
+         "v": " isn't a function. It is a recipe the compiler uses to write functions, which is how Bob Steagall puts it in his "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on templates",
+         "href": "https://www.youtube.com/watch?v=XN319NYEOcE"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2021). This program uses three kinds of "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": ", so it contains three functions, "
+        },
+        {
+         "t": "code",
+         "v": "larger<int>"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "larger<double>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "larger<std::string>"
+        },
+        {
+         "t": "text",
+         "v": ", each compiled as if you had written it by hand. Writing out the function for one set of template arguments is "
+        },
+        {
+         "t": "i",
+         "v": "instantiation"
+        },
+        {
+         "t": "text",
+         "v": ", and the function it produces is a "
+        },
+        {
+         "t": "i",
+         "v": "specialization"
+        },
+        {
+         "t": "text",
+         "v": ". Working out "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " from the types of the call's arguments is "
+        },
+        {
+         "t": "i",
+         "v": "template argument deduction"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Deduction looks at each argument on its own, and the answers have to agree. Here they don't:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "deduced conflicting types for parameter",
+       "text": "template <typename T>\n[[nodiscard]] T larger(T a, T b) {\n  return b < a ? a : b;\n}\n\nint main() { return larger(3, 4.5) > 4.0 ? 0 : 1; }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 says "
+        },
+        {
+         "t": "code",
+         "v": "deduced conflicting types for parameter ‘T’ (‘int’ and ‘double’)"
+        },
+        {
+         "t": "text",
+         "v": ". Deduction matches types and doesn't consider conversions such as "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": ". Conversions come after "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is fixed, which is what the last call in the first program does: "
+        },
+        {
+         "t": "code",
+         "v": "larger<double>(3, 4.5)"
+        },
+        {
+         "t": "text",
+         "v": " names "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": ", and then "
+        },
+        {
+         "t": "code",
+         "v": "3"
+        },
+        {
+         "t": "text",
+         "v": " converts to "
+        },
+        {
+         "t": "code",
+         "v": "3.0"
+        },
+        {
+         "t": "text",
+         "v": " as it would for any function taking a "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": ". Nicolai Josuttis's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on templates",
+         "href": "https://www.youtube.com/watch?v=HqsEHG0QJXU"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2022) takes the other route for his "
+        },
+        {
+         "t": "code",
+         "v": "mymax"
+        },
+        {
+         "t": "text",
+         "v": ": two template parameters and an "
+        },
+        {
+         "t": "code",
+         "v": "auto"
+        },
+        {
+         "t": "text",
+         "v": " return type, so the compiler works out the common type of the two."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For a parameter declared as plain "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": ", taken by value, deduction produces the type of a copy. References and top-level "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " go, and an array turns into a pointer to its first element, which is called "
+        },
+        {
+         "t": "i",
+         "v": "decay"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": " proves each case without running anything:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <concepts>\n#include <string>\n\ntemplate <typename T>\nT deduced(T value) {\n  return value;\n}\n\nint main() {\n  const int limit = 10;\n  const int& ref = limit;\n  const std::string name = \"base_link\";\n  static_assert(std::same_as<decltype(deduced(limit)), int>);          // top-level const dropped\n  static_assert(std::same_as<decltype(deduced(ref)), int>);            // the reference too\n  static_assert(std::same_as<decltype(deduced(\"arm\")), const char*>);  // the array decays to a pointer\n  static_assert(std::same_as<decltype(deduced(name)), std::string>);   // a copy of name\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third line is why "
+        },
+        {
+         "t": "code",
+         "v": "larger(\"arm\", \"base\")"
+        },
+        {
+         "t": "text",
+         "v": " compiles and means nothing. "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "const char*"
+        },
+        {
+         "t": "text",
+         "v": ", so the call compares two addresses, and the standard doesn't specify the order of pointers to unrelated objects. Name the type, "
+        },
+        {
+         "t": "code",
+         "v": "larger<std::string_view>(\"arm\", \"base\")"
+        },
+        {
+         "t": "text",
+         "v": ", or pass "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " values. A parameter declared "
+        },
+        {
+         "t": "code",
+         "v": "const T&"
+        },
+        {
+         "t": "text",
+         "v": " keeps the argument's type and skips the copy, and "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " in a template is a forwarding reference, which the forwarding topic covered. Deduction also can't see through a nested name: in "
+        },
+        {
+         "t": "code",
+         "v": "template <typename T> void set(typename Box<T>::value_type v)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " stands to the left of "
+        },
+        {
+         "t": "code",
+         "v": "::"
+        },
+        {
+         "t": "text",
+         "v": " and is never deduced, so every call must name it. David Olsen's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on generic programming",
+         "href": "https://www.youtube.com/watch?v=0_0HsEBsgPc"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) has his rule for it: make every template parameter deducible, except when you can't."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A class template is a recipe for classes, and the compiler is lazier with it than it looks:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <iostream>\n#include <numeric>\n#include <optional>\n#include <string>\n#include <utility>\n#include <vector>\n\ntemplate <typename T>\nclass Samples {\n public:\n  void add(T value) { values_.push_back(std::move(value)); }\n  [[nodiscard]] std::ptrdiff_t count() const { return std::ssize(values_); }\n\n  // Needs T{}, + and a conversion from an integer: fine for int, impossible for std::string.\n  [[nodiscard]] std::optional<T> mean() const {\n    if (values_.empty()) return std::nullopt;\n    return std::accumulate(values_.begin(), values_.end(), T{}) / static_cast<T>(count());\n  }\n\n private:\n  std::vector<T> values_;\n};\n\nint main() {\n  Samples<int> ranges_mm;\n  for (const int r : {800, 900, 1300}) ranges_mm.add(r);\n  if (const auto mean = ranges_mm.mean()) std::cout << ranges_mm.count() << \" ranges, mean \" << *mean << \" mm\\n\";\n\n  Samples<std::string> frames;\n  frames.add(\"base_link\");\n  frames.add(\"laser\");\n  std::cout << frames.count() << \" frames\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "3 ranges, mean 1000 mm\n2 frames"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Samples<std::string>"
+        },
+        {
+         "t": "text",
+         "v": " compiles although its "
+        },
+        {
+         "t": "code",
+         "v": "mean()"
+        },
+        {
+         "t": "text",
+         "v": " never could. The compiler instantiates the class definition, the data members and the declarations of the member functions, when the program needs "
+        },
+        {
+         "t": "code",
+         "v": "Samples<std::string>"
+        },
+        {
+         "t": "text",
+         "v": " as a complete type, and it instantiates each member function's body only when something calls it (Olsen 2024). That has two consequences. An error in a template appears only when a use instantiates the broken part, which may be in someone else's code months later. And the compiler needs the whole definition at every place that uses the template, so templates live in headers, not in "
+        },
+        {
+         "t": "code",
+         "v": ".cpp"
+        },
+        {
+         "t": "text",
+         "v": " files (Steagall 2021, part 2). Each specialization is also a type of its own: "
+        },
+        {
+         "t": "code",
+         "v": "Samples<int>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Samples<double>"
+        },
+        {
+         "t": "text",
+         "v": " are unrelated, with no conversion between them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Since C++17, the compiler also deduces a class template's arguments from a constructor call, which is "
+        },
+        {
+         "t": "i",
+         "v": "class template argument deduction"
+        },
+        {
+         "t": "text",
+         "v": ", or CTAD:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <concepts>\n#include <iostream>\n#include <optional>\n#include <utility>\n#include <vector>\n\nint main() {\n  const std::vector ids{4, 8, 15};\n  const std::pair pose{2, 0.5};\n  const std::array corners{1, 2, 3, 4};\n  const std::optional timeout_ms{250};\n  const std::vector names{\"lidar\", \"imu\"};\n  const std::vector braces{ids.begin(), ids.end()};\n  const std::vector parens(ids.begin(), ids.end());\n\n  static_assert(std::same_as<decltype(ids), const std::vector<int>>);\n  static_assert(std::same_as<decltype(pose), const std::pair<int, double>>);\n  static_assert(std::same_as<decltype(corners), const std::array<int, 4>>);\n  static_assert(std::same_as<decltype(timeout_ms), const std::optional<int>>);\n  static_assert(std::same_as<decltype(names), const std::vector<const char*>>);\n  static_assert(std::same_as<decltype(braces), const std::vector<std::vector<int>::const_iterator>>);\n  static_assert(std::same_as<decltype(parens), const std::vector<int>>);\n  std::cout << \"braces hold \" << braces.size() << \" elements, parens hold \" << parens.size() << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "braces hold 2 elements, parens hold 3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first four read as you'd expect. The next two are the traps Josuttis shows in his 2022 talk. String literals give "
+        },
+        {
+         "t": "code",
+         "v": "const char*"
+        },
+        {
+         "t": "text",
+         "v": ", not "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": ". Two iterators in braces make a vector that holds the two iterators, because a braced list prefers the "
+        },
+        {
+         "t": "code",
+         "v": "std::initializer_list"
+        },
+        {
+         "t": "text",
+         "v": " constructor. The last line is the fix for the second trap: parentheses can't form an initializer list, so the constructor that copies a range wins, and "
+        },
+        {
+         "t": "code",
+         "v": "parens"
+        },
+        {
+         "t": "text",
+         "v": " holds the three ints. His rule is to use CTAD only where the deduced type is obvious to a reader, and his book "
+        },
+        {
+         "t": "a",
+         "v": "C++17: The Complete Guide",
+         "href": "https://leanpub.com/cpp17"
+        },
+        {
+         "t": "text",
+         "v": " covers the deduction rules and deduction guides in chapter 9."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last piece is saying what a template needs from its type. The template at the top accepts any "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " and fails inside its body when "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " has no "
+        },
+        {
+         "t": "code",
+         "v": "<"
+        },
+        {
+         "t": "text",
+         "v": ". For "
+        },
+        {
+         "t": "code",
+         "v": "std::complex<double>"
+        },
+        {
+         "t": "text",
+         "v": ", which has no ordering, GCC 13 prints 119 lines: the error points at "
+        },
+        {
+         "t": "code",
+         "v": "b < a"
+        },
+        {
+         "t": "text",
+         "v": " in the template, and most of the rest lists every "
+        },
+        {
+         "t": "code",
+         "v": "operator<"
+        },
+        {
+         "t": "text",
+         "v": " it tried and rejected. Constrained with a concept, the same call prints 46 lines, and the first ones name the call and the requirement that failed:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "constraints not satisfied",
+       "text": "#include <complex>\n#include <concepts>\n\ntemplate <std::totally_ordered T>\n[[nodiscard]] T larger(T a, T b) {\n  return b < a ? a : b;\n}\n\nint main() {\n  const std::complex<double> a{1.0, 2.0};\n  const std::complex<double> b{2.0, 1.0};\n  return larger(a, b).real() > 0.0 ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "concept"
+        },
+        {
+         "t": "text",
+         "v": " is a named compile-time predicate on types. "
+        },
+        {
+         "t": "code",
+         "v": "std::totally_ordered<T>"
+        },
+        {
+         "t": "text",
+         "v": " is true when "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " supports the six comparisons, and written in place of "
+        },
+        {
+         "t": "code",
+         "v": "typename"
+        },
+        {
+         "t": "text",
+         "v": " it constrains the template. The compiler checks the constraint while it chooses among overloads, before it looks at any body, so a type that fails is not a candidate at all, and another overload can take it. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "T.10",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-concepts"
+        },
+        {
+         "t": "text",
+         "v": " asks for a concept on every template parameter, and "
+        },
+        {
+         "t": "a",
+         "v": "T.1",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-raise"
+        },
+        {
+         "t": "text",
+         "v": " asks that it name a meaningful set of types, such as ordered or arithmetic, rather than the one operator the body happens to use. The same constraint has three spellings: "
+        },
+        {
+         "t": "code",
+         "v": "template <std::totally_ordered T>"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "requires std::totally_ordered<T>"
+        },
+        {
+         "t": "text",
+         "v": " clause after the template parameter list, and "
+        },
+        {
+         "t": "code",
+         "v": "std::totally_ordered auto"
+        },
+        {
+         "t": "text",
+         "v": " for a parameter of an abbreviated function template. The third gives every "
+        },
+        {
+         "t": "code",
+         "v": "auto"
+        },
+        {
+         "t": "text",
+         "v": " parameter its own type, so it can't say that two parameters share one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A concept checks syntax, not meaning. "
+        },
+        {
+         "t": "code",
+         "v": "std::totally_ordered"
+        },
+        {
+         "t": "text",
+         "v": " also promises that the operators form a total order, and no compiler can check that part; it is documentation. Josuttis's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on concepts",
+         "href": "https://www.youtube.com/watch?v=jzwqTi7n-rg"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) adds a warning: a concept with a typo in it, "
+        },
+        {
+         "t": "code",
+         "v": "c.pushback(v)"
+        },
+        {
+         "t": "text",
+         "v": " for "
+        },
+        {
+         "t": "code",
+         "v": "c.push_back(v)"
+        },
+        {
+         "t": "text",
+         "v": ", is false for every type and compiles without complaint, so test each concept with a "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": " on one type that should satisfy it and one that shouldn't. Jeff Garland's "
+        },
+        {
+         "t": "a",
+         "v": "talk on concepts",
+         "href": "https://www.youtube.com/watch?v=NpuNUGifL1M"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2025) goes on from there to where a constrained "
+        },
+        {
+         "t": "code",
+         "v": "auto"
+        },
+        {
+         "t": "text",
+         "v": " may appear and how a concept replaces a dependency on one type with a dependency on a set of types."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Write a class template "
+        },
+        {
+         "t": "code",
+         "v": "LastN<T, N>"
+        },
+        {
+         "t": "text",
+         "v": " that keeps the last "
+        },
+        {
+         "t": "code",
+         "v": "N"
+        },
+        {
+         "t": "text",
+         "v": " values pushed into it in a "
+        },
+        {
+         "t": "code",
+         "v": "std::array<T, N>"
+        },
+        {
+         "t": "text",
+         "v": ", overwriting the oldest when it is full. It has:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "push(T value)"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "size()"
+         },
+         {
+          "t": "text",
+          "v": ", the number of values held, at most "
+         },
+         {
+          "t": "code",
+          "v": "N"
+         },
+         {
+          "t": "text",
+          "v": ", as a "
+         },
+         {
+          "t": "code",
+          "v": "std::ptrdiff_t"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "newest()"
+         },
+         {
+          "t": "text",
+          "v": ", returning "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<T>"
+         },
+         {
+          "t": "text",
+          "v": ", empty before the first push;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "mean()"
+         },
+         {
+          "t": "text",
+          "v": ", returning "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<double>"
+         },
+         {
+          "t": "text",
+          "v": ", which exists only when "
+         },
+         {
+          "t": "code",
+          "v": "T"
+         },
+         {
+          "t": "text",
+          "v": " is an integer or floating-point type."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Refuse "
+        },
+        {
+         "t": "code",
+         "v": "N == 0"
+        },
+        {
+         "t": "text",
+         "v": " at compile time. In "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", push five ranges into a "
+        },
+        {
+         "t": "code",
+         "v": "LastN<int, 3>"
+        },
+        {
+         "t": "text",
+         "v": " and print its size, newest value and mean, then push three frame names into a "
+        },
+        {
+         "t": "code",
+         "v": "LastN<std::string, 2>"
+        },
+        {
+         "t": "text",
+         "v": " and print its size and newest value. Prove with "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": " that "
+        },
+        {
+         "t": "code",
+         "v": "LastN<int, 3>"
+        },
+        {
+         "t": "text",
+         "v": " has a "
+        },
+        {
+         "t": "code",
+         "v": "mean()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "LastN<std::string, 2>"
+        },
+        {
+         "t": "text",
+         "v": " doesn't. Before you run it, say why "
+        },
+        {
+         "t": "code",
+         "v": "LastN<std::string, 2>"
+        },
+        {
+         "t": "text",
+         "v": " compiles at all."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <concepts>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <utility>\n\ntemplate <typename T, std::size_t N>\n  requires(N > 0)\nclass LastN {\n public:\n  void push(T value) {\n    values_[next_] = std::move(value);\n    next_ = (next_ + 1) % capacity;\n    if (count_ < capacity) ++count_;\n  }\n\n  [[nodiscard]] std::ptrdiff_t size() const { return count_; }\n\n  [[nodiscard]] std::optional<T> newest() const {\n    if (count_ == 0) return std::nullopt;\n    return values_[(next_ + capacity - 1) % capacity];\n  }\n\n  [[nodiscard]] std::optional<double> mean() const\n    requires std::integral<T> || std::floating_point<T>\n  {\n    if (count_ == 0) return std::nullopt;\n    const double sum = std::accumulate(values_.begin(), values_.begin() + count_, 0.0);\n    return sum / static_cast<double>(count_);\n  }\n\n private:\n  static constexpr auto capacity = static_cast<std::ptrdiff_t>(N);\n  std::array<T, N> values_{};\n  std::ptrdiff_t next_ = 0;   // where the next push goes\n  std::ptrdiff_t count_ = 0;  // how many values are held\n};\n\ntemplate <typename B>\nconcept HasMean = requires(const B& b) { b.mean(); };\n\nstatic_assert(HasMean<LastN<int, 3>>);\nstatic_assert(!HasMean<LastN<std::string, 2>>);\n\nint main() {\n  LastN<int, 3> ranges_mm;\n  for (const int r : {900, 850, 1300, 1250, 700}) ranges_mm.push(r);\n  const auto newest = ranges_mm.newest();\n  const auto mean = ranges_mm.mean();\n  if (newest && mean) std::cout << std::format(\"size {}, newest {}, mean {:.1f}\\n\", ranges_mm.size(), *newest, *mean);\n\n  LastN<std::string, 2> frames;\n  for (const std::string_view frame : {\"map\", \"odom\", \"base_link\"}) frames.push(std::string(frame));\n  if (const auto frame = frames.newest()) std::cout << std::format(\"size {}, newest {}\\n\", frames.size(), *frame);\n}"
+      },
+      {
+       "t": "output",
+       "text": "size 3, newest 700, mean 1083.3\nsize 2, newest base_link"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "LastN<std::string, 2>"
+        },
+        {
+         "t": "text",
+         "v": " compiles because member function bodies are instantiated only when called, and nothing calls "
+        },
+        {
+         "t": "code",
+         "v": "mean()"
+        },
+        {
+         "t": "text",
+         "v": " on it. The "
+        },
+        {
+         "t": "code",
+         "v": "requires"
+        },
+        {
+         "t": "text",
+         "v": " clause on "
+        },
+        {
+         "t": "code",
+         "v": "mean()"
+        },
+        {
+         "t": "text",
+         "v": " goes one step further: it removes the member from "
+        },
+        {
+         "t": "code",
+         "v": "LastN<std::string, 2>"
+        },
+        {
+         "t": "text",
+         "v": " altogether, so "
+        },
+        {
+         "t": "code",
+         "v": "HasMean"
+        },
+        {
+         "t": "text",
+         "v": " sees that it is missing. Without the clause, "
+        },
+        {
+         "t": "code",
+         "v": "mean()"
+        },
+        {
+         "t": "text",
+         "v": " would still be declared for strings, "
+        },
+        {
+         "t": "code",
+         "v": "HasMean"
+        },
+        {
+         "t": "text",
+         "v": " would be true, and the mistake would surface only inside the body, the day someone called it. Josuttis's 2024 talk constrains member functions of a class template the same way. "
+        },
+        {
+         "t": "code",
+         "v": "requires(N > 0)"
+        },
+        {
+         "t": "text",
+         "v": " on the class turns "
+        },
+        {
+         "t": "code",
+         "v": "LastN<int, 0>"
+        },
+        {
+         "t": "text",
+         "v": " into a \"template constraint failure\" at the declaration, before a division by zero in "
+        },
+        {
+         "t": "code",
+         "v": "%"
+        },
+        {
+         "t": "text",
+         "v": " could happen."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The indices are "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "capacity"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "N"
+        },
+        {
+         "t": "text",
+         "v": " converted once, so the arithmetic stays signed and the comparisons don't mix signed and unsigned. "
+        },
+        {
+         "t": "code",
+         "v": "std::array<T, N> values_{}"
+        },
+        {
+         "t": "text",
+         "v": " constructs "
+        },
+        {
+         "t": "code",
+         "v": "N"
+        },
+        {
+         "t": "text",
+         "v": " values up front, which needs a default-constructible "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": "; a "
+        },
+        {
+         "t": "code",
+         "v": "LastN"
+        },
+        {
+         "t": "text",
+         "v": " of a type without a default constructor would store "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<T>"
+        },
+        {
+         "t": "text",
+         "v": " elements instead. If yours returned "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "mean()"
+        },
+        {
+         "t": "text",
+         "v": ", try it with "
+        },
+        {
+         "t": "code",
+         "v": "LastN<int, 3>"
+        },
+        {
+         "t": "text",
+         "v": ": the mean of 1300, 1250 and 700 is 1083.3, and an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " result says 1083."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "optional",
+   "title": "optional for absent values; value_or and its pitfalls",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <vector>\n\n// The nearest obstacle in a scan, or nothing when the scan saw nothing.\n[[nodiscard]] std::optional<int> nearest_mm(std::span<const int> ranges_mm) {\n  if (ranges_mm.empty()) return std::nullopt;\n  return std::ranges::min(ranges_mm);\n}\n\nint main() {\n  const std::vector<int> scan{1200, 850, 3100};\n  const std::vector<int> blind;\n  if (const auto d = nearest_mm(scan)) std::cout << std::format(\"nearest {} mm\\n\", *d);\n\n  const std::optional<int> none = nearest_mm(blind);\n  std::cout << std::format(\"has a value: {}\\n\", none.has_value());\n  try {\n    std::cout << none.value() << '\\n';\n  } catch (const std::bad_optional_access& e) {\n    std::cout << std::format(\"value() threw: {}\\n\", e.what());\n  }\n  std::cout << std::format(\"sizeof: optional<int> {}, optional<double> {}\\n\", sizeof(std::optional<int>),\n                           sizeof(std::optional<double>));\n}"
+      },
+      {
+       "t": "output",
+       "text": "nearest 850 mm\nhas a value: false\nvalue() threw: bad optional access\nsizeof: optional<int> 8, optional<double> 16"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A function that can have no answer has two honest choices: return a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": ", or throw when having no answer is an error for the caller. The third choice, a special value such as -1, is what Abseil's "
+        },
+        {
+         "t": "a",
+         "v": "tip 171",
+         "href": "https://abseil.io/tips/171"
+        },
+        {
+         "t": "text",
+         "v": " argues against. Nothing in the type tells the caller to check, a caller who forgets the check gets no warning, and the special value is sometimes a real one: -1 can't be a range, but it can be a temperature or an offset. "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int>"
+        },
+        {
+         "t": "text",
+         "v": " puts the check into the type (Josuttis, C++17: The Complete Guide, chapter 15)."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An optional that holds a value is "
+        },
+        {
+         "t": "i",
+         "v": "engaged"
+        },
+        {
+         "t": "text",
+         "v": ", and an empty one is "
+        },
+        {
+         "t": "i",
+         "v": "disengaged"
+        },
+        {
+         "t": "text",
+         "v": ", the terms Arthur O'Dwyer uses in his "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on algebraic data types",
+         "href": "https://www.youtube.com/watch?v=OJzmWqCCZaM"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2020). "
+        },
+        {
+         "t": "code",
+         "v": "if (d)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "d.has_value()"
+        },
+        {
+         "t": "text",
+         "v": " test it. "
+        },
+        {
+         "t": "code",
+         "v": "*d"
+        },
+        {
+         "t": "text",
+         "v": " reads the value without a check, and on an empty optional it is undefined behaviour; "
+        },
+        {
+         "t": "code",
+         "v": "d.value()"
+        },
+        {
+         "t": "text",
+         "v": " checks and throws "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_optional_access"
+        },
+        {
+         "t": "text",
+         "v": ", as the output shows. O'Dwyer's mnemonic is "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": "'s: the operator is unchecked like "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": ", and the named function checks like "
+        },
+        {
+         "t": "code",
+         "v": "at()"
+        },
+        {
+         "t": "text",
+         "v": ". The value lives inside the optional, next to a "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": ", and nothing is allocated, which the sizes show: GCC 13 makes "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int>"
+        },
+        {
+         "t": "text",
+         "v": " 8 bytes and "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<double>"
+        },
+        {
+         "t": "text",
+         "v": " 16."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "value_or(fallback)"
+        },
+        {
+         "t": "text",
+         "v": " returns the value, or the fallback when the optional is empty. It reads well and has three traps. The first is that the fallback is an ordinary function argument, so it is computed before "
+        },
+        {
+         "t": "code",
+         "v": "value_or"
+        },
+        {
+         "t": "text",
+         "v": " runs, whether it is needed or not. O'Dwyer's slides make this point about a default certificate that is loaded on every call; the exercise below counts the calls on a fallback that costs two seconds."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second trap is that "
+        },
+        {
+         "t": "code",
+         "v": "value_or"
+        },
+        {
+         "t": "text",
+         "v": " returns a "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " by value ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/utility/optional/value_or"
+        },
+        {
+         "t": "text",
+         "v": "): a new object, even when the optional holds a value. A "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " bound to that object dangles at the end of the statement. The frame names here are longer than the 15 characters libstdc++ keeps inside a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": ", so their characters live on the heap and AddressSanitizer reports the read:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <iostream>\n#include <optional>\n#include <string>\n#include <string_view>\n\n[[nodiscard]] std::optional<std::string> frame_name(int sensor_id) {\n  if (sensor_id == 1) return \"base_link_of_the_left_front_wheel\";\n  return std::nullopt;\n}\n\nint main() {\n  const std::string_view name = frame_name(2).value_or(\"unnamed_frame_for_the_sensor_mount\");\n  std::cout << name << '\\n';  // the std::string that value_or returned is gone\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third trap is O'Dwyer's post on "
+        },
+        {
+         "t": "a",
+         "v": "a linker error from static const and value_or",
+         "href": "https://quuxplusone.github.io/blog/2020/09/19/value-or-pitfall/"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "value_or"
+        },
+        {
+         "t": "text",
+         "v": " takes its fallback by reference, "
+        },
+        {
+         "t": "code",
+         "v": "U&&"
+        },
+        {
+         "t": "text",
+         "v": ", and binding a reference to a "
+        },
+        {
+         "t": "code",
+         "v": "static const"
+        },
+        {
+         "t": "text",
+         "v": " data member needs the member's definition, which old code often never wrote. The ternary "
+        },
+        {
+         "t": "code",
+         "v": "timeout_ms ? *timeout_ms : default_timeout_ms"
+        },
+        {
+         "t": "text",
+         "v": " only reads the value and links; the "
+        },
+        {
+         "t": "code",
+         "v": "value_or"
+        },
+        {
+         "t": "text",
+         "v": " version compiles and then fails to link in an unoptimised build:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "undefined reference to",
+       "text": "#include <optional>\n\nstruct Link {\n  static const int default_timeout_ms = 100;  // declared, never defined\n  std::optional<int> timeout_ms;\n  [[nodiscard]] int timeout() const { return timeout_ms.value_or(default_timeout_ms); }\n};\n\nint main() {\n  const Link link;\n  return link.timeout() == 100 ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "static constexpr int default_timeout_ms = 100;"
+        },
+        {
+         "t": "text",
+         "v": " fixes it. Since C++17 a "
+        },
+        {
+         "t": "code",
+         "v": "static constexpr"
+        },
+        {
+         "t": "text",
+         "v": " data member is implicitly "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": ", and the declaration in the class is its definition."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The standard keeps adding to optional. C++23 adds "
+        },
+        {
+         "t": "code",
+         "v": "and_then"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "transform"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "or_else"
+        },
+        {
+         "t": "text",
+         "v": ", which chain steps that may each produce nothing; GCC 13 has them in C++23 mode only. C++26 adds "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<T&>"
+        },
+        {
+         "t": "text",
+         "v": " and makes an optional a range of zero or one element, which Steve Downey traces from Boost to C++26 in his "
+        },
+        {
+         "t": "a",
+         "v": "CppCon 2025 talk on optional",
+         "href": "https://www.youtube.com/watch?v=fTbTF0MUsPA"
+        },
+        {
+         "t": "text",
+         "v": ". Until then, a reference that may be absent is a pointer that may be null."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 15 minutes. "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " holds settings as text in a "
+        },
+        {
+         "t": "code",
+         "v": "std::map<std::string, std::string, std::less<>>"
+        },
+        {
+         "t": "text",
+         "v": " and has "
+        },
+        {
+         "t": "code",
+         "v": "get(std::string_view key)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::string>"
+        },
+        {
+         "t": "text",
+         "v": ". Add "
+        },
+        {
+         "t": "code",
+         "v": "get_int(std::string_view key)"
+        },
+        {
+         "t": "text",
+         "v": ", returning "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int>"
+        },
+        {
+         "t": "text",
+         "v": ": empty when the key is missing or its text isn't a whole number, as the "
+        },
+        {
+         "t": "code",
+         "v": "gain"
+        },
+        {
+         "t": "text",
+         "v": " below isn't. Use "
+        },
+        {
+         "t": "code",
+         "v": "std::from_chars"
+        },
+        {
+         "t": "text",
+         "v": ", which neither throws nor allocates. Then fix these three lines. Each compiles, and each is wrong:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "const Config cfg({{\"host\", \"robot-7.local\"}, {\"timeout_ms\", \"250\"}, {\"retries\", \"3\"}, {\"gain\", \"3x\"}});\nLinkProbe probe;  // measure_latency_ms() pings the robot for two seconds\nconst std::string_view host = cfg.get(\"hostname\").value_or(\"localhost.localdomain\");\nconst int timeout_ms = cfg.get_int(\"timeout_ms\").value_or(probe.measure_latency_ms());\nconst int retries = *cfg.get_int(\"retry\");"
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <charconv>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <map>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <system_error>\n#include <utility>\n\nclass Config {\n public:\n  explicit Config(std::map<std::string, std::string, std::less<>> values) : values_(std::move(values)) {}\n\n  [[nodiscard]] std::optional<std::string> get(std::string_view key) const {\n    const auto it = values_.find(key);\n    if (it == values_.end()) return std::nullopt;\n    return it->second;\n  }\n\n  [[nodiscard]] std::optional<int> get_int(std::string_view key) const {\n    const auto it = values_.find(key);\n    if (it == values_.end()) return std::nullopt;\n    const std::string& text = it->second;\n    int value = 0;\n    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);\n    if (error != std::errc{} || end != text.data() + text.size()) return std::nullopt;\n    return value;\n  }\n\n private:\n  std::map<std::string, std::string, std::less<>> values_;\n};\n\nclass LinkProbe {\n public:\n  [[nodiscard]] int measure_latency_ms() {  // stands in for two seconds of pings\n    ++probes_;\n    return 180;\n  }\n  [[nodiscard]] int probes() const { return probes_; }\n\n private:\n  int probes_ = 0;\n};\n\nint main() {\n  const Config cfg({{\"host\", \"robot-7.local\"}, {\"timeout_ms\", \"250\"}, {\"retries\", \"3\"}, {\"gain\", \"3x\"}});\n  LinkProbe probe;\n\n  // 1. value_or returns a new std::string: keep it, don't view it.\n  const std::string host = cfg.get(\"hostname\").value_or(\"localhost.localdomain\");\n\n  // 2. As written, the fallback runs although the setting is there.\n  const int as_written = cfg.get_int(\"timeout_ms\").value_or(probe.measure_latency_ms());\n  const int probes_as_written = probe.probes();\n  // Fixed: the probe runs only when the setting is missing.\n  const std::optional<int> configured = cfg.get_int(\"timeout_ms\");\n  const int timeout_ms = configured ? *configured : probe.measure_latency_ms();\n\n  // 3. The key is misspelled, so the optional is empty and *retry was undefined behaviour.\n  if (const std::optional<int> retries = cfg.get_int(\"retry\")) {\n    std::cout << std::format(\"retries {}\\n\", *retries);\n  } else {\n    std::cout << \"retry is not set\\n\";\n  }\n\n  std::cout << std::format(\"host {}, timeout {} ms as written and {} ms after the fix\\n\", host, as_written, timeout_ms);\n  std::cout << std::format(\"probes: {} as written, {} after the fix\\n\", probes_as_written,\n                           probe.probes() - probes_as_written);\n  std::cout << std::format(\"gain parses: {}\\n\", cfg.get_int(\"gain\").has_value());\n}"
+      },
+      {
+       "t": "output",
+       "text": "retry is not set\nhost localhost.localdomain, timeout 250 ms as written and 250 ms after the fix\nprobes: 1 as written, 0 after the fix\ngain parses: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first line kept a view of the temporary "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " that "
+        },
+        {
+         "t": "code",
+         "v": "value_or"
+        },
+        {
+         "t": "text",
+         "v": " returned; owning the string fixes it, and costs one copy of a short string. The second called the probe on every start, two seconds each time, although the setting was there. The program keeps both lines so the counter can tell them apart: one probe as written, none after the fix, and the same 250 ms either way. The third dereferenced an empty optional, because the key is "
+        },
+        {
+         "t": "code",
+         "v": "retries"
+        },
+        {
+         "t": "text",
+         "v": ". That is undefined behaviour, and in practice it reads whatever bytes the empty optional holds, so nothing fails where the typo is. Whether a missing setting is an error for the program or has a default is the caller's decision, and the "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": " makes the caller write it down. If it is an error, throw an exception that names the key; "
+        },
+        {
+         "t": "code",
+         "v": "value()"
+        },
+        {
+         "t": "text",
+         "v": " would throw too, but its message doesn't say which key."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "get_int"
+        },
+        {
+         "t": "text",
+         "v": " accepts the text only when "
+        },
+        {
+         "t": "code",
+         "v": "from_chars"
+        },
+        {
+         "t": "text",
+         "v": " succeeds and consumed all of it, so "
+        },
+        {
+         "t": "code",
+         "v": "\"3x\""
+        },
+        {
+         "t": "text",
+         "v": " is refused rather than read as 3. "
+        },
+        {
+         "t": "code",
+         "v": "std::less<>"
+        },
+        {
+         "t": "text",
+         "v": " makes the map's lookup heterogeneous, which lets "
+        },
+        {
+         "t": "code",
+         "v": "find"
+        },
+        {
+         "t": "text",
+         "v": " take a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " without building a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " first."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "variant",
+   "title": "variant and std::visit with overloaded lambdas",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <variant>\n\nstruct Stop {};\nstruct Drive {\n  double speed_mps;\n};\nstruct Turn {\n  double angle_rad;\n};\n\nusing Command = std::variant<Stop, Drive, Turn>;\n\nint main() {\n  Command cmd;  // holds a Stop: the first alternative, value-initialised\n  std::cout << std::format(\"index {}, sizeof {}\\n\", cmd.index(), sizeof(Command));\n\n  cmd = Drive{0.4};\n  std::cout << std::format(\"index {}, speed {}\\n\", cmd.index(), std::get<Drive>(cmd).speed_mps);\n\n  if (const Turn* turn = std::get_if<Turn>(&cmd)) std::cout << std::format(\"turn {}\\n\", turn->angle_rad);\n\n  try {\n    std::cout << std::get<Turn>(cmd).angle_rad << '\\n';\n  } catch (const std::bad_variant_access& e) {\n    std::cout << std::format(\"get<Turn> threw: {}\\n\", e.what());\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "index 0, sizeof 16\nindex 1, speed 0.4\nget<Turn> threw: std::get: wrong index for variant"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "std::variant<Stop, Drive, Turn>"
+        },
+        {
+         "t": "text",
+         "v": " holds exactly one of its three "
+        },
+        {
+         "t": "i",
+         "v": "alternatives"
+        },
+        {
+         "t": "text",
+         "v": " at a time and knows which one: "
+        },
+        {
+         "t": "code",
+         "v": "index()"
+        },
+        {
+         "t": "text",
+         "v": " says 0, 1 or 2. It is the type-safe form of a tagged union, a "
+        },
+        {
+         "t": "code",
+         "v": "union"
+        },
+        {
+         "t": "text",
+         "v": " plus an enum that records which member is live, which Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.181",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ru-naked"
+        },
+        {
+         "t": "text",
+         "v": " tells you not to write by hand. O'Dwyer (2020) calls it a "
+        },
+        {
+         "t": "i",
+         "v": "sum type"
+        },
+        {
+         "t": "text",
+         "v": ": a "
+        },
+        {
+         "t": "code",
+         "v": "Command"
+        },
+        {
+         "t": "text",
+         "v": " has as many possible values as "
+        },
+        {
+         "t": "code",
+         "v": "Stop"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Drive"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Turn"
+        },
+        {
+         "t": "text",
+         "v": " have together, where a struct holding all three would have their product. The alternatives share storage inside the variant, with a small index beside them. GCC 13 makes this "
+        },
+        {
+         "t": "code",
+         "v": "Command"
+        },
+        {
+         "t": "text",
+         "v": " 16 bytes, 8 for the largest alternative plus the index and padding, and a variant never allocates."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::get<Drive>(cmd)"
+        },
+        {
+         "t": "text",
+         "v": " returns the "
+        },
+        {
+         "t": "code",
+         "v": "Drive"
+        },
+        {
+         "t": "text",
+         "v": ", or throws "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_variant_access"
+        },
+        {
+         "t": "text",
+         "v": " when another alternative is active. "
+        },
+        {
+         "t": "code",
+         "v": "std::get_if<Turn>(&cmd)"
+        },
+        {
+         "t": "text",
+         "v": " takes a pointer and returns a null pointer instead of throwing. A default-constructed variant holds its first alternative, value-initialised, so list the natural starting state first, or "
+        },
+        {
+         "t": "code",
+         "v": "std::monostate"
+        },
+        {
+         "t": "text",
+         "v": " when the variant should start out holding nothing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Testing the alternatives one by one with "
+        },
+        {
+         "t": "code",
+         "v": "get_if"
+        },
+        {
+         "t": "text",
+         "v": " works, and nothing warns you when a fourth alternative is added and one of the chains forgets it. "
+        },
+        {
+         "t": "code",
+         "v": "std::visit"
+        },
+        {
+         "t": "text",
+         "v": " calls a function with whichever alternative is active, and the call compiles only if the function accepts every alternative. The usual way to write that function is one lambda per alternative, merged into one object:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "template <typename... Fs>\nstruct overloaded : Fs... {\n  using Fs::operator()...;\n};\n\nstd::visit(overloaded{\n               [](const Stop&) { std::cout << \"stop\\n\"; },\n               [](const Drive& d) { std::cout << std::format(\"drive {}\\n\", d.speed_mps); },\n               [](const Turn& t) { std::cout << std::format(\"turn {}\\n\", t.angle_rad); },\n           },\n           cmd);"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "overloaded"
+        },
+        {
+         "t": "text",
+         "v": " derives from the type of every lambda passed to it, and its "
+        },
+        {
+         "t": "code",
+         "v": "using"
+        },
+        {
+         "t": "text",
+         "v": " declaration brings each lambda's "
+        },
+        {
+         "t": "code",
+         "v": "operator()"
+        },
+        {
+         "t": "text",
+         "v": " into one scope, so a call with a "
+        },
+        {
+         "t": "code",
+         "v": "Drive"
+        },
+        {
+         "t": "text",
+         "v": " picks the "
+        },
+        {
+         "t": "code",
+         "v": "Drive"
+        },
+        {
+         "t": "text",
+         "v": " overload by ordinary overload resolution. "
+        },
+        {
+         "t": "code",
+         "v": "overloaded{...}"
+        },
+        {
+         "t": "text",
+         "v": " is an aggregate, and C++20 deduces an aggregate's template arguments from its initialisers. C++17 needed one more line, a deduction guide, which you still see in older code; "
+        },
+        {
+         "t": "a",
+         "v": "cppreference's page on std::visit",
+         "href": "https://en.cppreference.com/cpp/utility/variant/visit"
+        },
+        {
+         "t": "text",
+         "v": " shows both. Inbal Levi's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on virtual dispatch and its alternatives",
+         "href": "https://www.youtube.com/watch?v=jBnIMEb2GhA"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019) builds the same helper as an alternative to a class hierarchy."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::visit"
+        },
+        {
+         "t": "text",
+         "v": " also needs every branch to return the same type. When they don't, GCC 13 stops with a static assertion that says so: "
+        },
+        {
+         "t": "code",
+         "v": "std::visit requires the visitor to have the same return type for all alternatives of a variant"
+        },
+        {
+         "t": "text",
+         "v": ". For one variant, "
+        },
+        {
+         "t": "code",
+         "v": "visit"
+        },
+        {
+         "t": "text",
+         "v": " runs in constant time, and implementations typically jump through a table with one entry per alternative."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two more facts belong here. If building the new alternative throws after the old one has been destroyed, the variant holds nothing, and "
+        },
+        {
+         "t": "code",
+         "v": "valueless_by_exception()"
+        },
+        {
+         "t": "text",
+         "v": " returns true; O'Dwyer's advice is to keep that state inside the "
+        },
+        {
+         "t": "code",
+         "v": "catch"
+        },
+        {
+         "t": "text",
+         "v": " block that sees it. And converting constructors used to surprise: "
+        },
+        {
+         "t": "code",
+         "v": "std::variant<bool, std::string> v = \"abc\";"
+        },
+        {
+         "t": "text",
+         "v": " chose "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " in C++17 as first published, because a pointer converts to "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": ". The fix, "
+        },
+        {
+         "t": "a",
+         "v": "P0608",
+         "href": "https://wg21.link/p0608r3"
+        },
+        {
+         "t": "text",
+         "v": ", was applied as a defect report, and GCC 13 picks "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A variant is closed. Its alternatives are listed in one place, and adding one means changing every visitor, which the compiler then finds for you. A class hierarchy is the reverse, as the next topic shows: adding a type is one new class, and adding an operation touches every class. Klaus Iglberger's book "
+        },
+        {
+         "t": "a",
+         "v": "C++ Software Design",
+         "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+        },
+        {
+         "t": "text",
+         "v": " builds its comparison on exactly this trade (Guidelines 15 and 17), and Josuttis's C++17 book compares the two in section 16.4.3."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot runs a plan of commands. "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": " changes the robot's state with one visitor, and "
+        },
+        {
+         "t": "code",
+         "v": "describe"
+        },
+        {
+         "t": "text",
+         "v": " turns a command into text with another."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <numbers>\n#include <string>\n#include <variant>\n#include <vector>\n\nstruct Stop {};\nstruct Drive {\n  double speed_mps;\n};\nstruct Turn {\n  double angle_rad;\n};\n\nusing Command = std::variant<Stop, Drive, Turn>;\n\ntemplate <typename... Fs>\nstruct overloaded : Fs... {\n  using Fs::operator()...;\n};\n\nstruct Robot {\n  double speed_mps = 0.0;\n  double heading_rad = 0.0;\n};\n\nvoid apply(Robot& robot, const Command& cmd) {\n  std::visit(overloaded{\n                 [&](const Stop&) { robot.speed_mps = 0.0; },\n                 [&](const Drive& d) { robot.speed_mps = d.speed_mps; },\n                 [&](const Turn& t) { robot.heading_rad += t.angle_rad; },\n             },\n             cmd);\n}\n\n[[nodiscard]] std::string describe(const Command& cmd) {\n  return std::visit(overloaded{\n                        [](const Stop&) { return std::string(\"stop\"); },\n                        [](const Drive& d) { return std::format(\"drive at {:.2f} m/s\", d.speed_mps); },\n                        [](const Turn& t) { return std::format(\"turn by {:.3f} rad\", t.angle_rad); },\n                    },\n                    cmd);\n}\n\nint main() {\n  const std::vector<Command> plan{Drive{0.5}, Turn{std::numbers::pi / 2}, Drive{0.25}, Stop{}};\n  Robot robot;\n  for (const Command& cmd : plan) {\n    apply(robot, cmd);\n    std::cout << std::format(\"{:<22} speed {:.2f}, heading {:.3f}\\n\", describe(cmd), robot.speed_mps, robot.heading_rad);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "drive at 0.50 m/s      speed 0.50, heading 0.000\nturn by 1.571 rad      speed 0.50, heading 1.571\ndrive at 0.25 m/s      speed 0.25, heading 1.571\nstop                   speed 0.00, heading 1.571"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "apply"
+         },
+         {
+          "t": "text",
+          "v": "'s lambdas capture "
+         },
+         {
+          "t": "code",
+          "v": "robot"
+         },
+         {
+          "t": "text",
+          "v": " by reference and return nothing, which is the same type for all three. A "
+         },
+         {
+          "t": "code",
+          "v": "Turn"
+         },
+         {
+          "t": "text",
+          "v": " changes the heading and leaves the speed alone, and the output shows it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Every branch of "
+         },
+         {
+          "t": "code",
+          "v": "describe"
+         },
+         {
+          "t": "text",
+          "v": " returns "
+         },
+         {
+          "t": "code",
+          "v": "std::string"
+         },
+         {
+          "t": "text",
+          "v": ". The first is "
+         },
+         {
+          "t": "code",
+          "v": "std::string(\"stop\")"
+         },
+         {
+          "t": "text",
+          "v": ", not "
+         },
+         {
+          "t": "code",
+          "v": "\"stop\""
+         },
+         {
+          "t": "text",
+          "v": ": a "
+         },
+         {
+          "t": "code",
+          "v": "const char*"
+         },
+         {
+          "t": "text",
+          "v": " from one branch and "
+         },
+         {
+          "t": "code",
+          "v": "std::string"
+         },
+         {
+          "t": "text",
+          "v": " from the others would be two return types, and the static assertion above would stop the build."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "plan"
+         },
+         {
+          "t": "text",
+          "v": " is a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<Command>"
+         },
+         {
+          "t": "text",
+          "v": ", so the four commands sit in the vector's buffer, 16 bytes each, with no allocation per command. The same plan as a hierarchy of command classes would be a vector of "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr"
+         },
+         {
+          "t": "text",
+          "v": ", with one allocation and one pointer per command."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The visitors are written where they are used. Nothing in "
+         },
+         {
+          "t": "code",
+          "v": "Stop"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "Drive"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "Turn"
+         },
+         {
+          "t": "text",
+          "v": " knows about "
+         },
+         {
+          "t": "code",
+          "v": "apply"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "describe"
+         },
+         {
+          "t": "text",
+          "v": ", so a third operation is one more function, and the command structs stay plain data."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now add a fourth command, "
+        },
+        {
+         "t": "code",
+         "v": "Dock"
+        },
+        {
+         "t": "text",
+         "v": ", to the variant and change nothing else. The build stops at every visitor that has no branch for it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "no type named",
+       "text": "#include <variant>\n\nstruct Stop {};\nstruct Drive {\n  double speed_mps;\n};\nstruct Dock {};\n\nusing Command = std::variant<Stop, Drive, Dock>;\n\ntemplate <typename... Fs>\nstruct overloaded : Fs... {\n  using Fs::operator()...;\n};\n\nstruct Robot {\n  double speed_mps = 0.0;\n};\n\nvoid apply(Robot& robot, const Command& cmd) {\n  std::visit(overloaded{\n                 [&](const Stop&) { robot.speed_mps = 0.0; },\n                 [&](const Drive& d) { robot.speed_mps = d.speed_mps; },\n             },\n             cmd);\n}\n\nint main() {\n  Robot robot;\n  apply(robot, Dock{});\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13's first error is "
+        },
+        {
+         "t": "code",
+         "v": "no type named ‘type’ in ‘struct std::invoke_result<overloaded<...>, const Dock&>’"
+        },
+        {
+         "t": "text",
+         "v": ": the visitor has nothing to call with a "
+        },
+        {
+         "t": "code",
+         "v": "const Dock&"
+        },
+        {
+         "t": "text",
+         "v": ". The message is long and points into "
+        },
+        {
+         "t": "code",
+         "v": "<variant>"
+        },
+        {
+         "t": "text",
+         "v": ", but it names the alternative that is missing. A catch-all branch, "
+        },
+        {
+         "t": "code",
+         "v": "[](const auto&) {}"
+        },
+        {
+         "t": "text",
+         "v": ", would make this compile, and it would also hide the next alternative someone adds. Use one only when doing nothing really is right for every other command."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. A sensor log has one reading per line: "
+        },
+        {
+         "t": "code",
+         "v": "T 21.5"
+        },
+        {
+         "t": "text",
+         "v": " is a temperature in degrees Celsius, "
+        },
+        {
+         "t": "code",
+         "v": "R 850"
+        },
+        {
+         "t": "text",
+         "v": " a range in millimetres, and "
+        },
+        {
+         "t": "code",
+         "v": "F wheel stalled"
+        },
+        {
+         "t": "text",
+         "v": " a fault. Write:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "struct Temperature { double celsius; }"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "struct Range { int mm; }"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "struct Fault { std::string what; }"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "using Reading = std::variant<Temperature, Range, Fault>"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "parse(std::string_view line)"
+         },
+         {
+          "t": "text",
+          "v": ", returning "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<Reading>"
+         },
+         {
+          "t": "text",
+          "v": ": empty for an unknown letter, or a number that doesn't parse completely. Use "
+         },
+         {
+          "t": "code",
+          "v": "std::from_chars"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a "
+         },
+         {
+          "t": "code",
+          "v": "Summary"
+         },
+         {
+          "t": "text",
+          "v": " with the highest temperature and the shortest range, each a "
+         },
+         {
+          "t": "code",
+          "v": "std::optional"
+         },
+         {
+          "t": "text",
+          "v": ", the faults in order, and the number of lines that didn't parse, filled by one "
+         },
+         {
+          "t": "code",
+          "v": "std::visit"
+         },
+         {
+          "t": "text",
+          "v": " with overloaded lambdas."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run it on the lines "
+        },
+        {
+         "t": "code",
+         "v": "T 21.5"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "R 850"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "T 24.0"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "X 1"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "R 430"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "F wheel stalled"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "R 4x0"
+        },
+        {
+         "t": "text",
+         "v": ", and print the summary."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <charconv>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <system_error>\n#include <variant>\n#include <vector>\n\nstruct Temperature {\n  double celsius;\n};\nstruct Range {\n  int mm;\n};\nstruct Fault {\n  std::string what;\n};\nusing Reading = std::variant<Temperature, Range, Fault>;\n\ntemplate <typename... Fs>\nstruct overloaded : Fs... {\n  using Fs::operator()...;\n};\n\n// The whole of text as a number, or nothing.\ntemplate <typename T>\n[[nodiscard]] std::optional<T> to_number(std::string_view text) {\n  T value{};\n  const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);\n  if (error != std::errc{} || end != text.data() + text.size()) return std::nullopt;\n  return value;\n}\n\n[[nodiscard]] std::optional<Reading> parse(std::string_view line) {\n  if (line.size() < 3 || line[1] != ' ') return std::nullopt;\n  const std::string_view rest = line.substr(2);\n  switch (line[0]) {\n    case 'T':\n      if (const auto c = to_number<double>(rest)) return Temperature{*c};\n      return std::nullopt;\n    case 'R':\n      if (const auto mm = to_number<int>(rest)) return Range{*mm};\n      return std::nullopt;\n    case 'F':\n      return Fault{std::string(rest)};\n    default:\n      return std::nullopt;\n  }\n}\n\nstruct Summary {\n  std::optional<double> highest_celsius;\n  std::optional<int> shortest_mm;\n  std::vector<std::string> faults;\n  int bad_lines = 0;\n};\n\nvoid add(Summary& s, const Reading& reading) {\n  std::visit(overloaded{\n                 [&](const Temperature& t) {\n                   if (!s.highest_celsius || t.celsius > *s.highest_celsius) s.highest_celsius = t.celsius;\n                 },\n                 [&](const Range& r) {\n                   if (!s.shortest_mm || r.mm < *s.shortest_mm) s.shortest_mm = r.mm;\n                 },\n                 [&](const Fault& f) { s.faults.push_back(f.what); },\n             },\n             reading);\n}\n\nint main() {\n  constexpr std::array<std::string_view, 7> log{\"T 21.5\", \"R 850\", \"T 24.0\", \"X 1\", \"R 430\", \"F wheel stalled\", \"R 4x0\"};\n  Summary s;\n  for (const std::string_view line : log) {\n    if (const std::optional<Reading> reading = parse(line)) {\n      add(s, *reading);\n    } else {\n      ++s.bad_lines;\n    }\n  }\n  if (s.highest_celsius) std::cout << std::format(\"highest {:.1f} C\\n\", *s.highest_celsius);\n  if (s.shortest_mm) std::cout << std::format(\"shortest {} mm\\n\", *s.shortest_mm);\n  for (const std::string& f : s.faults) std::cout << std::format(\"fault: {}\\n\", f);\n  std::cout << std::format(\"bad lines: {}\\n\", s.bad_lines);\n}"
+      },
+      {
+       "t": "output",
+       "text": "highest 24.0 C\nshortest 430 mm\nfault: wheel stalled\nbad lines: 2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two vocabulary types answer two different questions. "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<Reading>"
+        },
+        {
+         "t": "text",
+         "v": " says whether the line was a reading at all, and "
+        },
+        {
+         "t": "code",
+         "v": "Reading"
+        },
+        {
+         "t": "text",
+         "v": " says which kind it was, so the caller handles \"not a reading\" once, with the "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": ", and \"which kind\" once, in "
+        },
+        {
+         "t": "code",
+         "v": "add"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "to_number"
+        },
+        {
+         "t": "text",
+         "v": " is a function template deduced from nothing, so every call names "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": "; it is one template for both "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " because "
+        },
+        {
+         "t": "code",
+         "v": "std::from_chars"
+        },
+        {
+         "t": "text",
+         "v": " has overloads for both (the floating-point ones arrived in GCC 11). It refuses "
+        },
+        {
+         "t": "code",
+         "v": "\"4x0\""
+        },
+        {
+         "t": "text",
+         "v": ", as "
+        },
+        {
+         "t": "code",
+         "v": "get_int"
+        },
+        {
+         "t": "text",
+         "v": " refused "
+        },
+        {
+         "t": "code",
+         "v": "\"3x\""
+        },
+        {
+         "t": "text",
+         "v": ", because the parse has to consume the whole text. The fields of "
+        },
+        {
+         "t": "code",
+         "v": "Summary"
+        },
+        {
+         "t": "text",
+         "v": " start empty rather than at 0 or -273, so a log with no temperatures prints no temperature, instead of a made-up one."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what deduction does with a by-value parameter, and why "
+        },
+        {
+         "t": "code",
+         "v": "larger(3, 4.5)"
+        },
+        {
+         "t": "text",
+         "v": " fails; when a class template's member functions are instantiated, and what that means for headers; which two CTAD results surprise people; what a concept changes about where an error is reported; why "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " beats a special value, and the three traps of "
+        },
+        {
+         "t": "code",
+         "v": "value_or"
+        },
+        {
+         "t": "text",
+         "v": "; and what "
+        },
+        {
+         "t": "code",
+         "v": "std::visit"
+        },
+        {
+         "t": "text",
+         "v": " checks that a chain of "
+        },
+        {
+         "t": "code",
+         "v": "get_if"
+        },
+        {
+         "t": "text",
+         "v": " tests doesn't, and how "
+        },
+        {
+         "t": "code",
+         "v": "overloaded"
+        },
+        {
+         "t": "text",
+         "v": " gets one call operator per alternative."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Why doesn't "
+     },
+     {
+      "t": "code",
+      "v": "larger(3, 4.5)"
+     },
+     {
+      "t": "text",
+      "v": " compile when "
+     },
+     {
+      "t": "code",
+      "v": "larger"
+     },
+     {
+      "t": "text",
+      "v": " takes two "
+     },
+     {
+      "t": "code",
+      "v": "T"
+     },
+     {
+      "t": "text",
+      "v": "s, and what are two ways to make the call work?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "larger(\"arm\", \"base\")"
+     },
+     {
+      "t": "text",
+      "v": " deduce, and why is its answer meaningless?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When does the compiler instantiate a member function of a class template, and why do template definitions live in headers?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What do "
+     },
+     {
+      "t": "code",
+      "v": "std::vector v{ids.begin(), ids.end()}"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::vector v{\"a\", \"b\"}"
+     },
+     {
+      "t": "text",
+      "v": " deduce?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Where does GCC report an error for a type that can't be ordered, with and without a concept on "
+     },
+     {
+      "t": "code",
+      "v": "larger"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What do "
+     },
+     {
+      "t": "code",
+      "v": "*opt"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "opt.value()"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "opt.value_or(x)"
+     },
+     {
+      "t": "text",
+      "v": " do on an empty optional, and which of them can dangle or link-fail?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::visit"
+     },
+     {
+      "t": "text",
+      "v": " check at compile time that a chain of "
+     },
+     {
+      "t": "code",
+      "v": "std::get_if"
+     },
+     {
+      "t": "text",
+      "v": " tests doesn't?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: "
+     },
+     {
+      "t": "code",
+      "v": "overloaded"
+     },
+     {
+      "t": "text",
+      "v": ", and a "
+     },
+     {
+      "t": "code",
+      "v": "std::visit"
+     },
+     {
+      "t": "text",
+      "v": " over a variant of three structs that returns a "
+     },
+     {
+      "t": "code",
+      "v": "std::string"
+     },
+     {
+      "t": "text",
+      "v": " from every branch."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Algebraic Data Types, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_algebraic_data_types/back_to_basics_algebraic_data_types__arthur_odwyer__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=OJzmWqCCZaM"
+     },
+     {
+      "t": "text",
+      "v": ". Sum and product types, engaged and disengaged, "
+     },
+     {
+      "t": "code",
+      "v": "value_or"
+     },
+     {
+      "t": "text",
+      "v": " evaluating its fallback, visitation."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Andreas Fertig, Back to Basics: Templates, CppCon 2020: part 1 "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_templates_part_1/back_to_basics_templates_part_1__andreas_fertig__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VNJ4wiuxJM4"
+     },
+     {
+      "t": "text",
+      "v": ", part 2 "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_templates_part_2/back_to_basics_templates_part_2__andreas_fertig__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=0dtjDTEE0hQ"
+     },
+     {
+      "t": "text",
+      "v": ". Instantiation, class and alias templates, then variadic templates, fold expressions and the step from SFINAE to concepts."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bob Steagall, Back to Basics: Templates, CppCon 2021: part 1 "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/back_to_basics_templates_part_1__bob_steagall__cppcon_2021.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=XN319NYEOcE"
+     },
+     {
+      "t": "text",
+      "v": ", part 2 "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/back_to_basics_templates_part_2__bob_steagall__cppcon_2021.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=2Y9XbltAfXs"
+     },
+     {
+      "t": "text",
+      "v": ". Templates as recipes, specializations, instantiation, and where template code has to live."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, Back to Basics: C++ Templates, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/CTemplates_cppcon_220918.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=HqsEHG0QJXU"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "mymax"
+     },
+     {
+      "t": "text",
+      "v": ", the return type of a two-parameter template, and the CTAD traps."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: Generic Programming, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Generic_Programming.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=0_0HsEBsgPc"
+     },
+     {
+      "t": "text",
+      "v": ". Substitution against instantiation, members instantiated on use, deducible parameters."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, Back to Basics: Concepts, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_To_Basics_Concepts.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=jzwqTi7n-rg"
+     },
+     {
+      "t": "text",
+      "v": ". Testing concepts with "
+     },
+     {
+      "t": "code",
+      "v": "static_assert"
+     },
+     {
+      "t": "text",
+      "v": ", constrained member functions, subsumption."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jeff Garland, Back to Basics: Concepts, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Back_To_Basics_Concepts.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=NpuNUGifL1M"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Steve Downey, CppCon 2025. The "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/stdoptional.pdf"
+     },
+     {
+      "t": "text",
+      "v": " are titled "
+     },
+     {
+      "t": "code",
+      "v": "std::optional<T&>"
+     },
+     {
+      "t": "text",
+      "v": ", Optional Over References; the "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=fTbTF0MUsPA"
+     },
+     {
+      "t": "text",
+      "v": " is published under a title that traces the evolution of "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": " from Boost to C++26. The history of optional and what C++26 adds."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Inbal Levi, Back to Basics: Virtual Dispatch and its Alternatives, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_virtual_dispatch_and_its_alternatives/back_to_basics_virtual_dispatch_and_its_alternatives__inbal_levi__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=jBnIMEb2GhA"
+     },
+     {
+      "t": "text",
+      "v": ". The "
+     },
+     {
+      "t": "code",
+      "v": "overloaded"
+     },
+     {
+      "t": "text",
+      "v": " helper with "
+     },
+     {
+      "t": "code",
+      "v": "std::visit"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "T.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-raise"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "T.10",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-concepts"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "C.181",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ru-naked"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, C++17: The Complete Guide: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://leanpub.com/cpp17"
+     },
+     {
+      "t": "text",
+      "v": ". Chapter 9 on class template argument deduction, chapter 15 on "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": ", chapter 16 on "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, C++ Software Design, O'Reilly 2022: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+     },
+     {
+      "t": "text",
+      "v": ". Guideline 15 on adding types against adding operations, and Guideline 17 on "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": " as a visitor."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, "
+     },
+     {
+      "t": "a",
+      "v": "the linker error from static const and value_or",
+      "href": "https://quuxplusone.github.io/blog/2020/09/19/value-or-pitfall/"
+     },
+     {
+      "t": "text",
+      "v": ", 2020."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil, "
+     },
+     {
+      "t": "a",
+      "v": "tip 171 on sentinel values",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "P0608R3, "
+     },
+     {
+      "t": "a",
+      "v": "a sane variant converting constructor",
+      "href": "https://wg21.link/p0608r3"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "template argument deduction",
+      "href": "https://en.cppreference.com/cpp/language/template_argument_deduction"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "class template argument deduction",
+      "href": "https://en.cppreference.com/cpp/language/class_template_argument_deduction"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "constraints and concepts",
+      "href": "https://en.cppreference.com/cpp/language/constraints"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "value_or",
+      "href": "https://en.cppreference.com/cpp/utility/optional/value_or"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::variant",
+      "href": "https://en.cppreference.com/cpp/utility/variant"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::visit",
+      "href": "https://en.cppreference.com/cpp/utility/variant/visit"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

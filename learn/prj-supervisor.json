@@ -1,0 +1,2332 @@
+{
+ "id": "prj-supervisor",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage gives the bench a supervisor: the only publisher on "
+    },
+    {
+     "t": "code",
+     "v": "/cmd_vel"
+    },
+    {
+     "t": "text",
+     "v": ", forwarding commands from "
+    },
+    {
+     "t": "code",
+     "v": "/cmd_vel_nav"
+    },
+    {
+     "t": "text",
+     "v": " only while odometry is fresh, and publishing a stop twenty times a second whenever odometry or commands go stale. Its rules live in a plain class in "
+    },
+    {
+     "t": "code",
+     "v": "bench_core"
+    },
+    {
+     "t": "text",
+     "v": ", tested to the nanosecond, and only afterward wrapped in a thin ROS node."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is that the class never reads a clock itself. Every call takes the time as an argument, so a test passes any time it likes and gets the same answer on every machine, and a replay driven by the recording's own clock reproduces the same decisions the live supervisor made. We also chose to let the robot resume by itself once both inputs are fresh again, rather than latching the stop until an operator clears it, and wrote that choice down as a decision, not a default."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: four fake-input tests pass in "
+    },
+    {
+     "t": "code",
+     "v": "./check.sh"
+    },
+    {
+     "t": "text",
+     "v": " and in CI, and we watched two of them fail first against a supervisor that forwarded commands without odometry. In the actual world, stopping the relay brings the robot to rest in about 0.5 to 0.6 seconds of simulated time, measured from the message stamps themselves."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "supervisor",
+   "title": "Supervisor node and its state",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " holds the supervisor's rules in a plain class, with GoogleTest tests that you wrote before the class and saw fail."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In the robot-world topic, the robot kept driving after you stopped publishing, because the DiffDrive system keeps using the last command it received. That topic promised a supervisor that stops the robot by itself when commands or odometry go stale. The architecture topic drew where it sits: between the controller and the bridge, as the only publisher on "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": ", forwarding the controller's commands from "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel_nav"
+        },
+        {
+         "t": "text",
+         "v": ". A relay republishes the bridge's odometry, renamed "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", as "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", so that a later scenario can cut it off. The rules come first, in words:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A command on "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel_nav"
+         },
+         {
+          "t": "text",
+          "v": " is forwarded to "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel"
+         },
+         {
+          "t": "text",
+          "v": " only while odometry is fresh."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Odometry is fresh while the last "
+         },
+         {
+          "t": "code",
+          "v": "/odom"
+         },
+         {
+          "t": "text",
+          "v": " message arrived at most "
+         },
+         {
+          "t": "code",
+          "v": "odom_timeout_ms"
+         },
+         {
+          "t": "text",
+          "v": " ago on the supervisor's clock, 250 ms by default."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Commands are fresh while the last "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel_nav"
+         },
+         {
+          "t": "text",
+          "v": " message arrived at most "
+         },
+         {
+          "t": "code",
+          "v": "cmd_timeout_ms"
+         },
+         {
+          "t": "text",
+          "v": " ago, 500 ms by default."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Each input is stale before its first message, and when the clock reads earlier than its last message."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "While odometry or the commands are stale, a timer in the supervisor publishes a stop, a zero velocity, 20 times a second."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Each change of state is logged once."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each rule has a reason. The TurtleBot's DiffDrive system publishes odometry 30 times a second, "
+        },
+        {
+         "t": "code",
+         "v": "odom_publish_frequency"
+        },
+        {
+         "t": "text",
+         "v": " in the robot's "
+        },
+        {
+         "t": "code",
+         "v": "gz_waffle.sdf.xacro"
+        },
+        {
+         "t": "text",
+         "v": ", so 250 ms is about seven missed messages: long enough to ride out a late one, and short enough that a robot at 0.2 m/s covers about 6 cm before the stop goes out. Commands come from a controller at 20 Hz, or from "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic pub --rate 10"
+        },
+        {
+         "t": "text",
+         "v": " while you test by hand, so 500 ms covers five missed commands at the slower rate. The command rule is the one that answers the robot-world problem: without it, a controller that dies after sending 0.2 m/s leaves the robot driving while odometry flows normally. It is also why the stop comes from a timer. When the commands go stale, no command arrives, so no command callback would ever run to stop the robot."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The age is measured from when a message arrived on the supervisor's clock, not from the time stamp in its header, for three reasons. A stamp can be zero: "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic pub"
+        },
+        {
+         "t": "text",
+         "v": " fills a header only when asked to, and the fake inputs below publish "
+        },
+        {
+         "t": "code",
+         "v": "Odometry{}"
+        },
+        {
+         "t": "text",
+         "v": ". A stamp can come from the recording, as in a replay without "
+        },
+        {
+         "t": "code",
+         "v": "--clock"
+        },
+        {
+         "t": "text",
+         "v": ". And a stamp is on the publisher's clock, while the arrival time is on the supervisor's own, which is the clock its timeouts are defined on. A clock that jumps back comes from a simulation that was reset or a bag that starts again, and the ROS 2 design article on clocks requires code on ROS time to cope with it. Treating it as stale fails safe: the next message makes the input fresh again. The stop repeats rather than going out once, so a lost stop message is replaced 50 ms later. And the supervisor resumes by itself when both inputs are fresh again. A real robot often latches the stop until an operator clears it. Write down which the bench does, and why, in its decision record."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The time is the part that decides how testable this is. The class never reads a clock: every call takes the time as an argument, a "
+        },
+        {
+         "t": "code",
+         "v": "bench::Time"
+        },
+        {
+         "t": "text",
+         "v": " from the record-and-replay topic. A test passes any time it likes, 1 s and then 1.25 s, and gets the same answer on every run and every machine. The node reads its clock once per callback and hands the reading in, which is also what lets a replay with "
+        },
+        {
+         "t": "code",
+         "v": "--clock"
+        },
+        {
+         "t": "text",
+         "v": " reproduce the supervisor's decisions."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the tests first, in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/test/supervisor_test.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The first case checks the boundary of a timeout to the nanosecond:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <chrono>\n\n#include <gtest/gtest.h>\n\n#include \"bench/supervisor.hpp\"\n\nusing namespace std::chrono_literals;\n\nTEST(Freshness, FreshUpToMaxAgeAndStaleAfter) {\n  bench::Freshness odometry(250ms);\n  odometry.on_message({1s});\n  EXPECT_TRUE(odometry.fresh({1s + 250ms}));\n  EXPECT_FALSE(odometry.fresh({1s + 250ms + 1ns}));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a case for each of the other rules: stale before any message; stale when the clock reads earlier than the last message; a command dropped while odometry is stale; a supervisor whose odometry keeps coming ticking "
+        },
+        {
+         "t": "code",
+         "v": "Gate::no_commands"
+        },
+        {
+         "t": "text",
+         "v": " once the last command is 1 ns older than the command timeout; and "
+        },
+        {
+         "t": "code",
+         "v": "tick()"
+        },
+        {
+         "t": "text",
+         "v": " reporting a change at the first tick of each new state, and none in between. Add "
+        },
+        {
+         "t": "code",
+         "v": "supervisor"
+        },
+        {
+         "t": "text",
+         "v": " to the list in the test part of "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_core/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", which becomes "
+        },
+        {
+         "t": "code",
+         "v": "foreach(name odometry replay supervisor)"
+        },
+        {
+         "t": "text",
+         "v": ". Run "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": ". It fails to compile, because "
+        },
+        {
+         "t": "code",
+         "v": "bench/supervisor.hpp"
+        },
+        {
+         "t": "text",
+         "v": " doesn't exist yet. That is the failure you want to see first."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/include/bench/supervisor.hpp"
+         },
+         {
+          "t": "text",
+          "v": ". The classes are small, so they live whole in the header, which includes "
+         },
+         {
+          "t": "code",
+          "v": "\"bench/time.hpp\""
+         },
+         {
+          "t": "text",
+          "v": ". Here they are with "
+         },
+         {
+          "t": "code",
+          "v": "Time"
+         },
+         {
+          "t": "text",
+          "v": " and a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that walks through the rules:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <chrono>\n#include <compare>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string_view>\n\nnamespace bench {\n\n// From bench/time.hpp: a reading of a node's clock, in nanoseconds since that clock's zero.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\n// Whether a stream of messages is fresh: its last message arrived at most max_age ago. It is\n// stale before the first message, and when the clock reads earlier than the last message,\n// which happens when a simulation is reset or a replay starts again.\nclass Freshness {\n public:\n  explicit Freshness(std::chrono::nanoseconds max_age) : max_age_(max_age) {}\n\n  void on_message(Time now) { last_ = now; }\n\n  [[nodiscard]] bool fresh(Time now) const {\n    return last_ && *last_ <= now && now.since_epoch - last_->since_epoch <= max_age_;\n  }\n\n private:\n  std::chrono::nanoseconds max_age_;\n  std::optional<Time> last_;\n};\n\n// How long each input may stay silent. Two durations, so the call names them.\nstruct Timeouts {\n  std::chrono::nanoseconds odometry;\n  std::chrono::nanoseconds commands;\n};\n\n// What the supervisor lets through: commands, or nothing and why.\nenum class Gate { open, no_odometry, no_commands };\n\n// What the supervisor's timer does at one tick.\nstruct Tick {\n  Gate gate;     // anything but open: publish a stop now\n  bool changed;  // not what it was at the previous tick: log it\n};\n\n// The supervisor's rules. A command is forwarded while odometry is fresh, and the timer\n// publishes a stop while odometry or the commands are stale.\nclass Supervisor {\n public:\n  explicit Supervisor(Timeouts timeouts) : odometry_(timeouts.odometry), commands_(timeouts.commands) {}\n\n  void on_odometry(Time now) { odometry_.on_message(now); }\n\n  // Records a command's arrival, and returns whether to forward it.\n  [[nodiscard]] bool on_command(Time now) {\n    commands_.on_message(now);\n    return odometry_.fresh(now);\n  }\n\n  [[nodiscard]] Gate gate(Time now) const {\n    if (!odometry_.fresh(now)) return Gate::no_odometry;\n    if (!commands_.fresh(now)) return Gate::no_commands;\n    return Gate::open;\n  }\n\n  [[nodiscard]] Tick tick(Time now) {\n    const Gate current = gate(now);\n    const bool changed = current != previous_;\n    previous_ = current;\n    return {.gate = current, .changed = changed};\n  }\n\n private:\n  Freshness odometry_;\n  Freshness commands_;\n  Gate previous_ = Gate::no_odometry;  // the robot starts held still\n};\n\n}  // namespace bench\n\n[[nodiscard]] constexpr std::string_view name(bench::Gate gate) {\n  switch (gate) {\n    case bench::Gate::open: return \"open\";\n    case bench::Gate::no_odometry: return \"no odometry\";\n    case bench::Gate::no_commands: return \"no commands\";\n  }\n  return \"?\";\n}\n\n// One moment of a made-up run: the messages that arrive, then a tick of the timer.\nstruct Moment {\n  std::chrono::milliseconds t;\n  bool odometry;\n  bool command;\n};\n\nint main() {\n  using namespace std::chrono_literals;\n  const auto at = [](std::chrono::nanoseconds t) { return bench::Time{t}; };\n\n  bench::Freshness odometry(250ms);\n  std::cout << std::format(\"before any message: {}\\n\", odometry.fresh(at(1s)));\n  odometry.on_message(at(1s));\n  std::cout << std::format(\"after 250 ms: {}\\n\", odometry.fresh(at(1s + 250ms)));\n  std::cout << std::format(\"after 250 ms and 1 ns: {}\\n\", odometry.fresh(at(1s + 250ms + 1ns)));\n  std::cout << std::format(\"clock went back: {}\\n\", odometry.fresh(at(900ms)));\n\n  // Odometry pauses from 100 ms to 450 ms; the controller goes quiet after 400 ms.\n  constexpr std::array<Moment, 8> run{{{.t = 0ms, .odometry = true, .command = false},\n                                       {.t = 50ms, .odometry = true, .command = true},\n                                       {.t = 100ms, .odometry = true, .command = true},\n                                       {.t = 150ms, .odometry = false, .command = true},\n                                       {.t = 400ms, .odometry = false, .command = true},\n                                       {.t = 450ms, .odometry = true, .command = false},\n                                       {.t = 700ms, .odometry = true, .command = false},\n                                       {.t = 950ms, .odometry = true, .command = false}}};\n  bench::Supervisor supervisor({.odometry = 250ms, .commands = 500ms});\n  for (const Moment& moment : run) {\n    if (moment.odometry) supervisor.on_odometry(at(moment.t));\n    std::string_view command;\n    if (moment.command) command = supervisor.on_command(at(moment.t)) ? \"command forwarded, \" : \"command dropped, \";\n    const bench::Tick tick = supervisor.tick(at(moment.t));\n    std::cout << std::format(\"{:3} ms: {}gate {}{}\\n\", moment.t.count(), command, name(tick.gate),\n                             tick.changed ? \" (changed)\" : \"\");\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "before any message: false\nafter 250 ms: true\nafter 250 ms and 1 ns: false\nclock went back: false\n  0 ms: gate no commands (changed)\n 50 ms: command forwarded, gate open (changed)\n100 ms: command forwarded, gate open\n150 ms: command forwarded, gate open\n400 ms: command dropped, gate no odometry (changed)\n450 ms: gate open (changed)\n700 ms: gate open\n950 ms: gate no commands (changed)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The run shows both timeouts at work. At 150 ms odometry is 50 ms old, so the command passes. At 400 ms it is 300 ms old: the supervisor drops the command and closes the gate. At 450 ms odometry is back, and the command from 400 ms is still fresh, so the gate opens again by itself. At 950 ms the last command is 550 ms old, and the gate closes for lack of commands while odometry keeps coming."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In the node the ticks are 50 ms apart, which gives the latency you can promise: the first stop goes out 250 to 300 ms after the last odometry message, or 500 to 550 ms after the last command. The DiffDrive system then brakes at its configured 1 m/s², which takes 0.2 s from 0.2 m/s."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A few details carry the rules. "
+        },
+        {
+         "t": "code",
+         "v": "Freshness"
+        },
+        {
+         "t": "text",
+         "v": " holds the one rule the two inputs share, so it is written and tested once. The two timeouts are both durations, so they travel in a "
+        },
+        {
+         "t": "code",
+         "v": "Timeouts"
+        },
+        {
+         "t": "text",
+         "v": " struct and the call names each one: "
+        },
+        {
+         "t": "code",
+         "v": "{.odometry = 250ms, .commands = 500ms}"
+        },
+        {
+         "t": "text",
+         "v": " can't be swapped by accident. A timeout is a "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::nanoseconds"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "250ms"
+        },
+        {
+         "t": "text",
+         "v": " converts to it without a cast, because the conversion loses nothing; a lossy one, such as nanoseconds to seconds, needs "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::duration_cast"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "*last_ <= now"
+        },
+        {
+         "t": "text",
+         "v": " uses the comparison that "
+        },
+        {
+         "t": "code",
+         "v": "Time"
+        },
+        {
+         "t": "text",
+         "v": " got from its defaulted "
+        },
+        {
+         "t": "code",
+         "v": "operator<=>"
+        },
+        {
+         "t": "text",
+         "v": ". The last arrival is a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<Time>"
+        },
+        {
+         "t": "text",
+         "v": ", not a time of 0 meaning none, which on a simulation clock would be a real time. "
+        },
+        {
+         "t": "code",
+         "v": "gate()"
+        },
+        {
+         "t": "text",
+         "v": " checks odometry first, so when both inputs are stale the log names the one the robot can't move safely without. "
+        },
+        {
+         "t": "code",
+         "v": "Tick"
+        },
+        {
+         "t": "text",
+         "v": " returns two facts to the caller instead of taking a flag. And the constructors are "
+        },
+        {
+         "t": "code",
+         "v": "explicit"
+        },
+        {
+         "t": "text",
+         "v": ", so a bare duration never turns into a "
+        },
+        {
+         "t": "code",
+         "v": "Freshness"
+        },
+        {
+         "t": "text",
+         "v": " by accident."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " until it is green, then commit on a branch and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the supervisor's tests pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, and you saw them fail before the header existed."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the supervisor and the relay run as ROS 2 nodes in "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes"
+        },
+        {
+         "t": "text",
+         "v": ", and in the robot world the robot stops by itself when you stop the relay or the command publisher."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Make "
+         },
+         {
+          "t": "code",
+          "v": "bench_nodes"
+         },
+         {
+          "t": "text",
+          "v": " use "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": ". In "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/package.xml"
+         },
+         {
+          "t": "text",
+          "v": ", add "
+         },
+         {
+          "t": "code",
+          "v": "<depend>bench_core</depend>"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "<depend>geometry_msgs</depend>"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "<depend>nav_msgs</depend>"
+         },
+         {
+          "t": "text",
+          "v": ". The first line is what makes colcon build "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " first and put its install folder on "
+         },
+         {
+          "t": "code",
+          "v": "CMAKE_PREFIX_PATH"
+         },
+         {
+          "t": "text",
+          "v": ", as the skeleton topic showed."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the node, "
+         },
+         {
+          "t": "code",
+          "v": "include/bench_nodes/supervisor.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", which includes "
+         },
+         {
+          "t": "code",
+          "v": "\"bench/supervisor.hpp\""
+         },
+         {
+          "t": "text",
+          "v": " for the rules. The fence below has the rules copied in and a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", so that it builds on its own; "
+         },
+         {
+          "t": "code",
+          "v": "src/supervisor_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": " holds only that "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", as the first nodes do:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <compare>\n#include <cstdint>\n#include <memory>\n#include <optional>\n\n#include <geometry_msgs/msg/twist_stamped.hpp>\n#include <nav_msgs/msg/odometry.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nnamespace bench {\n\n// In the bench, bench_core provides these in bench/time.hpp and bench/supervisor.hpp.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\nclass Freshness {\n public:\n  explicit Freshness(std::chrono::nanoseconds max_age) : max_age_(max_age) {}\n\n  void on_message(Time now) { last_ = now; }\n\n  [[nodiscard]] bool fresh(Time now) const {\n    return last_ && *last_ <= now && now.since_epoch - last_->since_epoch <= max_age_;\n  }\n\n private:\n  std::chrono::nanoseconds max_age_;\n  std::optional<Time> last_;\n};\n\nstruct Timeouts {\n  std::chrono::nanoseconds odometry;\n  std::chrono::nanoseconds commands;\n};\n\nenum class Gate { open, no_odometry, no_commands };\n\nstruct Tick {\n  Gate gate;\n  bool changed;\n};\n\nclass Supervisor {\n public:\n  explicit Supervisor(Timeouts timeouts) : odometry_(timeouts.odometry), commands_(timeouts.commands) {}\n\n  void on_odometry(Time now) { odometry_.on_message(now); }\n\n  [[nodiscard]] bool on_command(Time now) {\n    commands_.on_message(now);\n    return odometry_.fresh(now);\n  }\n\n  [[nodiscard]] Gate gate(Time now) const {\n    if (!odometry_.fresh(now)) return Gate::no_odometry;\n    if (!commands_.fresh(now)) return Gate::no_commands;\n    return Gate::open;\n  }\n\n  [[nodiscard]] Tick tick(Time now) {\n    const Gate current = gate(now);\n    const bool changed = current != previous_;\n    previous_ = current;\n    return {.gate = current, .changed = changed};\n  }\n\n private:\n  Freshness odometry_;\n  Freshness commands_;\n  Gate previous_ = Gate::no_odometry;\n};\n\n}  // namespace bench\n\nnamespace bench_nodes {\n\n// The type the bridge in bench_sim takes on /cmd_vel. If yours takes Twist, change it here.\nusing Command = geometry_msgs::msg::TwistStamped;\n\n// The only publisher on /cmd_vel: forwards /cmd_vel_nav while /odom is fresh, and publishes a\n// stop 20 times a second while odometry or the commands are stale.\nclass Supervisor : public rclcpp::Node {\n public:\n  explicit Supervisor(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"supervisor\", options), rules_(declare_timeouts()) {\n    const rclcpp::QoS qos(rclcpp::KeepLast(10));\n    publisher_ = create_publisher<Command>(\"cmd_vel\", qos);\n    odometry_ = create_subscription<nav_msgs::msg::Odometry>(\n        \"odom\", qos, [this](const nav_msgs::msg::Odometry&) { rules_.on_odometry(clock_time()); });\n    commands_ = create_subscription<Command>(\"cmd_vel_nav\", qos, [this](const Command& command) {\n      if (rules_.on_command(clock_time())) publisher_->publish(command);\n    });\n    timer_ = create_timer(std::chrono::milliseconds(50), [this] { on_tick(); });\n  }\n\n private:\n  [[nodiscard]] bench::Timeouts declare_timeouts() {\n    return {.odometry = std::chrono::milliseconds(declare_parameter<std::int64_t>(\"odom_timeout_ms\", 250)),\n            .commands = std::chrono::milliseconds(declare_parameter<std::int64_t>(\"cmd_timeout_ms\", 500))};\n  }\n\n  // The one place that reads the time: the node's clock, handed to the rules.\n  [[nodiscard]] bench::Time clock_time() const { return {std::chrono::nanoseconds(now().nanoseconds())}; }\n\n  void on_tick() {\n    const bench::Tick tick = rules_.tick(clock_time());\n    if (tick.changed) log_gate(tick.gate);\n    if (tick.gate != bench::Gate::open) {\n      Command stop;\n      stop.header.stamp = now();\n      stop.header.frame_id = \"base_link\";\n      publisher_->publish(stop);\n    }\n  }\n\n  void log_gate(bench::Gate gate) const {\n    switch (gate) {\n      case bench::Gate::open:\n        RCLCPP_INFO(get_logger(), \"forwarding commands\");\n        break;\n      case bench::Gate::no_odometry:\n        RCLCPP_WARN(get_logger(), \"odometry is stale: stopping the robot\");\n        break;\n      case bench::Gate::no_commands:\n        RCLCPP_INFO(get_logger(), \"commands are stale: stopping the robot\");\n        break;\n    }\n  }\n\n  bench::Supervisor rules_;\n  rclcpp::Publisher<Command>::SharedPtr publisher_;\n  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_;\n  rclcpp::Subscription<Command>::SharedPtr commands_;\n  rclcpp::TimerBase::SharedPtr timer_;\n};\n\n}  // namespace bench_nodes\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<bench_nodes::Supervisor>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The node adds no rules of its own. Each callback reads the clock once, through "
+        },
+        {
+         "t": "code",
+         "v": "clock_time()"
+        },
+        {
+         "t": "text",
+         "v": ", and asks "
+        },
+        {
+         "t": "code",
+         "v": "rules_"
+        },
+        {
+         "t": "text",
+         "v": " what to do: the command callback forwards a command only when "
+        },
+        {
+         "t": "code",
+         "v": "on_command"
+        },
+        {
+         "t": "text",
+         "v": " says so, and the timer publishes a stop whenever the gate isn't open. The member initialiser list builds "
+        },
+        {
+         "t": "code",
+         "v": "rules_"
+        },
+        {
+         "t": "text",
+         "v": " from the two parameters, through "
+        },
+        {
+         "t": "code",
+         "v": "declare_timeouts()"
+        },
+        {
+         "t": "text",
+         "v": ". That works because a base class is constructed before the members, so the "
+        },
+        {
+         "t": "code",
+         "v": "Node"
+        },
+        {
+         "t": "text",
+         "v": " part exists when "
+        },
+        {
+         "t": "code",
+         "v": "declare_parameter"
+        },
+        {
+         "t": "text",
+         "v": " runs. The timer is a "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": " on the node's clock, so under "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " the supervisor ticks in simulated time, and a paused simulation pauses the supervisor too. That is right in a simulation, where a stopped "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " means a stopped world."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Command"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "TwistStamped"
+        },
+        {
+         "t": "text",
+         "v": " on both topics, because the 1.3.0 bridge in "
+        },
+        {
+         "t": "code",
+         "v": "bench_sim"
+        },
+        {
+         "t": "text",
+         "v": " takes that type on "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": ", as you found in the robot-world topic. The architecture drawing used "
+        },
+        {
+         "t": "code",
+         "v": "Twist"
+        },
+        {
+         "t": "text",
+         "v": "; with one type on both sides, forwarding is a copy and needs no conversion. If your installation bridges "
+        },
+        {
+         "t": "code",
+         "v": "Twist"
+        },
+        {
+         "t": "text",
+         "v": ", change the alias."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the relay, "
+         },
+         {
+          "t": "code",
+          "v": "include/bench_nodes/odom_relay.hpp"
+         },
+         {
+          "t": "text",
+          "v": " with its "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "src/odom_relay_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". It has no rules, so it has no plain class:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <memory>\n\n#include <nav_msgs/msg/odometry.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nnamespace bench_nodes {\n\n// Republishes the bridge's /odom_raw as /odom. The missing-odometry scenario will make it\n// stop on cue; for now it forwards every message.\nclass OdomRelay : public rclcpp::Node {\n public:\n  explicit OdomRelay(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"odom_relay\", options) {\n    const rclcpp::QoS qos(rclcpp::KeepLast(10));\n    publisher_ = create_publisher<nav_msgs::msg::Odometry>(\"odom\", qos);\n    subscription_ = create_subscription<nav_msgs::msg::Odometry>(\n        \"odom_raw\", qos, [this](const nav_msgs::msg::Odometry& msg) { publisher_->publish(msg); });\n  }\n\n private:\n  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher_;\n  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subscription_;\n};\n\n}  // namespace bench_nodes\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<bench_nodes::OdomRelay>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add both programs to "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": ", after the heartbeat and the monitor:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "find_package(geometry_msgs REQUIRED)\nfind_package(nav_msgs REQUIRED)\nfind_package(bench_core REQUIRED)\n\nadd_executable(supervisor src/supervisor_node.cpp)\nadd_executable(odom_relay src/odom_relay_node.cpp)\nforeach(node supervisor odom_relay)\n  target_include_directories(${node} PRIVATE include)\n  ament_target_dependencies(${node} rclcpp geometry_msgs nav_msgs)\nendforeach()\ntarget_link_libraries(supervisor bench_core::bench_core)\ninstall(TARGETS supervisor odom_relay DESTINATION lib/${PROJECT_NAME})"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "target_link_libraries"
+        },
+        {
+         "t": "text",
+         "v": " line has no "
+        },
+        {
+         "t": "code",
+         "v": "PRIVATE"
+        },
+        {
+         "t": "text",
+         "v": ", and that is on purpose. "
+        },
+        {
+         "t": "code",
+         "v": "ament_target_dependencies"
+        },
+        {
+         "t": "text",
+         "v": " calls "
+        },
+        {
+         "t": "code",
+         "v": "target_link_libraries"
+        },
+        {
+         "t": "text",
+         "v": " without a keyword, and CMake refuses a target on which both forms are used. With a keyword, the configure step stops with this, measured with CMake 3.28 on a two-line reproduction; in the bench, the plain call it lists is inside "
+        },
+        {
+         "t": "code",
+         "v": "ament_target_dependencies.cmake"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "CMake Error at CMakeLists.txt:6 (target_link_libraries):\n  The plain signature for target_link_libraries has already been used with\n  the target \"supervisor\".  All uses of target_link_libraries with a target\n  must be either all-keyword or all-plain."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Through "
+        },
+        {
+         "t": "code",
+         "v": "bench_core::bench_core"
+        },
+        {
+         "t": "text",
+         "v": ", the supervisor also gets the include folder that "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " installed, so "
+        },
+        {
+         "t": "code",
+         "v": "#include \"bench/supervisor.hpp\""
+        },
+        {
+         "t": "text",
+         "v": " needs nothing more."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", and try the supervisor from the command line, each command in its own terminal:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run bench_nodes supervisor                                     # terminal 1\nros2 topic echo /cmd_vel --field twist.linear.x                     # terminal 2: 0.0, 20 times a second\nros2 topic pub --rate 10 /cmd_vel_nav geometry_msgs/msg/TwistStamped \"{twist: {linear: {x: 0.2}}}\"   # terminal 3\nros2 topic pub --rate 30 /odom nav_msgs/msg/Odometry \"{}\"          # terminal 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Until terminal 4 starts, terminal 2 shows only stops: without odometry, every command is dropped. Once odometry flows, the supervisor logs that it is forwarding commands, and terminal 2 shows 0.2 ten times a second. Stop terminal 4 with Ctrl+C: the supervisor logs that odometry is stale, and the stops come back. Start it again, then stop terminal 3 instead: the supervisor logs that commands are stale, and the stops come back while odometry still flows."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Put the supervisor into the robot world. First, the bridge must publish odometry as "
+         },
+         {
+          "t": "code",
+          "v": "/odom_raw"
+         },
+         {
+          "t": "text",
+          "v": ", or the relay would have nothing to cut off. The bridge is started inside Nav2's "
+         },
+         {
+          "t": "code",
+          "v": "spawn_tb3.launch.py"
+         },
+         {
+          "t": "text",
+          "v": ", so rename its topic from outside with "
+         },
+         {
+          "t": "code",
+          "v": "SetRemap"
+         },
+         {
+          "t": "text",
+          "v": ", which applies a remapping to every node started in the same group. In "
+         },
+         {
+          "t": "code",
+          "v": "bench_sim/launch/world.launch.py"
+         },
+         {
+          "t": "text",
+          "v": ", add "
+         },
+         {
+          "t": "code",
+          "v": "GroupAction"
+         },
+         {
+          "t": "text",
+          "v": " to the imports from "
+         },
+         {
+          "t": "code",
+          "v": "launch.actions"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "SetRemap"
+         },
+         {
+          "t": "text",
+          "v": " to those from "
+         },
+         {
+          "t": "code",
+          "v": "launch_ros.actions"
+         },
+         {
+          "t": "text",
+          "v": ", and wrap the include of the robot:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "    # The bridge's odometry becomes /odom_raw; the bench's relay republishes it as /odom.\n    robot = GroupAction([\n        SetRemap(src='/odom', dst='/odom_raw'),\n        IncludeLaunchDescription(\n            PythonLaunchDescriptionSource(os.path.join(sim_dir, 'launch', 'spawn_tb3.launch.py'))),\n    ])"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then add "
+        },
+        {
+         "t": "code",
+         "v": "bench_sim/launch/bench.launch.py"
+        },
+        {
+         "t": "text",
+         "v": ", which starts the world and the supervisor on simulated time, and add "
+        },
+        {
+         "t": "code",
+         "v": "<exec_depend>bench_nodes</exec_depend>"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "bench_sim/package.xml"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "\"\"\"Starts the Test Bench world with the supervisor between /cmd_vel_nav and the robot.\"\"\"\nimport os\n\nfrom ament_index_python.packages import get_package_share_directory\nfrom launch import LaunchDescription\nfrom launch.actions import DeclareLaunchArgument, IncludeLaunchDescription\nfrom launch.launch_description_sources import PythonLaunchDescriptionSource\nfrom launch.substitutions import LaunchConfiguration\nfrom launch_ros.actions import Node\n\n\ndef generate_launch_description():\n    world = IncludeLaunchDescription(\n        PythonLaunchDescriptionSource(\n            os.path.join(get_package_share_directory('bench_sim'), 'launch', 'world.launch.py')),\n        launch_arguments={'headless': LaunchConfiguration('headless')}.items())\n    supervisor = Node(package='bench_nodes', executable='supervisor',\n                      parameters=[{'use_sim_time': True}], output='screen')\n    return LaunchDescription([\n        DeclareLaunchArgument('headless', default_value='True'),\n        world,\n        supervisor,\n    ])"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The relay runs in a terminal of its own for now, so that Ctrl+C stops it alone. It reads no clock, so it needs no "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": ". From now on, drive the robot through "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel_nav"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " belongs to the supervisor, and a second publisher there would fight it."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim bench.launch.py headless:=False               # terminal 1\nros2 run bench_nodes odom_relay                                     # terminal 2\nros2 topic pub --rate 10 /cmd_vel_nav geometry_msgs/msg/TwistStamped \"{twist: {linear: {x: 0.2}}}\"   # terminal 3\nros2 topic echo /odom_raw --field twist.twist.linear.x              # terminal 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Check with "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic list"
+        },
+        {
+         "t": "text",
+         "v": " that "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " exists and the bridge no longer publishes "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " itself: "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info /odom"
+        },
+        {
+         "t": "text",
+         "v": " shows a publisher count of 1, the relay. The robot drives, and terminal 4 shows about 0.2. Terminal 4 reads "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", the simulator's own measurement of the robot, not the command the supervisor sent: a published stop is not proof that the robot stopped."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Stop terminal 3 with Ctrl+C. This is the robot-world problem, and now the supervisor logs that commands are stale and terminal 4 falls to about 0. Start terminal 3 again, and the robot drives on."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Measure the stop after a lost odometry stream, in simulated time. Expect about 0.5 to 0.6 s: 0.25 to 0.30 s until the first stop goes out, 0.2 s of braking at 1 m/s² ("
+         },
+         {
+          "t": "code",
+          "v": "min_linear_acceleration"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "gz_waffle.sdf.xacro"
+         },
+         {
+          "t": "text",
+          "v": "), up to one odometry period of 33 ms before "
+         },
+         {
+          "t": "code",
+          "v": "/odom_raw"
+         },
+         {
+          "t": "text",
+          "v": " shows it, and the time the bridge and the relay take. The log lines carry the computer's time, not simulated time, so read the time stamps in the messages instead. Replace terminal 4 with these three, each writing to a file:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic echo /odom --field header.stamp > ~/odom_stamps.txt       # the last stamp is the last odometry the supervisor got\nros2 topic echo /cmd_vel --field header.stamp > ~/cmd_stamps.txt     # forwarded commands show sec: 0; stops show simulated time\nros2 topic echo /odom_raw > ~/odom_raw.txt                           # the robot's speed, with its stamp"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start them while the robot drives. Stop the relay with Ctrl+C, wait two seconds, and stop the three echoes. The last stamp in "
+        },
+        {
+         "t": "code",
+         "v": "odom_stamps.txt"
+        },
+        {
+         "t": "text",
+         "v": " is when odometry stopped. The first stamp that isn't "
+        },
+        {
+         "t": "code",
+         "v": "sec: 0"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "cmd_stamps.txt"
+        },
+        {
+         "t": "text",
+         "v": " is when the first stop went out: 0.25 to 0.30 s later, plus the time the bridge and the relay took. In "
+        },
+        {
+         "t": "code",
+         "v": "odom_raw.txt"
+        },
+        {
+         "t": "text",
+         "v": ", the first message after the first stop whose "
+        },
+        {
+         "t": "code",
+         "v": "twist.twist.linear.x"
+        },
+        {
+         "t": "text",
+         "v": " is below 0.01 marks the robot at rest; its "
+        },
+        {
+         "t": "code",
+         "v": "header.stamp"
+        },
+        {
+         "t": "text",
+         "v": " minus the last odometry stamp is the number you want. Start the relay again, and the robot drives on."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 8,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "from the command line, commands pass only while "
+         },
+         {
+          "t": "code",
+          "v": "/odom"
+         },
+         {
+          "t": "text",
+          "v": " flows, and stops appear when either "
+         },
+         {
+          "t": "code",
+          "v": "/odom"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel_nav"
+         },
+         {
+          "t": "text",
+          "v": " ends;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "in the world, the robot drives through "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel_nav"
+         },
+         {
+          "t": "text",
+          "v": " and the supervisor, and stops when you stop the command publisher;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "stopping the relay stops the robot in about 0.5 to 0.6 s of simulated time, measured from the stamps."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "tests",
+   "title": "Fake-input tests",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, a GoogleTest test starts the supervisor next to a node of fake inputs, and checks in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI that the supervisor holds the robot without odometry, forwards commands while odometry is fresh, and stops when odometry or the commands stop."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rules are already tested in "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": ", to the nanosecond and without ROS. This test checks what those tests can't: that the node subscribes to the right topics with the right types, that its timer runs, and that the stop actually goes out on "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": ". It runs in real time, with margins wide enough that a slow CI machine doesn't fail it."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the fake inputs, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/test/fake_inputs.hpp"
+         },
+         {
+          "t": "text",
+          "v": ". The class stands in for the bridge and the controller: each feed can be switched on and off, and it keeps the forward speed of every command the supervisor sends. The fence adds a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", so that it builds on its own, and so that you can run it by hand against a running supervisor; the header has only the class and includes "
+         },
+         {
+          "t": "code",
+          "v": "\"bench_nodes/supervisor.hpp\""
+         },
+         {
+          "t": "text",
+          "v": " for "
+         },
+         {
+          "t": "code",
+          "v": "Command"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <memory>\n#include <vector>\n\n#include <geometry_msgs/msg/twist_stamped.hpp>\n#include <nav_msgs/msg/odometry.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nnamespace bench_nodes {\n\nusing Command = geometry_msgs::msg::TwistStamped;  // in the bench: from bench_nodes/supervisor.hpp\n\nenum class Feed { on, off };\n\n// Stands in for the bridge and the controller: while each feed is on, publishes /odom and a\n// 0.2 m/s command on /cmd_vel_nav 20 times a second. Keeps the forward speed of every command\n// the supervisor sends on /cmd_vel.\nclass FakeInputs : public rclcpp::Node {\n public:\n  explicit FakeInputs(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"fake_inputs\", options) {\n    const rclcpp::QoS qos(rclcpp::KeepLast(10));\n    odometry_ = create_publisher<nav_msgs::msg::Odometry>(\"odom\", qos);\n    commands_ = create_publisher<Command>(\"cmd_vel_nav\", qos);\n    sent_ = create_subscription<Command>(\n        \"cmd_vel\", qos, [this](const Command& command) { speeds_.push_back(command.twist.linear.x); });\n    timer_ = create_timer(std::chrono::milliseconds(50), [this] {\n      if (odometry_feed_ == Feed::on) odometry_->publish(nav_msgs::msg::Odometry{});\n      if (command_feed_ == Feed::on) {\n        Command command;\n        command.twist.linear.x = 0.2;\n        commands_->publish(command);\n      }\n    });\n  }\n\n  void odometry(Feed feed) { odometry_feed_ = feed; }\n  void commands(Feed feed) { command_feed_ = feed; }\n  [[nodiscard]] const std::vector<double>& speeds() const { return speeds_; }\n\n private:\n  Feed odometry_feed_ = Feed::off;\n  Feed command_feed_ = Feed::off;\n  std::vector<double> speeds_;\n  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_;\n  rclcpp::Publisher<Command>::SharedPtr commands_;\n  rclcpp::Subscription<Command>::SharedPtr sent_;\n  rclcpp::TimerBase::SharedPtr timer_;\n};\n\n}  // namespace bench_nodes\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  auto fake = std::make_shared<bench_nodes::FakeInputs>();\n  fake->odometry(bench_nodes::Feed::on);\n  fake->commands(bench_nodes::Feed::on);\n  rclcpp::spin(fake);\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The feeds are switched with an enum, "
+        },
+        {
+         "t": "code",
+         "v": "fake->odometry(Feed::off)"
+        },
+        {
+         "t": "text",
+         "v": ", rather than a "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " parameter, so a call says what it does. The data members come before the publishers, the subscription and the timer, so they outlive every callback that uses them."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the test, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/test/test_supervisor.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". It includes "
+         },
+         {
+          "t": "code",
+          "v": "<algorithm>"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "<chrono>"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "<functional>"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "<iterator>"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "<memory>"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "<ranges>"
+         },
+         {
+          "t": "text",
+          "v": ", GoogleTest, rclcpp, "
+         },
+         {
+          "t": "code",
+          "v": "\"bench_nodes/supervisor.hpp\""
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "\"fake_inputs.hpp\""
+         },
+         {
+          "t": "text",
+          "v": ", and says "
+         },
+         {
+          "t": "code",
+          "v": "using bench_nodes::Feed;"
+         },
+         {
+          "t": "text",
+          "v": ". The fixture starts ROS once for the suite, as the exchange test does, and has a helper that spins until a condition holds or a deadline passes:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "class SupervisorTest : public testing::Test {\n protected:\n  static void SetUpTestSuite() { rclcpp::init(0, nullptr); }\n  static void TearDownTestSuite() { rclcpp::shutdown(); }\n\n  // Spins both nodes until done() holds or 5 s have passed, and returns done().\n  bool spin_until(const std::function<bool()>& done) {\n    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);\n    while (!done() && std::chrono::steady_clock::now() < deadline) {\n      executor.spin_once(std::chrono::milliseconds(10));\n    }\n    return done();\n  }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rest of the fixture creates the two nodes and one executor for each test case. Both timeouts are 500 ms, so that a CI machine that pauses the test for a moment doesn't make an input look stale while the fake still sends it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  void SetUp() override {\n    executor.add_node(supervisor);\n    executor.add_node(fake);\n  }\n\n  // With 500 ms timeouts, the first stop is due 500 to 550 ms after the last message of either input.\n  std::shared_ptr<bench_nodes::Supervisor> supervisor = std::make_shared<bench_nodes::Supervisor>(\n      rclcpp::NodeOptions().append_parameter_override(\"odom_timeout_ms\", 500).append_parameter_override(\n          \"cmd_timeout_ms\", 500));\n  std::shared_ptr<bench_nodes::FakeInputs> fake = std::make_shared<bench_nodes::FakeInputs>();\n  rclcpp::executors::SingleThreadedExecutor executor;\n};"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "append_parameter_override"
+        },
+        {
+         "t": "text",
+         "v": " is how a test sets a parameter: the node's "
+        },
+        {
+         "t": "code",
+         "v": "declare_parameter"
+        },
+        {
+         "t": "text",
+         "v": " then returns 500 instead of its default. Each call returns the options, so the two chain. The executor is declared last, so it is destroyed first, before the nodes it spins."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the cases. The first two are short:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "TEST_F(SupervisorTest, HoldsTheRobotWithoutOdometry) {\n  fake->commands(Feed::on);\n  ASSERT_TRUE(spin_until([&] { return std::ranges::count(fake->speeds(), 0.0) >= 5; }));\n  EXPECT_EQ(std::ranges::count(fake->speeds(), 0.2), 0);\n}\n\nTEST_F(SupervisorTest, ForwardsCommandsWhileOdometryIsFresh) {\n  fake->odometry(Feed::on);\n  fake->commands(Feed::on);\n  EXPECT_TRUE(spin_until([&] { return std::ranges::count(fake->speeds(), 0.2) >= 5; }));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third switches odometry off after the supervisor has forwarded five commands, waits for five stops, and then checks that no command got through after the first stop:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "TEST_F(SupervisorTest, StopsWhenOdometryStops) {\n  fake->odometry(Feed::on);\n  fake->commands(Feed::on);\n  ASSERT_TRUE(spin_until([&] { return std::ranges::count(fake->speeds(), 0.2) >= 5; }));\n\n  fake->odometry(Feed::off);\n  const auto before = std::ssize(fake->speeds());\n  const auto since_off = [&] { return fake->speeds() | std::views::drop(before); };\n  ASSERT_TRUE(spin_until([&] { return std::ranges::count(since_off(), 0.0) >= 5; }));\n  auto after_first_stop = since_off() | std::views::drop_while([](double speed) { return speed != 0.0; });\n  EXPECT_EQ(std::ranges::count(after_first_stop, 0.2), 0);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Comparing speeds with "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " is exact here, not a rounding gamble: 0.2 and 0.0 are copied through the middleware bit for bit, never computed. After odometry stops, commands still pass for up to 500 ms, which is why the check starts at the first stop. "
+        },
+        {
+         "t": "code",
+         "v": "drop_while"
+        },
+        {
+         "t": "text",
+         "v": " skips to it, and "
+        },
+        {
+         "t": "code",
+         "v": "after_first_stop"
+        },
+        {
+         "t": "text",
+         "v": " isn't "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ", because a "
+        },
+        {
+         "t": "code",
+         "v": "drop_while_view"
+        },
+        {
+         "t": "text",
+         "v": " computes its beginning on first use and caches it. Every wait is a count with a deadline, as in the exchange test, so discovery can take its time and a broken supervisor fails in 5 s instead of hanging CI."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a fourth case, "
+        },
+        {
+         "t": "code",
+         "v": "StopsWhenCommandsStop"
+        },
+        {
+         "t": "text",
+         "v": ". It starts like the third, switches the command feed off instead of odometry, and waits for five stops after that moment. No check after the first stop is needed: with the commands off, nothing but stops can arrive."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Register the test. This is the second test that uses topics, so switch both to "
+         },
+         {
+          "t": "code",
+          "v": "ament_add_ros_isolated_gtest"
+         },
+         {
+          "t": "text",
+          "v": ", as the first-nodes topic planned: add "
+         },
+         {
+          "t": "code",
+          "v": "<test_depend>ament_cmake_ros</test_depend>"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": "package.xml"
+         },
+         {
+          "t": "text",
+          "v": ", and make the test part of "
+         },
+         {
+          "t": "code",
+          "v": "CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": " this:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "if(BUILD_TESTING)\n  find_package(ament_cmake_gtest REQUIRED)\n  find_package(ament_cmake_ros REQUIRED)\n  ament_add_gtest(test_heartbeat_check test/test_heartbeat_check.cpp)\n  target_include_directories(test_heartbeat_check PRIVATE include)\n  ament_add_ros_isolated_gtest(test_exchange test/test_exchange.cpp)\n  target_include_directories(test_exchange PRIVATE include)\n  ament_target_dependencies(test_exchange rclcpp std_msgs)\n  ament_add_ros_isolated_gtest(test_supervisor test/test_supervisor.cpp)\n  target_include_directories(test_supervisor PRIVATE include)\n  ament_target_dependencies(test_supervisor rclcpp geometry_msgs nav_msgs)\n  target_link_libraries(test_supervisor bench_core::bench_core)\nendif()"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The isolated variant runs each test program in a "
+        },
+        {
+         "t": "code",
+         "v": "ROS_DOMAIN_ID"
+        },
+        {
+         "t": "text",
+         "v": " of its own, so the fake's commands can't reach the nodes of the exchange test when colcon runs both at once. "
+        },
+        {
+         "t": "code",
+         "v": "test_heartbeat_check"
+        },
+        {
+         "t": "text",
+         "v": " uses no topics and stays as it was. The plain "
+        },
+        {
+         "t": "code",
+         "v": "target_link_libraries"
+        },
+        {
+         "t": "text",
+         "v": " is needed here for the same reason as in Build 2."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "colcon test-result --verbose"
+         },
+         {
+          "t": "text",
+          "v": ", which now counts the four supervisor cases too."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that the test can fail. In the supervisor node, publish every command whatever "
+         },
+         {
+          "t": "code",
+          "v": "on_command"
+         },
+         {
+          "t": "text",
+          "v": " returns: replace the "
+         },
+         {
+          "t": "code",
+          "v": "if"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "[[maybe_unused]] const bool forward = rules_.on_command(clock_time()); publisher_->publish(command);"
+         },
+         {
+          "t": "text",
+          "v": ". The call has to stay, because it records the command's arrival, and "
+         },
+         {
+          "t": "code",
+          "v": "on_command"
+         },
+         {
+          "t": "text",
+          "v": " is "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]]"
+         },
+         {
+          "t": "text",
+          "v": ", so a bare call doesn't build with "
+         },
+         {
+          "t": "code",
+          "v": "-Werror"
+         },
+         {
+          "t": "text",
+          "v": ". Then run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ". "
+         },
+         {
+          "t": "code",
+          "v": "HoldsTheRobotWithoutOdometry"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "StopsWhenOdometryStops"
+         },
+         {
+          "t": "text",
+          "v": " fail, each with the count of 0.2 commands that got through. Undo the change."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit, push, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the four cases pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, and you have seen two of them fail against a supervisor that forwards commands without fresh odometry."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a \"Supervisor\" section to "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic. Give the topics and types the supervisor reads and writes, its rules, its two parameters with their defaults, and the stop latency after each input goes quiet, with its arithmetic. Then write three to five lines on the tests: what the "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " tests prove with injected time, what the fake-input tests prove that those can't, and why their margins are wide. End with the decision you recorded on resuming by itself."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". The rules in a plain class, time passed in, and thin callbacks."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article on "
+     },
+     {
+      "t": "a",
+      "v": "clock and time",
+      "href": "https://design.ros2.org/articles/clock_and_time.html"
+     },
+     {
+      "t": "text",
+      "v": ": ROS time, "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": ", and time that jumps back during playback."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "testing with GTest",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Testing/Cpp.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "using parameters in a class",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-Client-Libraries/Using-Parameters-In-A-Class-CPP.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the sources of "
+     },
+     {
+      "t": "a",
+      "v": "ament_add_ros_isolated_gtest",
+      "href": "https://github.com/ros2/ament_cmake_ros/blob/jazzy/ament_cmake_ros/cmake/ament_add_ros_isolated_gtest.cmake"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ament_target_dependencies",
+      "href": "https://github.com/ament/ament_cmake/blob/jazzy/ament_cmake_target_dependencies/cmake/ament_target_dependencies.cmake"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "SetRemap",
+      "href": "https://github.com/ros2/launch_ros/blob/jazzy/launch_ros/launch_ros/actions/set_remap.py"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot 3 model in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_turtlebot_simulation 1.3.0",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/1.3.0/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+     },
+     {
+      "t": "text",
+      "v": ": odometry at 30 Hz and the DiffDrive limits."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "CMake's "
+     },
+     {
+      "t": "a",
+      "v": "target_link_libraries",
+      "href": "https://cmake.org/cmake/help/latest/command/target_link_libraries.html"
+     },
+     {
+      "t": "text",
+      "v": ", on the plain and keyword forms."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " on precisely typed interfaces, the reason for "
+     },
+     {
+      "t": "code",
+      "v": "bench::Time"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "code",
+      "v": "Feed"
+     },
+     {
+      "t": "text",
+      "v": " enum; cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::chrono::duration",
+      "href": "https://en.cppreference.com/cpp/chrono/duration"
+     },
+     {
+      "t": "text",
+      "v": " and its conversions."
+     }
+    ]
+   ]
+  }
+ ]
+}

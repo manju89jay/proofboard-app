@@ -1,0 +1,1334 @@
+{
+ "id": "sim-time-stepping",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "In five or six sentences, and without looking anything up: what is a fixed time step and what is a variable one, which kind Gazebo uses, and where a world sets it? What is the real-time factor, and how long does 10 s of simulated time take at a real-time factor of 0.5? Does running the same world at a higher real-time factor change the physics? Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "With a fixed step, every step advances simulated time by the same amount, and the integration error depends on that amount. With a variable step, the solver chooses each step from an error estimate: long steps while the motion is smooth, short ones where it changes fast. Gazebo uses a fixed step, set by "
+     },
+     {
+      "t": "code",
+      "v": "max_step_size"
+     },
+     {
+      "t": "text",
+      "v": " in the world's "
+     },
+     {
+      "t": "code",
+      "v": "<physics>"
+     },
+     {
+      "t": "text",
+      "v": " element, 1 ms by default. The real-time factor is simulated time divided by wall-clock time, so 10 s of simulation at 0.5 takes 20 s. The factor only sets how long Gazebo waits between steps, so on its own it doesn't change the physics. It does change what anything outside the simulator sees: a ROS node that takes 5 ms of wall time to answer sees 5 ms of simulated time pass at a factor of 1, and 50 ms at a factor of 10."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you had fixed against variable steps, "
+     },
+     {
+      "t": "code",
+      "v": "max_step_size"
+     },
+     {
+      "t": "text",
+      "v": ", the ratio and the 20 s, and the point that pacing isn't physics. Missing the effect on nodes outside the simulator is a partial pass. Thinking that a higher factor makes each step longer is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Gazebo advances a simulation in fixed steps: every iteration adds the same, pre-set amount of simulated time, whatever happened in it, rather than a variable step that grows or shrinks from an estimate of the error it is making. The real-time factor is simulated time divided by wall-clock time, a separate number saying how fast the simulation is paced against the clock on the wall."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is keeping a simulation's physics reproducible from its inputs alone, whatever speed it runs at on a given machine, while still letting anything outside the simulator, a ROS node answering on its own wall clock, take part in a closed loop with it. Those two goals pull apart once the outside world is involved, because the simulator can run however fast it likes, but the code reacting to it cannot."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The step function that advances the physics is handed only the step size and the current state, never a clock, so the same inputs at the same step size produce the same result whatever the real-time factor is set to and however fast the host machine runs. The factor only controls how long Gazebo waits between iterations, pacing the loop against the wall clock so that, on a machine that keeps up, simulated time tracks wall time at the requested ratio; set it to run flat out and the physics computed is unchanged. The step size is what feeds the physics, and a larger one costs accuracy, past a point catastrophically, because the integration error it introduces grows with it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake under pressure is assuming a higher factor changes what the simulation computes, when it only changes how fast the same computation is paced. What it does change is what the outside world experiences: a controller taking a fixed slice of wall-clock time to answer is, relative to the robot, slower at a higher factor, because that same delay now represents more simulated time passing underneath it. A closed loop with real ROS nodes can pass at a factor of 1 and fail at 10 for that reason alone, nothing wrong in the robot or its code."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This is the interview question itself: naming which kind of step Gazebo uses and where it is set, computing how long ten seconds of simulated time takes at half real-time-factor speed, and saying that pacing a simulation faster or slower does not change its physics."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "steps",
+   "title": "Fixed and variable steps; pause, step, reset; real-time factor",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the "
+        },
+        {
+         "t": "code",
+         "v": "<physics>"
+        },
+        {
+         "t": "text",
+         "v": " element of "
+        },
+        {
+         "t": "code",
+         "v": "diff_drive.sdf"
+        },
+        {
+         "t": "text",
+         "v": ", the example world from the Gazebo topic:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<physics name=\"1ms\" type=\"ignored\">\n  <max_step_size>0.001</max_step_size>\n  <real_time_factor>1.0</real_time_factor>\n</physics>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start the world without a window and ask it about time:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "gz sim -s -r diff_drive.sdf       # terminal 1\ngz topic -e -t /stats -n 1        # terminal 2: sim_time, real_time, iterations, paused, real_time_factor, step_size\ngz topic -e -t /clock -n 1        # simulated, real and system time in one message"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every "
+        },
+        {
+         "t": "i",
+         "v": "iteration"
+        },
+        {
+         "t": "text",
+         "v": " of the server's loop is one step. It runs the "
+        },
+        {
+         "t": "code",
+         "v": "PreUpdate"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Update"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "PostUpdate"
+        },
+        {
+         "t": "text",
+         "v": " of every system once, and adds exactly "
+        },
+        {
+         "t": "code",
+         "v": "max_step_size"
+        },
+        {
+         "t": "text",
+         "v": " to simulated time. The Physics system hands that step to the physics engine, DART by default, which advances every body by it. The name says maximum, but in Gazebo Sim every step has exactly this size, and simulated time is an integer count of nanoseconds, so 1000 steps of 1 ms are exactly 1 s. The "
+        },
+        {
+         "t": "code",
+         "v": "type"
+        },
+        {
+         "t": "text",
+         "v": " attribute names a Gazebo Classic engine, and Gazebo Sim ignores it: the engine comes from the Physics system's configuration or "
+        },
+        {
+         "t": "code",
+         "v": "--physics-engine"
+        },
+        {
+         "t": "text",
+         "v": ", and the example worlds write "
+        },
+        {
+         "t": "code",
+         "v": "ignored"
+        },
+        {
+         "t": "text",
+         "v": " there."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "variable-step"
+        },
+        {
+         "t": "text",
+         "v": " solver, such as the RK45 method behind SciPy's "
+        },
+        {
+         "t": "code",
+         "v": "solve_ivp"
+        },
+        {
+         "t": "text",
+         "v": ", estimates the error of each step and adjusts the next one to keep that estimate within a tolerance. For a smooth system that saves work. A robot simulation isn't smooth: contacts start and stop, and joint limits engage. An adaptive solver shrinks its step at every such event. Controllers and sensors also run at fixed rates, and with a 1 ms step a 50 Hz odometry publisher lands on every 20th step, while with variable steps it would fall between them. A fixed step also lets Gazebo pace the loop against the clock with one fixed period. So Gazebo steps at a fixed size and accepts that the error depends on it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "How much it depends is the subject of the worked example. The short version: DART does "
+        },
+        {
+         "t": "i",
+         "v": "semi-implicit Euler"
+        },
+        {
+         "t": "text",
+         "v": ". It integrates the velocities, solves the contact and joint constraints, and then moves the positions with the new velocities. Error grows with the step, and for anything stiff there is a hard limit. An undamped spring with natural frequency ω is stable under semi-implicit Euler only while step × ω < 2, and a position controller with a high gain is a spring to the integrator. A light link held by a stiff joint, or a high-gain controller, needs a small step."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "i",
+         "v": "real-time factor"
+        },
+        {
+         "t": "text",
+         "v": " is simulated time divided by wall time. Gazebo paces its loop with an "
+        },
+        {
+         "t": "i",
+         "v": "update period"
+        },
+        {
+         "t": "text",
+         "v": " of "
+        },
+        {
+         "t": "code",
+         "v": "max_step_size / real_time_factor"
+        },
+        {
+         "t": "text",
+         "v": ": after each step, it waits until one period has passed since the previous step. At 1 ms and a factor of 1 that is 1000 steps per wall second. When a step takes longer than the period, there is nothing to wait for, the achieved factor drops below the target, and the lost time isn't made up afterwards. A target of 0 in the world file removes the wait, and the world runs as fast as the machine allows. "
+        },
+        {
+         "t": "code",
+         "v": "gz sim -z <Hz>"
+        },
+        {
+         "t": "text",
+         "v": " sets the update rate directly and overrides the world's factor, so "
+        },
+        {
+         "t": "code",
+         "v": "-z 2000"
+        },
+        {
+         "t": "text",
+         "v": " with 1 ms steps asks for a factor of 2."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "/stats"
+        },
+        {
+         "t": "text",
+         "v": " reports two views of the factor. "
+        },
+        {
+         "t": "code",
+         "v": "real_time_factor"
+        },
+        {
+         "t": "text",
+         "v": " is the ratio for the most recent step alone, which jumps around. "
+        },
+        {
+         "t": "code",
+         "v": "sim_time"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "real_time"
+        },
+        {
+         "t": "text",
+         "v": " are totals since the start, and "
+        },
+        {
+         "t": "code",
+         "v": "real_time"
+        },
+        {
+         "t": "text",
+         "v": " stops while the simulation is paused, so "
+        },
+        {
+         "t": "code",
+         "v": "sim_time / real_time"
+        },
+        {
+         "t": "text",
+         "v": " is the average factor of the run. Gazebo publishes "
+        },
+        {
+         "t": "code",
+         "v": "/stats"
+        },
+        {
+         "t": "text",
+         "v": " ten times a second and "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " on every iteration, so a bridged "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " arrives at 1 kHz with 1 ms steps."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Pacing is separate from physics. The step function receives the step size and the state, never the wall clock, so a headless run at a factor of 10 goes through the same states as the same run at 1, provided nothing outside the simulator takes part. ROS nodes do take part. Gazebo doesn't wait for them, and they run on wall time. At a factor of 10, a controller that needs 5 ms of CPU answers 50 ms of simulated time late, where at 1 it answered 5 ms late. A closed loop with ROS nodes can pass at 1 and fail at 10, and that is a property of the test setup, not of the robot."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every world has a control service, "
+        },
+        {
+         "t": "code",
+         "v": "/world/<world name>/control"
+        },
+        {
+         "t": "text",
+         "v": ", of type "
+        },
+        {
+         "t": "code",
+         "v": "gz.msgs.WorldControl"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "# pause\ngz service -s /world/diff_drive/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \\\n  --timeout 3000 --req 'pause: true'\n# advance exactly 100 steps, then stay paused\ngz service -s /world/diff_drive/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \\\n  --timeout 3000 --req 'pause: true, multi_step: 100'\n# rewind to time zero and the initial state, and stay paused\ngz service -s /world/diff_drive/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \\\n  --timeout 3000 --req 'pause: true, reset: {all: true}'"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each request carries a "
+        },
+        {
+         "t": "code",
+         "v": "pause"
+        },
+        {
+         "t": "text",
+         "v": " field, which defaults to false, and the server applies it before anything else in the request. So "
+        },
+        {
+         "t": "code",
+         "v": "--req 'multi_step: 100'"
+        },
+        {
+         "t": "text",
+         "v": " on its own unpauses the world and lets it run on, and a reset without "
+        },
+        {
+         "t": "code",
+         "v": "pause: true"
+        },
+        {
+         "t": "text",
+         "v": " leaves it running. Write "
+        },
+        {
+         "t": "code",
+         "v": "pause: true"
+        },
+        {
+         "t": "text",
+         "v": " into every step and reset. A reset sets simulated time back to its start, so every node on "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " sees time jump backwards, as the time topic describes. "
+        },
+        {
+         "t": "code",
+         "v": "run_to_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " runs until a given simulated time and then pauses. The seed of Gazebo's random numbers, used for sensor noise, can only be set at start with "
+        },
+        {
+         "t": "code",
+         "v": "--seed"
+        },
+        {
+         "t": "text",
+         "v": ", and the server ignores a new seed later, with a warning. Without it, every run draws a new seed. The topic on reproducibility builds on that."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Headless means "
+        },
+        {
+         "t": "code",
+         "v": "gz sim -s"
+        },
+        {
+         "t": "text",
+         "v": ", the server alone. Worlds whose sensors render, such as cameras and the GPU lidar, still need a graphics context. On a machine without a display, add "
+        },
+        {
+         "t": "code",
+         "v": "--headless-rendering"
+        },
+        {
+         "t": "text",
+         "v": ", which renders through EGL. Rendering runs on its own thread, and a step that has to update a sensor waits while the previous render is still running, which makes rendering sensors a common reason why the factor falls below 1. "
+        },
+        {
+         "t": "code",
+         "v": "--iterations N"
+        },
+        {
+         "t": "text",
+         "v": " runs N unpaused iterations and exits, so "
+        },
+        {
+         "t": "code",
+         "v": "gz sim -s -r --iterations 10000 world.sdf"
+        },
+        {
+         "t": "text",
+         "v": " is a benchmark of 10 s of simulated time at 1 ms steps."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program steps a 1 kg slider that a position controller holds at 0 with a force of −10 000 N/m × position. To the integrator that is a spring with ω = √(10 000 / 1) = 100 rad/s, so the stability limit is a step of 2 / ω = 20 ms. It starts 0.1 m out and runs 2 s of simulated time at five step sizes, with the same semi-implicit Euler that DART uses:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <chrono>\n#include <cmath>\n#include <cstdint>\n#include <format>\n#include <iostream>\n\nusing namespace std::chrono_literals;\n\nstruct State {\n  double position_m;\n  double velocity_mps;\n};\n\n// A slider held at 0 by a position controller that pushes with -gain * position.\nstruct Plant {\n  double mass_kg;\n  double gain_n_per_m;\n};\n\n// One fixed step of semi-implicit Euler: velocity first, then position with the new velocity.\n[[nodiscard]] State step(State s, Plant p, std::chrono::nanoseconds dt) {\n  const double h = std::chrono::duration<double>(dt).count();\n  s.velocity_mps += -p.gain_n_per_m * s.position_m / p.mass_kg * h;\n  s.position_m += s.velocity_mps * h;\n  return s;\n}\n\nstruct Run {\n  State end;\n  double peak_m;\n  std::int64_t steps;\n};\n\n// Simulated time is an integer count of nanoseconds, as in Gazebo, so the number of steps is exact.\n[[nodiscard]] Run simulate(Plant p, State start, std::chrono::nanoseconds dt, std::chrono::nanoseconds duration) {\n  Run r{.end = start, .peak_m = std::abs(start.position_m), .steps = 0};\n  for (std::chrono::nanoseconds t{0}; t < duration; t += dt) {\n    r.end = step(r.end, p, dt);\n    r.peak_m = std::max(r.peak_m, std::abs(r.end.position_m));\n    ++r.steps;\n  }\n  return r;\n}\n\nint main() {\n  constexpr Plant slider{.mass_kg = 1.0, .gain_n_per_m = 10'000.0};\n  constexpr State start{.position_m = 0.1, .velocity_mps = 0.0};\n  for (const std::chrono::milliseconds dt : std::array{1ms, 5ms, 10ms, 20ms, 25ms}) {\n    const Run r = simulate(slider, start, dt, 2s);\n    if (r.peak_m < 1.0) {\n      std::cout << std::format(\"step {:>4}: {:4} steps, x(2 s) = {:+.4f} m\\n\", dt, r.steps, r.end.position_m);\n    } else {\n      std::cout << std::format(\"step {:>4}: {:4} steps, unstable, peak {:.3g} m\\n\", dt, r.steps, r.peak_m);\n    }\n  }\n  std::cout << std::format(\"exact:                  x(2 s) = {:+.4f} m\\n\", 0.1 * std::cos(200.0));\n\n  const Run a = simulate(slider, start, 1ms, 2s);\n  const Run b = simulate(slider, start, 1ms, 2s);\n  const bool same = a.end.position_m == b.end.position_m && a.end.velocity_mps == b.end.velocity_mps;\n  std::cout << std::format(\"two runs at 1 ms end in identical bits: {}\\n\", same);\n\n  std::int64_t double_steps = 0;\n  for (double t = 0.0; t < 2.0; t += 0.001) ++double_steps;\n  std::cout << std::format(\"a double time counter takes {} steps of 1 ms to reach 2 s\\n\", double_steps);\n}"
+      },
+      {
+       "t": "output",
+       "text": "step  1ms: 2000 steps, x(2 s) = +0.0600 m\nstep  5ms:  400 steps, x(2 s) = +0.0241 m\nstep 10ms:  200 steps, x(2 s) = -0.1000 m\nstep 20ms:  100 steps, unstable, peak 20.1 m\nstep 25ms:   80 steps, unstable, peak 1.95e+47 m\nexact:                  x(2 s) = +0.0487 m\ntwo runs at 1 ms end in identical bits: true\na double time counter takes 2001 steps of 1 ms to reach 2 s"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the table from the top. At 1 ms the slider still swings with the right amplitude, but after 2 s, or 200 radians of oscillation, the small error per step has added up to a visible phase error: +0.0600 m against the exact +0.0487 m. At 5 and 10 ms the motion stays bounded, and the position at 2 s is wrong: at 10 ms it has the wrong sign. At 20 ms, step × ω is exactly 2, the edge of stability, and the error grows linearly, to 20 m after 2 s. At 25 ms it grows exponentially, to 10⁴⁷ m in 80 steps. Gazebo's JointPositionController system computes its force from the joint's position once per step, like this program, and a high gain on it fails the same way: past a point, a larger step doesn't make the simulation less accurate, it makes it explode."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Look at what the step function doesn't take: a wall clock or a real-time factor. Running the same inputs twice gives the same bits, and running them faster or slower in wall time would too. Only the step size and the inputs decide the result."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last line is the reason simulated time is kept as an integer. Adding 0.001 to a "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " 2000 times doesn't reach 2.0 exactly, because 0.001 has no exact binary representation, and the loop takes a 2001st step. Gazebo adds a "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::steady_clock::duration"
+        },
+        {
+         "t": "text",
+         "v": ", an integer number of nanoseconds, so 2000 steps of 1 ms are exactly 2 s, and a check for \"every 20 ms\" never misses a step."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "measure",
+   "title": "Measure the real-time factor of a headless run",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes, with Gazebo Harmonic installed as in the environment topic."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Predict, then measure, the wall time of "
+         },
+         {
+          "t": "code",
+          "v": "time gz sim -s -r --iterations 5000 diff_drive.sdf"
+         },
+         {
+          "t": "text",
+          "v": " and of the same run with "
+         },
+         {
+          "t": "code",
+          "v": "--iterations 15000"
+         },
+         {
+          "t": "text",
+          "v": ". From the two times, work out the real-time factor of the stepping alone, without the time it takes to load the world."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Download the world with "
+         },
+         {
+          "t": "code",
+          "v": "curl -o fast.sdf https://raw.githubusercontent.com/gazebosim/gz-sim/gz-sim8/examples/worlds/diff_drive.sdf"
+         },
+         {
+          "t": "text",
+          "v": ", set its "
+         },
+         {
+          "t": "code",
+          "v": "<real_time_factor>"
+         },
+         {
+          "t": "text",
+          "v": " to 0, and measure the same two runs. What is the fastest factor your machine reaches on this world?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Start "
+         },
+         {
+          "t": "code",
+          "v": "gz sim -s diff_drive.sdf"
+         },
+         {
+          "t": "text",
+          "v": " without "
+         },
+         {
+          "t": "code",
+          "v": "-r"
+         },
+         {
+          "t": "text",
+          "v": ", so that it starts paused. Read "
+         },
+         {
+          "t": "code",
+          "v": "/stats"
+         },
+         {
+          "t": "text",
+          "v": " once. Advance it by exactly 500 steps, read "
+         },
+         {
+          "t": "code",
+          "v": "/stats"
+         },
+         {
+          "t": "text",
+          "v": " again, and check "
+         },
+         {
+          "t": "code",
+          "v": "sim_time"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "iterations"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "paused"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Let it run for about 10 s of wall time, pause it, and compute the average factor from one "
+         },
+         {
+          "t": "code",
+          "v": "/stats"
+         },
+         {
+          "t": "text",
+          "v": " message. Then reset it, staying paused, and read "
+         },
+         {
+          "t": "code",
+          "v": "/stats"
+         },
+         {
+          "t": "text",
+          "v": " a last time."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Each run of 1 ms steps at a factor of 1 should take its simulated time in wall time, plus a load time of a second or two: about 5 s plus the load, and 15 s plus the load. The difference removes the load time, so the factor of the stepping is 10 s divided by the difference of the two wall times. On a machine that keeps up, the result is close to 1, because Gazebo waits for the rest of each 1 ms period. A result well below 1 means the steps take longer than 1 ms on this machine."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "With a target of 0, Gazebo doesn't wait, and the same arithmetic gives the fastest factor this world reaches on your machine. The world has two small vehicles and no sensors, so expect a factor well above 1; the number is yours to measure and write down. "
+         },
+         {
+          "t": "code",
+          "v": "gz sim -s -r -z 1000000 --iterations 15000 diff_drive.sdf"
+         },
+         {
+          "t": "text",
+          "v": " does the same without editing the file: it asks for a 1 µs update period, which no step meets, so there is never a wait."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The step request unpauses the world for exactly 500 iterations and pauses it again. "
+         },
+         {
+          "t": "code",
+          "v": "/stats"
+         },
+         {
+          "t": "text",
+          "v": " shows "
+         },
+         {
+          "t": "code",
+          "v": "sim_time"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "nsec: 500000000"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "iterations: 500"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "paused: true"
+         },
+         {
+          "t": "text",
+          "v": ". Without "
+         },
+         {
+          "t": "code",
+          "v": "pause: true"
+         },
+         {
+          "t": "text",
+          "v": " in the request, the world would have started running instead."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Divide "
+         },
+         {
+          "t": "code",
+          "v": "sim_time"
+         },
+         {
+          "t": "text",
+          "v": " by "
+         },
+         {
+          "t": "code",
+          "v": "real_time"
+         },
+         {
+          "t": "text",
+          "v": ". Both exclude the paused periods, so the quotient is the average factor while running, close to 1 for this world. Compare it with "
+         },
+         {
+          "t": "code",
+          "v": "real_time_factor"
+         },
+         {
+          "t": "text",
+          "v": " in the same message, which describes only the last step. The pause-and-run tutorial shows one such message, with 8.707 s of simulated time against 8.824 s of real time, an average of 0.987, and a last-step factor of 0.998. After the reset, "
+         },
+         {
+          "t": "code",
+          "v": "/stats"
+         },
+         {
+          "t": "text",
+          "v": " shows "
+         },
+         {
+          "t": "code",
+          "v": "sim_time"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "iterations"
+         },
+         {
+          "t": "text",
+          "v": " back at 0 and the world still paused. With "
+         },
+         {
+          "t": "code",
+          "v": "/clock"
+         },
+         {
+          "t": "text",
+          "v": " bridged to ROS, that reset is a backward jump for every node that uses simulation time."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The commands for steps 3 and 4:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "gz sim -s diff_drive.sdf                          # terminal 1: starts paused\ngz topic -e -t /stats -n 1                        # sim_time 0, iterations 0, paused: true\ngz service -s /world/diff_drive/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \\\n  --timeout 3000 --req 'pause: true, multi_step: 500'\ngz topic -e -t /stats -n 1\ngz service -s /world/diff_drive/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \\\n  --timeout 3000 --req 'pause: false'\ngz service -s /world/diff_drive/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \\\n  --timeout 3000 --req 'pause: true'\ngz topic -e -t /stats -n 1\ngz service -s /world/diff_drive/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \\\n  --timeout 3000 --req 'pause: true, reset: {all: true}'\ngz topic -e -t /stats -n 1"
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what one iteration does, where the step size is set, and why robot simulators use a fixed step. Give the formula for the update period and what happens when a step takes longer than it. Name the two ways to read the factor from "
+        },
+        {
+         "t": "code",
+         "v": "/stats"
+        },
+        {
+         "t": "text",
+         "v": ", the service requests that pause, step and reset a world, and the trap in the "
+        },
+        {
+         "t": "code",
+         "v": "pause"
+        },
+        {
+         "t": "text",
+         "v": " field. Finish with one sentence on how the step size changes results and one on why the real-time factor changes them only when something outside the simulator takes part."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does Gazebo do in one iteration, and by how much does simulated time advance?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the update period for a 2 ms step at a target factor of 0.5, and what happens when a step takes 5 ms?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is "
+     },
+     {
+      "t": "code",
+      "v": "sim_time / real_time"
+     },
+     {
+      "t": "text",
+      "v": " from one "
+     },
+     {
+      "t": "code",
+      "v": "/stats"
+     },
+     {
+      "t": "text",
+      "v": " message a better measure than its "
+     },
+     {
+      "t": "code",
+      "v": "real_time_factor"
+     },
+     {
+      "t": "text",
+      "v": " field?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A request with "
+     },
+     {
+      "t": "code",
+      "v": "multi_step: 100"
+     },
+     {
+      "t": "text",
+      "v": " makes the world run on instead of stepping 100 times. Why?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A position controller has a natural frequency of 300 rad/s. What is the largest stable step under semi-implicit Euler?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A closed-loop test with ROS nodes passes at a factor of 1 and fails at 10. What changed, if the physics didn't?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: the commands that start a world paused and headless, step it 500 times, read its statistics and reset it."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "SDFormat specification 1.11, the "
+     },
+     {
+      "t": "a",
+      "v": "physics element",
+      "href": "https://sdformat.org/spec?ver=1.11&elem=physics"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "max_step_size"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "real_time_factor"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "gz-sim 8, the Harmonic release, on GitHub: "
+     },
+     {
+      "t": "a",
+      "v": "SimulationRunner.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/SimulationRunner.cc"
+     },
+     {
+      "t": "text",
+      "v": " for the step, the update period, "
+     },
+     {
+      "t": "code",
+      "v": "/stats"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": " and the world control requests; "
+     },
+     {
+      "t": "a",
+      "v": "Server.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/Server.cc"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ServerConfig.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/ServerConfig.cc"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "-z"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "--seed"
+     },
+     {
+      "t": "text",
+      "v": "; "
+     },
+     {
+      "t": "a",
+      "v": "cmdsim.rb.in",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/cmd/cmdsim.rb.in"
+     },
+     {
+      "t": "text",
+      "v": " for the command-line options; "
+     },
+     {
+      "t": "a",
+      "v": "Physics.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/physics/Physics.cc"
+     },
+     {
+      "t": "text",
+      "v": " for the engine choice; and "
+     },
+     {
+      "t": "a",
+      "v": "Sensors.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/sensors/Sensors.cc"
+     },
+     {
+      "t": "text",
+      "v": " for the render thread."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "gz-msgs 10: "
+     },
+     {
+      "t": "a",
+      "v": "world_control.proto",
+      "href": "https://github.com/gazebosim/gz-msgs/blob/gz-msgs10/proto/gz/msgs/world_control.proto"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "world_stats.proto",
+      "href": "https://github.com/gazebosim/gz-msgs/blob/gz-msgs10/proto/gz/msgs/world_stats.proto"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo Harmonic tutorials: "
+     },
+     {
+      "t": "a",
+      "v": "pause and run",
+      "href": "https://gazebosim.org/api/sim/8/pause_run_simulation.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "reset",
+      "href": "https://gazebosim.org/api/sim/8/reset_simulation.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "headless rendering",
+      "href": "https://gazebosim.org/api/sim/8/headless_rendering.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "DART 6.13, "
+     },
+     {
+      "t": "a",
+      "v": "World.cpp",
+      "href": "https://github.com/dartsim/dart/blob/v6.13.2/dart/simulation/World.cpp"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "World::step"
+     },
+     {
+      "t": "text",
+      "v": " integrates velocities, solves constraints, then integrates positions."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Glenn Fiedler, "
+     },
+     {
+      "t": "a",
+      "v": "Integration Basics",
+      "href": "https://gafferongames.com/post/integration_basics/"
+     },
+     {
+      "t": "text",
+      "v": " on semi-implicit Euler, and "
+     },
+     {
+      "t": "a",
+      "v": "Fix Your Timestep!",
+      "href": "https://gafferongames.com/post/fix_your_timestep/"
+     },
+     {
+      "t": "text",
+      "v": " on stepping a fixed size against a real clock."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "SciPy's "
+     },
+     {
+      "t": "a",
+      "v": "solve_ivp",
+      "href": "https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html"
+     },
+     {
+      "t": "text",
+      "v": ", an adaptive-step solver with error control."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "steady_clock",
+      "href": "https://en.cppreference.com/cpp/chrono/steady_clock"
+     },
+     {
+      "t": "text",
+      "v": ", whose "
+     },
+     {
+      "t": "code",
+      "v": "duration"
+     },
+     {
+      "t": "text",
+      "v": " Gazebo uses for simulated time."
+     }
+    ]
+   ]
+  }
+ ]
+}

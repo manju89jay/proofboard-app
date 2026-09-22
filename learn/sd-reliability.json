@@ -1,0 +1,1151 @@
+{
+ "id": "sd-reliability",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Answer on paper in 10 minutes. Explain exponential backoff in two or three sentences, say what jitter adds and what goes wrong without it, and write the formula for full jitter. Then answer a second question: a node publishes a heartbeat every 100 ms and a supervisor watches it. What does that prove when the heartbeat keeps arriving, and what does it not prove?"
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Exponential backoff doubles the wait between attempts: the first retry waits a base period, the second twice that, the third four times. It exists because the usual reason a request failed is that the other side has more work than it can do, and a client that keeps asking at the same rate is part of that work. A cap stops the wait growing without limit, and a budget of attempts and total time stops the client retrying forever and hiding the failure."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Jitter is a random component in the wait. Without it, every client that failed at the same moment waits the same time and comes back at the same instant, so the load arrives as spikes with idle gaps between them, and each spike re-synchronises the clients that it knocks back. Doubling without jitter changes how often the herd arrives, not that it arrives as a herd. Full jitter is"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "text",
+    "tag": "",
+    "expect": "",
+    "text": "wait = a uniform random value in [0, min(cap, base * 2^failures)]"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "which spreads the clients across the whole window rather than stacking them at its end."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The heartbeat proves that the thread publishing it is running, that the process is alive, that the executor is serving at least that callback, and that the middleware path between the two nodes works. It proves nothing about the value of anything the node computes, and nothing about any other callback in that node: a control loop wedged in a 30-second call keeps its heartbeat if the heartbeat is on a different thread or callback group. A heartbeat is worth what the thing that sends it is worth, so send it from the work that matters, and make it carry a number the supervisor can check rather than a bare tick."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if backoff is doubling plus a cap, jitter breaks the synchronisation, the formula has the random draw over the whole window, and the heartbeat answer separates liveness from correctness. Getting the backoff right and answering that the heartbeat proves the node is healthy is a partial pass, and it is the common one."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Reliability has a number: availability, the fraction of time a system works, equal to the mean time between failures divided by that plus the mean time to recover. Backoff and jitter turn a retry policy into a number too: exponential backoff doubles the wait before each retry up to a fixed cap, and jitter draws the wait at random from that window instead of using it outright. A heartbeat is a periodic signal one piece of code sends to prove it alone runs."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem backoff and jitter solve is that a request usually fails because the other side already has more work than it can do, so retrying at a fixed rate adds to that load, and if every failed client retries after the same wait they arrive back together and knock the server down again. The problem a heartbeat solves is narrower than assumed: a component still there is not one doing the right thing, and treating the two as one is the mistake reliability numbers exist to catch."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A chain of components is worse than its worst part, since availabilities multiply, so several reliable pieces in series add up to a system down for days a year. Redundancy looks like the fix, since two independent copies square the failure probability, but it buys almost nothing once both can fail for the same reason at once, a shared bug, a shared file, a shared power supply, since that shared portion of the failure rate is what redundancy cannot divide."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Doubling alone only changes how often the herd of retrying clients arrives together, not whether it does; drawing the wait uniformly from the doubled window spreads clients across different instants instead. A heartbeat works the same narrow way: it proves the thread sending it, and the path to whoever watches it, are alive, nothing else, so a control loop wedged on another thread of the same process can keep the heartbeat ticking through the failure it was meant to catch. It only turns a silent component into one whose absence is detected; it never catches one producing a plausible, wrong answer on schedule."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This is the interview question itself: giving the doubling-plus-cap-plus-jitter shape of a retry policy from memory, and for a heartbeat still arriving on schedule, saying what it proves, one thread and one path alive, and what it does not, that anything the node computes is correct."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "reliability",
+   "title": "Crashes, timeouts, backoff with jitter, failure isolation",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start with the arithmetic, because it settles arguments that otherwise run on opinion. Availability is the fraction of time a thing is working, and it comes from two numbers: the mean time between failures and the mean time to recover, with availability equal to MTBF divided by MTBF plus MTTR. That form is worth staring at, because it says the two levers are equal. Halving how often you fail and halving how long you take to recover buy the same availability, and on almost every system the second is much cheaper. This program puts the numbers on it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string_view>\n#include <vector>\n\nconstexpr double hours_per_year = 8760.0;\n\n// A chain: every part must work, so the availabilities multiply.\n[[nodiscard]] constexpr double in_series(double availability, int parts) {\n  double product = 1.0;\n  for (int i = 0; i < parts; ++i) product *= availability;\n  return product;\n}\n\n// Two copies where either one is enough, with `common` the share of the failures that take both\n// down at once: the same bug, the same bad input, the same power supply.\n[[nodiscard]] constexpr double in_parallel(double availability, double common) {\n  const double down = 1.0 - availability;\n  const double independent = (1.0 - common) * down;\n  return 1.0 - (common * down + independent * independent);\n}\n\nstruct Row {\n  std::string_view what;\n  double availability;\n};\n\nint main() {\n  const std::vector<Row> rows{\n      {.what = \"one part, 0.99\", .availability = 0.99},\n      {.what = \"one part, 0.999\", .availability = 0.999},\n      {.what = \"one part, 0.9999\", .availability = 0.9999},\n      {.what = \"six 0.999 parts in series\", .availability = in_series(0.999, 6)},\n      {.what = \"ten 0.999 parts in series\", .availability = in_series(0.999, 10)},\n      {.what = \"two 0.999 parts, failures independent\", .availability = in_parallel(0.999, 0.0)},\n      {.what = \"two 0.999 parts, 1 in 100 failures common\", .availability = in_parallel(0.999, 0.01)},\n      {.what = \"two 0.999 parts, 1 in 10 failures common\", .availability = in_parallel(0.999, 0.10)},\n  };\n\n  std::cout << std::format(\"{:<42} {:>10} {:>14}\\n\", \"arrangement\", \"available\", \"down per year\");\n  for (const Row& row : rows) {\n    const double down_hours = (1.0 - row.availability) * hours_per_year;\n    const std::string down = down_hours >= 1.0 ? std::format(\"{:.1f} h\", down_hours)\n                                               : std::format(\"{:.0f} min\", down_hours * 60.0);\n    std::cout << std::format(\"{:<42} {:>10.6f} {:>14}\\n\", row.what, row.availability, down);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "arrangement                                 available  down per year\none part, 0.99                               0.990000         87.6 h\none part, 0.999                              0.999000          8.8 h\none part, 0.9999                             0.999900         53 min\nsix 0.999 parts in series                    0.994015         52.4 h\nten 0.999 parts in series                    0.990045         87.2 h\ntwo 0.999 parts, failures independent        0.999999          1 min\ntwo 0.999 parts, 1 in 100 failures common    0.999989          6 min\ntwo 0.999 parts, 1 in 10 failures common     0.999899         53 min"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three readings, and the third is the one that changes designs. A chain is worse than its worst part: the bench's six processes, each at 0.999, give 0.994 and 52 hours a year, and nobody wrote that number down anywhere. Redundancy looks spectacular on paper, turning 8.8 hours into 1 minute. And it collapses the moment the two copies can fail together: at one common-cause failure in ten, the redundant pair is no better than a single part at 0.9999, which you could probably have built for less. Software bugs, a shared configuration file, a shared power supply and a shared bad input are all common-cause, which is why two copies of the same program are worth much less than the formula promises and two copies of a power supply are worth roughly what it promises."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For a robot, availability is often the wrong number anyway. \"Fraction of time the system is up\" says nothing about a robot that is up and driving into a wall. The numbers that carry information are the ones that count interventions: failures per thousand hours, mean distance between interventions, or the fraction of scenario runs that pass. Pick the one you are judged on, write it down, and say what it excludes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now the failure modes, ranked by what it takes to survive each one. A "
+        },
+        {
+         "t": "i",
+         "v": "crash"
+        },
+        {
+         "t": "text",
+         "v": " is the best failure there is: it is unambiguous, everything downstream sees the process go away, and the recovery is a restart. A "
+        },
+        {
+         "t": "i",
+         "v": "hang"
+        },
+        {
+         "t": "text",
+         "v": " is worse, because the process is still there and still holds whatever it held. "
+        },
+        {
+         "t": "i",
+         "v": "Fail-silent"
+        },
+        {
+         "t": "text",
+         "v": " means the component stops producing output and says nothing, which is survivable only if somebody is watching for the absence. "
+        },
+        {
+         "t": "i",
+         "v": "Fail-arbitrary"
+        },
+        {
+         "t": "text",
+         "v": " means it keeps producing plausible wrong output, and it is the one nothing downstream can catch on its own, because nothing in the message says the number is wrong."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Against that ranking, "
+        },
+        {
+         "t": "i",
+         "v": "fail-safe"
+        },
+        {
+         "t": "text",
+         "v": " is a property you add: on failure the system reaches a state that is safe without further decisions, and it says so. The bench's supervisor turns a fail-silent odometry source into a fail-safe robot, because absence is exactly what it can detect. It cannot do anything about a fail-arbitrary one: odometry that reports a plausible wrong pose arrives on time, passes every freshness check, and drives the robot into the wall. Catching that needs a second, independent measurement to disagree with, which is a different and much more expensive design."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Timeouts"
+        },
+        {
+         "t": "text",
+         "v": " are how absence becomes detectable, and every wait in a system needs one. A timeout is a claim about the slowest answer you are willing to accept, so it comes from the measured tail and not from the mean: measure the p99 and the maximum over a realistic run, then add margin. Too short and you turn a healthy system into a permanent alarm; too long and the system sits doing nothing while the operator watches. The bench's supervisor has two, and both are stated as multiples of a period: "
+        },
+        {
+         "t": "code",
+         "v": "odom_timeout_ms"
+        },
+        {
+         "t": "text",
+         "v": " is 250 against odometry at 30 Hz, so about seven periods, and "
+        },
+        {
+         "t": "code",
+         "v": "cmd_timeout_ms"
+        },
+        {
+         "t": "text",
+         "v": " is 500 against a command stream the route follower produces one message at a time. Write the multiple in the comment, not the millisecond value, because the millisecond value stops meaning anything the day somebody changes the rate."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A timeout also needs the right clock, and the time topic settled which: a deadline in simulated time stops when the simulation does, which is what you want for robot logic, and a deadline that must fire even when the simulation is dead belongs on a steady clock. The bench uses a wall timer for exactly one thing, the scenario guard, for that reason."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Backoff"
+        },
+        {
+         "t": "text",
+         "v": " is what happens after the timeout fires, and the cold check has the formula. Three variants are in use: full jitter draws uniformly over the whole window, equal jitter takes half the window plus a draw over the other half, and decorrelated jitter grows from the previous wait rather than from the attempt number. Full jitter is the default to reach for, and the reason to prefer it over doubling with a small random nudge is in the exercise below."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Isolation"
+        },
+        {
+         "t": "text",
+         "v": " is the last tool, and it is the one that makes the arithmetic at the top change. Two components in one process share a crash, a memory limit, an address space and, as the executors topic showed, a thread. Two components in two processes share a machine, a kernel, a disk and a clock. Two components on two machines share a network and a power supply. Each boundary you add removes a class of common-cause failure and costs something: a process boundary costs serialisation, a participant and a discovery entry, as the DDS topic measured, and a machine boundary costs a network that can now partition. The bench puts the supervisor in its own process for one reason, and it is the whole argument for isolation in a sentence: a supervisor inside the controller dies with the controller, and the failure it exists to catch is the controller dying."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "design",
+   "title": "Reliability design for a supervisor and its nodes",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. The bench runs six processes on one computer: the Gazebo simulation, the bridge, "
+        },
+        {
+         "t": "code",
+         "v": "odom_relay"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "route_follower"
+        },
+        {
+         "t": "text",
+         "v": ", the supervisor and "
+        },
+        {
+         "t": "code",
+         "v": "scenario_runner"
+        },
+        {
+         "t": "text",
+         "v": ". Odometry arrives at 30 Hz, the follower publishes a command for each odometry message, and the supervisor gates "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel_nav"
+        },
+        {
+         "t": "text",
+         "v": " onto "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " with a 20 Hz timer."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "For each of the six processes, write one line: what it must do when its own input stops, and whether its failure is fail-safe, fail-silent or fail-arbitrary as the system stands."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Choose the supervisor's two timeouts from the rates and justify each as a multiple of a period. Say which measurement you would take before committing them, and what you would do if the measured tail were above your first guess."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The runner makes one service call, "
+         },
+         {
+          "t": "code",
+          "v": "/odom_relay/drop"
+         },
+         {
+          "t": "text",
+          "v": ". Write its retry policy as a plain class with no ROS types: full jitter, a cap, a budget of attempts and of total time, and a deterministic generator so a test can replay it. Give three numbered pass or fail checks."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Name the failure isolation you would add to this set, and what it costs."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Name one failure this whole design cannot catch, and say why."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 1, the six processes."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Process"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "When its input stops"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "How it fails today"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Gazebo"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Nothing upstream to lose; it is the source of time and of odometry"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Fail-silent: "
+          },
+          {
+           "t": "code",
+           "v": "/clock"
+          },
+          {
+           "t": "text",
+           "v": " and "
+          },
+          {
+           "t": "code",
+           "v": "/odom_raw"
+          },
+          {
+           "t": "text",
+           "v": " stop, and every node on simulated time freezes with them"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "ros_gz_bridge"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Gazebo gone: it publishes nothing"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Fail-silent, and indistinguishable from Gazebo being gone"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "odom_relay"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No "
+          },
+          {
+           "t": "code",
+           "v": "/odom_raw"
+          },
+          {
+           "t": "text",
+           "v": ": it forwards nothing, which is the same as its deliberate drop"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Fail-silent by design, and the supervisor is what makes that safe"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "route_follower"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No "
+          },
+          {
+           "t": "code",
+           "v": "/odom"
+          },
+          {
+           "t": "text",
+           "v": ": it publishes no command, because it has one command per odometry message and no timer"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Fail-silent, on purpose: it goes quiet rather than steering on a stale pose"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Supervisor"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No "
+          },
+          {
+           "t": "code",
+           "v": "/odom"
+          },
+          {
+           "t": "text",
+           "v": " or no "
+          },
+          {
+           "t": "code",
+           "v": "/cmd_vel_nav"
+          },
+          {
+           "t": "text",
+           "v": ": it publishes a stop at 20 Hz"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Fail-safe, and it is the only fail-safe component here"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "scenario_runner"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No "
+          },
+          {
+           "t": "code",
+           "v": "/odom_raw"
+          },
+          {
+           "t": "text",
+           "v": ": it stops sampling, and the wall-clock guard ends the run"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Fail-safe through the guard, fail-silent without it"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The shape to notice is that five of the six are fail-silent and exactly one turns silence into a safe state. That is the design: you do not need every component to be safe, you need the absence of every component to be detectable by one that is."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 2, the timeouts. Odometry at 30 Hz has a 33 ms period, so "
+        },
+        {
+         "t": "code",
+         "v": "odom_timeout_ms"
+        },
+        {
+         "t": "text",
+         "v": " at 250 is about seven periods: long enough to ride out a few dropped messages and a scheduling hiccup, short enough that the robot stops within about half a second of losing its pose. Commands come one per odometry message, so "
+        },
+        {
+         "t": "code",
+         "v": "cmd_timeout_ms"
+        },
+        {
+         "t": "text",
+         "v": " at 500 is the same order with more slack, which is right because a missing command is less dangerous than a missing pose: the supervisor's own stop covers it. Before committing either, measure the delivery delay and the gap distribution over a full scenario run, and set the timeout above the measured maximum with margin rather than above the mean. If the measured tail came out above the guess, the answer is not to raise the timeout until the alarm stops: find out what produces the tail, because a 300 ms gap in odometry at 30 Hz is nine missing messages and that is a fault whether or not anything times out."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 3, the retry policy:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <chrono>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <random>\n#include <string>\n\nusing Millis = std::chrono::milliseconds;\n\n// What the caller is willing to spend on one request before it gives up and reports the failure.\nstruct Budget {\n  Millis base;            // the first window\n  Millis cap;             // the window never grows past this\n  std::int64_t attempts;  // including the first one\n  Millis total;           // wall time for the whole sequence\n};\n\n// The window the doubling produced, and the wait drawn from it.\nstruct Step {\n  Millis window;\n  Millis wait;\n};\n\n// Full jitter: wait a uniform time in [0, window], where the window doubles after each failure.\n// Plain doubling puts every client back on the wire at the same instants; the random draw spreads\n// them. Time arrives as an argument and the generator is a member, so a test replays any timeline.\nclass Retry {\n public:\n  Retry(Budget budget, std::uint32_t seed) : budget_(budget), generator_(seed) {}\n\n  // The next wait, or nothing when the attempts or the time are spent.\n  [[nodiscard]] std::optional<Step> after_failure(Millis elapsed) {\n    ++failures_;\n    if (failures_ >= budget_.attempts) return std::nullopt;\n    const std::int64_t doublings = std::min<std::int64_t>(failures_ - 1, 20);\n    const Millis window{std::min(budget_.cap.count(), budget_.base.count() << doublings)};\n    const Millis wait{static_cast<std::int64_t>(generator_() % static_cast<std::uint32_t>(window.count() + 1))};\n    if (elapsed + wait > budget_.total) return std::nullopt;\n    return Step{.window = window, .wait = wait};\n  }\n\n private:\n  Budget budget_;\n  std::mt19937 generator_;\n  std::int64_t failures_ = 0;\n};\n\nint main() {\n  const Budget budget{.base = Millis{100}, .cap = Millis{2000}, .attempts = 8, .total = Millis{5000}};\n  Retry retry{budget, 20260921U};\n\n  std::cout << std::format(\"{:>7} {:>9} {:>9} {:>9}\\n\", \"failure\", \"window\", \"wait\", \"elapsed\");\n  Millis elapsed{0};\n  for (std::int64_t failure = 1;; ++failure) {\n    const std::optional<Step> step = retry.after_failure(elapsed);\n    if (!step) {\n      std::cout << std::format(\"{:>7} {:>9} {:>9} {:>9}\\n\", failure, \"-\", \"give up\", elapsed.count());\n      break;\n    }\n    elapsed += step->wait;\n    std::cout << std::format(\"{:>7} {:>9} {:>9} {:>9}\\n\", failure, step->window.count(), step->wait.count(),\n                             elapsed.count());\n  }\n\n  // Five clients that failed together, shown on their third failure. Doubling alone would put all\n  // five back on the wire 400 ms later; the draw spreads them across the window.\n  std::string spread;\n  for (const std::uint32_t seed : {7919U, 104729U, 1299709U, 15485863U, 179424673U}) {\n    Retry client{budget, seed};\n    std::optional<Step> step;\n    for (int attempt = 0; attempt < 3; ++attempt) step = client.after_failure(Millis{0});\n    if (!spread.empty()) spread += \", \";\n    spread += std::format(\"{} ms\", step ? step->wait.count() : 0);\n  }\n  std::cout << std::format(\"five clients after their third failure, window 400 ms: {}\\n\", spread);\n}"
+      },
+      {
+       "t": "output",
+       "text": "failure    window      wait   elapsed\n      1       100        47        47\n      2       200       153       200\n      3       400       216       416\n      4       800       152       568\n      5      1600       213       781\n      6      2000      1106      1887\n      7      2000       668      2555\n      8         -   give up      2555\nfive clients after their third failure, window 400 ms: 315 ms, 305 ms, 359 ms, 384 ms, 127 ms"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the two halves. The window doubles from 100 ms to the 2000 ms cap while the waits drawn from it wander, which is the point: an observer cannot predict when this client comes back, and neither can the other clients. The sequence ends at attempt 8 after 2.555 s, inside the 5 s budget, and it ends by saying so rather than by carrying on. The last line is jitter doing its work: five clients that failed at the same instant on the same window come back between 127 ms and 384 ms apart instead of all at 400 ms. Doubling with a small nudge would have spread them over a few milliseconds around 400; drawing over the whole window spreads them over the whole window."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three checks to write as tests before the class:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Given a seed and a budget, "
+         },
+         {
+          "t": "code",
+          "v": "after_failure"
+         },
+         {
+          "t": "text",
+          "v": " returns the same sequence of waits on every run and on every build. Freeze the first four numbers in the test, because a change to how the generator is used is a change to the behaviour."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Every wait is within "
+         },
+         {
+          "t": "code",
+          "v": "[0, min(cap, base << failures-1)]"
+         },
+         {
+          "t": "text",
+          "v": ", checked for the first twelve failures, so the cap holds and the shift does not overflow."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The sequence ends for both reasons: with "
+         },
+         {
+          "t": "code",
+          "v": "attempts"
+         },
+         {
+          "t": "text",
+          "v": " small it returns nothing on the attempt after the last, and with "
+         },
+         {
+          "t": "code",
+          "v": "attempts"
+         },
+         {
+          "t": "text",
+          "v": " large and "
+         },
+         {
+          "t": "code",
+          "v": "total"
+         },
+         {
+          "t": "text",
+          "v": " small it returns nothing as soon as the next wait would cross the budget."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4, the isolation. One boundary is worth adding and one is not. Worth adding: run the recorder, once the bench has one, in its own process, because a full disk should not be able to stop the supervisor, and a writer is the component most likely to block on a resource. Not worth adding: a second machine for the supervisor, which buys independence from the robot computer's crash and costs a network that can partition, and a supervisor that cannot see the robot is worse than no supervisor. The costs of the boundary that is worth it are the ones the DDS topic measured: another participant, two more ports, another copy of the discovery database, and serialisation of everything that crosses. The cost that gets forgotten is that the boundary itself is a new failure mode, so the recorder being absent must now be detectable too."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5, what this design cannot catch. Odometry that is fresh and wrong. Every check in the system is about arrival: the supervisor measures freshness, the runner measures what the odometry says the robot did, and the scenario's verdict is computed from the same odometry. A bias in the wheel radius makes every one of those agree with every other and all of them wrong, and the robot's real position drifts away from the number without a single check firing. Catching it needs a second measurement that does not share the fault, a lidar scan against a known map, a motion-capture ground truth, or a tape measure, and that is a different design with a different cost."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Timeouts that are too short or missing",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A timeout that is too short is worse than a slightly long one, and the reason is what people do about it. The bench has a ready-made demonstration: run "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "max_age_ms:=5"
+        },
+        {
+         "t": "text",
+         "v": " against a transform whose measured delivery delay is tens of milliseconds, and it reports the transform stale for ever. The system is healthy and the alarm is permanent, so within a day somebody raises the limit until the alarm stops, and the number they land on has no relationship to anything measured. That is how a timeout becomes decoration. A timeout is a number you defend with a measurement, or it is noise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A timeout that is too short also feeds the previous topic's retry storm. The caller gives up while the server is still working, retries, and now the server has two copies of the same work plus the first one it has not finished. At scale that is how a system with plenty of capacity saturates itself: almost all of its work is work whose answer nobody is waiting for any more."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A missing timeout is a different failure with a worse shape, because it produces no event at all. "
+        },
+        {
+         "t": "code",
+         "v": "wait_for_service()"
+        },
+        {
+         "t": "text",
+         "v": " with no argument waits for ever. A blocking read on a socket with no "
+        },
+        {
+         "t": "code",
+         "v": "SO_RCVTIMEO"
+        },
+        {
+         "t": "text",
+         "v": " waits until the kernel gives up, which for a TCP connection can be minutes. A future waited on with "
+        },
+        {
+         "t": "code",
+         "v": "wait()"
+        },
+        {
+         "t": "text",
+         "v": " rather than "
+        },
+        {
+         "t": "code",
+         "v": "wait_for()"
+        },
+        {
+         "t": "text",
+         "v": " never comes back. Each of these turns a failure into a hang, and a hang is the failure mode that costs the most to diagnose because there is nothing in any log to say when it started. Every wait gets a timeout, including the ones inside libraries you did not write, which is what the timeout on the process as a whole is for: the bench wraps each scenario in "
+        },
+        {
+         "t": "code",
+         "v": "timeout --signal=INT 180"
+        },
+        {
+         "t": "text",
+         "v": " for exactly this reason."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three more shapes are worth recognising. A timeout that guards the wrong thing: five seconds on a call whose server needs 4.9 s at its 99th percentile fires on one call in a hundred, and the retry makes it two in a hundred. Nested timeouts that are not ordered: an inner wait of 30 s under an outer wait of 10 s means the outer one always wins and the inner one is dead code that will surprise somebody later. And a timeout on the wrong clock, which the time topic covered: a deadline on the steady clock inside robot logic fires during every simulation pause, and a deadline on simulated time never fires when the simulator has died, which is why the guard around a scenario is the one wall timer in the bench."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last one is the timeout nobody set because the wait is not visible as a wait. A mutex has no timeout. An unbounded queue has no timeout; it has a memory limit instead, which the data-flow topic covered, and the symptom is the same hang with the machine swapping. A service callback that does long work is a wait the caller cannot see and cannot bound from its side. When you cannot put a timeout on the wait, put a bound on the work: a maximum queue length, a maximum batch, or a maximum time slice per callback."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the availability formula in terms of MTBF and MTTR and say which lever is usually cheaper. Say what happens to availability along a chain and what common-cause failures do to a redundant pair. Rank crash, hang, fail-silent and fail-arbitrary, and say which one the bench's supervisor can turn into fail-safe and which it cannot. Say where a timeout's value comes from and why it is written as a multiple of a period. Give the full-jitter formula and what jitter buys over doubling alone. Say what a heartbeat proves and what it does not, and name the cost of one isolation boundary."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Write availability in terms of MTBF and MTTR, and say which of the two is usually cheaper to improve."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Six components at 0.999 in series: what is the availability and roughly how many hours a year is that?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is a redundant pair worth much less than 1 minus the square of the failure probability, and what kind of failure causes that?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rank crash, hang, fail-silent and fail-arbitrary by how hard each is to survive, and say why."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which of those four can a freshness watchdog turn into a safe stop, and which one defeats it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Where does the number in a timeout come from, and why write it as a multiple of a period?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give the full-jitter formula, and say what doubling without jitter fails to fix."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A node's heartbeat is still arriving. What does that prove about its control loop?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name three waits in a typical node that have no timeout unless you add one."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page: the timeouts, the retry policy and the isolation boundaries for a supervisor watching two input streams, with a measurement named for every number."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Amazon's builders' library, "
+     },
+     {
+      "t": "a",
+      "v": "Timeouts, retries and backoff with jitter",
+      "href": "https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/"
+     },
+     {
+      "t": "text",
+      "v": ", and Marc Brooker's post on "
+     },
+     {
+      "t": "a",
+      "v": "exponential backoff and jitter",
+      "href": "https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/"
+     },
+     {
+      "t": "text",
+      "v": ", which compares full, equal and decorrelated jitter with measured numbers."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Google, "
+     },
+     {
+      "t": "a",
+      "v": "Site Reliability Engineering",
+      "href": "https://sre.google/sre-book/embracing-risk/"
+     },
+     {
+      "t": "text",
+      "v": ": availability as a target you choose, and "
+     },
+     {
+      "t": "a",
+      "v": "addressing cascading failures",
+      "href": "https://sre.google/sre-book/addressing-cascading-failures/"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jim Gray, "
+     },
+     {
+      "t": "a",
+      "v": "Why do computers stop and what can be done about it?",
+      "href": "https://jimgray.azurewebsites.net/papers/tandemtr85.7_whydocomputersstop.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", Tandem technical report 85.7, 1985: fail-fast components, process pairs, and how many failures in the field turned out to be transient."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Flaviu Cristian, "
+     },
+     {
+      "t": "a",
+      "v": "Understanding fault-tolerant distributed systems",
+      "href": "https://dl.acm.org/doi/10.1145/102792.102801"
+     },
+     {
+      "t": "text",
+      "v": ", CACM 1991: the failure classes, from crash through omission and timing to arbitrary."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nancy Leveson, "
+     },
+     {
+      "t": "a",
+      "v": "her book on systems thinking applied to safety",
+      "href": "https://web.mit.edu/2.75/resources/random/Engineering%20a%20Safer%20World.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", MIT Press 2011: safe states, and why a correct component is not the same as a safe system."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Michael Nygard, "
+     },
+     {
+      "t": "a",
+      "v": "his book on designing production systems",
+      "href": "https://pragprog.com/titles/mnee2/release-it-second-edition/"
+     },
+     {
+      "t": "text",
+      "v": ", 2nd edition: bulkheads, circuit breakers and the failures that cross a boundary."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "DDS tuning",
+      "href": "https://docs.ros.org/en/jazzy/How-To-Guides/DDS-tuning.html"
+     },
+     {
+      "t": "text",
+      "v": ", whose 30-second reassembly stall is a worked example of a wait nobody set a timeout on."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "mt19937",
+      "href": "https://en.cppreference.com/cpp/numeric/random/mersenne_twister_engine"
+     },
+     {
+      "t": "text",
+      "v": ", whose sequence is fixed by the standard for a given seed, which is what makes the retry policy above testable."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "CP.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-raii"
+     },
+     {
+      "t": "text",
+      "v": " on taking a lock through a scoped guard rather than "
+     },
+     {
+      "t": "code",
+      "v": "lock()"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "unlock()"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "I.30",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-encapsulate"
+     },
+     {
+      "t": "text",
+      "v": " on putting a rule violation behind one interface."
+     }
+    ]
+   ]
+  }
+ ]
+}

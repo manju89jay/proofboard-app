@@ -1,0 +1,1977 @@
+{
+ "id": "sd-contracts",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The Test Bench logs wheel encoder readings as text, one per line: "
+     },
+     {
+      "t": "code",
+      "v": "stamp_ns,left_ticks,right_ticks"
+     },
+     {
+      "t": "text",
+      "v": ", for example "
+     },
+     {
+      "t": "code",
+      "v": "1726650000000000000,1200,1187"
+     },
+     {
+      "t": "text",
+      "v": ". Write the C++ declaration of a function that parses one line. Then write its preconditions, its postconditions, and what it does for each way a line can be wrong. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "struct Ticks { std::int64_t count; };\nstruct WheelTicks { Ticks left; Ticks right; };\nstruct EncoderLine { std::int64_t stamp_ns; WheelTicks ticks; };\n\nenum class LineError { field_count, not_a_number, out_of_range, negative_stamp };\n\n// Pre:    none. Any text is a valid argument, because the text comes from a file.\n// Post:   on success, stamp_ns >= 0 and each field equals the decimal number in the line.\n// Errors: the first problem found, as a LineError. Never throws, never reads outside the view.\n[[nodiscard]] std::variant<EncoderLine, LineError> parse_line(std::string_view line) noexcept;"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The central point is that there is no precondition on the text. A line comes from a file, so no caller can promise that it is well formed, and everything that can be wrong with it belongs in the error contract: too few or too many fields, a field that isn't a number, a number that doesn't fit in 64 bits, a negative time stamp. Negative ticks are fine, because the robot can reverse. The result type says that the caller gets either a sample or a reason, and "
+     },
+     {
+      "t": "code",
+      "v": "[[nodiscard]]"
+     },
+     {
+      "t": "text",
+      "v": " stops a caller from dropping both."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if your function takes a view of the text, reports at least three kinds of error as a value rather than a sentinel such as -1, and states what the fields hold on success. Treating malformed text as a precondition, or leaving out the postcondition, is a partial pass. No error contract at all is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A contract states what each side of an interface promises, in four parts. A precondition is what the caller must make true before the call. A postcondition is what the function makes true on a normal return. An invariant is what stays true of an object between calls to its public members, established by the constructor and kept after. An error contract says what the function does when it can't meet its postcondition: which errors, reported how, what state is left behind. Types are the part a compiler checks; the rest lives in comments, checks, or, from C++26, the language itself."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this solves is a promise nobody wrote down. Three plain doubles in a row say nothing about which is which or what unit each is in, so a caller can swap two wheels or pass millimetres for metres, and the compiler says nothing. Input from outside the process, a file, a message, the network, is never a precondition: no caller can guarantee it arrived well formed, and treating it as one turns an operator mistake into a crash instead of a reported error."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is telling a broken precondition apart from an error, then pushing as much of the rest into the type system as it will hold. A broken precondition is a bug in the caller, fixed in code and stopped loudly, close to where it happened; an error is an outcome the caller expects and has to handle. A named struct of wheel ticks, or a position tagged with its frame, makes a class of mistake fail to compile; a message crossing a process boundary can't carry that, so the check moves to run time against a fixed definition."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is a choice of three ways to report an error, each losable differently. An error code is dropped silently unless its type is marked so ignoring it won't compile. An exception can't be ignored, but one left uncaught ends the process, taking a whole ROS node down with it. A result type still fails if the caller reads the wrong alternative unchecked."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: write the preconditions, postconditions and errors for a function parsing one line of a file, where the answer that matters is that it has no precondition on the text at all, because everything wrong with it belongs in the error contract instead."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "contracts",
+   "title": "Pre- and post-conditions, invariants, error contracts",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three calls to the same function compile without a warning:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n\n// Heading change of a differential-drive robot from the distance each wheel rolled.\n[[nodiscard]] double heading_change_rad(double left_m, double right_m, double base_m) {\n  return (right_m - left_m) / base_m;\n}\n\nint main() {\n  std::cout << std::format(\"{:.4f} rad\\n\", heading_change_rad(0.10, 0.20, 0.160));\n  // The new controller keeps the wheel base in millimetres.\n  std::cout << std::format(\"{:.4f} rad\\n\", heading_change_rad(0.10, 0.20, 160.0));\n  // This caller reads the wheels in the other order.\n  std::cout << std::format(\"{:.4f} rad\\n\", heading_change_rad(0.20, 0.10, 0.160));\n}"
+      },
+      {
+       "t": "output",
+       "text": "0.6250 rad\n0.0006 rad\n-0.6250 rad"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second call passes the wheel base in millimetres, and the third swaps the wheels. The results are off by a factor of 1000 and by a sign, and the heading estimate takes both. The swap is the case Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.24",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-unrelated"
+        },
+        {
+         "t": "text",
+         "v": " warns about: adjacent parameters that accept the same arguments in either order and mean something different each way round. The fix is the "
+        },
+        {
+         "t": "code",
+         "v": "WheelTicks"
+        },
+        {
+         "t": "text",
+         "v": " of the cold check, one parameter whose fields are named at the call site: "
+        },
+        {
+         "t": "code",
+         "v": "{.left = Ticks{100}, .right = Ticks{300}}"
+        },
+        {
+         "t": "text",
+         "v": " can't be swapped by accident. Nothing in "
+        },
+        {
+         "t": "code",
+         "v": "double, double, double"
+        },
+        {
+         "t": "text",
+         "v": " says which number is which or what unit it has. That knowledge is part of the function's "
+        },
+        {
+         "t": "i",
+         "v": "contract"
+        },
+        {
+         "t": "text",
+         "v": ", and here it lives only in the parameter names."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A contract says what each side of an interface promises, and it has four parts:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "i",
+          "v": "precondition"
+         },
+         {
+          "t": "text",
+          "v": " is what the caller makes true before the call: here, "
+         },
+         {
+          "t": "code",
+          "v": "base_m > 0"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "i",
+          "v": "postcondition"
+         },
+         {
+          "t": "text",
+          "v": " is what the function makes true when it returns normally: the result is the heading change in radians, positive when the robot turns left."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "An "
+         },
+         {
+          "t": "i",
+          "v": "invariant"
+         },
+         {
+          "t": "text",
+          "v": " is what stays true of an object between calls to its public members, such as a trip counter that never decreases. The constructor establishes it, every public member keeps it, and in return no member has to check it again (Core Guidelines "
+         },
+         {
+          "t": "a",
+          "v": "I.5",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-pre"
+         },
+         {
+          "t": "text",
+          "v": ", second note, and "
+         },
+         {
+          "t": "a",
+          "v": "E.5",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-invariant"
+         },
+         {
+          "t": "text",
+          "v": ")."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "An "
+         },
+         {
+          "t": "i",
+          "v": "error contract"
+         },
+         {
+          "t": "text",
+          "v": " says what the function does when it can't meet its postcondition: which errors, reported how, and in what state it leaves things."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The line between a precondition and an error matters more than the names. A broken precondition is a bug in the caller. The fix is in the code, and the right response is to stop loudly, as close to the bug as possible. An error is an outcome the caller expects and has to handle: a missing file, a line that doesn't parse, a full disk. Input from outside the process, such as files, messages, the network or a person, is never a precondition, because no caller can guarantee it. A parser has no precondition on its text, and everything wrong with the text goes into its error contract."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.5",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-pre"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "I.7",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-post"
+        },
+        {
+         "t": "text",
+         "v": " ask you to state preconditions and postconditions. "
+        },
+        {
+         "t": "a",
+         "v": "I.6",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-expects"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "I.8",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-ensures"
+        },
+        {
+         "t": "text",
+         "v": " prefer "
+        },
+        {
+         "t": "code",
+         "v": "Expects()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Ensures()"
+        },
+        {
+         "t": "text",
+         "v": " from the Guidelines Support Library to plain comments and "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": " statements, so that readers and tools can tell a contract check from ordinary logic. C++26 moves this into the language, with "
+        },
+        {
+         "t": "code",
+         "v": "pre"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "post"
+        },
+        {
+         "t": "text",
+         "v": " on a function declaration and a "
+        },
+        {
+         "t": "code",
+         "v": "contract_assert"
+        },
+        {
+         "t": "text",
+         "v": " statement ("
+        },
+        {
+         "t": "a",
+         "v": "P2900",
+         "href": "https://wg21.link/p2900r14"
+        },
+        {
+         "t": "text",
+         "v": ", adopted in "
+        },
+        {
+         "t": "a",
+         "v": "February 2025",
+         "href": "https://herbsutter.com/2025/02/17/trip-report-february-2025-iso-c-standards-meeting-hagenberg-austria/"
+        },
+        {
+         "t": "text",
+         "v": "). GCC 13 has none of it, so this page writes contracts as comments and checks them in code."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Types are the part of a contract that the compiler checks. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.4",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+        },
+        {
+         "t": "text",
+         "v": " asks for interfaces that are precisely and strongly typed, with "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::milliseconds"
+        },
+        {
+         "t": "text",
+         "v": " as its example of a unit in a type. Units and coordinate frames work the same way:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "could not convert",
+       "text": "#include <cmath>\n\nstruct Metres {\n  constexpr explicit Metres(double v) : value(v) {}\n  double value;\n};\n\nstruct OdomFrame {};\nstruct MapFrame {};\n\n// A position tagged with the frame it is expressed in. The tag costs nothing at run time.\ntemplate <typename Frame>\nstruct Position {\n  Metres x;\n  Metres y;\n};\n\n[[nodiscard]] Metres distance(Position<MapFrame> a, Position<MapFrame> b) {\n  return Metres{std::hypot(a.x.value - b.x.value, a.y.value - b.y.value)};\n}\n\nint main() {\n  const Position<OdomFrame> robot{.x = Metres{1.0}, .y = Metres{2.0}};\n  const Position<MapFrame> goal{.x = Metres{4.0}, .y = Metres{6.0}};\n  return distance(robot, goal).value > 5.0 ? 1 : 0;  // the robot position is in odom, not in map\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC stops at the call: "
+        },
+        {
+         "t": "code",
+         "v": "could not convert 'robot' from 'Position<OdomFrame>' to 'Position<MapFrame>'"
+        },
+        {
+         "t": "text",
+         "v": ". The explicit constructor of "
+        },
+        {
+         "t": "code",
+         "v": "Metres"
+        },
+        {
+         "t": "text",
+         "v": " means that "
+        },
+        {
+         "t": "code",
+         "v": "160.0"
+        },
+        {
+         "t": "text",
+         "v": " never becomes a length without the word "
+        },
+        {
+         "t": "code",
+         "v": "Metres"
+        },
+        {
+         "t": "text",
+         "v": " at the call site, and the frame tag means that the only way from odom to map is a function that applies the transform between them. The tags are empty types, so a "
+        },
+        {
+         "t": "code",
+         "v": "Position<OdomFrame>"
+        },
+        {
+         "t": "text",
+         "v": " is two doubles, like an untagged one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "ROS messages can't carry this in their types. "
+        },
+        {
+         "t": "a",
+         "v": "REP 103",
+         "href": "https://www.ros.org/reps/rep-0103.html"
+        },
+        {
+         "t": "text",
+         "v": " fixes the units to SI: metres, radians, seconds. A frame travels as a string in "
+        },
+        {
+         "t": "code",
+         "v": "header.frame_id"
+        },
+        {
+         "t": "text",
+         "v": ", so a node checks it at run time, when a message arrives. The comments in a message definition are part of its contract. "
+        },
+        {
+         "t": "a",
+         "v": "`nav_msgs/msg/Odometry`",
+         "href": "https://github.com/ros2/common_interfaces/blob/jazzy/nav_msgs/msg/Odometry.msg"
+        },
+        {
+         "t": "text",
+         "v": " says that the pose is in "
+        },
+        {
+         "t": "code",
+         "v": "header.frame_id"
+        },
+        {
+         "t": "text",
+         "v": " and the twist in "
+        },
+        {
+         "t": "code",
+         "v": "child_frame_id"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "a",
+         "v": "`sensor_msgs/msg/Imu`",
+         "href": "https://github.com/ros2/common_interfaces/blob/jazzy/sensor_msgs/msg/Imu.msg"
+        },
+        {
+         "t": "text",
+         "v": " says that angular velocity is in rad/s, and that -1 in the first element of a covariance marks an estimate the sensor doesn't provide. A subscriber that skips those checks breaks the contract, and no compiler tells it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A contract also has to survive change. Once another team, a log file or a recorded bag depends on a message, its definition is fixed: adding a field, renaming one or changing its type changes the bytes on the wire, while the type name stays the same. Since Iron, each ROS 2 interface carries a hash of its definition, and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info --verbose"
+        },
+        {
+         "t": "text",
+         "v": " prints it for each endpoint as "
+        },
+        {
+         "t": "code",
+         "v": "Topic type hash"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "Iron release notes",
+         "href": "https://docs.ros.org/en/jazzy/Releases/Release-Iron-Irwini.html"
+        },
+        {
+         "t": "text",
+         "v": "). Two endpoints built from different definitions show different hashes. The safe rules are the ones Protocol Buffers writes down for "
+        },
+        {
+         "t": "a",
+         "v": "updating a message type",
+         "href": "https://protobuf.dev/programming-guides/proto3/#updating"
+        },
+        {
+         "t": "text",
+         "v": ": never reuse or renumber a field, add only fields whose absence means something sensible, and when the meaning changes, make a new type, such as "
+        },
+        {
+         "t": "code",
+         "v": "WheelTicksV2"
+        },
+        {
+         "t": "text",
+         "v": ", and publish both until every consumer has moved. A file format carries a version number in its header, and a reader refuses a major version it doesn't know instead of guessing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A contract is tested clause by clause. Each error in the error contract gets a test that provokes it and checks both the error and the state left behind. A postcondition gets a test over many inputs, often a round trip: write a value, parse it back, compare. An invariant gets a test that tries to break it through the public members. A precondition check gets at most a test that it fires, such as GoogleTest's "
+        },
+        {
+         "t": "code",
+         "v": "EXPECT_DEATH"
+        },
+        {
+         "t": "text",
+         "v": ", because a program in which it fires is already wrong. At a message boundary, the consumer's tests replay messages the producer really sent, such as a recorded bag, so a change on either side fails a test before it reaches the robot."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the parser from the cold check with its contract, and a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that tests it one clause at a time. In the bench these cases would be GoogleTest tests in "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": ". Here "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " prints them, so that the output shows each result:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <charconv>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <limits>\n#include <ranges>\n#include <string>\n#include <string_view>\n#include <system_error>\n#include <variant>\n\nstruct Ticks {\n  std::int64_t count;\n};\n\nstruct WheelTicks {\n  Ticks left;\n  Ticks right;\n};\n\nstruct EncoderLine {\n  std::int64_t stamp_ns;\n  WheelTicks ticks;\n};\n\nenum class LineError { field_count, not_a_number, out_of_range, negative_stamp };\n\n[[nodiscard]] constexpr std::string_view name_of(LineError error) {\n  switch (error) {\n    case LineError::field_count: return \"field_count\";\n    case LineError::not_a_number: return \"not_a_number\";\n    case LineError::out_of_range: return \"out_of_range\";\n    case LineError::negative_stamp: return \"negative_stamp\";\n  }\n  return \"not a LineError\";\n}\n\n// Parses \"stamp_ns,left_ticks,right_ticks\".\n// Pre:    none. Any text is a valid argument, because the text comes from a file.\n// Post:   on success, stamp_ns >= 0 and each field equals the decimal number in the line.\n// Errors: the first problem found, as a LineError. Never throws, never reads outside the view.\n[[nodiscard]] std::variant<EncoderLine, LineError> parse_line(std::string_view line) noexcept {\n  std::array<std::int64_t, 3> fields{};\n  std::ptrdiff_t count = 0;\n  for (const auto part : std::views::split(line, ',')) {\n    if (count == std::ssize(fields)) return LineError::field_count;\n    const std::string_view text(part.begin(), part.end());\n    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), fields[count]);\n    if (error == std::errc::result_out_of_range) return LineError::out_of_range;\n    if (error != std::errc{} || end != text.data() + text.size()) return LineError::not_a_number;\n    ++count;\n  }\n  if (count != std::ssize(fields)) return LineError::field_count;\n  if (fields[0] < 0) return LineError::negative_stamp;\n  return EncoderLine{.stamp_ns = fields[0], .ticks = {.left = Ticks{fields[1]}, .right = Ticks{fields[2]}}};\n}\n\n[[nodiscard]] std::string describe(const std::variant<EncoderLine, LineError>& result) {\n  if (const auto* error = std::get_if<LineError>(&result)) return std::string(name_of(*error));\n  const auto& [stamp_ns, ticks] = std::get<EncoderLine>(result);\n  return std::format(\"{} {} {}\", stamp_ns, ticks.left.count, ticks.right.count);\n}\n\nstruct Case {\n  std::string_view line;\n  std::string_view expected;\n};\n\nint main() {\n  // One case per clause of the contract.\n  constexpr std::array cases{\n      Case{.line = \"1726650000000000000,1200,1187\", .expected = \"1726650000000000000 1200 1187\"},\n      Case{.line = \"1726650000000000000,-40,-38\", .expected = \"1726650000000000000 -40 -38\"},\n      Case{.line = \"\", .expected = \"field_count\"},\n      Case{.line = \"1726650000000000000,1200\", .expected = \"field_count\"},\n      Case{.line = \"1726650000000000000,1200,1187,5\", .expected = \"field_count\"},\n      Case{.line = \"1726650000000000000,12x0,1187\", .expected = \"not_a_number\"},\n      Case{.line = \"1726650000000000000, 1200,1187\", .expected = \"not_a_number\"},\n      Case{.line = \"99999999999999999999,1200,1187\", .expected = \"out_of_range\"},\n      Case{.line = \"-5,1200,1187\", .expected = \"negative_stamp\"},\n  };\n  for (const auto& [line, expected] : cases) {\n    const std::string got = describe(parse_line(line));\n    std::cout << std::format(\"{:<35}{:<31}{}\\n\", std::format(\"\\\"{}\\\"\", line), got, got == expected ? \"ok\" : \"WRONG\");\n  }\n\n  // The postcondition as a round trip: a line written from values parses back to the same values.\n  constexpr std::array<std::int64_t, 5> values{0, 1, -1, std::numeric_limits<std::int64_t>::min(),\n                                               std::numeric_limits<std::int64_t>::max()};\n  std::int32_t lines = 0;\n  std::int32_t mismatches = 0;\n  for (const auto stamp : values | std::views::filter([](std::int64_t v) { return v >= 0; })) {\n    for (const auto left : values) {\n      for (const auto right : values) {\n        const auto parsed = parse_line(std::format(\"{},{},{}\", stamp, left, right));\n        const auto* got = std::get_if<EncoderLine>(&parsed);\n        const bool same = got != nullptr && got->stamp_ns == stamp && got->ticks.left.count == left &&\n                          got->ticks.right.count == right;\n        ++lines;\n        mismatches += same ? 0 : 1;\n      }\n    }\n  }\n  std::cout << std::format(\"round trip: {} lines, {} mismatches\\n\", lines, mismatches);\n}"
+      },
+      {
+       "t": "output",
+       "text": "\"1726650000000000000,1200,1187\"    1726650000000000000 1200 1187  ok\n\"1726650000000000000,-40,-38\"      1726650000000000000 -40 -38    ok\n\"\"                                 field_count                    ok\n\"1726650000000000000,1200\"         field_count                    ok\n\"1726650000000000000,1200,1187,5\"  field_count                    ok\n\"1726650000000000000,12x0,1187\"    not_a_number                   ok\n\"1726650000000000000, 1200,1187\"   not_a_number                   ok\n\"99999999999999999999,1200,1187\"   out_of_range                   ok\n\"-5,1200,1187\"                     negative_stamp                 ok\nround trip: 75 lines, 0 mismatches"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The contract has no precondition, and "
+         },
+         {
+          "t": "code",
+          "v": "LineError"
+         },
+         {
+          "t": "text",
+          "v": " names every way the text can be wrong. "
+         },
+         {
+          "t": "code",
+          "v": "noexcept"
+         },
+         {
+          "t": "text",
+          "v": " is part of the contract too: a loop over a million lines never needs a "
+         },
+         {
+          "t": "code",
+          "v": "try"
+         },
+         {
+          "t": "text",
+          "v": " block around this call."
+         }
+        ],
+        [
+         {
+          "t": "a",
+          "v": "`std::from_chars`",
+          "href": "https://en.cppreference.com/cpp/utility/from_chars"
+         },
+         {
+          "t": "text",
+          "v": " does most of the checking. It skips no leading space and accepts no plus sign, reports overflow as "
+         },
+         {
+          "t": "code",
+          "v": "result_out_of_range"
+         },
+         {
+          "t": "text",
+          "v": ", and returns where it stopped, which is how "
+         },
+         {
+          "t": "code",
+          "v": "12x0"
+         },
+         {
+          "t": "text",
+          "v": " is caught."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Negative ticks are valid and a negative stamp isn't. The type "
+         },
+         {
+          "t": "code",
+          "v": "std::int64_t"
+         },
+         {
+          "t": "text",
+          "v": " allows both, so that rule lives in the contract and in a test."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The round trip tests the postcondition at the edges of the type: 0, 1, -1 and the lowest and highest "
+         },
+         {
+          "t": "code",
+          "v": "std::int64_t"
+         },
+         {
+          "t": "text",
+          "v": ". The filter drops the two negative stamps, which leaves 3 × 5 × 5 = 75 lines."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The result type is "
+         },
+         {
+          "t": "code",
+          "v": "std::variant<EncoderLine, LineError>"
+         },
+         {
+          "t": "text",
+          "v": ". C++23 has "
+         },
+         {
+          "t": "code",
+          "v": "std::expected<EncoderLine, LineError>"
+         },
+         {
+          "t": "text",
+          "v": " for this, with named accessors "
+         },
+         {
+          "t": "code",
+          "v": "has_value()"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "value()"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "error()"
+         },
+         {
+          "t": "text",
+          "v": ", but GCC 13 offers it only with "
+         },
+         {
+          "t": "code",
+          "v": "-std=c++23"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pipeline",
+   "title": "Reader, parser, processor and writer interfaces",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. The bench turns an encoder log into an odometry log in four stages:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "a reader yields the lines of a file;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the parser from the worked example turns each line into an "
+         },
+         {
+          "t": "code",
+          "v": "EncoderLine"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a processor turns consecutive samples into the distance and the heading change between them, using "
+         },
+         {
+          "t": "code",
+          "v": "Wheels{metres_per_tick, base_m}"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a writer appends one line per result to the output."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write the declarations of the reader, the processor and the writer, each with its preconditions, postconditions, invariants and error contract as comments. For every error, decide whether the run stops, or skips the input and counts it, and say why. Two inputs must be handled: a sample whose stamp goes back in time, and a last line cut off by a crash. Then list the tests that the processor's contract implies, one per clause."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is one design, as a program that runs the four stages over a log in memory. With files, only the stream types change:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <charconv>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <istream>\n#include <optional>\n#include <ostream>\n#include <ranges>\n#include <sstream>\n#include <stdexcept>\n#include <string>\n#include <string_view>\n#include <system_error>\n#include <utility>\n#include <variant>\n\nstruct Ticks {\n  std::int64_t count;\n};\n\nstruct WheelTicks {\n  Ticks left;\n  Ticks right;\n};\n\nstruct EncoderLine {\n  std::int64_t stamp_ns;\n  WheelTicks ticks;\n};\n\nenum class LineError { field_count, not_a_number, out_of_range, negative_stamp };\n\n// Parser: the worked example's parse_line, with the same contract.\n[[nodiscard]] std::variant<EncoderLine, LineError> parse_line(std::string_view line) noexcept {\n  std::array<std::int64_t, 3> fields{};\n  std::ptrdiff_t count = 0;\n  for (const auto part : std::views::split(line, ',')) {\n    if (count == std::ssize(fields)) return LineError::field_count;\n    const std::string_view text(part.begin(), part.end());\n    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), fields[count]);\n    if (error == std::errc::result_out_of_range) return LineError::out_of_range;\n    if (error != std::errc{} || end != text.data() + text.size()) return LineError::not_a_number;\n    ++count;\n  }\n  if (count != std::ssize(fields)) return LineError::field_count;\n  if (fields[0] < 0) return LineError::negative_stamp;\n  return EncoderLine{.stamp_ns = fields[0], .ticks = {.left = Ticks{fields[1]}, .right = Ticks{fields[2]}}};\n}\n\n// Reader.\n// Post:   the next line without its newline, or nullopt at the end of the input. The view borrows\n//         the reader's buffer and is valid until the next call to next().\n// Errors: a failed read, as opposed to the end of the input, throws std::runtime_error.\nclass LineReader {\n public:\n  explicit LineReader(std::istream& in) : in_(in) {}\n\n  [[nodiscard]] std::optional<std::string_view> next() {\n    if (std::getline(in_, line_)) return line_;\n    if (in_.bad()) throw std::runtime_error(\"read failed\");\n    return std::nullopt;\n  }\n\n private:\n  std::istream& in_;\n  std::string line_;\n};\n\nstruct Wheels {\n  double metres_per_tick;\n  double base_m;\n};\n\nstruct Motion {\n  std::int64_t stamp_ns;\n  double distance_m;\n  double heading_change_rad;\n};\n\nenum class Skip { first_sample, stamp_not_after_last };\n\n// Processor: the motion between consecutive samples.\n// Invariant: the stamps of accepted samples strictly increase.\n// Post:      a Motion covers the interval from the last accepted sample to this one.\n// Errors:    the constructor throws std::invalid_argument for wheels that aren't positive. A sample\n//            that isn't later than the last accepted one is refused with a Skip and changes nothing.\nclass Odometer {\n public:\n  explicit Odometer(Wheels wheels) : wheels_(wheels) {\n    if (!(wheels.metres_per_tick > 0.0 && wheels.base_m > 0.0)) throw std::invalid_argument(\"wheels must be positive\");\n  }\n\n  [[nodiscard]] std::variant<Motion, Skip> add(const EncoderLine& sample) {\n    if (last_ && sample.stamp_ns <= last_->stamp_ns) return Skip::stamp_not_after_last;\n    const auto previous = std::exchange(last_, sample);\n    if (!previous) return Skip::first_sample;\n    const double left_m = metres(sample.ticks.left.count - previous->ticks.left.count);\n    const double right_m = metres(sample.ticks.right.count - previous->ticks.right.count);\n    return Motion{.stamp_ns = sample.stamp_ns,\n                  .distance_m = (left_m + right_m) / 2.0,\n                  .heading_change_rad = (right_m - left_m) / wheels_.base_m};\n  }\n\n private:\n  [[nodiscard]] double metres(std::int64_t ticks) const { return static_cast<double>(ticks) * wheels_.metres_per_tick; }\n\n  Wheels wheels_;\n  std::optional<EncoderLine> last_;\n};\n\n// Writer.\n// Post:   one line \"stamp_ns,distance_m,heading_change_rad\" per call, in call order.\n// Errors: a failed write throws std::runtime_error: the run can't do its job without its output.\nclass MotionWriter {\n public:\n  explicit MotionWriter(std::ostream& out) : out_(out) {}\n\n  void write(const Motion& motion) {\n    out_ << std::format(\"{},{:.4f},{:.4f}\\n\", motion.stamp_ns, motion.distance_m, motion.heading_change_rad);\n    if (!out_) throw std::runtime_error(\"write failed\");\n  }\n\n private:\n  std::ostream& out_;\n};\n\nstruct Report {\n  std::int32_t lines = 0;\n  std::int32_t written = 0;\n  std::int32_t bad_lines = 0;\n  std::int32_t out_of_order = 0;\n};\n\n// Bad lines and out-of-order samples are skipped and counted; read and write failures propagate.\n[[nodiscard]] Report convert(LineReader& reader, Odometer& odometer, MotionWriter& writer) {\n  Report report;\n  while (const auto line = reader.next()) {\n    ++report.lines;\n    const auto parsed = parse_line(*line);\n    const auto* sample = std::get_if<EncoderLine>(&parsed);\n    if (sample == nullptr) {\n      ++report.bad_lines;\n      continue;\n    }\n    const auto step = odometer.add(*sample);\n    if (const auto* motion = std::get_if<Motion>(&step)) {\n      writer.write(*motion);\n      ++report.written;\n    } else if (std::get<Skip>(step) == Skip::stamp_not_after_last) {\n      ++report.out_of_order;\n    }\n  }\n  return report;\n}\n\nint main() {\n  std::istringstream log(\n      \"1000000000,0,0\\n\"\n      \"1100000000,100,100\\n\"\n      \"1200000000,200,210\\n\"\n      \"1150000000,250,260\\n\"  // stamp goes back\n      \"1300000000,300,320\\n\"\n      \"1400000000,40\");       // the last line of a run that crashed mid-write\n  std::ostringstream out;\n  LineReader reader(log);\n  Odometer odometer(Wheels{.metres_per_tick = 0.0005, .base_m = 0.15});\n  MotionWriter writer(out);\n\n  const Report report = convert(reader, odometer, writer);\n  std::cout << out.str();\n  std::cout << std::format(\"lines {}, written {}, bad lines {}, out of order {}\\n\", report.lines, report.written,\n                           report.bad_lines, report.out_of_order);\n}"
+      },
+      {
+       "t": "output",
+       "text": "1100000000,0.0500,0.0000\n1200000000,0.0525,0.0333\n1300000000,0.0525,0.0333\nlines 6, written 3, bad lines 1, out of order 1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The design decisions, stage by stage:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The reader's postcondition says how long its result lives: the view borrows the reader's buffer until the next call. That is a borrowing contract, and the next topic follows such borrows through a pipeline. Returning a "
+         },
+         {
+          "t": "code",
+          "v": "std::string"
+         },
+         {
+          "t": "text",
+          "v": " would remove the rule at the price of a copy per line. The end of the input is not an error, so it is an empty "
+         },
+         {
+          "t": "code",
+          "v": "optional"
+         },
+         {
+          "t": "text",
+          "v": ". A failed read is an error, and it throws, because a run that lost part of its input can't produce a correct output."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The truncated last line never reaches the processor. The parser reports it as "
+         },
+         {
+          "t": "code",
+          "v": "field_count"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "convert"
+         },
+         {
+          "t": "text",
+          "v": " skips and counts it, which is the right choice for a log whose last line a crash can cut."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The processor's invariant is visible in the output. The sample at 1.15 s is refused, and the motion at 1.3 s is computed from the sample at 1.2 s, as if the refused one had never arrived. The wheel sizes come from configuration, which is input from outside, so they are checked in the constructor, which throws when it can't establish the invariant ("
+         },
+         {
+          "t": "a",
+          "v": "E.5",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-invariant"
+         },
+         {
+          "t": "text",
+          "v": "). An odometer with a zero wheel base can do nothing useful, so the run doesn't start."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The writer throws when a write fails, which is Core Guidelines "
+         },
+         {
+          "t": "a",
+          "v": "E.2",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-throw"
+         },
+         {
+          "t": "text",
+          "v": ": throw when a function can't do the job it was given. Skipping the line and carrying on would leave an output file that looks complete and isn't."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Report"
+         },
+         {
+          "t": "text",
+          "v": " counts everything that was skipped. A silent skip hides a sensor that sends garbage for an hour, and a count makes it visible to the operator and to tests."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The processor's contract implies these tests:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "the constructor throws for a zero or negative "
+         },
+         {
+          "t": "code",
+          "v": "metres_per_tick"
+         },
+         {
+          "t": "text",
+          "v": ", and for a zero or negative "
+         },
+         {
+          "t": "code",
+          "v": "base_m"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the first sample returns "
+         },
+         {
+          "t": "code",
+          "v": "Skip::first_sample"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "two samples with the same tick change on both wheels give a distance and a heading change of 0 rad, and more ticks on the right wheel give a positive heading change;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a sample with the same stamp as the last one, and one with an earlier stamp, return "
+         },
+         {
+          "t": "code",
+          "v": "Skip::stamp_not_after_last"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "after a refused sample, the next motion is computed from the last accepted sample, which is the invariant."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "errors",
+   "title": "Exceptions versus std::expected versus error codes",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program reports its error correctly and still prints a wrong number:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <charconv>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string_view>\n#include <system_error>\n\n// The C style: returns 0 on success and -1 on failure, and writes the value through a pointer.\nint parse_ticks(std::string_view text, std::int64_t* out) {\n  const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), *out);\n  return error == std::errc{} && end == text.data() + text.size() ? 0 : -1;\n}\n\nint main() {\n  std::int64_t left = 0;\n  parse_ticks(\"12x0\", &left);  // returns -1, and nobody looks\n  std::cout << std::format(\"left wheel moved {} ticks\\n\", left);\n}"
+      },
+      {
+       "t": "output",
+       "text": "left wheel moved 12 ticks"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "parse_ticks"
+        },
+        {
+         "t": "text",
+         "v": " returned -1, and the caller never looked. "
+        },
+        {
+         "t": "code",
+         "v": "from_chars"
+        },
+        {
+         "t": "text",
+         "v": " had already stored the 12 it read before the "
+        },
+        {
+         "t": "code",
+         "v": "x"
+        },
+        {
+         "t": "text",
+         "v": ", so the value is plausible, and nothing downstream can tell. This is how error codes fail: the error is reported and then dropped. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.10",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-except"
+        },
+        {
+         "t": "text",
+         "v": " prefers exceptions for exactly this reason, that it should not be possible to ignore an error, and "
+        },
+        {
+         "t": "a",
+         "v": "E.28",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-no-throw"
+        },
+        {
+         "t": "text",
+         "v": " rules out the global form, "
+        },
+        {
+         "t": "code",
+         "v": "errno"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When a code base uses error codes anyway, make ignoring one a compile error. "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": " on the error type covers every function that returns it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "ignoring returned value of type",
+       "text": "#include <cstdint>\n\nenum class [[nodiscard]] WriteStatus { ok, disk_full };\n\nWriteStatus append_line(std::int64_t stamp_ns) { return stamp_ns >= 0 ? WriteStatus::ok : WriteStatus::disk_full; }\n\nint main() {\n  append_line(1726650000000000000);  // the disk may be full, and nobody looks\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": ", GCC stops with "
+        },
+        {
+         "t": "code",
+         "v": "ignoring returned value of type 'WriteStatus', declared with attribute 'nodiscard'"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three ways to report an error differ in who can ignore it and who has to handle it:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [],
+        [
+         {
+          "t": "text",
+          "v": "Exception"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::expected<T, E>"
+         },
+         {
+          "t": "text",
+          "v": ", or "
+         },
+         {
+          "t": "code",
+          "v": "std::variant<T, E>"
+         },
+         {
+          "t": "text",
+          "v": " in C++20"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Error code"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Can the caller ignore it?"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No: an uncaught exception ends the program"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Only by not reading the value"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Yes, unless the type is "
+          },
+          {
+           "t": "code",
+           "v": "[[nodiscard]]"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Who handles it"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Any caller up the stack"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The direct caller"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The direct caller"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Fits"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The task can't be done, and the direct caller can't repair it"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "A failure the direct caller expects and handles"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "C interfaces, and code built without exceptions"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Bench example"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "A failed write in "
+          },
+          {
+           "t": "code",
+           "v": "MotionWriter"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "A bad line from "
+          },
+          {
+           "t": "code",
+           "v": "parse_line"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The count "
+          },
+          {
+           "t": "code",
+           "v": "std::fwrite"
+          },
+          {
+           "t": "text",
+           "v": " returns, in a writer built on "
+          },
+          {
+           "t": "code",
+           "v": "FILE*"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each has a failure of its own. An exception that leaves a "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " function, or the function a "
+        },
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": " runs, calls "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": ". rclcpp doesn't catch exceptions from your callbacks: the executor catches only its own errors around taking a message ("
+        },
+        {
+         "t": "a",
+         "v": "executor.cpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executor.cpp"
+        },
+        {
+         "t": "text",
+         "v": "), so an exception thrown in a subscription callback leaves "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin"
+        },
+        {
+         "t": "text",
+         "v": ", and unless "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " catches it, the node's process ends. A "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " read without a check fails too: "
+        },
+        {
+         "t": "code",
+         "v": "std::get"
+        },
+        {
+         "t": "text",
+         "v": " of the wrong alternative throws "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_variant_access"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "*"
+        },
+        {
+         "t": "text",
+         "v": " on an empty "
+        },
+        {
+         "t": "code",
+         "v": "optional"
+        },
+        {
+         "t": "text",
+         "v": " is undefined behaviour. Some code bases, embedded and real-time ones among them, build with "
+        },
+        {
+         "t": "code",
+         "v": "-fno-exceptions"
+        },
+        {
+         "t": "text",
+         "v": ". There, "
+        },
+        {
+         "t": "a",
+         "v": "E.27",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-no-throw-codes"
+        },
+        {
+         "t": "text",
+         "v": " asks for error codes used systematically, and "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": " on every error type makes that checkable."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A broken precondition is none of the three. It is a bug, so it is reported by a check that stops the program, such as "
+        },
+        {
+         "t": "code",
+         "v": "assert"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Expects()"
+        },
+        {
+         "t": "text",
+         "v": " or, in C++26, a contract. Returning an error code for a bug invites the caller to handle it, and there is nothing correct to do."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the four parts of a contract, with a bench example of each, and say why input from outside the process is never a precondition. Show how units and frames go into C++ types, and what a ROS message does instead. Say how to change a released message safely, and how each clause of a contract is tested. Give one case each for an exception, "
+        },
+        {
+         "t": "code",
+         "v": "std::expected"
+        },
+        {
+         "t": "text",
+         "v": " and an error code, and say what "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": " adds to the last two."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between a broken precondition and an error? Which one is a malformed line in a log file?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Who establishes a class invariant, and who has to keep it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How does "
+     },
+     {
+      "t": "code",
+      "v": "Position<MapFrame>"
+     },
+     {
+      "t": "text",
+      "v": " stop a frame mix-up at compile time, and what does a ROS node do instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A released message needs a new field. What are the safe ways to add it, and how do you spot two nodes built from different definitions?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name one test for each clause of a parser's contract."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When is an exception the right way to report an error, when "
+     },
+     {
+      "t": "code",
+      "v": "std::expected"
+     },
+     {
+      "t": "text",
+      "v": ", and when an error code?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What happens to a ROS 2 node when a subscription callback throws?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page in 10 minutes: preconditions, postconditions and errors for a function that reads one record from a binary log."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines, interfaces: "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " strongly typed interfaces, "
+     },
+     {
+      "t": "a",
+      "v": "I.5",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-pre"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "I.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-expects"
+     },
+     {
+      "t": "text",
+      "v": " preconditions, "
+     },
+     {
+      "t": "a",
+      "v": "I.7",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-post"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "I.8",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-ensures"
+     },
+     {
+      "t": "text",
+      "v": " postconditions, "
+     },
+     {
+      "t": "a",
+      "v": "I.10",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-except"
+     },
+     {
+      "t": "text",
+      "v": " exceptions for failures, and "
+     },
+     {
+      "t": "a",
+      "v": "I.24",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-unrelated"
+     },
+     {
+      "t": "text",
+      "v": " on adjacent parameters that can be swapped."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines, errors: "
+     },
+     {
+      "t": "a",
+      "v": "E.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-throw"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "E.5",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-invariant"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "E.27",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-no-throw-codes"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "E.28",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-no-throw"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jason Turner, Back to Basics: C++ API Design, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/CppCon-2022-Jason-Turner-API-Design-Back-to-Basics.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=zL-vn_pGGgY"
+     },
+     {
+      "t": "text",
+      "v": ". Interfaces that are hard to use wrongly."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: Exceptions, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_exceptions/back_to_basics_exceptions__klaus_iglberger__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=0ojB8c0xUd8"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Contracts in C++26: the proposal "
+     },
+     {
+      "t": "a",
+      "v": "P2900",
+      "href": "https://wg21.link/p2900r14"
+     },
+     {
+      "t": "text",
+      "v": ", and Herb Sutter's trip reports from "
+     },
+     {
+      "t": "a",
+      "v": "February 2025",
+      "href": "https://herbsutter.com/2025/02/17/trip-report-february-2025-iso-c-standards-meeting-hagenberg-austria/"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "March 2026",
+      "href": "https://herbsutter.com/2026/03/29/c26-is-done-trip-report-march-2026-iso-c-standards-meeting-london-croydon-uk/"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS: "
+     },
+     {
+      "t": "a",
+      "v": "REP 103",
+      "href": "https://www.ros.org/reps/rep-0103.html"
+     },
+     {
+      "t": "text",
+      "v": " on units and coordinate conventions; the message definitions "
+     },
+     {
+      "t": "a",
+      "v": "Odometry",
+      "href": "https://github.com/ros2/common_interfaces/blob/jazzy/nav_msgs/msg/Odometry.msg"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Imu",
+      "href": "https://github.com/ros2/common_interfaces/blob/jazzy/sensor_msgs/msg/Imu.msg"
+     },
+     {
+      "t": "text",
+      "v": " on the jazzy branch; the "
+     },
+     {
+      "t": "a",
+      "v": "Iron release notes",
+      "href": "https://docs.ros.org/en/jazzy/Releases/Release-Iron-Irwini.html"
+     },
+     {
+      "t": "text",
+      "v": " on type hashes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Protocol Buffers, "
+     },
+     {
+      "t": "a",
+      "v": "updating a message type",
+      "href": "https://protobuf.dev/programming-guides/proto3/#updating"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference: "
+     },
+     {
+      "t": "a",
+      "v": "std::from_chars",
+      "href": "https://en.cppreference.com/cpp/utility/from_chars"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::variant",
+      "href": "https://en.cppreference.com/cpp/utility/variant"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::expected",
+      "href": "https://en.cppreference.com/cpp/utility/expected"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "nodiscard",
+      "href": "https://en.cppreference.com/cpp/language/attributes/nodiscard"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,2033 @@
+{
+ "id": "pat-strategy",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A delivery robot quotes a job: a distance in metres and a waiting time in seconds. Three pricing rules can apply, a flat fee, a fee per kilometre and a fee per minute of waiting, and which one applies is decided when the quoting object is built. From memory, sketch the Strategy: write the point of variation as one operation, hold it in a "
+     },
+     {
+      "t": "code",
+      "v": "Quoter"
+     },
+     {
+      "t": "text",
+      "v": ", and show the same job quoted under all three rules. Keep money in whole cents as "
+     },
+     {
+      "t": "code",
+      "v": "std::int64_t"
+     },
+     {
+      "t": "text",
+      "v": ", never a "
+     },
+     {
+      "t": "code",
+      "v": "double"
+     },
+     {
+      "t": "text",
+      "v": ". Say which of the ways of holding the strategy you picked and why. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <string>\n#include <utility>\n\nstruct Job {\n  std::int64_t distance_m;\n  std::int64_t waiting_s;\n};\n\n// The three rules, in whole cents. Money is never a double.\nstruct Flat {\n  std::int64_t cents;\n};\nstruct PerKilometre {\n  std::int64_t cents_per_km;\n};\nstruct PerMinute {\n  std::int64_t cents_per_minute;\n};\n\n[[nodiscard]] constexpr std::int64_t price_of(Flat rule, const Job&) { return rule.cents; }\n[[nodiscard]] constexpr std::int64_t price_of(PerKilometre rule, const Job& job) {\n  return rule.cents_per_km * job.distance_m / 1000;\n}\n[[nodiscard]] constexpr std::int64_t price_of(PerMinute rule, const Job& job) {\n  return rule.cents_per_minute * job.waiting_s / 60;\n}\n\n// The point of variation is one operation, so the strategy is one callable.\nusing Pricing = std::function<std::int64_t(const Job&)>;\n\nclass Quoter {\n public:\n  explicit Quoter(Pricing pricing) : pricing_(std::move(pricing)) {}\n  void use(Pricing pricing) { pricing_ = std::move(pricing); }\n  [[nodiscard]] std::int64_t quote_cents(const Job& job) const { return pricing_(job); }\n\n private:\n  Pricing pricing_;\n};\n\n[[nodiscard]] std::string shown(std::int64_t cents) { return std::format(\"{}.{:02}\", cents / 100, cents % 100); }\n\nint main() {\n  const Job job{.distance_m = 7400, .waiting_s = 320};\n  Quoter quoter(Pricing{[](const Job& j) { return price_of(Flat{.cents = 950}, j); }});\n  std::cout << std::format(\"flat:          {}\\n\", shown(quoter.quote_cents(job)));\n\n  quoter.use([](const Job& j) { return price_of(PerKilometre{.cents_per_km = 120}, j); });\n  std::cout << std::format(\"per kilometre: {}\\n\", shown(quoter.quote_cents(job)));\n\n  quoter.use([](const Job& j) { return price_of(PerMinute{.cents_per_minute = 45}, j); });\n  std::cout << std::format(\"per minute:    {}\\n\", shown(quoter.quote_cents(job)));\n}"
+   },
+   {
+    "t": "output",
+    "text": "flat:          9.50\nper kilometre: 8.88\nper minute:    2.40"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " is the choice that fits this shape: the strategy is exactly one operation, the rule has to be chosen at run time from a tariff, and a "
+     },
+     {
+      "t": "code",
+      "v": "Quoter"
+     },
+     {
+      "t": "text",
+      "v": " stays copyable. A base class would work too and costs a heap object per rule; a template parameter would be wrong here, because the tariff is read at run time."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the rule is a member the caller supplies, the quoting code names no rule, and you can say what the other two ways would have cost. Writing three "
+     },
+     {
+      "t": "code",
+      "v": "Quoter"
+     },
+     {
+      "t": "text",
+      "v": " subclasses is a fail: that puts the variation in the class hierarchy, which is the thing Strategy exists to avoid."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Strategy is a pattern that isolates one step of an algorithm, the operation that varies, behind a name the rest of the algorithm calls without knowing which version runs. It differs from Command, which isolates a piece of work handed to something else once: a Strategy is a property of an object, chosen when the object is built and used on every call after."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is a step that would otherwise scatter across a family of near-identical classes. Three pricing rules that differ only in how they price a job could be written as three subclasses of the quoting object, but that puts the one thing that varies into the class hierarchy, so choosing a rule means choosing a class instead of passing a value."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is holding that one operation as a value the object carries rather than as behaviour fixed in its class. Behind a small interface through a "
+    },
+    {
+     "t": "code",
+     "v": "std::unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": ", it is chosen and swapped at run time and open to any class that derives from the interface, for the pointer plus a heap object. As a "
+    },
+    {
+     "t": "code",
+     "v": "std::function"
+    },
+    {
+     "t": "text",
+     "v": ", it is equally swappable and accepts any matching callable, a lambda included, for a larger fixed size, but it can carry only that one operation. As a template parameter, it costs nothing at run time and the compiler can inline the call, but the choice is fixed when the program is built, which only fits when the caller decides, not a value read while running."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs beyond the bytes is the call itself: one the compiler cannot see through, through a virtual function or a "
+    },
+    {
+     "t": "code",
+     "v": "std::function"
+    },
+    {
+     "t": "text",
+     "v": ", measured several times slower than an inlined call in a tight loop, though the gap disappears once the call does real work rather than sit in a microbenchmark. The pattern is also the wrong choice for a small, closed set of behaviours, which an enumeration and a switch check more directly, and for a step that never changes, which needs no variation to isolate."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet Strategy already in "
+    },
+    {
+     "t": "code",
+     "v": "std::ranges::sort"
+    },
+    {
+     "t": "text",
+     "v": "'s comparison argument and in a "
+    },
+    {
+     "t": "code",
+     "v": "unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": "'s deleter, and the robot's own pricing rules and speed profiles are built the same way. The interview question is this choice: picking which way to hold a rule fits one read from a tariff at run time, and saying what the others would have cost."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Strategy as interface, std::function or template parameter",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You have been using Strategy since your first "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " call:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdio>\n#include <cstdlib>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <span>\n#include <string>\n#include <vector>\n\n// The deleter is a template parameter of unique_ptr: one Strategy, fixed at compile time.\nstruct FileCloser {\n  void operator()(std::FILE* file) const noexcept { std::fclose(file); }\n};\n\nusing ClosingFn = void (*)(std::FILE*);\n\n[[nodiscard]] std::string joined(std::span<const int> values) {\n  std::string out;\n  for (const int value : values) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", value);\n  return out;\n}\n\nint main() {\n  std::vector<int> ranges_mm{4100, 380, 1250, 90, 2600};\n\n  std::ranges::sort(ranges_mm);  // std::ranges::less, the default comparison\n  std::cout << std::format(\"default:          {}\\n\", joined(ranges_mm));\n\n  std::ranges::sort(ranges_mm, std::ranges::greater{});\n  std::cout << std::format(\"greater:          {}\\n\", joined(ranges_mm));\n\n  std::ranges::sort(ranges_mm, {}, [](int mm) { return std::abs(mm - 1000); });\n  std::cout << std::format(\"closest to 1000:  {}\\n\", joined(ranges_mm));\n\n  std::cout << std::format(\"unique_ptr<int>:                       {} bytes\\n\", sizeof(std::unique_ptr<int>));\n  std::cout << std::format(\"unique_ptr<FILE, FileCloser>:          {} bytes\\n\",\n                           sizeof(std::unique_ptr<std::FILE, FileCloser>));\n  std::cout << std::format(\"unique_ptr<FILE, void(*)(FILE*)>:      {} bytes\\n\",\n                           sizeof(std::unique_ptr<std::FILE, ClosingFn>));\n  std::cout << std::format(\"unique_ptr<FILE, std::function<...>>:  {} bytes\\n\",\n                           sizeof(std::unique_ptr<std::FILE, std::function<void(std::FILE*)>>));\n}"
+      },
+      {
+       "t": "output",
+       "text": "default:          90 380 1250 2600 4100\ngreater:          4100 2600 1250 380 90\nclosest to 1000:  1250 380 90 2600 4100\nunique_ptr<int>:                       8 bytes\nunique_ptr<FILE, FileCloser>:          8 bytes\nunique_ptr<FILE, void(*)(FILE*)>:      16 bytes\nunique_ptr<FILE, std::function<...>>:  40 bytes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::ranges::sort"
+        },
+        {
+         "t": "text",
+         "v": " does not know how to compare anything. The comparison is handed in, as a default or as an argument, and so is the projection that says which part of each element to compare. The RAII topic's "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " with a deleter is the same idea one level down: "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " knows how to own, and the deleter says how to release. Both are Strategy, and the sizes show the price of each way of holding it. "
+        },
+        {
+         "t": "code",
+         "v": "FileCloser"
+        },
+        {
+         "t": "text",
+         "v": " has no members, and libstdc++ stores a stateless deleter in a way that costs nothing, so the pointer stays 8 bytes. A function pointer is state, so it costs 8 more. A "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " costs 32 more, for a deleter that is decided once and never changes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Strategy"
+        },
+        {
+         "t": "text",
+         "v": " isolates how one step of an algorithm is done, so the step can be replaced without touching the algorithm. Klaus Iglberger states it as Guideline 19 in C++ Software Design, and pairs it with Command, Guideline 21, which isolates what is done rather than how. The distinction is worth keeping: a Strategy is a property of an object, chosen when the object is built and used on every call; a Command is a piece of work you hand to something else once."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The 1994 catalogue describes it as a base class with one virtual function ("
+        },
+        {
+         "t": "a",
+         "v": "Design Patterns",
+         "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+        },
+        {
+         "t": "text",
+         "v": ", the behavioural chapter), and that is one implementation out of several. The intent is the pattern; the implementations differ in what they cost and what they allow. The polymorphism topic measured the first three of these, so the table here only adds what is specific to Strategy."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Holding it as"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Chosen"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Swappable at run time"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Open to types you never saw"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Bytes in the object"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::unique_ptr<Strategy>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "run time"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes, by deriving"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "8, plus a heap object"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::function<R(Args)>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "run time"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes, any callable"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "32"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "A template parameter"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "compile time"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes, any type that fits the concept"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0 for a stateless one"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "A "
+          },
+          {
+           "t": "code",
+           "v": "std::variant"
+          },
+          {
+           "t": "text",
+           "v": " of settings"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "run time"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no, the list is closed"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the largest alternative plus a tag"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A Strategy is one operation, which is what makes "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " fit it so closely: the one thing "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " cannot do is carry a second operation. The moment the strategy needs "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "describe"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " is out, and the choice is between a base class, a variant, and the type-erased value the polymorphism topic built by hand. Iglberger's Guideline 23 argues for that value-based form over a base class wherever it fits, because a value copies with the object that holds it and needs no "
+        },
+        {
+         "t": "code",
+         "v": "clone"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What each one costs per call is worth measuring rather than guessing. Here is the loop. The step keeps the index and advances it on every call, so each call depends on the one before and the compiler cannot vectorise any version away:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "struct Clamp {  // the same body behind all four holders\n  std::span<const std::int32_t> readings;\n  std::int32_t min_mm;\n  std::int32_t max_mm;\n  mutable std::int64_t at = 0;\n  [[nodiscard]] std::int32_t apply() const {\n    at = (at + 1) & 2047;  // 2048 readings, 8 KB, resident in L1\n    const std::int32_t mm = readings[static_cast<std::size_t>(at)];\n    return mm < min_mm ? min_mm : (mm > max_mm ? max_mm : mm);\n  }\n};\n// The timed loop, written once per holder; only the type of `step` changes.\nstd::int64_t acc = 0;\nfor (std::int64_t k = 0; k < 50'000'000; ++k) acc += step.apply();"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The body writes the clamp out by hand rather than calling "
+        },
+        {
+         "t": "code",
+         "v": "std::clamp"
+        },
+        {
+         "t": "text",
+         "v": ", which is the one place on this page where that is the right choice: "
+        },
+        {
+         "t": "code",
+         "v": "std::clamp"
+        },
+        {
+         "t": "text",
+         "v": " takes and returns "
+        },
+        {
+         "t": "code",
+         "v": "const T&"
+        },
+        {
+         "t": "text",
+         "v": ", and swapping it in moved every row of the table, the inlined ones by a factor of two. A benchmark has to measure the dispatch, not the argument passing of the body."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rest of the program is the three other holders wrapping the same body, the run-time class chosen behind a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Step>"
+        },
+        {
+         "t": "text",
+         "v": " so the compiler cannot see its type, a timing loop that keeps the best of eleven, and a check that all four rows return the same "
+        },
+        {
+         "t": "code",
+         "v": "acc"
+        },
+        {
+         "t": "text",
+         "v": ", which they do: 139,348,834,314, or a mean clamped reading of 2,787. It is built with GCC 13.3 and run on an Intel Core i7-14700HX:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -O2 -Wall -Wextra strategy_cost.cpp -o strategy_cost\n./strategy_cost     # best of eleven for each row"
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "The strategy is held as"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Best of eleven, 50 million calls, over 16 runs of the program"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "a template parameter, a plain settings struct"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "19 to 21 ms"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "const Step&"
+          },
+          {
+           "t": "text",
+           "v": ", whose static type is a "
+          },
+          {
+           "t": "code",
+           "v": "final"
+          },
+          {
+           "t": "text",
+           "v": " leaf"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "19 to 21 ms"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "const Step&"
+          },
+          {
+           "t": "text",
+           "v": " with the class chosen at run time, or "
+          },
+          {
+           "t": "code",
+           "v": "std::function<int32_t()>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "57 to 66 ms"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first two rows are the same because the compiler can see the exact type in both and inlines the call; "
+        },
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": " on a leaf class is what lets it do that for the second. That is the row worth remembering, because it is stable and it is the whole compile-time argument in one line."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last two forms share a row because the gap between them is not stable. In this build the "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " is the faster of the two by about 5 ms; an earlier build of the same benchmark, differing only in how the loop added up its result, put them in the opposite order by a wider margin. That is untimed work outside the call changing the answer, so the ordering is a property of the build rather than of the mechanism. Treat them as one thing. A call the compiler cannot inline costs roughly 0.4 to 0.9 ns more than one it can, counting this measurement and the dependency injection topic's."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three warnings come with the number. These are at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", and every example on this page builds unoptimised with sanitizers, where all the rows are slower and closer together. They are one machine in one session, over a body that does an increment, a load and a clamp; on a body that does real work the difference disappears into the noise, which is why Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "Per.6",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+        },
+        {
+         "t": "text",
+         "v": " refuses speed claims without a measurement of your own case. And a benchmark of this shape is delicate: an earlier version of this loop ran over a 200 MB array, where the inlined row was limited by memory bandwidth rather than by the call, and it reported a difference three times too large."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The standard library gives you more Strategies than the comparator and the deleter. "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": " takes a hash and an equality as template parameters, which the hash-map topic used. "
+        },
+        {
+         "t": "code",
+         "v": "std::pmr::memory_resource"
+        },
+        {
+         "t": "text",
+         "v": " is the same pattern as a base class, because an allocator has to be chosen at run time. And a lambda passed to "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::for_each"
+        },
+        {
+         "t": "text",
+         "v": " is a Strategy with a lifetime of one call. Iglberger's Guideline 13 makes the general point: the patterns are already in the library you use every day, under the names of their parameters."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A speed planner turns a clearance reading into a speed. Which profile it uses is a decision the node makes, and a test rig changes it while the robot is running. Here is the same planner with the strategy held three ways."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <utility>\n\n// The settings of each profile, one struct per profile, so no two numbers can be swapped.\nstruct Cautious {\n  std::int32_t stop_below_mm;\n  std::int32_t top_mm_s;\n};\nstruct Nominal {\n  std::int32_t stop_below_mm;\n  std::int32_t top_mm_s;\n};\nstruct Hold {\n  std::int32_t speed_mm_s;\n};\n\n[[nodiscard]] constexpr std::int32_t speed_of(Cautious p, std::int32_t clearance_mm) {\n  return clearance_mm < p.stop_below_mm ? 0 : std::min(clearance_mm / 4, p.top_mm_s);\n}\n[[nodiscard]] constexpr std::int32_t speed_of(Nominal p, std::int32_t clearance_mm) {\n  return clearance_mm < p.stop_below_mm ? 0 : std::min(clearance_mm / 2, p.top_mm_s);\n}\n[[nodiscard]] constexpr std::int32_t speed_of(Hold p, std::int32_t) { return p.speed_mm_s; }\n\n// 1. The strategy behind an interface: swappable at run time, open to profiles this file never saw.\nclass Profile {\n public:\n  Profile() = default;\n  Profile(const Profile&) = delete;\n  Profile& operator=(const Profile&) = delete;\n  virtual ~Profile() = default;\n  [[nodiscard]] virtual std::int32_t speed_mm_s(std::int32_t clearance_mm) const = 0;\n};\n\ntemplate <typename Settings>\nclass SettingsProfile final : public Profile {\n public:\n  explicit SettingsProfile(Settings settings) : settings_(settings) {}\n  [[nodiscard]] std::int32_t speed_mm_s(std::int32_t clearance_mm) const override {\n    return speed_of(settings_, clearance_mm);\n  }\n\n private:\n  Settings settings_;\n};\n\nclass OwningPlanner {\n public:\n  explicit OwningPlanner(std::unique_ptr<Profile> profile) : profile_(std::move(profile)) {}\n  void use(std::unique_ptr<Profile> profile) { profile_ = std::move(profile); }\n  [[nodiscard]] std::int32_t speed_mm_s(std::int32_t clearance_mm) const {\n    return profile_->speed_mm_s(clearance_mm);\n  }\n\n private:\n  std::unique_ptr<Profile> profile_;\n};\n\n// 2. The strategy as a value: swappable at run time, copyable, one operation only.\nclass CallablePlanner {\n public:\n  explicit CallablePlanner(std::function<std::int32_t(std::int32_t)> profile) : profile_(std::move(profile)) {}\n  void use(std::function<std::int32_t(std::int32_t)> profile) { profile_ = std::move(profile); }\n  [[nodiscard]] std::int32_t speed_mm_s(std::int32_t clearance_mm) const { return profile_(clearance_mm); }\n\n private:\n  std::function<std::int32_t(std::int32_t)> profile_;\n};\n\n// 3. The strategy as a template parameter: fixed where the planner is built, no indirect call.\ntemplate <typename Settings>\nclass StaticPlanner {\n public:\n  explicit StaticPlanner(Settings settings) : settings_(settings) {}\n  [[nodiscard]] std::int32_t speed_mm_s(std::int32_t clearance_mm) const {\n    return speed_of(settings_, clearance_mm);\n  }\n\n private:\n  [[no_unique_address]] Settings settings_;\n};\n\nint main() {\n  const Cautious cautious{.stop_below_mm = 800, .top_mm_s = 400};\n  const Nominal nominal{.stop_below_mm = 400, .top_mm_s = 800};\n\n  OwningPlanner owning(std::make_unique<SettingsProfile<Cautious>>(cautious));\n  CallablePlanner callable([cautious](std::int32_t mm) { return speed_of(cautious, mm); });\n  const StaticPlanner<Cautious> fixed(cautious);\n\n  std::cout << \"clearance  interface  function  template\\n\";\n  for (const std::int32_t mm : {200, 600, 1500, 4000}) {\n    std::cout << std::format(\"{:>9}  {:>9}  {:>8}  {:>8}\\n\", mm, owning.speed_mm_s(mm), callable.speed_mm_s(mm),\n                             fixed.speed_mm_s(mm));\n  }\n\n  // The same two planners, now running the nominal profile. The third cannot change.\n  owning.use(std::make_unique<SettingsProfile<Nominal>>(nominal));\n  callable.use([nominal](std::int32_t mm) { return speed_of(nominal, mm); });\n  std::cout << \"after swapping to the nominal profile at run time:\\n\";\n  for (const std::int32_t mm : {200, 600, 1500, 4000}) {\n    std::cout << std::format(\"{:>9}  {:>9}  {:>8}  {:>8}\\n\", mm, owning.speed_mm_s(mm), callable.speed_mm_s(mm),\n                             fixed.speed_mm_s(mm));\n  }\n\n  owning.use(std::make_unique<SettingsProfile<Hold>>(Hold{.speed_mm_s = 150}));\n  std::cout << std::format(\"a tow test holds {} mm/s at 200 mm of clearance\\n\", owning.speed_mm_s(200));\n\n  std::cout << std::format(\"sizeof: OwningPlanner {}, plus {} on the heap\\n\", sizeof(OwningPlanner),\n                           sizeof(SettingsProfile<Cautious>));\n  std::cout << std::format(\"sizeof: CallablePlanner {}\\n\", sizeof(CallablePlanner));\n  std::cout << std::format(\"sizeof: StaticPlanner<Cautious> {}, StaticPlanner<Hold> {}\\n\",\n                           sizeof(StaticPlanner<Cautious>), sizeof(StaticPlanner<Hold>));\n}"
+      },
+      {
+       "t": "output",
+       "text": "clearance  interface  function  template\n      200          0         0         0\n      600          0         0         0\n     1500        375       375       375\n     4000        400       400       400\nafter swapping to the nominal profile at run time:\n      200          0         0         0\n      600        300       300         0\n     1500        750       750       375\n     4000        800       800       400\na tow test holds 150 mm/s at 200 mm of clearance\nsizeof: OwningPlanner 8, plus 16 on the heap\nsizeof: CallablePlanner 32\nsizeof: StaticPlanner<Cautious> 8, StaticPlanner<Hold> 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The third column does not move after the swap. "
+         },
+         {
+          "t": "code",
+          "v": "StaticPlanner<Cautious>"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "StaticPlanner<Nominal>"
+         },
+         {
+          "t": "text",
+          "v": " are different types, so "
+         },
+         {
+          "t": "code",
+          "v": "use"
+         },
+         {
+          "t": "text",
+          "v": " cannot exist: the only way to change that planner is to build another one. That is the whole of the compile-time trade in one line of output."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The arithmetic lives in three free functions that no class owns, and all three planners call the same ones. "
+         },
+         {
+          "t": "code",
+          "v": "SettingsProfile<Settings>"
+         },
+         {
+          "t": "text",
+          "v": " exists to put a vtable on top of a plain struct, which is the External Polymorphism pattern Iglberger reaches Type Erasure through, Guideline 31: the settings structs derive from nothing and know nothing about "
+         },
+         {
+          "t": "code",
+          "v": "Profile"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "StaticPlanner<Cautious>"
+         },
+         {
+          "t": "text",
+          "v": " is 8 bytes and "
+         },
+         {
+          "t": "code",
+          "v": "StaticPlanner<Hold>"
+         },
+         {
+          "t": "text",
+          "v": " is 4, in both cases exactly the settings, because "
+         },
+         {
+          "t": "code",
+          "v": "[[no_unique_address]]"
+         },
+         {
+          "t": "text",
+          "v": " leaves no room for a strategy that has no state. The interface version is 8 bytes plus a 16-byte heap object: 8 for the vptr and 8 for the two "
+         },
+         {
+          "t": "code",
+          "v": "int32_t"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Hold"
+         },
+         {
+          "t": "text",
+          "v": " is a profile the planner would not have had if the variation had gone into subclasses of the planner. It ignores its input entirely, which is legal for a strategy and would be strange for a "
+         },
+         {
+          "t": "code",
+          "v": "HoldingPlanner"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "owning.use(...)"
+         },
+         {
+          "t": "text",
+          "v": " takes the new strategy by "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr"
+         },
+         {
+          "t": "text",
+          "v": " and the old one is destroyed by the assignment. "
+         },
+         {
+          "t": "code",
+          "v": "callable.use(...)"
+         },
+         {
+          "t": "text",
+          "v": " takes it by value and moves it in. Both are constructor injection with a setter added on purpose, because swapping mid-run is the requirement."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "evaluators",
+   "title": "Replaceable scenario-result evaluators",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. A test bench finishes a scenario and records a "
+        },
+        {
+         "t": "code",
+         "v": "Run"
+        },
+        {
+         "t": "text",
+         "v": ": a name, the distance travelled in millimetres as "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": ", a duration as "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::milliseconds"
+        },
+        {
+         "t": "text",
+         "v": ", a count of collisions, the worst lateral error in millimetres, and the number of samples recorded. An evaluator turns a "
+        },
+        {
+         "t": "code",
+         "v": "Run"
+        },
+        {
+         "t": "text",
+         "v": " into a "
+        },
+        {
+         "t": "code",
+         "v": "Verdict"
+        },
+        {
+         "t": "text",
+         "v": ", which holds a "
+        },
+        {
+         "t": "code",
+         "v": "bool passed"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "std::string reason"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write three rules as settings structs with a free "
+        },
+        {
+         "t": "code",
+         "v": "judge"
+        },
+        {
+         "t": "text",
+         "v": " overload for each: "
+        },
+        {
+         "t": "code",
+         "v": "NoContact{}"
+        },
+        {
+         "t": "text",
+         "v": " passes when there were no collisions; "
+        },
+        {
+         "t": "code",
+         "v": "LateralWithin{max_error_mm}"
+        },
+        {
+         "t": "text",
+         "v": " passes when the worst lateral error is within its limit; "
+        },
+        {
+         "t": "code",
+         "v": "FinishesWithin{budget}"
+        },
+        {
+         "t": "text",
+         "v": " passes when the duration is within its budget. Each "
+        },
+        {
+         "t": "code",
+         "v": "judge"
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<Verdict>"
+        },
+        {
+         "t": "text",
+         "v": ", and returns nothing when the run recorded no samples, because a run with no data has no verdict rather than a failing one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then hold the three evaluators two ways and show that they agree."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "An "
+         },
+         {
+          "t": "code",
+          "v": "Evaluator"
+         },
+         {
+          "t": "text",
+          "v": " interface with "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] virtual std::optional<Verdict> judge(const Run&) const"
+         },
+         {
+          "t": "text",
+          "v": ", a class template that wraps one settings struct and derives from it, and a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::unique_ptr<Evaluator>>"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::function<std::optional<Verdict>(const Run&)>>"
+         },
+         {
+          "t": "text",
+          "v": " of lambdas."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run three records through both: a clean one, one with a collision and a lateral error over the limit and a duration over budget, and one with zero samples. Print each verdict and whether the two holders agreed. Then replace the second element of the callable list with a looser limit and print the new verdict for the second run. Finish by printing "
+        },
+        {
+         "t": "code",
+         "v": "sizeof"
+        },
+        {
+         "t": "text",
+         "v": " of one element of each vector and of each object behind a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer four questions in writing. Which of the two holders lets another package add an evaluator without this file changing? Which of them can a caller replace one element of, and what does that cost? Which allocates, and how much? What changes in each when every evaluator must also report a short name of its own?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <iterator>\n#include <memory>\n#include <optional>\n#include <string>\n#include <vector>\n\nusing namespace std::chrono_literals;\n\nstruct Run {\n  std::string name;\n  std::int64_t travelled_mm;\n  std::chrono::milliseconds duration;\n  std::int32_t collisions;\n  std::int32_t max_lateral_error_mm;\n  std::int32_t samples;\n};\n\nstruct Verdict {\n  bool passed;\n  std::string reason;\n};\n\n// One settings struct per rule, so no two numbers can be swapped at the call.\nstruct NoContact {};\nstruct LateralWithin {\n  std::int32_t max_error_mm;\n};\nstruct FinishesWithin {\n  std::chrono::milliseconds budget;\n};\n\n[[nodiscard]] std::optional<Verdict> judge(NoContact, const Run& run) {\n  if (run.samples == 0) return std::nullopt;\n  return Verdict{.passed = run.collisions == 0, .reason = std::format(\"contacts: {}\", run.collisions)};\n}\n\n[[nodiscard]] std::optional<Verdict> judge(LateralWithin rule, const Run& run) {\n  if (run.samples == 0) return std::nullopt;\n  return Verdict{.passed = run.max_lateral_error_mm <= rule.max_error_mm,\n                 .reason = std::format(\"worst offset {} mm, limit {} mm\", run.max_lateral_error_mm, rule.max_error_mm)};\n}\n\n[[nodiscard]] std::optional<Verdict> judge(FinishesWithin rule, const Run& run) {\n  if (run.samples == 0) return std::nullopt;\n  return Verdict{.passed = run.duration <= rule.budget,\n                 .reason = std::format(\"{} taken, budget {}\", run.duration, rule.budget)};\n}\n\n// 1. The evaluators behind an interface.\nclass Evaluator {\n public:\n  Evaluator() = default;\n  Evaluator(const Evaluator&) = delete;\n  Evaluator& operator=(const Evaluator&) = delete;\n  virtual ~Evaluator() = default;\n  [[nodiscard]] virtual std::optional<Verdict> judge(const Run& run) const = 0;\n};\n\ntemplate <typename Rule>\nclass RuleEvaluator final : public Evaluator {\n public:\n  explicit RuleEvaluator(Rule rule) : rule_(rule) {}\n  [[nodiscard]] std::optional<Verdict> judge(const Run& run) const override { return ::judge(rule_, run); }\n\n private:\n  [[no_unique_address]] Rule rule_;\n};\n\n// 2. The same evaluators as values.\nusing Judging = std::function<std::optional<Verdict>(const Run&)>;\n\n[[nodiscard]] std::string shown(const std::optional<Verdict>& verdict) {\n  if (!verdict) return \"no samples\";\n  return std::format(\"{} ({})\", verdict->passed ? \"pass\" : \"FAIL\", verdict->reason);\n}\n\nint main() {\n  const LateralWithin lateral{.max_error_mm = 120};\n  const FinishesWithin budget{.budget = 20s};\n\n  std::vector<std::unique_ptr<Evaluator>> objects;\n  objects.push_back(std::make_unique<RuleEvaluator<NoContact>>(NoContact{}));\n  objects.push_back(std::make_unique<RuleEvaluator<LateralWithin>>(lateral));\n  objects.push_back(std::make_unique<RuleEvaluator<FinishesWithin>>(budget));\n\n  std::vector<Judging> callables{\n      [](const Run& run) { return judge(NoContact{}, run); },\n      [lateral](const Run& run) { return judge(lateral, run); },\n      [budget](const Run& run) { return judge(budget, run); },\n  };\n\n  const std::vector<Run> runs{\n      {.name = \"straight_10m\",\n       .travelled_mm = 10'020,\n       .duration = 18'400ms,\n       .collisions = 0,\n       .max_lateral_error_mm = 74,\n       .samples = 920},\n      {.name = \"slalom\",\n       .travelled_mm = 12'300,\n       .duration = 26'100ms,\n       .collisions = 1,\n       .max_lateral_error_mm = 310,\n       .samples = 1305},\n      {.name = \"aborted\", .travelled_mm = 0, .duration = 0ms, .collisions = 0, .max_lateral_error_mm = 0, .samples = 0},\n  };\n\n  for (const Run& run : runs) {\n    std::cout << std::format(\"{}\\n\", run.name);\n    for (std::ptrdiff_t k = 0; k < std::ssize(objects); ++k) {\n      const std::string from_object = shown(objects[k]->judge(run));\n      const std::string from_callable = shown(callables[k](run));\n      std::cout << std::format(\"  rule {}: {:<44} agree: {}\\n\", k, from_object, from_object == from_callable);\n    }\n  }\n\n  // Replacing one rule in a list that is already built.\n  callables[1] = [](const Run& run) { return judge(LateralWithin{.max_error_mm = 400}, run); };\n  std::cout << std::format(\"slalom under a 400 mm limit: {}\\n\", shown(callables[1](runs[1])));\n\n  std::cout << std::format(\"sizeof one element: unique_ptr {}, function {}\\n\", sizeof(objects.front()),\n                           sizeof(callables.front()));\n  std::cout << std::format(\"sizeof each object on the heap: {}, {}, {}\\n\", sizeof(RuleEvaluator<NoContact>),\n                           sizeof(RuleEvaluator<LateralWithin>), sizeof(RuleEvaluator<FinishesWithin>));\n}"
+      },
+      {
+       "t": "output",
+       "text": "straight_10m\n  rule 0: pass (contacts: 0)                           agree: true\n  rule 1: pass (worst offset 74 mm, limit 120 mm)      agree: true\n  rule 2: pass (18400ms taken, budget 20000ms)         agree: true\nslalom\n  rule 0: FAIL (contacts: 1)                           agree: true\n  rule 1: FAIL (worst offset 310 mm, limit 120 mm)     agree: true\n  rule 2: FAIL (26100ms taken, budget 20000ms)         agree: true\naborted\n  rule 0: no samples                                   agree: true\n  rule 1: no samples                                   agree: true\n  rule 2: no samples                                   agree: true\nslalom under a 400 mm limit: pass (worst offset 310 mm, limit 400 mm)\nsizeof one element: unique_ptr 8, function 32\nsizeof each object on the heap: 8, 16, 16"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The four answers. Both holders are open: another package can derive from "
+        },
+        {
+         "t": "code",
+         "v": "Evaluator"
+        },
+        {
+         "t": "text",
+         "v": ", or write a lambda with the right signature, and neither needs this file. The callable list is the one a caller can rewrite element by element with an assignment, as the 400 mm line shows, because a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " is a value; assigning into the "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " list works too, but it means building a new object on the heap. Only the interface list allocates, 8 bytes for "
+        },
+        {
+         "t": "code",
+         "v": "RuleEvaluator<NoContact>"
+        },
+        {
+         "t": "text",
+         "v": ", which is a vptr and nothing else, and 16 for the two that carry settings. And when every evaluator must also report a name, the interface grows a second pure virtual function and all three wrappers gain a line, while the "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " list cannot express it at all and has to become a small struct holding a name and a callable, or a type-erased value."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two details in the solution are worth keeping. "
+        },
+        {
+         "t": "code",
+         "v": "RuleEvaluator<NoContact>"
+        },
+        {
+         "t": "text",
+         "v": " holds a "
+        },
+        {
+         "t": "code",
+         "v": "NoContact"
+        },
+        {
+         "t": "text",
+         "v": " that has no members, and "
+        },
+        {
+         "t": "code",
+         "v": "[[no_unique_address]]"
+        },
+        {
+         "t": "text",
+         "v": " keeps the object at the size of its vptr. And the "
+        },
+        {
+         "t": "code",
+         "v": "agree"
+        },
+        {
+         "t": "text",
+         "v": " column compares the printed strings rather than the verdicts, which is a cheap way to compare two values that have no "
+        },
+        {
+         "t": "code",
+         "v": "operator=="
+        },
+        {
+         "t": "text",
+         "v": "; giving "
+        },
+        {
+         "t": "code",
+         "v": "Verdict"
+        },
+        {
+         "t": "text",
+         "v": " a defaulted "
+        },
+        {
+         "t": "code",
+         "v": "operator=="
+        },
+        {
+         "t": "text",
+         "v": " would be the honest fix in real code."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "alternatives",
+   "title": "When an if, a switch or a lambda is enough",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Strategy earns its keep when the set of behaviours is open and the choice is made somewhere other than the code that runs it. When either half is missing, the pattern costs more than it returns."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two behaviours that will never be three do not need it. The worked example's first version is about forty lines for an interface, a wrapper template and an owning planner. The honest version of two fixed behaviours is:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// The two modes the robot will ever have, in the one place that chooses.\nenum class Mode { driving, towing };\n\n[[nodiscard]] constexpr std::int32_t speed_mm_s(std::int32_t clearance_mm, Mode mode) {\n  if (mode == Mode::towing) return 150;\n  return clearance_mm < 800 ? 0 : std::min(clearance_mm / 4, 400);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The parameter is an enumeration rather than a "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": ", because Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.4",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+        },
+        {
+         "t": "text",
+         "v": " asks for types that say what they mean and a "
+        },
+        {
+         "t": "code",
+         "v": "true"
+        },
+        {
+         "t": "text",
+         "v": " at a call site says nothing. The shape is the point: one function, one branch, nothing to inject and nothing to own. Iglberger's Guideline 5 says the same from the other side, that designing for extension before there is a second case is a guess with a maintenance cost attached."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A set that is closed, because a protocol or a parameter file fixes it, wants an enumeration and a switch rather than a hierarchy, and the reason is that the compiler then finds every place you forgot:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "not handled in switch",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n\nenum class ProfileKind { cautious, nominal, hold };\n\n// A closed set, chosen by a switch. The hold profile arrived later and this was not updated.\n[[nodiscard]] std::int32_t top_speed_mm_s(ProfileKind kind) {\n  switch (kind) {\n    case ProfileKind::cautious:\n      return 400;\n    case ProfileKind::nominal:\n      return 800;\n  }\n  return 0;\n}\n\nint main() {\n  std::cout << std::format(\"{}\\n\", top_speed_mm_s(ProfileKind::hold));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 stops with "
+        },
+        {
+         "t": "code",
+         "v": "enumeration value ‘hold’ not handled in switch [-Werror=switch]"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "-Wswitch"
+        },
+        {
+         "t": "text",
+         "v": " is part of "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": ", and it only fires when the switch has no "
+        },
+        {
+         "t": "code",
+         "v": "default"
+        },
+        {
+         "t": "text",
+         "v": " label, so a "
+        },
+        {
+         "t": "code",
+         "v": "default: return 0;"
+        },
+        {
+         "t": "text",
+         "v": " would have thrown the check away and shipped a silent zero. The trailing "
+        },
+        {
+         "t": "code",
+         "v": "return 0"
+        },
+        {
+         "t": "text",
+         "v": " after the switch is there for the case where the value is not one of the three, which a cast or a corrupted parameter can produce; it does not disable the warning. "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::visit"
+        },
+        {
+         "t": "text",
+         "v": " give the same completeness check with data attached to each alternative, which the templates topic showed, and Iglberger's Guideline 17 is the case for reaching for "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": " where a class hierarchy would otherwise go."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third failure belongs to "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " alone. It has an empty state, and calling it in that state is an exception rather than a compile error:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <utility>\n\nclass CallablePlanner {\n public:\n  CallablePlanner() = default;  // built without a profile: this is the bug\n  void use(std::function<std::int32_t(std::int32_t)> profile) { profile_ = std::move(profile); }\n  [[nodiscard]] std::int32_t speed_mm_s(std::int32_t clearance_mm) const { return profile_(clearance_mm); }\n\n private:\n  std::function<std::int32_t(std::int32_t)> profile_;\n};\n\nint main() {\n  CallablePlanner planner;\n  try {\n    std::cout << std::format(\"speed at 1500 mm: {}\\n\", planner.speed_mm_s(1500));\n  } catch (const std::bad_function_call& e) {\n    std::cout << std::format(\"calling an empty std::function threw: {}\\n\", e.what());\n  }\n\n  planner.use([](std::int32_t mm) { return mm / 2; });\n  std::cout << std::format(\"after use(): speed at 1500 mm is {}\\n\", planner.speed_mm_s(1500));\n}"
+      },
+      {
+       "t": "output",
+       "text": "calling an empty std::function threw: bad_function_call\nafter use(): speed at 1500 mm is 750"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A default constructor that leaves the strategy empty turns a compile-time question into a run-time one, and the same hole exists for a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Profile>"
+        },
+        {
+         "t": "text",
+         "v": " member that is allowed to be null. Delete the default constructor and require the strategy in the constructor, which is the dependency injection topic's rule, and the state cannot be reached. A moved-from "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " is in that state too: the standard leaves its value unspecified, so a planner that has been moved from may only be assigned to or destroyed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two naming failures are worth watching for in a review. A class called "
+        },
+        {
+         "t": "code",
+         "v": "Strategy"
+        },
+        {
+         "t": "text",
+         "v": " that holds a queue and remembers what it has done is not a Strategy, because it is not a property of its owner; that is Command, and it wants a different interface. And a lambda that captures a reference to the object that holds it, then outlives it, is a dangling strategy: capture by value, or store what it needs, which is the same rule the topic on references gave for "
+        },
+        {
+         "t": "code",
+         "v": "string_view"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Finally, the reason Strategy exists rather than subclassing the algorithm. Putting the variation in a "
+        },
+        {
+         "t": "code",
+         "v": "CautiousPlanner"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "NominalPlanner"
+        },
+        {
+         "t": "text",
+         "v": " looks smaller today, and it multiplies: with three profiles and two logging modes it is six classes, and the next axis makes it twelve. A Strategy held as a member is one class and three settings structs, and the next axis is a second member. Iglberger's Guideline 20, favour composition over inheritance, is the same advice the polymorphism topic gave for filter chains."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what Strategy isolates and how that differs from Command. Name the four ways to hold one, with the bytes each costs and whether it can be swapped after construction. Say what an uninlinable call cost per call at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", on what machine, and what makes the compiler able to remove that cost. Give two Strategies the standard library already hands you. Then give the three cases where the pattern is the wrong answer: two fixed behaviours, a closed set that an enumeration and a switch check better, and a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " that nobody filled."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Where is the Strategy in "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::sort(v, std::ranges::greater{})"
+     },
+     {
+      "t": "text",
+      "v": " and in "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr<FILE, FileCloser>"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the measured size of "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " with a stateless deleter, a function pointer deleter and a "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " deleter?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which of the four ways of holding a Strategy can be swapped after the object is built, and which costs nothing per object?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What can a base class Strategy do that a "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " cannot?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "At "
+     },
+     {
+      "t": "code",
+      "v": "-O2"
+     },
+     {
+      "t": "text",
+      "v": " on the machine the page names, what did a Strategy call the compiler could not inline cost per call, what made the template row and the "
+     },
+     {
+      "t": "code",
+      "v": "final"
+     },
+     {
+      "t": "text",
+      "v": " leaf row identical, and why do the other two share a row?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which is right for a set of profiles fixed by a parameter file, and what does the compiler do for you there?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What happens when you call a "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " that was never given a target, and what removes that state?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Three profiles and two logging modes: how many classes does subclassing the planner need, and how many does Strategy need?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: a planner holding its strategy as a "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", as a "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " and as a template parameter, with the one thing the third cannot do."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, C++ Software Design, O'Reilly 2022: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+     },
+     {
+      "t": "text",
+      "v": ". Guideline 5 on not designing for extension too early, Guideline 13 on the patterns already in the standard library, Guideline 17 on "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": ", Guideline 19 on Strategy isolating how, Guideline 20 on composition, Guideline 21 on Command isolating what, Guideline 23 on value-based Strategy, and Guideline 31 on External Polymorphism."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gamma, Helm, Johnson and Vlissides, Design Patterns, Addison-Wesley 1994: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "behavioural chapter",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+     },
+     {
+      "t": "text",
+      "v": ", which is where Strategy is defined as one base class with one operation."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Design Patterns, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_design_patterns/back_to_basics_design_patterns__michael_shah__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=2UUqX2eIdSM"
+     },
+     {
+      "t": "text",
+      "v": ". What a design pattern is, the three categories the 1994 catalogue uses, and Singleton, Adapter and Iterator worked through in C++."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Inbal Levi, Back to Basics: Virtual Dispatch and its Alternatives, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_virtual_dispatch_and_its_alternatives/back_to_basics_virtual_dispatch_and_its_alternatives__inbal_levi__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=jBnIMEb2GhA"
+     },
+     {
+      "t": "text",
+      "v": ". Virtual calls measured against the compile-time alternatives, and how much the answer depends on the optimisation level."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Comparators and projections as the parameters that make an algorithm reusable."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Pete Muldoon, Dependency Injection in C++: A Practical Guide, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Dependency_Injection_in_Cpp.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=as5Z45G59Ws"
+     },
+     {
+      "t": "text",
+      "v": ", whose title differs. A polymorphic function wrapper as the way to inject exactly one operation."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "T.40",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-fo"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "C.139",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-final"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "ranges::sort",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/sort"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "unique_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::function",
+      "href": "https://en.cppreference.com/cpp/utility/functional/function"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "bad_function_call",
+      "href": "https://en.cppreference.com/cpp/utility/functional/bad_function_call"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "GCC 13, "
+     },
+     {
+      "t": "a",
+      "v": "warning options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc-13.3.0/gcc/Warning-Options.html"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "-Wswitch"
+     },
+     {
+      "t": "text",
+      "v": ", what turns it off, and its place in "
+     },
+     {
+      "t": "code",
+      "v": "-Wall"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,2258 @@
+{
+ "id": "ros-executors",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A node runs a controller on a 20 Hz timer and offers a service whose callback takes 2 seconds. Both were created with the node's defaults, and "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": " calls "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::spin(node)"
+     },
+     {
+      "t": "text",
+      "v": ". Answer three questions on paper. What does the timer do while the service callback runs? How many timer callbacks does the node run in the second after the service returns? And what changes if you replace "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::spin(node)"
+     },
+     {
+      "t": "text",
+      "v": " with a "
+     },
+     {
+      "t": "code",
+      "v": "MultiThreadedExecutor"
+     },
+     {
+      "t": "text",
+      "v": " on an eight-core machine and change nothing else? Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The timer does not fire. "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::spin"
+     },
+     {
+      "t": "text",
+      "v": " runs a single-threaded executor: one thread takes one ready callback at a time, and while that thread is inside the service callback it takes nothing else. For those 2 seconds the node runs no timer, no subscription callback and no second service request."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "In the second after the service returns, the timer runs 20 times, not 60. rcl does not queue the periods that passed. When a timer is overdue it moves the next call time forward by whole periods and calls the callback once ("
+     },
+     {
+      "t": "a",
+      "v": "rcl/src/rcl/timer.c",
+      "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/src/rcl/timer.c"
+     },
+     {
+      "t": "text",
+      "v": "). Missed ticks are lost, not owed."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Nothing changes with the multi-threaded executor. Every entity created without a callback group belongs to the node's default group, and that group is mutually exclusive, so no two of its callbacks run at the same time. Eight threads that are all forbidden to take a second callback out of the same group behave like one. The Jazzy guide on callback groups puts it the same way: a node whose entities all share one mutually exclusive group acts as if a single-threaded executor were running it."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if all three answers are right. Getting the first two and missing the third is a partial pass, and it is the usual gap: the executor decides how many threads exist, the callback groups decide what those threads are allowed to do. Answering that the timer queues its missed ticks is a fail, because it leads to code that measures time by counting its own callbacks."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "An executor decides which thread runs a node's callbacks: it watches a wait set of timers, subscriptions, services and clients, and hands one ready one at a time to a thread. "
+    },
+    {
+     "t": "code",
+     "v": "rclcpp::spin"
+    },
+    {
+     "t": "text",
+     "v": " is the simplest case: one thread takes one ready callback, runs it, and asks again. A "
+    },
+    {
+     "t": "i",
+     "v": "callback group"
+    },
+    {
+     "t": "text",
+     "v": " decides what may run at once: a mutually exclusive group never runs two of its own callbacks together, a reentrant group lets its callbacks overlap themselves and each other, and callbacks in two different groups may always run together, whatever kind either is. Anything created without naming a group lands in the node's default, mutually exclusive group."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this solves is letting some callbacks run at once without a lock on every piece of shared state. A control loop's timer and the odometry it reads can share one mutually exclusive group, so the executor guarantees they never run together and their shared state needs no mutex; a slow, occasional service can sit in a group of its own so it never holds up that timer."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A mutually exclusive group is a lock built into the executor: only one thread may run a callback from it at a time, on any number of threads. A multi-threaded executor changes anything only once work is split across groups. Anything crossing a group boundary, a value one group's callback writes and another's reads, is a data race once two groups can run at once, needing its own protection, an atomic being the cheapest one."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake under pressure is waiting for a service's answer inside a callback sharing a mutually exclusive group with the client: the answer arrives only when a thread runs the client's callback, and every thread is forbidden from taking a second callback out of that group while the first waits, so adding threads changes nothing. A quieter version hits timers: an overdue one skips the ticks it missed and fires once, so code counting its own timer calls to measure elapsed time is wrong exactly when the node is busiest."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: a controller on a 20 Hz timer and a service whose callback takes two seconds, both in the node's default group, where the timer stops for those two seconds under "
+    },
+    {
+     "t": "code",
+     "v": "rclcpp::spin"
+    },
+    {
+     "t": "text",
+     "v": ", and stays stopped the same way after swapping in a multi-threaded executor with nothing else changed."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "executors",
+   "title": "Single and multi-threaded executors, callback groups, timers",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "rclcpp::spin(node)"
+        },
+        {
+         "t": "text",
+         "v": " is three lines of shorthand, and the Jazzy documentation on executors spells them out:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "rclcpp::executors::SingleThreadedExecutor executor;\nexecutor.add_node(node);\nexecutor.spin();"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "spin()"
+        },
+        {
+         "t": "text",
+         "v": " is a loop, and its whole body fits in a sentence: while the context is alive, ask for the next ready piece of work, run it, ask again. The Jazzy source is that short too ("
+        },
+        {
+         "t": "a",
+         "v": "single_threaded_executor.cpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executors/single_threaded_executor.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). Calling it twice on the same executor throws "
+        },
+        {
+         "t": "code",
+         "v": "std::runtime_error"
+        },
+        {
+         "t": "text",
+         "v": " with the message "
+        },
+        {
+         "t": "code",
+         "v": "spin() called while already spinning"
+        },
+        {
+         "t": "text",
+         "v": ", because the first thing "
+        },
+        {
+         "t": "code",
+         "v": "spin"
+        },
+        {
+         "t": "text",
+         "v": " does is an atomic exchange on a "
+        },
+        {
+         "t": "code",
+         "v": "spinning"
+        },
+        {
+         "t": "text",
+         "v": " flag."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "\"Ask for the next ready piece of work\" is where the design lives. The executor builds a "
+        },
+        {
+         "t": "i",
+         "v": "wait set"
+        },
+        {
+         "t": "text",
+         "v": " out of the node's timers, subscriptions, services, clients and waitables, hands it to rcl and blocks. The middleware wakes it when something is ready. What comes back is one flag per entity: this subscription has at least one message, that timer is due. Not how many messages, and not when they arrived. Messages stay in the middleware's own queue until a callback takes one, which is why the depth in the QoS profile is the queue that matters and the executor is the only thing that drains it. The Jazzy documentation calls that a deliberate difference from ROS 1, where the client library kept its own queue."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One flag per entity has a consequence people meet as a bug. The executor cannot serve messages in arrival order, because it does not know the arrival order. It walks the ready entities and takes one message from each, then waits again. The Jazzy documentation calls this round robin rather than first in, first out, and Casini and colleagues described it in their 2019 paper on ROS 2 response times. Here is the shape of it, with the middleware queues and one pass of the wait set modelled in plain C++. A callback has held the only thread for 2 seconds, odometry arrives 50 times a second into a queue of depth 10, and scans arrive 10 times a second into a queue of depth 5:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <string>\n#include <vector>\n\n// What the middleware holds for one subscription under KeepLast(depth): the newest `depth`\n// messages, plus a count of the older ones it dropped to keep them.\nclass Inbox {\n public:\n  Inbox(std::string topic, std::ptrdiff_t depth) : topic_(std::move(topic)), depth_(depth) {}\n\n  void deliver(std::int64_t seq) {\n    ++delivered_;\n    if (std::ssize(waiting_) == depth_) {\n      waiting_.pop_front();\n      ++dropped_;\n    }\n    waiting_.push_back(seq);\n  }\n\n  // The wait set carries one flag per subscription: work or no work, never how much.\n  [[nodiscard]] bool ready() const { return !waiting_.empty(); }\n\n  std::int64_t take() {\n    const std::int64_t seq = waiting_.front();\n    waiting_.pop_front();\n    return seq;\n  }\n\n  [[nodiscard]] const std::string& topic() const { return topic_; }\n\n  [[nodiscard]] std::string report() const {\n    return std::format(\"{}: {} delivered, {} dropped, {} waiting\", topic_, delivered_, dropped_,\n                       std::ssize(waiting_));\n  }\n\n private:\n  std::string topic_;\n  std::ptrdiff_t depth_;\n  std::deque<std::int64_t> waiting_;\n  std::int64_t delivered_ = 0;\n  std::int64_t dropped_ = 0;\n};\n\nint main() {\n  std::vector<Inbox> inboxes{Inbox{\"odom\", 10}, Inbox{\"scan\", 5}};\n  Inbox& odom = inboxes.front();\n  Inbox& scan = inboxes.back();\n\n  for (std::int64_t seq = 1; seq <= 100; ++seq) odom.deliver(seq);\n  for (std::int64_t seq = 1; seq <= 20; ++seq) scan.deliver(seq);\n  std::cout << odom.report() << \"\\n\" << scan.report() << \"\\n\";\n\n  // The thread is free again. Each pass over the wait set takes at most one message per subscription.\n  std::string order;\n  for (int pass = 0; pass < 3; ++pass) {\n    for (Inbox& inbox : inboxes) {\n      if (!inbox.ready()) continue;\n      if (!order.empty()) order += \", \";\n      order += std::format(\"{} {}\", inbox.topic(), inbox.take());\n    }\n  }\n  std::cout << std::format(\"three passes over the wait set: {}\\n\", order);\n}"
+      },
+      {
+       "t": "output",
+       "text": "odom: 100 delivered, 90 dropped, 10 waiting\nscan: 20 delivered, 15 dropped, 5 waiting\nthree passes over the wait set: odom 91, scan 16, odom 92, scan 17, odom 93, scan 18"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two things to take from the numbers. A 2-second callback costs 90 odometry messages and 15 scans, and no error is raised anywhere: the queue drops the oldest to make room, exactly as "
+        },
+        {
+         "t": "code",
+         "v": "KeepLast(10)"
+        },
+        {
+         "t": "text",
+         "v": " asked it to. And when the thread comes back, the first odometry message it sees is number 91, which arrived at 1.82 seconds and is 0.18 seconds old. The node is a fifth of a second behind rather than one message behind, because the queue is holding ten messages and the oldest of them is the one it has to handle first, and the 90 that were dropped never come back."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "rclcpp ships four executors."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Class"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Threads"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What it does differently"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "SingleThreadedExecutor"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The default. "
+          },
+          {
+           "t": "code",
+           "v": "rclcpp::spin"
+          },
+          {
+           "t": "text",
+           "v": " and the "
+          },
+          {
+           "t": "code",
+           "v": "component_container"
+          },
+          {
+           "t": "text",
+           "v": " process both use it"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "MultiThreadedExecutor"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "max(hardware_concurrency(), 2)"
+          },
+          {
+           "t": "text",
+           "v": " by default"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Several threads take work from the same wait set, within the limits the callback groups set"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "StaticSingleThreadedExecutor"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Collects the node's entities once instead of rescanning on every loop. For nodes that create everything at construction"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "experimental::executors::EventsExecutor"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1, plus an optional timer thread"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Entities push events into a queue instead of the executor polling a wait set, and a timers manager drives the timers"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The multi-threaded executor's constructor takes the thread count as its second argument, and 0 means "
+        },
+        {
+         "t": "code",
+         "v": "std::max(std::thread::hardware_concurrency(), 2U)"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "multi_threaded_executor.cpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executors/multi_threaded_executor.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). Ask it for one thread and it logs a warning telling you to use the single-threaded one. Each of its threads runs the same loop under a shared mutex while it picks work, then releases the mutex and runs the callback."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The events executor lives in "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::experimental::executors"
+        },
+        {
+         "t": "text",
+         "v": " in Jazzy, so its API can change between distributions. Its header describes the trade it makes: entity callbacks push an event onto a queue that you can replace, which lets you pick bounded memory or low idle cost instead of the wait-set scan ("
+        },
+        {
+         "t": "a",
+         "v": "events_executor.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/experimental/executors/events_executor/events_executor.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). Its constructor's second argument, "
+        },
+        {
+         "t": "code",
+         "v": "execute_timers_separate_thread"
+        },
+        {
+         "t": "text",
+         "v": ", defaults to false. Jazzy carries a fifth class as well, "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::executors::EventsCBGExecutor"
+        },
+        {
+         "t": "text",
+         "v": ", which combines the event queue with a thread pool that schedules per callback group; one of the component containers below runs on it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Threads alone give you nothing, because a "
+        },
+        {
+         "t": "i",
+         "v": "callback group"
+        },
+        {
+         "t": "text",
+         "v": " decides what may overlap. There are two kinds, and rclcpp's "
+        },
+        {
+         "t": "a",
+         "v": "callback_group.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/callback_group.hpp"
+        },
+        {
+         "t": "text",
+         "v": " states the contract of each. Callbacks in a mutually exclusive group are never run more than once at a time, and never at the same time as another callback of the same group. Callbacks in a reentrant group may run at the same time as themselves and as each other. Callbacks in different groups may always run at the same time, whatever the type of either group."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read that last sentence twice, because it is the one that surprises people. Two mutually exclusive groups do not exclude each other. Mutual exclusion holds inside a group, never between groups."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every node has a default callback group, and it is mutually exclusive. Anything you create without naming a group lands there, which is what makes an unmodified node safe under any executor and also what makes a multi-threaded executor pointless until you split something out. You make a group with "
+        },
+        {
+         "t": "code",
+         "v": "create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive)"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "::Reentrant"
+        },
+        {
+         "t": "text",
+         "v": ", and you pass it as the last argument of "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "create_service"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "create_client"
+        },
+        {
+         "t": "text",
+         "v": ", or through the "
+        },
+        {
+         "t": "code",
+         "v": "callback_group"
+        },
+        {
+         "t": "text",
+         "v": " field of "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::SubscriptionOptions"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::PublisherOptions"
+        },
+        {
+         "t": "text",
+         "v": ". Keep the group in a member: as with subscriptions, a group you do not hold is dropped, and the executor stops triggering its callbacks."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two further properties are worth knowing. An entity passes its group on to every callback it creates, so an action client in a group hands that group to its goal, feedback and result callbacks. And a group's mutual exclusion is one atomic flag, "
+        },
+        {
+         "t": "code",
+         "v": "can_be_taken_from_"
+        },
+        {
+         "t": "text",
+         "v": ", that a thread clears while it holds work from the group; when the work is done, the multi-threaded executor triggers a guard condition so a waiting thread rebuilds its wait set and can take the group's next callback."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That flag is also the whole deadlock. If a callback in group G waits for a result that only another callback in group G can deliver, no thread is allowed to deliver it, and both wait forever. A service response is the common case: "
+        },
+        {
+         "t": "code",
+         "v": "async_send_request"
+        },
+        {
+         "t": "text",
+         "v": " returns a future that becomes ready when the executor hands the response to the client, and if the client and the caller share one mutually exclusive group, the caller is holding the one permission needed to do that. The services topic showed the same hang under "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin"
+        },
+        {
+         "t": "text",
+         "v": "; the exercise below shows that a multi-threaded executor does not fix it on its own, and which change does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Timers belong in this picture too. "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": " runs on the node's clock, "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": " on a steady clock, and in Jazzy "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": " also takes an "
+        },
+        {
+         "t": "code",
+         "v": "autostart"
+        },
+        {
+         "t": "text",
+         "v": " flag. Both take a callback group as their third argument. A control timer in a mutually exclusive group cannot overlap itself, which is what you want for a loop that publishes commands: a second copy of the control step running in parallel with the first would compute a command from half-updated state. A timer in a reentrant group can overlap itself, and then it can hand a long tick and a short tick to two threads at once."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "None of this changes what your code computes. The executor decides when a callback runs and on which thread; it never decides what the callback works out. So the rule from the earlier topics holds, and gets sharper here: keep the node's logic in plain classes with no ROS types and no clock, take the time and the inputs as arguments, and leave the callback with the translation. A plain class is the part you can test with a "
+        },
+        {
+         "t": "code",
+         "v": "g++"
+        },
+        {
+         "t": "text",
+         "v": " command and no middleware, and it is the part whose correctness does not depend on which executor someone chose in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is a relay for the bench: it reads "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", ramps the commanded speed towards a target and publishes "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " 20 times a second, and it also offers a self-test service whose callback takes a while. The control path and the service sit in two mutually exclusive callback groups, and "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " spins the node with a multi-threaded executor."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <atomic>\n#include <chrono>\n#include <format>\n#include <memory>\n#include <string>\n\n#include <example_interfaces/srv/trigger.hpp>\n#include <geometry_msgs/msg/twist.hpp>\n#include <nav_msgs/msg/odometry.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nusing namespace std::chrono_literals;\n\n// Limits how much the commanded speed may change in one control step. No ROS and no clock in here,\n// so a test drives it directly. The two speeds travel in a struct, so they can't be swapped.\nclass Ramp {\n public:\n  struct Step {\n    double from;\n    double to;\n  };\n\n  explicit Ramp(double max_change_per_step) : max_change_(max_change_per_step) {}\n\n  [[nodiscard]] double next(Step step) const {\n    return step.from + std::clamp(step.to - step.from, -max_change_, max_change_);\n  }\n\n private:\n  double max_change_;\n};\n\nclass Relay : public rclcpp::Node {\n public:\n  using Trigger = example_interfaces::srv::Trigger;\n\n  explicit Relay(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"relay\", options) {\n    control_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);\n    checks_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);\n\n    rclcpp::SubscriptionOptions subscription_options;\n    subscription_options.callback_group = control_;\n    odometry_ = create_subscription<nav_msgs::msg::Odometry>(\n        \"odom\", rclcpp::QoS(rclcpp::KeepLast(10)),\n        [this](const nav_msgs::msg::Odometry& msg) { measured_ = msg.twist.twist.linear.x; },\n        subscription_options);\n\n    publisher_ = create_publisher<geometry_msgs::msg::Twist>(\"cmd_vel\", rclcpp::QoS(rclcpp::KeepLast(10)));\n    timer_ = create_timer(50ms, [this] { step(); }, control_);\n\n    service_ = create_service<Trigger>(\n        \"~/self_test\",\n        [this](const std::shared_ptr<Trigger::Request>, std::shared_ptr<Trigger::Response> response) {\n          response->message = self_test();\n          response->success = true;\n        },\n        rclcpp::ServicesQoS(), checks_);\n  }\n\n private:\n  // Runs in `control_`, so it never overlaps itself and never runs beside the odometry callback.\n  void step() {\n    commanded_ = ramp_.next({.from = commanded_, .to = target_});\n    geometry_msgs::msg::Twist command;\n    command.linear.x = commanded_;\n    publisher_->publish(command);\n  }\n\n  // Runs in `checks_`, on another thread, while the control loop keeps its 20 Hz.\n  [[nodiscard]] std::string self_test() const {\n    return std::format(\"measured {:.3f} m/s\", measured_.load());\n  }\n\n  Ramp ramp_{0.05};  // 0.05 m/s per 50 ms step is 1 m/s^2\n  double target_ = 0.4;\n  double commanded_ = 0.0;        // only `control_` touches this one\n  std::atomic<double> measured_;  // written in `control_`, read in `checks_`\n\n  rclcpp::CallbackGroup::SharedPtr control_;\n  rclcpp::CallbackGroup::SharedPtr checks_;\n  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_;\n  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_;\n  rclcpp::TimerBase::SharedPtr timer_;\n  rclcpp::Service<Trigger>::SharedPtr service_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::executors::MultiThreadedExecutor executor;\n  const auto node = std::make_shared<Relay>();\n  executor.add_node(node);\n  executor.spin();\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four decisions in it are worth naming."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The timer and the odometry subscription share "
+        },
+        {
+         "t": "code",
+         "v": "control_"
+        },
+        {
+         "t": "text",
+         "v": ". They both touch the state the control loop owns, and one mutually exclusive group is the cheapest lock there is: the executor will not start one while the other runs, so "
+        },
+        {
+         "t": "code",
+         "v": "commanded_"
+        },
+        {
+         "t": "text",
+         "v": " needs no mutex and the code needs no lock ordering. Put them in two different groups, or in one reentrant group, and that plain "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " becomes a data race the day someone runs the node under a multi-threaded executor."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The service is in "
+        },
+        {
+         "t": "code",
+         "v": "checks_"
+        },
+        {
+         "t": "text",
+         "v": ", so its callback runs on a second thread and the control loop keeps publishing at 20 Hz through it. That is the point of the split, and it is also where the thinking starts, because "
+        },
+        {
+         "t": "code",
+         "v": "self_test"
+        },
+        {
+         "t": "text",
+         "v": " reads a member the control group writes. Two callbacks in different groups may always run at the same time, so no callback group protects that member, and a plain "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " read while another thread writes it is a data race and undefined behaviour. "
+        },
+        {
+         "t": "code",
+         "v": "measured_"
+        },
+        {
+         "t": "text",
+         "v": " is therefore a "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic<double>"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "commanded_"
+        },
+        {
+         "t": "text",
+         "v": ", which only "
+        },
+        {
+         "t": "code",
+         "v": "control_"
+        },
+        {
+         "t": "text",
+         "v": " touches, is not. Deciding which members cross a group boundary is the work that splitting into groups creates."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Ramp"
+        },
+        {
+         "t": "text",
+         "v": " holds the arithmetic and knows nothing about ROS, threads or time. Its "
+        },
+        {
+         "t": "code",
+         "v": "Step"
+        },
+        {
+         "t": "text",
+         "v": " struct takes the two speeds by name, so "
+        },
+        {
+         "t": "code",
+         "v": "{.from = commanded_, .to = target_}"
+        },
+        {
+         "t": "text",
+         "v": " cannot be written the wrong way round, which follows the Core Guidelines' advice on making interfaces hard to misuse ("
+        },
+        {
+         "t": "a",
+         "v": "I.4",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+        },
+        {
+         "t": "text",
+         "v": "). A GoogleTest case calls "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": " with a table of steps and needs neither an executor nor a middleware."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both groups are members. Drop either "
+        },
+        {
+         "t": "code",
+         "v": "control_"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "checks_"
+        },
+        {
+         "t": "text",
+         "v": " after the constructor and the entities in it stop being served, with no error and no log line."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "deadlock",
+   "title": "Reproduce and fix a blocked callback",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes and work in a package of your own that depends on "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write two nodes."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "answer_server"
+         },
+         {
+          "t": "text",
+          "v": " offers "
+         },
+         {
+          "t": "code",
+          "v": "example_interfaces/srv/Trigger"
+         },
+         {
+          "t": "text",
+          "v": " under the name "
+         },
+         {
+          "t": "code",
+          "v": "/self_test"
+         },
+         {
+          "t": "text",
+          "v": ". Its callback sets "
+         },
+         {
+          "t": "code",
+          "v": "success"
+         },
+         {
+          "t": "text",
+          "v": " to true, sets "
+         },
+         {
+          "t": "code",
+          "v": "message"
+         },
+         {
+          "t": "text",
+          "v": " to a short string, logs one line and returns at once. Spin it with "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::spin"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "blocking_client"
+         },
+         {
+          "t": "text",
+          "v": " calls that service from a 1 Hz timer and waits for the answer inside the timer callback: send the request with "
+         },
+         {
+          "t": "code",
+          "v": "async_send_request"
+         },
+         {
+          "t": "text",
+          "v": ", wait on the returned future for up to 5 seconds, then log whether an answer arrived."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Give the client two parameters, both declared and read in its constructor. "
+         },
+         {
+          "t": "code",
+          "v": "grouping"
+         },
+         {
+          "t": "text",
+          "v": " is a string: "
+         },
+         {
+          "t": "code",
+          "v": "shared"
+         },
+         {
+          "t": "text",
+          "v": " puts the timer and the client in one mutually exclusive group, "
+         },
+         {
+          "t": "code",
+          "v": "separate"
+         },
+         {
+          "t": "text",
+          "v": " puts them in two mutually exclusive groups, and "
+         },
+         {
+          "t": "code",
+          "v": "reentrant"
+         },
+         {
+          "t": "text",
+          "v": " puts both in one reentrant group. "
+         },
+         {
+          "t": "code",
+          "v": "multi_threaded"
+         },
+         {
+          "t": "text",
+          "v": " is a bool: false spins with "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::spin"
+         },
+         {
+          "t": "text",
+          "v": ", true with a "
+         },
+         {
+          "t": "code",
+          "v": "MultiThreadedExecutor"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Have "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " build the node, read "
+         },
+         {
+          "t": "code",
+          "v": "multi_threaded"
+         },
+         {
+          "t": "text",
+          "v": " from it, and pick the executor accordingly."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run the client four ways against the running server, and write down what each prints in the first 10 seconds:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Run"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "multi_threaded"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "grouping"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "a"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "false"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "shared"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "b"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "true"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "shared"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "c"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "true"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "separate"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "d"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "true"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "reentrant"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Predict all four before you run them. Then answer, in one line each: which runs deliver an answer; why run b fails on a machine with eight cores; and what run a's node does with messages on its other topics while it is stuck."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The server is the short one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <memory>\n\n#include <example_interfaces/srv/trigger.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nclass AnswerServer : public rclcpp::Node {\n public:\n  using Trigger = example_interfaces::srv::Trigger;\n\n  explicit AnswerServer(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"answer_server\", options) {\n    service_ = create_service<Trigger>(\n        \"/self_test\", [this](const std::shared_ptr<Trigger::Request>, std::shared_ptr<Trigger::Response> response) {\n          RCLCPP_INFO(get_logger(), \"request received, answering\");\n          response->success = true;\n          response->message = \"all good\";\n        });\n  }\n\n private:\n  rclcpp::Service<Trigger>::SharedPtr service_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<AnswerServer>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The client carries the arrangement in two parameters:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <future>\n#include <memory>\n#include <string>\n\n#include <example_interfaces/srv/trigger.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nusing namespace std::chrono_literals;\n\nclass BlockingClient : public rclcpp::Node {\n public:\n  using Trigger = example_interfaces::srv::Trigger;\n\n  explicit BlockingClient(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"blocking_client\", options) {\n    const std::string grouping = declare_parameter<std::string>(\"grouping\", \"shared\");\n    multi_threaded_ = declare_parameter<bool>(\"multi_threaded\", false);\n\n    if (grouping == \"reentrant\") {\n      client_group_ = create_callback_group(rclcpp::CallbackGroupType::Reentrant);\n      timer_group_ = client_group_;\n    } else {\n      client_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);\n      timer_group_ = grouping == \"separate\"\n                         ? create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive)\n                         : client_group_;\n    }\n\n    client_ = create_client<Trigger>(\"/self_test\", rclcpp::ServicesQoS(), client_group_);\n    timer_ = create_timer(1s, [this] { ask(); }, timer_group_);\n    RCLCPP_INFO(get_logger(), \"grouping %s, multi_threaded %s\", grouping.c_str(),\n                multi_threaded_ ? \"true\" : \"false\");\n  }\n\n  [[nodiscard]] bool multi_threaded() const { return multi_threaded_; }\n\n private:\n  // Waiting here is the bug the exercise reproduces. Real code passes a callback instead.\n  void ask() {\n    if (!client_->service_is_ready()) {\n      RCLCPP_WARN(get_logger(), \"no server yet\");\n      return;\n    }\n    RCLCPP_INFO(get_logger(), \"sending request\");\n    auto sent = client_->async_send_request(std::make_shared<Trigger::Request>());\n    if (sent.wait_for(5s) == std::future_status::ready) {\n      RCLCPP_INFO(get_logger(), \"answer: %s\", sent.get()->message.c_str());\n    } else {\n      RCLCPP_WARN(get_logger(), \"no answer within 5 s\");\n      client_->remove_pending_request(sent.request_id);\n    }\n  }\n\n  bool multi_threaded_ = false;\n  rclcpp::CallbackGroup::SharedPtr client_group_;\n  rclcpp::CallbackGroup::SharedPtr timer_group_;\n  rclcpp::Client<Trigger>::SharedPtr client_;\n  rclcpp::TimerBase::SharedPtr timer_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  const auto node = std::make_shared<BlockingClient>();\n  if (node->multi_threaded()) {\n    rclcpp::executors::MultiThreadedExecutor executor;\n    executor.add_node(node);\n    executor.spin();\n  } else {\n    rclcpp::spin(node);\n  }\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build both, then run the four configurations:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run bench_exec answer_server                                                       # terminal 1\nros2 run bench_exec blocking_client --ros-args -p multi_threaded:=false -p grouping:=shared     # a\nros2 run bench_exec blocking_client --ros-args -p multi_threaded:=true  -p grouping:=shared     # b\nros2 run bench_exec blocking_client --ros-args -p multi_threaded:=true  -p grouping:=separate   # c\nros2 run bench_exec blocking_client --ros-args -p multi_threaded:=true  -p grouping:=reentrant  # d"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Runs a and b log "
+        },
+        {
+         "t": "code",
+         "v": "sending request"
+        },
+        {
+         "t": "text",
+         "v": ", wait the full 5 seconds, log "
+        },
+        {
+         "t": "code",
+         "v": "no answer within 5 s"
+        },
+        {
+         "t": "text",
+         "v": ", and start again: one attempt every 5 seconds instead of one a second, because the timer that should fire meanwhile is the thing that is stuck. The server logs "
+        },
+        {
+         "t": "code",
+         "v": "request received, answering"
+        },
+        {
+         "t": "text",
+         "v": " a millisecond after each request, and that line is the proof that the request arrived and the answer went back. The answer is sitting in the middleware, and the only thread allowed to hand it to the client is the one waiting inside "
+        },
+        {
+         "t": "code",
+         "v": "ask"
+        },
+        {
+         "t": "text",
+         "v": ". Runs c and d log "
+        },
+        {
+         "t": "code",
+         "v": "sending request"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "answer: all good"
+        },
+        {
+         "t": "text",
+         "v": " within a millisecond of each other, once a second."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run b fails because the number of threads was never the constraint. "
+        },
+        {
+         "t": "code",
+         "v": "grouping:=shared"
+        },
+        {
+         "t": "text",
+         "v": " puts the client and the timer in one mutually exclusive group, and that group's rule is that no two of its callbacks run at the same time. The response arrives as a callback of the client, which is in the group; the timer callback holds the group. Seven idle threads change nothing, because none of them is allowed to take the response. The Jazzy guide on callback groups states the exact condition: the timer and the client must not be in the same mutually exclusive group."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "While run a's node is stuck, it receives nothing else either. Every subscription, every other service and the parameter services of that node are in its default callback group and behind the same one thread, and their messages pile up in the middleware until their queues drop the oldest. 5 seconds of a 50 Hz input at depth 10 is 250 messages arriving and 240 dropped."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two more things the runs teach. "
+        },
+        {
+         "t": "code",
+         "v": "remove_pending_request"
+        },
+        {
+         "t": "text",
+         "v": " matters: "
+        },
+        {
+         "t": "code",
+         "v": "async_send_request"
+        },
+        {
+         "t": "text",
+         "v": " keeps the request in the client until an answer or a removal, so a client that gives up without removing grows by one entry per lost request; the comment on "
+        },
+        {
+         "t": "code",
+         "v": "async_send_request"
+        },
+        {
+         "t": "text",
+         "v": " in rclcpp's "
+        },
+        {
+         "t": "a",
+         "v": "client.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/client.hpp"
+        },
+        {
+         "t": "text",
+         "v": " asks for it. And run d works, but a reentrant group is the wider tool: it also lets the timer overlap itself, so two requests can be in flight from a timer you thought was serial. Run c is the arrangement to copy when you have to wait."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The better fix is still not to wait at all, which the services topic showed: pass a response callback to "
+        },
+        {
+         "t": "code",
+         "v": "async_send_request"
+        },
+        {
+         "t": "text",
+         "v": " and carry on. Waiting is worth it only when the surrounding code cannot be split, and then run c's two groups are the price of admission."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lifecycle",
+   "title": "Lifecycle nodes and composition",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Composition puts several nodes in one process, and the executor is what they end up sharing. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 run rclcpp_components component_container"
+        },
+        {
+         "t": "text",
+         "v": " starts a container whose manager spins one "
+        },
+        {
+         "t": "code",
+         "v": "SingleThreadedExecutor"
+        },
+        {
+         "t": "text",
+         "v": ", and every component you load into it gets its callbacks from that one thread. Load the bench's supervisor next to a mapping node that spends 300 ms in a callback and the supervisor stops checking for 300 ms, although the two nodes have nothing to do with each other. Nothing in the launch file says so, and each node passed its own tests."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Jazzy ships three other containers for that reason ("
+        },
+        {
+         "t": "a",
+         "v": "rclcpp_components",
+         "href": "https://github.com/ros2/rclcpp/tree/jazzy/rclcpp_components"
+        },
+        {
+         "t": "text",
+         "v": "):"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "component_container_mt"
+         },
+         {
+          "t": "text",
+          "v": " runs one "
+         },
+         {
+          "t": "code",
+          "v": "MultiThreadedExecutor"
+         },
+         {
+          "t": "text",
+          "v": " for all components. Each component still keeps its own default mutually exclusive group, so callbacks of different components run in parallel while each component stays serial inside itself."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "component_container_isolated"
+         },
+         {
+          "t": "text",
+          "v": " gives every component its own executor, single-threaded by default and multi-threaded with "
+         },
+         {
+          "t": "code",
+          "v": "--use_multi_threaded_executor"
+         },
+         {
+          "t": "text",
+          "v": " ("
+         },
+         {
+          "t": "a",
+          "v": "component_container_isolated.cpp",
+          "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_components/src/component_container_isolated.cpp"
+         },
+         {
+          "t": "text",
+          "v": "). This is the one that makes a slow component cost only itself."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "component_container_events_cbg"
+         },
+         {
+          "t": "text",
+          "v": " runs "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::executors::EventsCBGExecutor"
+         },
+         {
+          "t": "text",
+          "v": ", whose thread pool schedules per callback group."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A node can only be loaded into any of them if it was written to be: a constructor taking "
+        },
+        {
+         "t": "code",
+         "v": "const rclcpp::NodeOptions&"
+        },
+        {
+         "t": "text",
+         "v": ", no "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that spins, and a "
+        },
+        {
+         "t": "code",
+         "v": "RCLCPP_COMPONENTS_REGISTER_NODE"
+        },
+        {
+         "t": "text",
+         "v": " line. That is the reason every node on these pages takes "
+        },
+        {
+         "t": "code",
+         "v": "NodeOptions"
+        },
+        {
+         "t": "text",
+         "v": ", and a node that reads its arguments from "
+        },
+        {
+         "t": "code",
+         "v": "argc"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "argv"
+        },
+        {
+         "t": "text",
+         "v": " instead of parameters cannot be composed at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Lifecycle nodes add a second way for a node to look dead while it runs. An "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp_lifecycle::LifecycleNode"
+        },
+        {
+         "t": "text",
+         "v": " has four states, unconfigured, inactive, active and finalized, and you move between them with the transitions configure, activate, deactivate, cleanup and shutdown, from the command line with "
+        },
+        {
+         "t": "code",
+         "v": "ros2 lifecycle set /node activate"
+        },
+        {
+         "t": "text",
+         "v": ". The transition callbacks are callbacks like any other: they run on the executor, in the node's callback group, and a 5-second "
+        },
+        {
+         "t": "code",
+         "v": "on_configure"
+        },
+        {
+         "t": "text",
+         "v": " blocks that node for 5 seconds exactly as a 5-second service callback would."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The trap is what the state actually controls. "
+        },
+        {
+         "t": "code",
+         "v": "LifecyclePublisher::publish"
+        },
+        {
+         "t": "text",
+         "v": " checks "
+        },
+        {
+         "t": "code",
+         "v": "is_activated()"
+        },
+        {
+         "t": "text",
+         "v": " and returns without publishing when the node is inactive ("
+        },
+        {
+         "t": "a",
+         "v": "lifecycle_publisher.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_lifecycle/include/rclcpp_lifecycle/lifecycle_publisher.hpp"
+        },
+        {
+         "t": "text",
+         "v": "), and it logs a warning while doing so. Timers get no such treatment. "
+        },
+        {
+         "t": "code",
+         "v": "ManagedEntityInterface"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "a",
+         "v": "managed_entity.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_lifecycle/include/rclcpp_lifecycle/managed_entity.hpp"
+        },
+        {
+         "t": "text",
+         "v": " is implemented by publishers, and by nothing else in rclcpp_lifecycle. So a control timer created in the constructor keeps firing while the node sits in the inactive state, keeps computing commands from state nobody is updating, and throws every one of them away at the publisher. The symptom is a quiet topic and a busy CPU."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fix is to own the states in your code:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "CallbackReturn on_activate(const rclcpp_lifecycle::State& state) override {\n  LifecycleNode::on_activate(state);  // activates the managed publishers\n  timer_->reset();                    // the timer is yours to start\n  return CallbackReturn::SUCCESS;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "with the matching "
+        },
+        {
+         "t": "code",
+         "v": "timer_->cancel()"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "on_deactivate"
+        },
+        {
+         "t": "text",
+         "v": ", and a "
+        },
+        {
+         "t": "code",
+         "v": "cancel()"
+        },
+        {
+         "t": "text",
+         "v": " at the end of "
+        },
+        {
+         "t": "code",
+         "v": "on_configure"
+        },
+        {
+         "t": "text",
+         "v": " so the timer stays quiet until the first activation. "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": " takes an "
+        },
+        {
+         "t": "code",
+         "v": "autostart"
+        },
+        {
+         "t": "text",
+         "v": " flag in Jazzy that does the same thing at construction. Subscriptions need the same thought: one created in the constructor keeps delivering messages in the inactive state, so either the callback checks the state or the subscription is created in "
+        },
+        {
+         "t": "code",
+         "v": "on_activate"
+        },
+        {
+         "t": "text",
+         "v": " and released in "
+        },
+        {
+         "t": "code",
+         "v": "on_deactivate"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last failure in this family is a handle nobody kept. An executor stores only weak pointers to the nodes and callback groups you add to it, and it prunes the expired ones when it rebuilds its collection ("
+        },
+        {
+         "t": "a",
+         "v": "executor_entities_collector.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/executors/executor_entities_collector.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). A node built inside a scope that ends, or a callback group held in a local, is dropped from the executor without an error and without a log line. It is the rule the topics page gave for subscriptions, and it reaches every entity: what you want served, you hold."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin"
+        },
+        {
+         "t": "text",
+         "v": " expands to and what one turn of the executor loop does, including what the wait set reports and what it does not. Name the four executors and one sentence about each. Give the guarantee of a mutually exclusive group and of a reentrant group, and say what holds between two different groups. Explain why a wait for a service response inside a callback of the same mutually exclusive group cannot finish, whatever the thread count, and name the two arrangements that let it finish. Say what a component container shares between its components, and which two things a lifecycle node stops for you and which it does not."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does the wait set tell the executor about a subscription, and what does it not tell it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does the executor serve two busy topics in turn rather than in arrival order, and where does that show up as a bug?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A 2-second callback blocks a node subscribed to a 50 Hz topic at depth 10. How many messages arrive, how many survive, and how old is the first one the node sees afterwards?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the default number of threads of a "
+     },
+     {
+      "t": "code",
+      "v": "MultiThreadedExecutor"
+     },
+     {
+      "t": "text",
+      "v": ", and what does it log if you ask for one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "State the guarantee of a mutually exclusive group, of a reentrant group, and between two different groups."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which callback group does an entity use when you do not name one, and what does that mean for a multi-threaded executor?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A timer callback waits for a service response and never gets it, on a 16-core machine with a multi-threaded executor. Name the cause and two fixes, and say which you would ship."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which component container would you pick for a container holding a 20 Hz supervisor and a node with 300 ms callbacks, and why?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A lifecycle node is inactive and its CPU is busy while its topic is silent. What is happening, and what do you change?"
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation: "
+     },
+     {
+      "t": "a",
+      "v": "Executors",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Executors.html"
+     },
+     {
+      "t": "text",
+      "v": " for the expansion of "
+     },
+     {
+      "t": "code",
+      "v": "spin"
+     },
+     {
+      "t": "text",
+      "v": ", the wait set, the round-robin order and the executor types; "
+     },
+     {
+      "t": "a",
+      "v": "Using callback groups",
+      "href": "https://docs.ros.org/en/jazzy/How-To-Guides/Using-callback-groups.html"
+     },
+     {
+      "t": "text",
+      "v": " for the deadlock and the exact condition that avoids it; "
+     },
+     {
+      "t": "a",
+      "v": "Composition",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Composition.html"
+     },
+     {
+      "t": "text",
+      "v": "; "
+     },
+     {
+      "t": "a",
+      "v": "Managed nodes",
+      "href": "https://design.ros2.org/articles/node_lifecycle.html"
+     },
+     {
+      "t": "text",
+      "v": " for the lifecycle states and transitions."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "single_threaded_executor.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executors/single_threaded_executor.cpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "multi_threaded_executor.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executors/multi_threaded_executor.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for the two spin loops and the default thread count; "
+     },
+     {
+      "t": "a",
+      "v": "static_single_threaded_executor.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/executors/static_single_threaded_executor.hpp"
+     },
+     {
+      "t": "text",
+      "v": "; "
+     },
+     {
+      "t": "a",
+      "v": "events_executor.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/experimental/executors/events_executor/events_executor.hpp"
+     },
+     {
+      "t": "text",
+      "v": "; "
+     },
+     {
+      "t": "a",
+      "v": "callback_group.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/callback_group.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the two group contracts and "
+     },
+     {
+      "t": "code",
+      "v": "can_be_taken_from"
+     },
+     {
+      "t": "text",
+      "v": "; "
+     },
+     {
+      "t": "a",
+      "v": "node.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/node.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the callback-group argument of "
+     },
+     {
+      "t": "code",
+      "v": "create_timer"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "create_service"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "create_client"
+     },
+     {
+      "t": "text",
+      "v": "; "
+     },
+     {
+      "t": "a",
+      "v": "client.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/client.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "remove_pending_request"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp_components on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "component_container_isolated.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_components/src/component_container_isolated.cpp"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "a",
+      "v": "CMakeLists",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_components/CMakeLists.txt"
+     },
+     {
+      "t": "text",
+      "v": " that names the four containers."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp_lifecycle on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "lifecycle_publisher.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_lifecycle/include/rclcpp_lifecycle/lifecycle_publisher.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the publish that does nothing while inactive, and "
+     },
+     {
+      "t": "a",
+      "v": "managed_entity.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_lifecycle/include/rclcpp_lifecycle/managed_entity.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", which only publishers implement."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rcl on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "timer.c",
+      "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/src/rcl/timer.c"
+     },
+     {
+      "t": "text",
+      "v": ": an overdue timer moves its next call time forward instead of queueing the periods it missed."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Daniel Casini, Tobias Blass, Ingo Lütkebohle and Björn Brandenburg, "
+     },
+     {
+      "t": "a",
+      "v": "Response-Time Analysis of ROS 2 Processing Chains",
+      "href": "https://drops.dagstuhl.de/opus/volltexte/2019/10743/pdf/LIPIcs-ECRTS-2019-6.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", ECRTS 2019: the scheduling semantics of the executor."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ros2/examples on the jazzy branch, the "
+     },
+     {
+      "t": "a",
+      "v": "cbg_executor demo",
+      "href": "https://github.com/ros2/examples/tree/jazzy/rclcpp/executors/cbg_executor"
+     },
+     {
+      "t": "text",
+      "v": ": callback groups handed to separate executors on separate threads."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " on interfaces that resist misuse, and "
+     },
+     {
+      "t": "a",
+      "v": "CP.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-races"
+     },
+     {
+      "t": "text",
+      "v": " on data races."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". Thin callbacks, with the logic in plain classes."
+     }
+    ]
+   ]
+  }
+ ]
+}

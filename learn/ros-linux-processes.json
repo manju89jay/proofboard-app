@@ -123,6 +123,205 @@
    }
   ]
  },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A process is a running program: the kernel gives it a process ID, the PID, its own memory, and a table of open files starting with stdin, stdout and stderr. A signal is a notification the kernel delivers to interrupt whatever that process is doing, and pressing Ctrl+C sends one specific signal, "
+    },
+    {
+     "t": "code",
+     "v": "SIGINT"
+    },
+    {
+     "t": "text",
+     "v": ", to every process in the foreground group. Left uncaught, "
+    },
+    {
+     "t": "code",
+     "v": "SIGINT"
+    },
+    {
+     "t": "text",
+     "v": "'s default action terminates the process at once. When any process ends, the kernel holds its exit status, a number from 0 to 255, until the parent collects it with "
+    },
+    {
+     "t": "code",
+     "v": "wait()"
+    },
+    {
+     "t": "text",
+     "v": ". A status of 0 means success and anything else is a chosen failure, except that a process a signal killed never chose one, so the shell reports 128 plus the signal's number instead: 130 for "
+    },
+    {
+     "t": "code",
+     "v": "SIGINT"
+    },
+    {
+     "t": "text",
+     "v": "."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this creates is that the default action gives a program no chance to save anything: a log to flush, a file to close, loses that chance the moment "
+    },
+    {
+     "t": "code",
+     "v": "SIGINT"
+    },
+    {
+     "t": "text",
+     "v": "'s default action runs."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a handler that does the smallest thing possible: set a flag, nothing else. That flag needs a type a handler may safely touch with no ordering against the main loop, such as an atomic, because a signal can interrupt a function like "
+    },
+    {
+     "t": "code",
+     "v": "printf"
+    },
+    {
+     "t": "text",
+     "v": " or "
+    },
+    {
+     "t": "code",
+     "v": "malloc"
+    },
+    {
+     "t": "text",
+     "v": " that already holds an internal lock, and calling back into one from inside the handler can deadlock or corrupt the heap. The main loop reads the flag in ordinary code, breaks out, does the real cleanup there, and exits with whatever status it chooses. This is how "
+    },
+    {
+     "t": "code",
+     "v": "rclcpp::init"
+    },
+    {
+     "t": "text",
+     "v": " wires "
+    },
+    {
+     "t": "code",
+     "v": "SIGINT"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "SIGTERM"
+    },
+    {
+     "t": "text",
+     "v": ": the handler only flips a flag that "
+    },
+    {
+     "t": "code",
+     "v": "rclcpp::ok()"
+    },
+    {
+     "t": "text",
+     "v": " reports, and every node's loop is expected to check it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that "
+    },
+    {
+     "t": "code",
+     "v": "SIGKILL"
+    },
+    {
+     "t": "text",
+     "v": " cannot be caught at all, so no handler protects against it; a result that must survive a hard kill has to be written to a temporary file and renamed into place instead. A node whose loop never checks "
+    },
+    {
+     "t": "code",
+     "v": "rclcpp::ok()"
+    },
+    {
+     "t": "text",
+     "v": " pays for the same gap: it survives both "
+    },
+    {
+     "t": "code",
+     "v": "SIGINT"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "SIGTERM"
+    },
+    {
+     "t": "text",
+     "v": ", holds up shutdown for the full grace period, and is finally killed with "
+    },
+    {
+     "t": "code",
+     "v": "SIGKILL"
+    },
+    {
+     "t": "text",
+     "v": " with none of its cleanup ever run."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this on every robot you build, because every ROS 2 node is a Linux process: "
+    },
+    {
+     "t": "code",
+     "v": "ps"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "kill"
+    },
+    {
+     "t": "text",
+     "v": " and the number "
+    },
+    {
+     "t": "code",
+     "v": "echo $?"
+    },
+    {
+     "t": "text",
+     "v": " prints once it stops are how you inspect one, and the interview question is this exact chain, from a Ctrl+C to the number the shell shows."
+    }
+   ]
+  }
+ ],
  "subs": [
   {
    "id": "processes",
@@ -162,7 +361,7 @@
         },
         {
          "t": "text",
-         "v": " is a running program. The kernel gives it a process ID (PID), its own memory, and a table of open files, which starts with stdin, stdout and stderr. Every process except the first one, PID 1, has a parent. When a process ends, the kernel keeps its "
+         "v": " is a running program. The kernel gives it a process ID (PID), its own memory, and a table of open files, which starts with stdin, stdout and stderr. Every process has a parent, shown as the PPID, except the ones the kernel starts itself: PID 1, the init process, and the kernel's own threads. When a process ends, the kernel keeps its "
         },
         {
          "t": "i",
@@ -447,7 +646,7 @@
           },
           {
            "t": "text",
-           "v": ", the sanitizers"
+           "v": ", an uncaught exception"
           }
          ],
          [
@@ -534,7 +733,23 @@
        "c": [
         {
          "t": "text",
-         "v": "A handler for SIGSEGV or SIGABRT runs in a process that is already broken, so there is little it can do safely. Leave those two to their default action and read the core dump or the sanitizer report instead."
+         "v": "A handler for SIGSEGV or SIGABRT runs in a process that is already broken, so there is little it can do safely. Leave those two to their default action and read the core dump or the sanitizer report instead. The sanitizers themselves don't end the process with a signal. A GCC 13 build with AddressSanitizer exits with status 1 after its report, and so does UndefinedBehaviorSanitizer when it is built with "
+        },
+        {
+         "t": "code",
+         "v": "-fno-sanitize-recover=all"
+        },
+        {
+         "t": "text",
+         "v": ", while a failed "
+        },
+        {
+         "t": "code",
+         "v": "assert"
+        },
+        {
+         "t": "text",
+         "v": " gives 134, which is 128 plus the 6 of SIGABRT."
         }
        ]
       },
@@ -567,7 +782,7 @@
         },
         {
          "t": "text",
-         "v": ", the launch system sends SIGINT to each node it started. A node that is still running 5 seconds later gets SIGTERM, and one that is still running 5 seconds after that gets SIGKILL, which it cannot catch. These are the defaults of the launch settings "
+         "v": ", the terminal sends SIGINT to the foreground process group, which includes every node launch started. Launch sends SIGINT itself only when it shuts down for another reason, or runs non-interactive. Either way, launch then sends SIGTERM to a node that is still running 5 seconds later, and one that is still running 5 seconds after that gets SIGKILL, which it cannot catch. These are the defaults of the launch settings "
         },
         {
          "t": "code",
@@ -583,7 +798,16 @@
         },
         {
          "t": "text",
-         "v": ". By default "
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "execute_local.py on the jazzy branch",
+         "href": "https://github.com/ros2/launch/blob/jazzy/launch/launch/actions/execute_local.py"
+        },
+        {
+         "t": "text",
+         "v": "). By default "
         },
         {
          "t": "code",
@@ -661,7 +885,7 @@
        "c": [
         {
          "t": "text",
-         "v": "Test it:"
+         "v": "Keep the flag the handler sets as the only global in the program. Test it:"
         }
        ]
       },
@@ -751,7 +975,7 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <atomic>\n#include <chrono>\n#include <csignal>\n#include <cstdio>\n#include <thread>\n\nstatic std::atomic<bool> stop_requested{false};\nstatic_assert(std::atomic<bool>::is_always_lock_free, \"a signal handler may only touch lock-free atomics\");\n\n// The only thing the handler does is set a flag: anything else is unsafe here.\nextern \"C\" void on_signal(int) { stop_requested.store(true); }\n\nint main() {\n  std::signal(SIGINT, on_signal);\n  std::signal(SIGTERM, on_signal);\n  int ticks = 0;\n  while (!stop_requested.load()) {\n    ++ticks;\n    std::printf(\"tick %d\\n\", ticks);\n    std::this_thread::sleep_for(std::chrono::milliseconds(100));\n    if (ticks == 3) std::raise(SIGINT);  // stands in for Ctrl+C so the example stops on its own\n  }\n  std::printf(\"stopping after %d ticks\\n\", ticks);\n  std::puts(\"saved\");  // clean-up happens here, in normal code, not in the handler\n  return 0;\n}"
+       "text": "#include <atomic>\n#include <chrono>\n#include <csignal>\n#include <format>\n#include <iostream>\n#include <thread>\n\nusing namespace std::chrono_literals;\n\nnamespace {\n// The one global in the program: a handler gets only the signal number, so it can reach nothing else.\nstd::atomic_flag stop_requested;  // since C++20, a default-constructed flag starts clear\n}  // namespace\n\n// The only thing the handler does is set the flag: anything else is unsafe here.\nextern \"C\" void on_signal(int /*signal*/) { stop_requested.test_and_set(); }\n\nint main() {\n  std::signal(SIGINT, on_signal);\n  std::signal(SIGTERM, on_signal);\n  int ticks = 0;\n  while (!stop_requested.test()) {\n    ++ticks;\n    std::cout << std::format(\"tick {}\\n\", ticks);\n    std::this_thread::sleep_for(100ms);\n    if (ticks == 3) std::raise(SIGINT);  // stands in for Ctrl+C so the example stops on its own\n  }\n  std::cout << std::format(\"stopping after {} ticks\\n\", ticks);\n  std::cout << \"saved\\n\";  // clean-up happens here, in normal code, not in the handler\n}"
       },
       {
        "t": "output",
@@ -762,15 +986,34 @@
        "c": [
         {
          "t": "text",
-         "v": "Compare your version on three points. The flag has to be a lock-free "
+         "v": "Compare your version on four points."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The flag is a global, and it has to be. A handler receives only the signal number, so whatever it touches must be reachable without an argument. This is the one exception to the rule against global mutable state (Core Guidelines "
         },
         {
-         "t": "code",
-         "v": "std::atomic<bool>"
+         "t": "a",
+         "v": "I.2",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global"
         },
         {
          "t": "text",
-         "v": " or a "
+         "v": "), and the unnamed namespace keeps it private to this file."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The flag's type is the second point. The handler and the loop touch it with no ordering between them, so it must be an object the standard lets a handler use: a lock-free atomic, or a "
         },
         {
          "t": "code",
@@ -778,7 +1021,16 @@
         },
         {
          "t": "text",
-         "v": ". A plain "
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "support.signal",
+         "href": "https://eel.is/c++draft/support.signal"
+        },
+        {
+         "t": "text",
+         "v": "). A plain "
         },
         {
          "t": "code",
@@ -786,7 +1038,107 @@
         },
         {
          "t": "text",
-         "v": " that the handler writes and the loop reads is a data race, and the compiler may keep it in a register and never see the change. The handler must do nothing except set that flag. And a signal doesn't cut the sleep short. It interrupts the "
+         "v": " is a data race, and the compiler may keep it in a register and never see the change. This version uses "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic_flag"
+        },
+        {
+         "t": "text",
+         "v": ", because it is the only atomic type the standard guarantees to be lock-free, and the standard lists its member functions among the operations a handler may call. Before C++20 it made a clumsy stop flag: its only read was "
+        },
+        {
+         "t": "code",
+         "v": "test_and_set"
+        },
+        {
+         "t": "text",
+         "v": ", which also sets it, and a default-constructed flag had an unspecified value unless you wrote "
+        },
+        {
+         "t": "code",
+         "v": "ATOMIC_FLAG_INIT"
+        },
+        {
+         "t": "text",
+         "v": ". C++20 added "
+        },
+        {
+         "t": "code",
+         "v": "test()"
+        },
+        {
+         "t": "text",
+         "v": ", which only reads, and made the default constructor start clear ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/atomic/atomic_flag"
+        },
+        {
+         "t": "text",
+         "v": "). A "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic<bool>"
+        },
+        {
+         "t": "text",
+         "v": " also works, and on x86-64 GCC 13 reports "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic<bool>::is_always_lock_free"
+        },
+        {
+         "t": "text",
+         "v": " as true, but the program then needs "
+        },
+        {
+         "t": "code",
+         "v": "static_assert(std::atomic<bool>::is_always_lock_free)"
+        },
+        {
+         "t": "text",
+         "v": " to prove it on every target. "
+        },
+        {
+         "t": "code",
+         "v": "volatile std::sig_atomic_t"
+        },
+        {
+         "t": "text",
+         "v": " is the C answer, and it is only safe while the handler runs on the thread that reads the flag. A ROS 2 process has middleware threads, and Linux delivers a signal to any thread that doesn't block it ("
+        },
+        {
+         "t": "a",
+         "v": "signal(7)",
+         "href": "https://man7.org/linux/man-pages/man7/signal.7.html"
+        },
+        {
+         "t": "text",
+         "v": "), so an atomic is the right choice there."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The handler must do nothing except set that flag. The failure cases below show what goes wrong otherwise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "And a signal doesn't cut the sleep short. It interrupts the "
         },
         {
          "t": "code",
@@ -951,7 +1303,16 @@
         },
         {
          "t": "text",
-         "v": ". "
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "signal-safety(7)",
+         "href": "https://man7.org/linux/man-pages/man7/signal-safety.7.html"
+        },
+        {
+         "t": "text",
+         "v": "). "
         },
         {
          "t": "code",
@@ -983,7 +1344,15 @@
         },
         {
          "t": "text",
-         "v": " are all unsafe. This handler is wrong in three ways:"
+         "v": " are all unsafe. This handler is wrong in three ways, and the "
+        },
+        {
+         "t": "code",
+         "v": "printf"
+        },
+        {
+         "t": "text",
+         "v": " in it stays because it is one of the bugs:"
         }
        ]
       },
@@ -993,6 +1362,51 @@
        "tag": "fragment",
        "expect": "",
        "text": "void on_signal(int) {\n  std::printf(\"stopping\\n\");  // not async-signal-safe: can deadlock inside printf\n  save_everything();          // allocates and locks: the same problem\n  std::exit(0);               // runs static destructors from inside the handler\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::format"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "std::cout"
+        },
+        {
+         "t": "text",
+         "v": " would be no better here. "
+        },
+        {
+         "t": "code",
+         "v": "std::format"
+        },
+        {
+         "t": "text",
+         "v": " allocates the string it returns, and by default "
+        },
+        {
+         "t": "code",
+         "v": "std::cout"
+        },
+        {
+         "t": "text",
+         "v": " writes through the same locked stdio buffer as "
+        },
+        {
+         "t": "code",
+         "v": "printf"
+        },
+        {
+         "t": "text",
+         "v": ", so both are unsafe in a handler for the same reason."
+        }
+       ]
       },
       {
        "t": "p",
@@ -1023,7 +1437,7 @@
        "c": [
         {
          "t": "text",
-         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. They should say what a process is and how its exit status reaches the shell. Name the five signals you meet most, with their numbers and what sends them, and give the exit status after SIGINT, SIGTERM and SIGKILL. Say the one thing a handler may safely do, and why."
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. They should say what a process is and how its exit status reaches the shell. Name the seven signals in the table, with their numbers and what sends them, and give the exit status after SIGINT, SIGTERM and SIGKILL. Say the one thing a handler may safely do, why, and which type the flag should have."
         }
        ]
       }
@@ -1057,6 +1471,20 @@
     [
      {
       "t": "text",
+      "v": "Why is "
+     },
+     {
+      "t": "code",
+      "v": "std::atomic_flag"
+     },
+     {
+      "t": "text",
+      "v": " a safe type for that flag, and what did C++20 add to it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
       "v": "How do you find a process's PID, its parent, its state and its memory from the shell?"
      }
     ],
@@ -1070,6 +1498,163 @@
      {
       "t": "text",
       "v": "From a blank file: a loop that stops cleanly on SIGINT and SIGTERM."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The Linux manual pages: "
+     },
+     {
+      "t": "a",
+      "v": "signal(7)",
+      "href": "https://man7.org/linux/man-pages/man7/signal.7.html"
+     },
+     {
+      "t": "text",
+      "v": " for the signal numbers, default actions and delivery to threads, "
+     },
+     {
+      "t": "a",
+      "v": "signal-safety(7)",
+      "href": "https://man7.org/linux/man-pages/man7/signal-safety.7.html"
+     },
+     {
+      "t": "text",
+      "v": " for the functions a handler may call, and "
+     },
+     {
+      "t": "a",
+      "v": "wait(2)",
+      "href": "https://man7.org/linux/man-pages/man2/wait.2.html"
+     },
+     {
+      "t": "text",
+      "v": " for zombies."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The Bash manual on "
+     },
+     {
+      "t": "a",
+      "v": "exit status",
+      "href": "https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html"
+     },
+     {
+      "t": "text",
+      "v": ": 128 plus the signal number."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The C++ standard draft on "
+     },
+     {
+      "t": "a",
+      "v": "signal handlers",
+      "href": "https://eel.is/c++draft/support.signal"
+     },
+     {
+      "t": "text",
+      "v": ", which defines the operations a handler may use, and cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::signal",
+      "href": "https://en.cppreference.com/cpp/utility/program/signal"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::atomic_flag",
+      "href": "https://en.cppreference.com/cpp/atomic/atomic_flag"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "I.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global"
+     },
+     {
+      "t": "text",
+      "v": ", on global mutable state."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "utilities.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/utilities.hpp"
+     },
+     {
+      "t": "text",
+      "v": ": the SIGINT and SIGTERM handlers "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::init"
+     },
+     {
+      "t": "text",
+      "v": " installs."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 launch on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "execute_local.py",
+      "href": "https://github.com/ros2/launch/blob/jazzy/launch/launch/actions/execute_local.py"
+     },
+     {
+      "t": "text",
+      "v": ": SIGINT from launch only when the shutdown wasn't caused by Ctrl+C or launch runs non-interactive, then SIGTERM after "
+     },
+     {
+      "t": "code",
+      "v": "sigterm_timeout"
+     },
+     {
+      "t": "text",
+      "v": ", then SIGKILL after "
+     },
+     {
+      "t": "code",
+      "v": "sigkill_timeout"
+     },
+     {
+      "t": "text",
+      "v": "."
      }
     ]
    ]

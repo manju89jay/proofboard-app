@@ -1,0 +1,574 @@
+{
+ "id": "sd-requirements",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A mobile robot must log its IMU at 200 Hz and a 2D lidar with 360 points at 10 Hz to disk during an 8-hour shift. Write down the inputs, the outputs, the rates, an estimate of the data volume, the limits on latency and memory, and the failures the logger must handle. Use numbers, not adjectives. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Start from the message sizes. A "
+     },
+     {
+      "t": "code",
+      "v": "sensor_msgs/msg/Imu"
+     },
+     {
+      "t": "text",
+      "v": " holds 37 doubles: an orientation of 4, an angular velocity and a linear acceleration of 3 each, and three 3×3 covariance matrices. That is 296 bytes, and with its header about 320 bytes. A "
+     },
+     {
+      "t": "code",
+      "v": "sensor_msgs/msg/LaserScan"
+     },
+     {
+      "t": "text",
+      "v": " with 360 points holds 360 ranges and 360 intensities as 4-byte floats, which is 2880 bytes, and with its fixed fields and header about 2.9 KB."
+     }
+    ]
+   },
+   {
+    "t": "table",
+    "head": [
+     [
+      {
+       "t": "text",
+       "v": "Input"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Rate"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Size"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Data rate"
+      }
+     ]
+    ],
+    "rows": [
+     [
+      [
+       {
+        "t": "text",
+        "v": "IMU"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "200 Hz"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "about 320 B"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "64 KB/s"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Lidar, 360 points"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "10 Hz"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "about 2.9 KB"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "29 KB/s"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Total"
+       }
+      ],
+      [],
+      [],
+      [
+       {
+        "t": "text",
+        "v": "about 93 KB/s, 0.33 GB per hour, 2.7 GB per shift"
+       }
+      ]
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The output is a file per shift, or better one per hour, so that a problem costs one file rather than the day. Latency hardly matters here: nobody reads the log live. What matters is throughput, meaning the logger has to keep up with 93 KB/s on average, and a bounded memory buffer that absorbs short disk stalls. The failures to handle are a full disk, a slow disk, a sensor that stops publishing, a jump in the clock, and a power cut in the middle of a write."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you had the rates, a volume estimate within a factor of two, and at least three failures. Missing the estimate is a partial pass, and more than that is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Requirements and constraints turn a vague ask into something you can test. A requirement often arrives as \"the system must record the sensors reliably and efficiently\", and nobody can test that, because \"reliably\" and \"efficiently\" name no measurement. Rewriting it splits into three groups. Functional requirements say what the system does: which data it takes in, what it produces, what a user can ask of it. Constraints are the numbers behind that: rates, message sizes, throughput, latency, memory, CPU, disk, the platform. Failure behaviour says, for each thing that can go wrong, how the system notices and what it does then."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this solves is a design nobody can hold accountable. A requirement with no number invites a design that satisfies it by accident and an acceptance test nobody can write. Failure behaviour is the group people leave out on their own, and it is where an interviewer, and a real system later, pushes hardest: a full disk, a sensor that stops, a clock that jumps, a power cut mid write are not edge cases to mention in passing, they are requirements with their own testable answer."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is naming which of two often confused quantities the system actually needs before designing anything. Latency is the time from an input to its effect, and it decides a controller, where a command 200 ms late can mean a collision. Throughput is how much work per second the system sustains, and it decides a logger, which can run seconds behind as long as it never falls further behind. Memory then follows from throughput and stalls: a buffer has to hold whatever arrives while the writer can't write, so its size is at least the data rate times the longest stall worth surviving."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is the discipline of writing a number down even without one. An assumption, stated as \"assume the disk sustains 50 MB/s, to be measured\", is worth keeping and revisiting; a requirement left as an adjective is worth nothing, because it can never be shown wrong. In an interview, the first five minutes should produce exactly this list, numbers and assumptions included, before anything is designed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: given a robot's IMU and lidar rates, produce the inputs, outputs, a data-volume estimate, the latency and memory limits, and the failures the system must handle, in numbers rather than adjectives."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Functional requirements, constraints, rates, latency, memory, failures",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is a requirement as it often arrives: \"The logger must record the sensors reliably and efficiently.\" Nobody can test it, because \"reliably\" and \"efficiently\" don't say what to measure. Rewritten, it becomes several statements you can check:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The logger records "
+         },
+         {
+          "t": "code",
+          "v": "/imu"
+         },
+         {
+          "t": "text",
+          "v": " at 200 Hz and "
+         },
+         {
+          "t": "code",
+          "v": "/scan"
+         },
+         {
+          "t": "text",
+          "v": " at 10 Hz for 8 hours without dropping a message while the disk keeps up."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "It uses at most 256 MB of memory and 20% of one CPU core."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "When free disk space falls below 500 MB, it stops recording, closes the current file so that it stays readable, and reports an error on "
+         },
+         {
+          "t": "code",
+          "v": "/diagnostics"
+         },
+         {
+          "t": "text",
+          "v": ". Closing a file writes its index at the end, so waiting until the disk is full is too late."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A power cut loses at most the last second of data."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Requirements fall into three groups. "
+        },
+        {
+         "t": "i",
+         "v": "Functional requirements"
+        },
+        {
+         "t": "text",
+         "v": " say what the system does: which data it takes in, what it produces, and what the user can ask of it. "
+        },
+        {
+         "t": "i",
+         "v": "Constraints"
+        },
+        {
+         "t": "text",
+         "v": " are the numbers: rates, message sizes, throughput, latency, memory, CPU, disk and the platform it runs on. "
+        },
+        {
+         "t": "i",
+         "v": "Failure behaviour"
+        },
+        {
+         "t": "text",
+         "v": " says, for each thing that can go wrong, how the system notices and what it does then. That third group is the one most often left out, and it is where interviewers and real systems both push hardest."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two quantities get confused. "
+        },
+        {
+         "t": "i",
+         "v": "Latency"
+        },
+        {
+         "t": "text",
+         "v": " is the time from an input to its effect, and it matters for a controller: a velocity command 200 ms late can mean a collision. "
+        },
+        {
+         "t": "i",
+         "v": "Throughput"
+        },
+        {
+         "t": "text",
+         "v": " is how much work per second the system sustains, and it matters for a logger, which can be seconds behind as long as it never falls further behind. Say which one the system needs before you design anything."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Memory follows from throughput and stalls. A buffer has to hold everything that arrives while the writer can't write, so its size is at least the data rate times the longest stall you want to survive. At 93 KB/s and a 2-second disk stall, that is 186 KB, which is small. With cameras it is a different story, as the exercise shows."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Where you don't know a number, write down an assumption and move on: \"assume the disk sustains 50 MB/s; to be measured.\" In an interview, the first five minutes should produce this list, with its numbers and assumptions, before any boxes are drawn."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here are the requirements for the sensor logger from the cold check, written the way you would hand them to a colleague. Notice that every line can be tested, and that the failure section is as long as the functional one."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "Purpose\n  Record IMU and lidar data during an 8-hour shift for later analysis and replay.\n\nInputs\n  /imu   sensor_msgs/msg/Imu        200 Hz   ~320 B   ~64 KB/s\n  /scan  sensor_msgs/msg/LaserScan   10 Hz  ~2.9 KB   ~29 KB/s\n  Total ~93 KB/s, ~0.33 GB/h, ~2.7 GB per shift (plus a few percent of file overhead).\n\nFunctional\n  F1  Record both topics with their original timestamps.\n  F2  Start a new file every hour; each file is readable on its own.\n  F3  Start and stop on a service call; report the current file and byte count on /diagnostics at 1 Hz.\n\nConstraints\n  C1  No dropped messages while the disk sustains at least 1 MB/s.\n  C2  At most 256 MB of memory, at most 20% of one CPU core.\n  C3  Disk budget 5 GB per robot per day; older files are deleted first.\n\nFailures\n  E1  Disk nearly full: below 500 MB free, stop recording, close the file cleanly, publish an error; never corrupt earlier files.\n  E2  Disk stall up to 2 s: buffer in memory (at least 186 KB); longer stalls drop the oldest data and count the drops.\n  E3  Sensor silent for more than 1 s: keep recording the other topic and log the gap with its start and end.\n  E4  Power cut: at most the last 1 s of data is lost (fdatasync at least once a second); earlier data in the file stays readable.\n  E5  Clock jump: record the receive time next to the message time so that gaps can be explained.\n\nAcceptance checks\n  A1  An 8-hour run at the nominal rates drops 0 messages, counted against test publishers that number their messages.\n  A2  Filling the disk during a run stops the recording cleanly and leaves every file readable.\n  A3  Cutting the power during a run (a hard reset of a test VM) loses at most the last 1 s of data."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The numbers came from the arithmetic in the cold check, and the limits are assumptions a product owner would confirm. A3 cuts the power on purpose rather than killing the process. After SIGKILL, data the recorder already passed to "
+        },
+        {
+         "t": "code",
+         "v": "write"
+        },
+        {
+         "t": "text",
+         "v": " is still in the kernel's page cache and reaches the disk anyway, so that test would pass even for a recorder that never calls "
+        },
+        {
+         "t": "code",
+         "v": "fdatasync"
+        },
+        {
+         "t": "text",
+         "v": ". E2 makes a decision explicit: when the buffer is full, drop the oldest data and count the drops, rather than block the publisher or grow without bound. Each of those choices is defensible, and writing it down is what matters."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "recorder",
+   "title": "Requirements for a rosbag-like recorder",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. A test robot needs a recorder for all its topics. Besides the IMU and lidar above, it has two cameras, each producing 1280×720 RGB images with one byte per channel at 30 Hz. The recorder runs on the robot, whose disk sustains about 200 MB/s. Write the inputs with a data-volume estimate, the functional requirements, the constraints and the failure behaviour, as in the worked example. Then answer: which single number decides the design, and what are the options?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One image is 1280 × 720 × 3 bytes, which is 2,764,800 bytes, about 2.76 MB. At 30 Hz that is 83 MB/s per camera, 166 MB/s for both, about 600 GB per hour and 4.8 TB per 8-hour shift. The IMU and lidar add less than 0.1 MB/s."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The number that decides the design is 166 MB/s against a disk that sustains about 200 MB/s. That leaves a margin of about 17%, and a buffer for a 2-second stall would need about 332 MB of memory. So recording raw images is at the limit on bandwidth and far beyond any practical disk budget. There are four options:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "record compressed images, where JPEG typically brings a frame down by 10 to 20 times at a quality loss;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "lower the rate, for example to 10 Hz, which cuts the volume by 3 times;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "lower the resolution;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "record raw images only in windows around events, keeping a rolling buffer in memory and writing the seconds before and after a trigger."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A good answer names the trade-off and writes it into the requirements:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "Inputs\n  2 x /camera/*/image_raw  sensor_msgs/msg/Image  1280x720 rgb8  30 Hz  2.76 MB  83 MB/s each\n  /imu, /scan as before, ~0.1 MB/s\n  Raw total ~166 MB/s, ~600 GB/h: not storable for a full shift.\n\nFunctional\n  F1  Record /imu and /scan always, and camera images compressed (JPEG, quality 90) at 30 Hz.\n  F2  On a trigger (service call or /events), also write raw images from 10 s before to 10 s after it.\n  F3  Split files every 10 minutes; each file readable on its own.\n\nConstraints\n  C1  Sustained write rate at most 50% of the measured disk bandwidth, leaving room for stalls.\n  C2  Memory at most 1 GB.\n  C3  The rolling raw buffer for F2 holds 20 s x 166 MB/s = 3.3 GB."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Writing the numbers down exposes two conflicts. C3 needs 3.3 GB of memory, and C2 allows 1 GB. And during a raw window the recorder writes 166 MB/s, while C1 allows about 100 MB/s. Both point to the same change: raw windows for one camera only. Only the 10 s before the trigger then need the buffer, because the frames after it can be written as they arrive: 10 × 83 MB/s = 830 MB, which fits C2. During a window the recorder writes 83 MB/s of raw images, plus about 8 to 17 MB/s for the two compressed streams and 0.1 MB/s for the rest: 91 to 100 MB/s. That is at C1's limit, not inside it, so the requirements have to say what gives. Either the JPEG quality drops during a raw window, or C1 rises to 60% of the disk bandwidth, with a smaller margin for stalls written down as the price. After the window, the raw stream stops, and its 83 MB/s drains the buffer in about 10 s. Catching this while writing requirements is much cheaper than finding it on the robot."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The remaining sections follow the logger's pattern: a full disk, a slow disk with a bounded buffer and counted drops, a camera that stops, a power cut, and acceptance checks that measure drops at the nominal rates."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the three groups of requirements, with an example of each, and explain the difference between latency and throughput and which one a logger needs. Show how to size a buffer from a data rate and a stall. Give the data-volume arithmetic for one camera stream."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Rewrite \"the system must be fast and reliable\" as three testable requirements."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which matters for a logger, latency or throughput, and which for a velocity controller? Why?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How big must a buffer be to survive a 2-second stall at 93 KB/s? At 166 MB/s?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the data rate of one 1280×720 RGB camera at 30 Hz, and what are the options when it is too much?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page in 20 minutes: requirements, constraints and failure behaviour for a system you haven't seen, such as a fleet telemetry uploader."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": null
+}

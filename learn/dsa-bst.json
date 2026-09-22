@@ -1,0 +1,1647 @@
+{
+ "id": "dsa-bst",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "is_bst(root)"
+     },
+     {
+      "t": "text",
+      "v": ", which says whether a binary tree of "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " keys is a binary search tree with distinct keys. The node type is the one from the traversal topic, with "
+     },
+     {
+      "t": "code",
+      "v": "int key"
+     },
+     {
+      "t": "text",
+      "v": " in place of "
+     },
+     {
+      "t": "code",
+      "v": "int value"
+     },
+     {
+      "t": "text",
+      "v": ". Test it on the tree from that topic, on a tree whose root is 5 with the left child 3 and the right child 8, where 8 has the children 4 and 9, on a tree with two nodes holding 5, on a single node and on the empty tree. Say what the time and the extra space are. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <optional>\n#include <string_view>\n#include <utility>\n\nstruct Node {\n  int key = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int key, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(key, std::move(left), std::move(right));\n}\n\n// Every key in this subtree must lie strictly between low and high, where no value means no bound.\n[[nodiscard]] bool in_range(const Node* n, std::optional<int> low, std::optional<int> high) {\n  if (n == nullptr) return true;\n  if (low && n->key <= *low) return false;\n  if (high && n->key >= *high) return false;\n  return in_range(n->left.get(), low, n->key) && in_range(n->right.get(), n->key, high);\n}\n\n[[nodiscard]] bool is_bst(const Node* root) { return in_range(root, std::nullopt, std::nullopt); }\n\nvoid report(std::string_view name, const Node* root) {\n  std::cout << std::format(\"{:<34}{}\\n\", name, is_bst(root));\n}\n\nint main() {\n  const std::unique_ptr<Node> good = node(5, node(3, node(2, node(1)), node(4)), node(8, nullptr, node(9)));\n  report(\"the tree from the cold check\", good.get());\n  const std::unique_ptr<Node> grandchild = node(5, node(3), node(8, node(4), node(9)));\n  report(\"4 under the right child 8\", grandchild.get());\n  const std::unique_ptr<Node> duplicate = node(5, node(5), node(8));\n  report(\"a second 5 on the left\", duplicate.get());\n  const std::unique_ptr<Node> one = node(7);\n  report(\"a single node\", one.get());\n  report(\"the empty tree\", nullptr);\n}"
+   },
+   {
+    "t": "output",
+    "text": "the tree from the cold check      true\n4 under the right child 8         false\na second 5 on the left            false\na single node                     true\nthe empty tree                    true"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The rule a node has to satisfy is not about its children. It is about every key below it, and that information comes from above: a node in the left subtree of 5 has to be below 5 however deep it sits. So the check carries a range down, and each node narrows one end of it before handing it on. The 4 in the second tree is smaller than its parent 8, which is why a check that compares a node with its parent alone accepts it; the range says 4 has to be above 5, and it is not. The last section measures what that mistake costs."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The bounds are "
+     },
+     {
+      "t": "code",
+      "v": "std::optional<int>"
+     },
+     {
+      "t": "text",
+      "v": " rather than the lowest and highest "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": ", which is what makes the whole "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " range usable as keys ("
+     },
+     {
+      "t": "a",
+      "v": "Abseil tip #171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on returning an optional instead of a sentinel). A version that starts with "
+     },
+     {
+      "t": "code",
+      "v": "std::numeric_limits<int>::min()"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "max()"
+     },
+     {
+      "t": "text",
+      "v": " as its bounds and compares with "
+     },
+     {
+      "t": "code",
+      "v": "<="
+     },
+     {
+      "t": "text",
+      "v": " rejects a perfectly good tree holding those two values, and a version that compares with "
+     },
+     {
+      "t": "code",
+      "v": "<"
+     },
+     {
+      "t": "text",
+      "v": " accepts a tree with duplicates."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "It is O(n) time, because every node is visited once, and O(h) extra space for a tree of height h, which is the recursion stack. Say both, and say that h is n in the worst case."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with a bounds-carrying check, correct on all five trees, and with O(n) and O(h) stated. A correct check with the extremes used as sentinel bounds is a partial pass. A check that compares each node only with its children is a fail, whatever it answers on your own test."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A binary search tree keeps one invariant: every key in a node's left subtree is smaller than the node's key, and every key in its right subtree is larger. That statement is about whole subtrees, not a node and its direct children, and reading it in order, left subtree then node then right subtree, produces ascending keys. "
+    },
+    {
+     "t": "code",
+     "v": "std::map"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "std::set"
+    },
+    {
+     "t": "text",
+     "v": " are this structure kept height-balanced through rotations, which is what most code should reach for rather than a hand-written tree."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is holding a changing set of keys in sorted order, supporting search, insert and erase, without the O(n) shifts a sorted array needs on every insert, and without giving up range queries, such as the first key at or after a time stamp, that a hash map cannot answer."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a descent: at each node, one comparison says which subtree could hold the key, and the other subtree is never looked at again, so search, insert and erase each cost one step per level, the tree's height. Erase only looks complicated with two children, where the node's key is replaced by its in-order successor, the smallest key of its right subtree, and removing that successor falls back to the no-child or one-child case."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What happens when the tree is unbalanced is that its height stops being logarithmic. Keys inserted in already-sorted order, ordinary for time stamps or a replayed log, build a tree that is a linked list wearing a tree's type, height equal to the key count, so every operation degrades to O(n). A red-black tree such as "
+    },
+    {
+     "t": "code",
+     "v": "std::map"
+    },
+    {
+     "t": "text",
+     "v": " rebalances with rotations on insert and erase so the height stays O(log n) whatever order the keys arrive in, at the cost of one allocation per node and pointers a processor cannot prefetch."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake that shows up under pressure is validating the invariant against only a node and its parent: a node can sit on the correct side of its own parent and still land in the wrong subtree of an ancestor further up, so a search that trusts the tree walks past a key that is there and returns false, with nothing crashing and no sanitizer firing. That is the interview question itself: checking whether a tree is a valid BST means carrying a shrinking range down from the root, not comparing each node with the one above it."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "BST property; std::map as a balanced BST",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A binary search tree with the three operations that define it, and a look at the shape after each one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int key = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n// The link that owns the node holding key, or the empty link where such a node would go.\n[[nodiscard]] std::unique_ptr<Node>* find_link(std::unique_ptr<Node>* link, int key) {\n  while (*link != nullptr && (*link)->key != key)\n    link = key < (*link)->key ? &(*link)->left : &(*link)->right;\n  return link;\n}\n\nbool insert(std::unique_ptr<Node>& root, int key) {\n  std::unique_ptr<Node>* link = find_link(&root, key);\n  if (*link != nullptr) return false;  // the key is already in the tree\n  *link = std::make_unique<Node>(key, nullptr, nullptr);\n  return true;\n}\n\n[[nodiscard]] bool contains(const Node* n, int key) {\n  while (n != nullptr && n->key != key) n = key < n->key ? n->left.get() : n->right.get();\n  return n != nullptr;\n}\n\nbool erase(std::unique_ptr<Node>& root, int key) {\n  std::unique_ptr<Node>* link = find_link(&root, key);\n  if (*link == nullptr) return false;\n  Node& victim = **link;\n  if (victim.left == nullptr || victim.right == nullptr) {\n    // No child, or one child: the child, or nothing, takes the node's place.\n    std::unique_ptr<Node> child = std::move(victim.left != nullptr ? victim.left : victim.right);\n    *link = std::move(child);  // the node dies here with both links already empty\n    return true;\n  }\n  // Two children: the smallest key of the right subtree goes up, and its node comes out.\n  std::unique_ptr<Node>* successor = &victim.right;\n  while ((*successor)->left != nullptr) successor = &(*successor)->left;\n  victim.key = (*successor)->key;\n  std::unique_ptr<Node> rest = std::move((*successor)->right);  // the successor has no left child\n  *successor = std::move(rest);\n  return true;\n}\n\n// In-order, iteratively, which is ascending order for a binary search tree.\n[[nodiscard]] std::vector<int> sorted(const Node* root) {\n  std::vector<int> out;\n  std::vector<const Node*> pending;\n  const Node* current = root;\n  while (current != nullptr || !pending.empty()) {\n    while (current != nullptr) {\n      pending.push_back(current);\n      current = current->left.get();\n    }\n    current = pending.back();\n    pending.pop_back();\n    out.push_back(current->key);\n    current = current->right.get();\n  }\n  return out;\n}\n\n[[nodiscard]] std::string shape(const Node* n) {  // pre-order, with . for a missing child\n  if (n == nullptr) return \".\";\n  if (n->left == nullptr && n->right == nullptr) return std::format(\"{}\", n->key);\n  return std::format(\"{}({} {})\", n->key, shape(n->left.get()), shape(n->right.get()));\n}\n\n[[nodiscard]] std::string show(std::span<const int> values) {\n  std::string out;\n  for (const int v : values) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", v);\n  return out;\n}\n\nint main() {\n  std::unique_ptr<Node> root;\n  for (const int key : {5, 3, 8, 2, 4, 9, 1}) insert(root, key);\n  std::cout << std::format(\"built      {}\\n\", shape(root.get()));\n  std::cout << std::format(\"in-order   {}\\n\", show(sorted(root.get())));\n  std::cout << std::format(\"insert 4 again: {}, contains 4: {}, contains 6: {}\\n\", insert(root, 4),\n                           contains(root.get(), 4), contains(root.get(), 6));\n  erase(root, 1);\n  std::cout << std::format(\"erase 1    {}   no children\\n\", shape(root.get()));\n  erase(root, 8);\n  std::cout << std::format(\"erase 8    {}   one child\\n\", shape(root.get()));\n  erase(root, 5);\n  std::cout << std::format(\"erase 5    {}   two children\\n\", shape(root.get()));\n  std::cout << std::format(\"in-order   {}, erase 7: {}\\n\", show(sorted(root.get())), erase(root, 7));\n}"
+      },
+      {
+       "t": "output",
+       "text": "built      5(3(2(1 .) 4) 8(. 9))\nin-order   1 2 3 4 5 8 9\ninsert 4 again: false, contains 4: true, contains 6: false\nerase 1    5(3(2 4) 8(. 9))   no children\nerase 8    5(3(2 4) 9)   one child\nerase 5    9(3(2 4) .)   two children\nin-order   2 3 4 9, erase 7: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The invariant is one sentence: every key in a node's left subtree is smaller than the node's key, and every key in its right subtree is larger. It is about whole subtrees, not about children, and the in-order walk is the same sentence in another form, because it comes out ascending. That is why the traversal topic's sample tree gave 1 2 3 4 5 8 9."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Search and insert are the invariant read as instructions. At each node, one comparison says which subtree can hold the key, and the other subtree is never looked at, so both take one comparison per level. "
+        },
+        {
+         "t": "code",
+         "v": "find_link"
+        },
+        {
+         "t": "text",
+         "v": " returns a pointer to the "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " that owns the node, which is the same link-pointer trick the linked-list topic used: when the key is absent, the link it returns is the empty one where the node belongs, so "
+        },
+        {
+         "t": "code",
+         "v": "insert"
+        },
+        {
+         "t": "text",
+         "v": " writes there and needs no special case for the root."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Erase has three cases, and they are what an interviewer asks about. A node with no children is unlinked. A node with one child is replaced by that child, which keeps the invariant because the whole subtree was already on the correct side. A node with two children cannot be unlinked at all, so its "
+        },
+        {
+         "t": "i",
+         "v": "key"
+        },
+        {
+         "t": "text",
+         "v": " is replaced instead, by the smallest key of its right subtree, the "
+        },
+        {
+         "t": "i",
+         "v": "in-order successor"
+        },
+        {
+         "t": "text",
+         "v": ", which is the next key in sorted order. That successor is the leftmost node of the right subtree, so it has no left child, and removing it falls back to one of the first two cases. Taking the largest key of the left subtree works the same way. Both "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " branches take the child out into a local before dropping the node, so no node is destroyed while one of its own members is being read, and no node is destroyed with a link still attached, which the traversal topic showed is what turns a deep tree into a stack overflow."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every one of these operations costs one step per level, so the cost is the height, and the height depends entirely on the order the keys arrived in:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <numeric>\n#include <random>\n#include <span>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int key = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\nvoid insert(std::unique_ptr<Node>& root, int key, std::int64_t& comparisons) {\n  std::unique_ptr<Node>* link = &root;\n  while (*link != nullptr) {\n    ++comparisons;\n    link = key < (*link)->key ? &(*link)->left : &(*link)->right;\n  }\n  *link = std::make_unique<Node>(key, nullptr, nullptr);\n}\n\n[[nodiscard]] bool contains(const Node* n, int key, std::int64_t& comparisons) {\n  while (n != nullptr && n->key != key) {\n    ++comparisons;\n    n = key < n->key ? n->left.get() : n->right.get();\n  }\n  return n != nullptr;\n}\n\n[[nodiscard]] std::ptrdiff_t height(const Node* root) {  // in nodes, iteratively\n  struct Reached {\n    const Node* node = nullptr;\n    std::ptrdiff_t depth = 0;\n  };\n  std::ptrdiff_t deepest = 0;\n  std::vector<Reached> pending;\n  if (root != nullptr) pending.push_back({.node = root, .depth = 1});\n  while (!pending.empty()) {\n    const Reached here = pending.back();\n    pending.pop_back();\n    deepest = std::max(deepest, here.depth);\n    if (here.node->left) pending.push_back({.node = here.node->left.get(), .depth = here.depth + 1});\n    if (here.node->right) pending.push_back({.node = here.node->right.get(), .depth = here.depth + 1});\n  }\n  return deepest;\n}\n\nvoid row(std::string_view order, std::span<const int> keys) {\n  std::unique_ptr<Node> root;\n  std::int64_t building = 0;\n  for (const int key : keys) insert(root, key, building);\n  std::int64_t looking = 0;\n  bool all_found = true;\n  for (const int key : keys) all_found = contains(root.get(), key, looking) && all_found;\n  const double average = static_cast<double>(looking) / static_cast<double>(std::ssize(keys));\n  std::cout << std::format(\"{:<22}{:>8}{:>14}{:>14}{:>10.1f}   {}\\n\", order, height(root.get()), building, looking,\n                           average, all_found);\n}\n\nint main() {\n  constexpr int n = 4096;\n  std::vector<int> keys(n);\n  std::iota(keys.begin(), keys.end(), 0);\n  std::cout << std::format(\"{:<22}{:>8}{:>14}{:>14}{:>10}   {}\\n\", \"insertion order\", \"height\", \"to build\",\n                           \"to look up\", \"per key\", \"all found\");\n  row(\"0 to 4095 in order\", keys);\n  std::mt19937 gen{42};\n  std::ranges::shuffle(keys, gen);\n  row(\"the same, shuffled\", keys);\n}"
+      },
+      {
+       "t": "output",
+       "text": "insertion order         height      to build    to look up   per key   all found\n0 to 4095 in order        4096       8386560       8386560    2047.5   true\nthe same, shuffled          28         55617         55617      13.6   true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same 4096 keys, the same code, two insertion orders. Sorted keys give a tree of height 4096, which is a linked list wearing a tree's type: every insert walks to the bottom, so building it costs n(n−1)/2 = 8,386,560 comparisons, and a lookup costs 2047.5 on average. Shuffled keys give height 28 and 13.6 comparisons per lookup, 150 times cheaper, and the perfectly balanced height for 4096 keys is 13. Sorted input is the ordinary case in a robot: time stamps, sequence numbers, sorted files and anything replayed from a log all arrive in order. This is the same 8,386,560 that the sorting topic measured for a textbook quicksort on sorted input, and for the same reason: an unbalanced split on every step."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "balanced"
+        },
+        {
+         "t": "text",
+         "v": " tree fixes this by rearranging itself as it is built, so the height stays O(log n) whatever the insertion order. "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " are that tree. The standard requires their search, insert and erase to be logarithmic, and cppreference notes that maps are "
+        },
+        {
+         "t": "a",
+         "v": "usually implemented as red-black trees",
+         "href": "https://en.cppreference.com/cpp/container/map"
+        },
+        {
+         "t": "text",
+         "v": "; in GCC 13's libstdc++ they share one "
+        },
+        {
+         "t": "code",
+         "v": "_Rb_tree"
+        },
+        {
+         "t": "text",
+         "v": " class template from "
+        },
+        {
+         "t": "code",
+         "v": "bits/stl_tree.h"
+        },
+        {
+         "t": "text",
+         "v": ", whose header comment introduces the file's red-black tree as a class written to implement the four associative containers, with insertion and deletion following Cormen, Leiserson and Rivest. A red-black tree keeps a colour bit per node and rebalances with rotations on insert and erase, which bounds the longest path at twice the shortest one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What you get with it is worth listing, because interview answers that say \"use "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": "\" and stop are leaving the reasons unsaid. Iteration is in ascending key order. "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "upper_bound"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "equal_range"
+        },
+        {
+         "t": "text",
+         "v": " answer range questions that a hash map cannot, such as the first reading at or after a time stamp. Inserting or erasing an element leaves every pointer, reference and iterator to the other elements valid, which a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " does not. And since C++17, "
+        },
+        {
+         "t": "code",
+         "v": "extract"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "merge"
+        },
+        {
+         "t": "text",
+         "v": " move a node from one map to another without copying the element or allocating."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What you give up is memory and speed on plain lookups. Every element is a separate allocation, holding two child pointers, a parent pointer and a colour, and a search follows those pointers to addresses the processor cannot predict. A sorted "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " searched with "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " does the same O(log n) comparisons in contiguous memory: one million lookups among 100,000 "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " keys took 112.2 ms through a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " and 62.9 ms through a sorted vector, the middle of three runs each, built with "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " under WSL with GCC 13.3. When the set of keys is fixed after start-up, the vector is the better container, which is the argument Kevin Carpenter's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on vectors",
+         "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) makes for containers in general."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So write your own tree when you need something the interface does not offer: a node that carries the size of its subtree, so you can ask for the k-th smallest key or the rank of a key in O(log n); an interval tree; a tree whose nodes hold an aggregate such as a running maximum. Everywhere else, "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " or a sorted vector is the answer, and the reason to know the three operations by hand is that interviewers ask for them and that the balanced versions are these three plus rotations."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Validate a BST; lowest common ancestor",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. The cold check's validator carries bounds down the tree. Write the other one: "
+        },
+        {
+         "t": "code",
+         "v": "first_out_of_order(root)"
+        },
+        {
+         "t": "text",
+         "v": ", which walks the tree in in-order and returns the first key that is not strictly greater than the key before it, or no value when the tree is a valid binary search tree with distinct keys."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write it as a loop with your own stack, not as a recursion, and stop at the first break without walking the rest of the tree. Keys are "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " and may be any value, including "
+        },
+        {
+         "t": "code",
+         "v": "std::numeric_limits<int>::min()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::numeric_limits<int>::max()"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test it on the tree from the cold check, on the tree whose 4 hangs under the right child 8, on a tree with two nodes holding 5, on the tree with root 0 whose children are the lowest and the highest "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", on a single node holding the lowest "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", and on the empty tree. Then say the time and the extra space, and say why this form handles the extreme values with no special case while a bounds-carrying version needs "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " to do the same."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The in-order walk is the one from the traversal topic, with one extra variable: the key visited before this one. The property to check becomes \"the sequence strictly increases\", which is a comparison between neighbours rather than a pair of bounds:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <limits>\n#include <memory>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int key = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int key, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(key, std::move(left), std::move(right));\n}\n\n// The first key that is not strictly greater than the key before it in in-order, or no value\n// when the whole tree is a binary search tree with distinct keys.\n[[nodiscard]] std::optional<int> first_out_of_order(const Node* root) {\n  std::vector<const Node*> pending;\n  const Node* current = root;\n  std::optional<int> previous;  // the key visited before this one, if any\n  while (current != nullptr || !pending.empty()) {\n    while (current != nullptr) {\n      pending.push_back(current);\n      current = current->left.get();\n    }\n    current = pending.back();\n    pending.pop_back();\n    if (previous && *previous >= current->key) return current->key;  // stop at the first break\n    previous = current->key;\n    current = current->right.get();\n  }\n  return std::nullopt;\n}\n\nvoid report(std::string_view name, const Node* root) {\n  const std::optional<int> bad = first_out_of_order(root);\n  std::cout << std::format(\"{:<34}{}\\n\", name, bad ? std::format(\"breaks at {}\", *bad) : \"a valid BST\");\n}\n\nint main() {\n  const std::unique_ptr<Node> good = node(5, node(3, node(2, node(1)), node(4)), node(8, nullptr, node(9)));\n  report(\"the tree from the cold check\", good.get());\n  const std::unique_ptr<Node> grandchild = node(5, node(3), node(8, node(4), node(9)));\n  report(\"4 under the right child 8\", grandchild.get());\n  const std::unique_ptr<Node> duplicate = node(5, node(5), node(8));\n  report(\"a second 5 on the left\", duplicate.get());\n  constexpr int lowest = std::numeric_limits<int>::min();\n  constexpr int highest = std::numeric_limits<int>::max();\n  const std::unique_ptr<Node> extremes = node(0, node(lowest), node(highest));\n  report(\"the two extreme int values\", extremes.get());\n  const std::unique_ptr<Node> only_min = node(lowest);\n  report(\"a single node holding the lowest\", only_min.get());\n  report(\"the empty tree\", nullptr);\n}"
+      },
+      {
+       "t": "output",
+       "text": "the tree from the cold check      a valid BST\n4 under the right child 8         breaks at 4\na second 5 on the left            breaks at 5\nthe two extreme int values        a valid BST\na single node holding the lowest  a valid BST\nthe empty tree                    a valid BST"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time in the worst case and O(h) extra space for "
+        },
+        {
+         "t": "code",
+         "v": "pending"
+        },
+        {
+         "t": "text",
+         "v": ", and it stops early: the second tree returns after visiting 3, 5 and 4, without touching 8 or 9. The comparison is "
+        },
+        {
+         "t": "code",
+         "v": ">="
+        },
+        {
+         "t": "text",
+         "v": ", which is what \"distinct keys\" means here, and turning it into "
+        },
+        {
+         "t": "code",
+         "v": ">"
+        },
+        {
+         "t": "text",
+         "v": " is what a version that allows duplicates would do."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The extreme values are the point of the last three trees. This form never invents a bound, so there is no value it has to reserve. A bounds-carrying validator that starts from "
+        },
+        {
+         "t": "code",
+         "v": "std::numeric_limits<int>::min()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "max()"
+        },
+        {
+         "t": "text",
+         "v": " has to, and both choices are wrong: comparing with "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": " rejects a valid tree that uses those two keys, and comparing with "
+        },
+        {
+         "t": "code",
+         "v": "<"
+        },
+        {
+         "t": "text",
+         "v": " accepts a tree with duplicates. "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " is the fix, as the cold check's version shows, and a wider type for the bounds, "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " around "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " keys, is the other one. The pattern behind it has a name worth using in an interview: a sentinel is a value stolen from the domain to mean \"no value\", and it works right up to the day the domain uses it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "previous"
+        },
+        {
+         "t": "text",
+         "v": " is an "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int>"
+        },
+        {
+         "t": "text",
+         "v": " for the same reason. The first node has no predecessor, and \"no predecessor\" is a different thing from \"a predecessor holding the lowest "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": "\", which is what a plain "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " would confuse it with."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bounds form and this one catch the same trees. Reach for this one when you also want to know where the tree breaks, or when the keys use the whole range of their type; reach for the bounds form when you want to stop descending into a subtree as soon as its range is impossible."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "lowest_common_ancestor(root, a, b)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the key of the deepest node that has both "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " somewhere in its subtree, where a node counts as being in its own subtree. Return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int>"
+        },
+        {
+         "t": "text",
+         "v": ", with no value when either key is missing from the tree."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write it twice. The first version takes a binary search tree and uses the ordering, so it never looks at a subtree that cannot hold either key. The second takes any binary tree with distinct keys and assumes no ordering at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test both on the tree from the cold check with the pairs (1, 4), (2, 4), (1, 9), (3, 3), (3, 4), (5, 9) and (4, 7), where 7 is not in the tree. Test the second on a tree whose keys are in no order, and both on the empty tree. Give the time and the extra space of each, in terms of the node count n and the height h."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In a binary search tree, the answer is the first node whose key stops both searches from going the same way. While both keys are below the node, both live in its left subtree, so the node is not the deepest common ancestor and the walk goes left; the mirror case goes right; anything else is the answer. In a tree with no ordering there is nothing to steer by, so the whole tree is searched and the answer is assembled on the way back up, which is a post-order:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <optional>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int key = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int key, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(key, std::move(left), std::move(right));\n}\n\n[[nodiscard]] bool contains(const Node* n, int key) {\n  while (n != nullptr && n->key != key) n = key < n->key ? n->left.get() : n->right.get();\n  return n != nullptr;\n}\n\n// In a BST: walk down while both keys are on the same side. O(h) time, O(1) space.\n[[nodiscard]] std::optional<int> lca_bst(const Node* root, int a, int b) {\n  if (!contains(root, a) || !contains(root, b)) return std::nullopt;\n  const Node* n = root;\n  while (n != nullptr) {\n    if (a < n->key && b < n->key) n = n->left.get();\n    else if (a > n->key && b > n->key) n = n->right.get();\n    else return n->key;  // the keys part here, or one of them is this node\n  }\n  return std::nullopt;\n}\n\n[[nodiscard]] bool holds(const Node* n, int key) {  // any order, so the whole subtree is searched\n  if (n == nullptr) return false;\n  return n->key == key || holds(n->left.get(), key) || holds(n->right.get(), key);\n}\n\n[[nodiscard]] const Node* lca_node(const Node* n, int a, int b) {\n  if (n == nullptr || n->key == a || n->key == b) return n;\n  const Node* left = lca_node(n->left.get(), a, b);\n  const Node* right = lca_node(n->right.get(), a, b);\n  if (left != nullptr && right != nullptr) return n;  // the keys are on different sides: this is the meeting point\n  return left != nullptr ? left : right;\n}\n\n// In any binary tree with distinct keys. O(n) time, O(h) stack.\n[[nodiscard]] std::optional<int> lca_any(const Node* root, int a, int b) {\n  if (!holds(root, a) || !holds(root, b)) return std::nullopt;\n  const Node* found = lca_node(root, a, b);\n  return found != nullptr ? std::optional<int>{found->key} : std::nullopt;\n}\n\n[[nodiscard]] std::string text(std::optional<int> value) {\n  return value ? std::format(\"{}\", *value) : \"none\";\n}\n\nint main() {\n  const std::unique_ptr<Node> tree = node(5, node(3, node(2, node(1)), node(4)), node(8, nullptr, node(9)));\n  const std::vector<std::pair<int, int>> pairs{{1, 4}, {2, 4}, {1, 9}, {3, 3}, {3, 4}, {5, 9}, {4, 7}};\n  for (const auto& [a, b] : pairs)\n    std::cout << std::format(\"{} and {}: bst {:<5} any order {}\\n\", a, b, text(lca_bst(tree.get(), a, b)),\n                             text(lca_any(tree.get(), a, b)));\n  const std::unique_ptr<Node> unordered = node(5, node(9, node(1), node(4)), node(3, node(8), nullptr));\n  std::cout << std::format(\"unordered tree, 1 and 4: {}\\n\", text(lca_any(unordered.get(), 1, 4)));\n  std::cout << std::format(\"unordered tree, 1 and 8: {}\\n\", text(lca_any(unordered.get(), 1, 8)));\n  std::cout << std::format(\"empty tree, 1 and 2: {} and {}\\n\", text(lca_bst(nullptr, 1, 2)),\n                           text(lca_any(nullptr, 1, 2)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "1 and 4: bst 3     any order 3\n2 and 4: bst 3     any order 3\n1 and 9: bst 5     any order 5\n3 and 3: bst 3     any order 3\n3 and 4: bst 3     any order 3\n5 and 9: bst 5     any order 5\n4 and 7: bst none  any order none\nunordered tree, 1 and 4: 9\nunordered tree, 1 and 8: 5\nempty tree, 1 and 2: none and none"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "lca_bst"
+        },
+        {
+         "t": "text",
+         "v": " is O(h) time and O(1) space for the walk, plus the two searches that check the keys exist, which are O(h) each. "
+        },
+        {
+         "t": "code",
+         "v": "lca_any"
+        },
+        {
+         "t": "text",
+         "v": " is O(n) time and O(h) stack, plus the two "
+        },
+        {
+         "t": "code",
+         "v": "holds"
+        },
+        {
+         "t": "text",
+         "v": " searches, which are O(n) each. On a balanced tree of a million nodes that is about 20 steps against a million, which is what the ordering buys."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pair (3, 4) is the case that catches people: 4 sits inside 3's subtree, so the answer is 3 itself. Both versions get it right for the same reason, that a node counts as its own ancestor, and both would get it wrong if they descended past a node whose key equals one of the two."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The missing key is the other case, and it is why both versions check first. Without the check, "
+        },
+        {
+         "t": "code",
+         "v": "lca_node"
+        },
+        {
+         "t": "text",
+         "v": " on the pair (4, 7) returns the node holding 4, because the recursion reports \"I found one of them below me\" and nothing ever contradicts it. Interview statements often say \"both keys are in the tree\", and saying out loud that you would check otherwise is worth more than the code. When both keys are known to be present, drop the two searches and "
+        },
+        {
+         "t": "code",
+         "v": "lca_any"
+        },
+        {
+         "t": "text",
+         "v": " is a single O(n) pass."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "holds"
+        },
+        {
+         "t": "text",
+         "v": " search is recursive, so its depth is the height, and on a chain of a million nodes it overflows the stack for the reason the traversal topic measured. The iterative form is the explicit-stack walk from that topic. On an interview whiteboard the recursion is fine; in the robot it is not."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Duplicate keys; comparing only with the parent",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two trees, and two mistakes that a small test will not catch:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int key = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int key, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(key, std::move(left), std::move(right));\n}\n\n// The check people write first: every child is on the correct side of its own parent.\n[[nodiscard]] bool parent_only(const Node* n) {\n  if (n == nullptr) return true;\n  if (n->left != nullptr && n->left->key >= n->key) return false;\n  if (n->right != nullptr && n->right->key <= n->key) return false;\n  return parent_only(n->left.get()) && parent_only(n->right.get());\n}\n\n// The whole subtree has to fit between the bounds its ancestors set.\n[[nodiscard]] bool in_range(const Node* n, std::optional<int> low, std::optional<int> high) {\n  if (n == nullptr) return true;\n  if (low && n->key <= *low) return false;\n  if (high && n->key >= *high) return false;\n  return in_range(n->left.get(), low, n->key) && in_range(n->right.get(), n->key, high);\n}\n\n// The search a BST promises: one comparison per level, never looking at the other side.\n[[nodiscard]] bool contains(const Node* n, int key) {\n  while (n != nullptr && n->key != key) n = key < n->key ? n->left.get() : n->right.get();\n  return n != nullptr;\n}\n\nenum class Ties { none, left, right };\n\n// Equal keys are allowed only on the side `ties` names.\n[[nodiscard]] bool fits(const Node* n, std::optional<int> low, std::optional<int> high, Ties ties) {\n  if (n == nullptr) return true;\n  if (low && (ties == Ties::right ? n->key < *low : n->key <= *low)) return false;\n  if (high && (ties == Ties::left ? n->key > *high : n->key >= *high)) return false;\n  return fits(n->left.get(), low, n->key, ties) && fits(n->right.get(), n->key, high, ties);\n}\n\n[[nodiscard]] std::string verdicts(const Node* root) {\n  return std::format(\"{:<7}{:<7}{}\", fits(root, std::nullopt, std::nullopt, Ties::none) ? \"yes\" : \"no\",\n                     fits(root, std::nullopt, std::nullopt, Ties::left) ? \"yes\" : \"no\",\n                     fits(root, std::nullopt, std::nullopt, Ties::right) ? \"yes\" : \"no\");\n}\n\nint main() {\n  const std::unique_ptr<Node> broken = node(5, node(3), node(8, node(4), node(9)));\n  std::cout << std::format(\"4 sits under 8, which sits right of 5\\n\");\n  std::cout << std::format(\"  every child fits its parent: {}\\n\", parent_only(broken.get()));\n  std::cout << std::format(\"  every subtree fits its bounds: {}\\n\", in_range(broken.get(), std::nullopt, std::nullopt));\n  std::cout << std::format(\"  a BST search finds 4: {}, finds 9: {}\\n\", contains(broken.get(), 4),\n                           contains(broken.get(), 9));\n\n  const std::unique_ptr<Node> ties_right = node(5, node(3), node(5, nullptr, node(8)));\n  const std::unique_ptr<Node> ties_left = node(5, node(5, node(3), nullptr), node(8));\n  std::cout << std::format(\"\\n{:<28}{:<7}{:<7}{}\\n\", \"equal keys\", \"strict\", \"left\", \"right\");\n  std::cout << std::format(\"{:<28}{}\\n\", \"the second 5 on the right\", verdicts(ties_right.get()));\n  std::cout << std::format(\"{:<28}{}\\n\", \"the second 5 on the left\", verdicts(ties_left.get()));\n}"
+      },
+      {
+       "t": "output",
+       "text": "4 sits under 8, which sits right of 5\n  every child fits its parent: true\n  every subtree fits its bounds: false\n  a BST search finds 4: false, finds 9: true\n\nequal keys                  strict left   right\nthe second 5 on the right   no     no     yes\nthe second 5 on the left    no     yes    no"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first tree is the one to remember. Every child is on the correct side of its own parent, so "
+        },
+        {
+         "t": "code",
+         "v": "parent_only"
+        },
+        {
+         "t": "text",
+         "v": " accepts it, and it is still not a binary search tree: 4 sits in the right subtree of 5. The line that proves the damage is the last one. "
+        },
+        {
+         "t": "code",
+         "v": "contains"
+        },
+        {
+         "t": "text",
+         "v": " looks for 4, sees 4 < 5, goes left into the subtree holding 3, finds nothing there, and answers false, for a key that is in the tree. Nothing crashes, no sanitizer fires, and the tree quietly loses a reading. Everything a binary search tree offers rests on the property holding for whole subtrees, so a validator that checks parents alone is checking a different, weaker thing. The same mistake appears as an insert that compares with the parent of the insertion point rather than walking from the root."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second half is about equal keys, and the honest answer is that the invariant as stated has nothing to say about them: it puts smaller keys left and larger keys right, and a key equal to the node belongs to neither side. So you pick a policy, and the table shows what each one accepts. Strict rejects both trees, \"equals on the left\" accepts only the tree that puts the second 5 on the left, and \"equals on the right\" accepts only the other. Every piece of code that touches the tree has to use the same policy. A tree built with equals going left and searched with a "
+        },
+        {
+         "t": "code",
+         "v": "key < n->key ? left : right"
+        },
+        {
+         "t": "text",
+         "v": " rule, which sends ties right, loses every duplicate but the first; an "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " that disagrees with "
+        },
+        {
+         "t": "code",
+         "v": "insert"
+        },
+        {
+         "t": "text",
+         "v": " removes the wrong node and leaves an unreachable one behind."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The standard library takes the choice away, which is the reason to prefer it. "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " hold one element per "
+        },
+        {
+         "t": "i",
+         "v": "equivalent"
+        },
+        {
+         "t": "text",
+         "v": " key, where two keys are equivalent when "
+        },
+        {
+         "t": "code",
+         "v": "!(a < b) && !(b < a)"
+        },
+        {
+         "t": "text",
+         "v": ", so the comparison has to be a strict weak ordering, the same requirement the sorting topic measured a sort crashing without. "
+        },
+        {
+         "t": "code",
+         "v": "std::multiset"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::multimap"
+        },
+        {
+         "t": "text",
+         "v": " hold many, keep equivalent elements in the order they were inserted, and hand them all back through "
+        },
+        {
+         "t": "a",
+         "v": "equal_range",
+         "href": "https://en.cppreference.com/cpp/container/multimap/equal_range"
+        },
+        {
+         "t": "text",
+         "v": ". And "
+        },
+        {
+         "t": "code",
+         "v": "std::map::insert"
+        },
+        {
+         "t": "text",
+         "v": " leaves an existing key alone while "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": " default-constructs a value for a missing one, which is the same distinction in another place and the reason "
+        },
+        {
+         "t": "a",
+         "v": "try_emplace",
+         "href": "https://en.cppreference.com/cpp/container/map/try_emplace"
+        },
+        {
+         "t": "text",
+         "v": " exists."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One more thing the small test hides: a hand-written tree built from sorted keys is a chain, and a chain of "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " nodes deeper than about 59,000 crashes in its own destructor, which the traversal topic measured. A BST fed time stamps reaches that depth on ordinary data. Either balance it, own it through a class with the iterative "
+        },
+        {
+         "t": "code",
+         "v": "clear()"
+        },
+        {
+         "t": "text",
+         "v": " from that topic, or use "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. State the invariant in one sentence and say why it is about subtrees rather than children. Give the two validators and say what each one is good for. Describe erase in its three cases, and say which node replaces a node with two children and why removing that node falls back to one of the first two cases. Give the measured heights and comparisons for 4096 keys inserted in order and shuffled, and name the inputs that arrive sorted in practice. Say what "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " are, which four things they give you that a hash map does not, and the measured cost against a sorted vector. Say what the invariant does not decide about equal keys and what the library does instead."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "State the binary search tree invariant. Why is \"each child is on the correct side of its parent\" a different, weaker statement?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Describe erase in all three cases. Which key replaces a node with two children, and why is that node simple to remove?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "4096 keys go into a plain BST in sorted order and then shuffled. Give the heights and the comparisons per lookup."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is "
+     },
+     {
+      "t": "code",
+      "v": "std::map"
+     },
+     {
+      "t": "text",
+      "v": " implemented as, and what does the standard require of its operations?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name four things "
+     },
+     {
+      "t": "code",
+      "v": "std::map"
+     },
+     {
+      "t": "text",
+      "v": " gives you that "
+     },
+     {
+      "t": "code",
+      "v": "std::unordered_map"
+     },
+     {
+      "t": "text",
+      "v": " does not, and one thing a sorted vector does better."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Where does the lowest common ancestor walk turn in a BST, and what does the version for an unordered tree do instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does the invariant say about two equal keys, and what do "
+     },
+     {
+      "t": "code",
+      "v": "std::set"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::multiset"
+     },
+     {
+      "t": "text",
+      "v": " do about them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: validate a BST, both ways, and say which trees each one stops early on."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". Node-based containers against contiguous ones, and what chasing pointers costs."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Standard Library Containers, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ZMUKa2kWtTk"
+     },
+     {
+      "t": "text",
+      "v": ". The ordered and unordered associative containers and where each one fits."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh and Adam Segoli Schubert, Back to Basics: Algorithmic Complexity, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Algorithmic_Complexity.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=AY2FqpDCBGs"
+     },
+     {
+      "t": "text",
+      "v": ". Why the height, and not the node count, is the cost of every operation here."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Herb Sutter, Leak-Freedom in C++... By Default, CppCon 2016: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2016/blob/master/Presentations/Lifetime%20Safety%20By%20Default%20-%20Making%20Code%20Leak-Free%20by%20Construction/Lifetime%20Safety%20By%20Default%20-%20Making%20Code%20Leak-Free%20by%20Construction%20-%20Herb%20Sutter%20-%20CppCon%202016.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=JfmTagWcqoE"
+     },
+     {
+      "t": "text",
+      "v": ". Owning links, and why a deep tree of them is a problem at destruction."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": " on preferring the library, "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " as the default container, "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": " on measuring before claiming, and "
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": " on raw pointers owning nothing."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil "
+     },
+     {
+      "t": "a",
+      "v": "tip #171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on returning "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": " instead of a value stolen from the domain."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::map",
+      "href": "https://en.cppreference.com/cpp/container/map"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::set",
+      "href": "https://en.cppreference.com/cpp/container/set"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "map::try_emplace",
+      "href": "https://en.cppreference.com/cpp/container/map/try_emplace"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "multimap::equal_range",
+      "href": "https://en.cppreference.com/cpp/container/multimap/equal_range"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "map::lower_bound",
+      "href": "https://en.cppreference.com/cpp/container/map/lower_bound"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "map::extract",
+      "href": "https://en.cppreference.com/cpp/container/map/extract"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ranges::lower_bound",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/lower_bound"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "libstdc++'s red-black tree, "
+     },
+     {
+      "t": "a",
+      "v": "bits/stl_tree.h on the GCC 13 branch",
+      "href": "https://github.com/gcc-mirror/gcc/blob/releases/gcc-13/libstdc%2B%2B-v3/include/bits/stl_tree.h"
+     },
+     {
+      "t": "text",
+      "v": ", which "
+     },
+     {
+      "t": "code",
+      "v": "std::map"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "std::set"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "std::multimap"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::multiset"
+     },
+     {
+      "t": "text",
+      "v": " all sit on."
+     }
+    ]
+   ]
+  }
+ ]
+}

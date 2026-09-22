@@ -1,0 +1,2700 @@
+{
+ "id": "cpp-refs-borrowing",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "For each declaration, say whether the function borrows its argument, takes ownership of it, or can leave the caller with something dangling, and why. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "void log(std::string_view line);\nvoid store(std::unique_ptr<Frame> frame);\nstd::string_view first_word(const std::string& text);\nvoid refill(std::vector<int>& buffer);\nint* find(std::vector<int>& values, int wanted);"
+   }
+  ],
+  "answer": [
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "code",
+       "v": "log"
+      },
+      {
+       "t": "text",
+       "v": " borrows the characters of "
+      },
+      {
+       "t": "code",
+       "v": "line"
+      },
+      {
+       "t": "text",
+       "v": " for the length of the call. A "
+      },
+      {
+       "t": "code",
+       "v": "std::string_view"
+      },
+      {
+       "t": "text",
+       "v": " is a pointer and a length into characters that someone else owns. If "
+      },
+      {
+       "t": "code",
+       "v": "log"
+      },
+      {
+       "t": "text",
+       "v": " wants to keep the text, it has to copy it into a "
+      },
+      {
+       "t": "code",
+       "v": "std::string"
+      },
+      {
+       "t": "text",
+       "v": ", because a stored view dangles once the caller's string is gone."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "store"
+      },
+      {
+       "t": "text",
+       "v": " takes ownership. The caller has to move a "
+      },
+      {
+       "t": "code",
+       "v": "std::unique_ptr"
+      },
+      {
+       "t": "text",
+       "v": " in, and from then on "
+      },
+      {
+       "t": "code",
+       "v": "store"
+      },
+      {
+       "t": "text",
+       "v": " decides when the "
+      },
+      {
+       "t": "code",
+       "v": "Frame"
+      },
+      {
+       "t": "text",
+       "v": " is destroyed."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "first_word"
+      },
+      {
+       "t": "text",
+       "v": " borrows "
+      },
+      {
+       "t": "code",
+       "v": "text"
+      },
+      {
+       "t": "text",
+       "v": " and returns a view into it. The view is only valid while "
+      },
+      {
+       "t": "code",
+       "v": "text"
+      },
+      {
+       "t": "text",
+       "v": " lives, so "
+      },
+      {
+       "t": "code",
+       "v": "first_word(std::string(\"pick up\"))"
+      },
+      {
+       "t": "text",
+       "v": " returns a view into a temporary that is destroyed at the end of the statement."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "refill"
+      },
+      {
+       "t": "text",
+       "v": " borrows "
+      },
+      {
+       "t": "code",
+       "v": "buffer"
+      },
+      {
+       "t": "text",
+       "v": " and may change it. If it adds elements and the vector reallocates, every pointer and iterator the caller holds into "
+      },
+      {
+       "t": "code",
+       "v": "buffer"
+      },
+      {
+       "t": "text",
+       "v": " is invalidated."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "find"
+      },
+      {
+       "t": "text",
+       "v": " returns a pointer into "
+      },
+      {
+       "t": "code",
+       "v": "values"
+      },
+      {
+       "t": "text",
+       "v": ", presumably "
+      },
+      {
+       "t": "code",
+       "v": "nullptr"
+      },
+      {
+       "t": "text",
+       "v": " when nothing matches, so the caller has to check it before using it. The pointer is valid until "
+      },
+      {
+       "t": "code",
+       "v": "values"
+      },
+      {
+       "t": "text",
+       "v": " reallocates or is destroyed."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with all five, including the dangling cases in 3, 4 and 5. Missing one or two is a partial pass, and more is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A reference and a pointer both let code refer to an object it doesn't own, but they are different kinds of thing. A reference is bound once, at initialisation, and never rebinds: it can't be null and there's no reference to a reference. A pointer is an object of its own that holds an address: it can be null, be pointed elsewhere, and be compared or incremented. Ownership is a separate question again. Every resource in a program should have exactly one owner, the object whose destruction releases it. Everything else that refers to the resource is a borrower: a reference, a raw pointer, a "
+    },
+    {
+     "t": "code",
+     "v": "std::string_view"
+    },
+    {
+     "t": "text",
+     "v": " or a "
+    },
+    {
+     "t": "code",
+     "v": "std::span"
+    },
+    {
+     "t": "text",
+     "v": ". A "
+    },
+    {
+     "t": "code",
+     "v": "std::string_view"
+    },
+    {
+     "t": "text",
+     "v": " is a pointer and a length into characters that someone else owns, and "
+    },
+    {
+     "t": "code",
+     "v": "std::span<const T>"
+    },
+    {
+     "t": "text",
+     "v": " is the same idea for any contiguous sequence, so both let a function read a "
+    },
+    {
+     "t": "code",
+     "v": "std::string"
+    },
+    {
+     "t": "text",
+     "v": ", part of one, or a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " without copying it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem borrowing solves is the copy a function would otherwise force on every caller to read a sequence it doesn't keep. What it can cause instead is a borrow that outlives what it borrows from. That's safe for the length of a call, but storing the borrow in a member, returning it, or capturing it by reference in a lambda that runs later needs someone to guarantee the owner lives at least as long. The compiler checks none of it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is that a view or a reference holds no data of its own, only a way to reach someone else's: it shows whatever the owner currently holds, and it stops being safe to read the moment the owner is destroyed or, for a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": ", reallocates."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is a check you owe every time a function returns a reference or a view, or a class stores one: what keeps that object alive here? Get it wrong and the borrow dangles, meaning it refers to an object whose lifetime has already ended, and reading through it is undefined behaviour."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this on every route the robot plans: a "
+    },
+    {
+     "t": "code",
+     "v": "find"
+    },
+    {
+     "t": "text",
+     "v": " that returns a pointer to a waypoint because \"not found\" is a real answer the caller must check, a "
+    },
+    {
+     "t": "code",
+     "v": "trim"
+    },
+    {
+     "t": "text",
+     "v": " that returns a view into the caller's string without allocating, and the interview question itself, which asks exactly this: for a handful of signatures, say which ones borrow, which take ownership, and which can leave the caller holding something dangling."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "ptr-ref",
+   "title": "Pointers versus references: null, rebinding, const correctness",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A reference and a pointer both refer to another object, but they behave differently when you assign to them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n\nint main() {\n  int a = 1;\n  int b = 2;\n  int& r = a;  // r is another name for a, for the rest of its life\n  r = b;       // copies the value of b into a; r still refers to a\n  int* p = &a;\n  p = &b;      // p now points at b\n  *p = 20;\n  std::cout << std::format(\"a={} b={} r={} *p={}\\n\", a, b, r, *p);\n}"
+      },
+      {
+       "t": "output",
+       "text": "a=2 b=20 r=2 *p=20"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A reference is bound once, when it is initialised, and never rebound: "
+        },
+        {
+         "t": "code",
+         "v": "r = b"
+        },
+        {
+         "t": "text",
+         "v": " assigns through it. It can't be null, and there's no reference to a reference. A pointer is an object of its own that holds an address. It can be null, it can be pointed elsewhere, and it can be compared and incremented. So use a reference when the object must exist and stays the same for the reference's whole life, and a pointer when \"no object\" is a valid answer or the target changes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " applies to whatever is on its left, or to what is on its right when nothing is on its left, so read declarations from right to left:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Declaration"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Can you change the int through it?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Can it refer to another int later?"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "int* p"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "const int* p"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "int* const p"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "const int& r"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no, references never rebind"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " member function promises not to change the object: inside it, "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": " points to "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ". Only "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " member functions can be called on a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " object or through a "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": ". That is why a class needs both "
+        },
+        {
+         "t": "code",
+         "v": "const T& at(std::ptrdiff_t) const"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "T& at(std::ptrdiff_t)"
+        },
+        {
+         "t": "text",
+         "v": " if callers should be able to read from a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " container and write to a non-"
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " one. Dan Saks calls "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " a promise in his "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk",
+         "href": "https://www.youtube.com/watch?v=NZtr93iL3R0"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019), and the compiler holds you to it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For parameters, the "
+        },
+        {
+         "t": "a",
+         "v": "C++ Core Guidelines on parameter passing",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ss-call"
+        },
+        {
+         "t": "text",
+         "v": " give rules you can apply without thinking twice. Pass cheap-to-copy types by value: "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": ", small structs, and "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": ", which are views. Pass anything else you only read by "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "F.16",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-in"
+        },
+        {
+         "t": "text",
+         "v": "). Pass by non-"
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " "
+        },
+        {
+         "t": "code",
+         "v": "&"
+        },
+        {
+         "t": "text",
+         "v": " only when the function must change the caller's object ("
+        },
+        {
+         "t": "a",
+         "v": "F.17",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-inout"
+        },
+        {
+         "t": "text",
+         "v": "), and prefer returning a result where you can ("
+        },
+        {
+         "t": "a",
+         "v": "F.20",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-out"
+        },
+        {
+         "t": "text",
+         "v": "). Use a pointer when \"no argument\" is a valid option ("
+        },
+        {
+         "t": "a",
+         "v": "F.60",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-ptr-ref"
+        },
+        {
+         "t": "text",
+         "v": "). When the function keeps its own copy, the plain choice is to take it by value and move it into place ("
+        },
+        {
+         "t": "a",
+         "v": "Abseil tip #234",
+         "href": "https://abseil.io/tips/234"
+        },
+        {
+         "t": "text",
+         "v": "). For code where that extra move has to go, the note under F.16 gives the Core Guidelines' form: a "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": " overload for lvalues plus a "
+        },
+        {
+         "t": "code",
+         "v": "T&&"
+        },
+        {
+         "t": "text",
+         "v": " overload that moves ("
+        },
+        {
+         "t": "a",
+         "v": "F.18",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-consume"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes and write this from a blank file. A "
+        },
+        {
+         "t": "code",
+         "v": "Route"
+        },
+        {
+         "t": "text",
+         "v": " holds a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Waypoint>"
+        },
+        {
+         "t": "text",
+         "v": ", where a "
+        },
+        {
+         "t": "code",
+         "v": "Waypoint"
+        },
+        {
+         "t": "text",
+         "v": " has a "
+        },
+        {
+         "t": "code",
+         "v": "std::string name"
+        },
+        {
+         "t": "text",
+         "v": " and two "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " coordinates "
+        },
+        {
+         "t": "code",
+         "v": "x"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "y"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Give "
+         },
+         {
+          "t": "code",
+          "v": "Route"
+         },
+         {
+          "t": "text",
+          "v": " an "
+         },
+         {
+          "t": "code",
+          "v": "add"
+         },
+         {
+          "t": "text",
+          "v": " function, and a "
+         },
+         {
+          "t": "code",
+          "v": "length"
+         },
+         {
+          "t": "text",
+          "v": " function that returns the total straight-line distance. Choose the parameter types by the rules above."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Add "
+         },
+         {
+          "t": "code",
+          "v": "find"
+         },
+         {
+          "t": "text",
+          "v": ", which takes a name and returns the matching waypoint, or says that there isn't one, without copying anything."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Add "
+         },
+         {
+          "t": "code",
+          "v": "at"
+         },
+         {
+          "t": "text",
+          "v": ", which returns the waypoint at a signed index, usable both on a "
+         },
+         {
+          "t": "code",
+          "v": "const Route"
+         },
+         {
+          "t": "text",
+          "v": " for reading and on a non-"
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": " one for changing it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "In "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", build a route with three waypoints, print its length, rename one waypoint through "
+         },
+         {
+          "t": "code",
+          "v": "at"
+         },
+         {
+          "t": "text",
+          "v": ", and look one up with "
+         },
+         {
+          "t": "code",
+          "v": "find"
+         },
+         {
+          "t": "text",
+          "v": ", both successfully and unsuccessfully."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cmath>\n#include <cstddef>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <numeric>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Waypoint {\n  std::string name;\n  double x = 0;\n  double y = 0;\n};\n\nclass Route {\n public:\n  void add(Waypoint w) { points_.push_back(std::move(w)); }  // kept, so taken by value and moved\n\n  [[nodiscard]] double length() const {\n    if (points_.size() < 2) return 0.0;\n    // Adds up the distance from each waypoint to the next one.\n    return std::transform_reduce(points_.begin(), points_.end() - 1, points_.begin() + 1, 0.0, std::plus<>{},\n                                 [](const Waypoint& from, const Waypoint& to) {\n                                   return std::hypot(to.x - from.x, to.y - from.y);\n                                 });\n  }\n\n  [[nodiscard]] const Waypoint* find(std::string_view name) const {  // nullptr means \"not found\"\n    const auto it = std::ranges::find(points_, name, &Waypoint::name);\n    return it != points_.end() ? &*it : nullptr;\n  }\n\n  [[nodiscard]] const Waypoint& at(std::ptrdiff_t i) const { return points_.at(static_cast<std::size_t>(i)); }\n  [[nodiscard]] Waypoint& at(std::ptrdiff_t i) { return points_.at(static_cast<std::size_t>(i)); }\n\n private:\n  std::vector<Waypoint> points_;\n};\n\nint main() {\n  Route route;\n  route.add({.name = \"dock\", .x = 0, .y = 0});\n  route.add({.name = \"shelf\", .x = 3, .y = 4});\n  route.add({.name = \"gate\", .x = 3, .y = 10});\n  std::cout << std::format(\"length {:.1f}\\n\", route.length());\n\n  route.at(2).name = \"exit\";\n  const Route& reader = route;\n  for (const std::string_view name : {\"exit\", \"gate\"}) {\n    if (const Waypoint* hit = reader.find(name)) {\n      std::cout << std::format(\"{} is at ({}, {})\\n\", name, hit->x, hit->y);\n    } else {\n      std::cout << std::format(\"{} not found\\n\", name);\n    }\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "length 11.0\nexit is at (3, 10)\ngate not found"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "find"
+        },
+        {
+         "t": "text",
+         "v": " returns a pointer because \"not found\" is a valid answer, and a pointer that marks a position is what Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "F.42",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-return-ptr"
+        },
+        {
+         "t": "text",
+         "v": " recommends. "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<Waypoint>"
+        },
+        {
+         "t": "text",
+         "v": " would also say \"maybe\", but it copies the waypoint, and "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<const Waypoint&>"
+        },
+        {
+         "t": "text",
+         "v": " arrives only in C++26 ("
+        },
+        {
+         "t": "a",
+         "v": "P2988R12",
+         "href": "https://wg21.link/p2988r12"
+        },
+        {
+         "t": "text",
+         "v": "). The price of the pointer is that every caller must check it before using it. "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " does that in the "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": "'s own declaration, so "
+        },
+        {
+         "t": "code",
+         "v": "hit"
+        },
+        {
+         "t": "text",
+         "v": " exists only in the branch where it isn't null."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pointer is a borrow: it's valid only while the route is alive and its vector doesn't reallocate, so a caller that calls "
+        },
+        {
+         "t": "code",
+         "v": "add"
+        },
+        {
+         "t": "text",
+         "v": " after "
+        },
+        {
+         "t": "code",
+         "v": "find"
+        },
+        {
+         "t": "text",
+         "v": " must not use the old pointer. "
+        },
+        {
+         "t": "code",
+         "v": "find"
+        },
+        {
+         "t": "text",
+         "v": " takes a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", so a string literal and a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " can both be passed without a copy. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::find"
+        },
+        {
+         "t": "text",
+         "v": " with the projection "
+        },
+        {
+         "t": "code",
+         "v": "&Waypoint::name"
+        },
+        {
+         "t": "text",
+         "v": " compares each waypoint's name with it. The call names the intent, a search by name, where a hand-written loop leaves the reader to work it out (Klaus Iglberger, "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics: (Range) Algorithms",
+         "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+        },
+        {
+         "t": "text",
+         "v": ", CppCon 2023)."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "length"
+        },
+        {
+         "t": "text",
+         "v": " pairs each waypoint with the next one by giving "
+        },
+        {
+         "t": "code",
+         "v": "std::transform_reduce"
+        },
+        {
+         "t": "text",
+         "v": " the vector and the same vector shifted by one. A route with fewer than two waypoints has length 0, which is a real answer, not a sentinel. "
+        },
+        {
+         "t": "code",
+         "v": "at"
+        },
+        {
+         "t": "text",
+         "v": " takes a signed index, as Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.107",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+        },
+        {
+         "t": "text",
+         "v": " asks, and converts it for the vector. A negative index becomes a huge unsigned one, and "
+        },
+        {
+         "t": "code",
+         "v": "vector::at"
+        },
+        {
+         "t": "text",
+         "v": " throws "
+        },
+        {
+         "t": "code",
+         "v": "std::out_of_range"
+        },
+        {
+         "t": "text",
+         "v": " for it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "borrow",
+   "title": "Ownership versus borrowing; string_view and span as borrowed views",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every resource in a C++ program should have exactly one "
+        },
+        {
+         "t": "i",
+         "v": "owner"
+        },
+        {
+         "t": "text",
+         "v": ", the object whose destruction releases it. A "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " owns its characters, a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " owns its elements, and a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " owns the object it points to. Everything else that refers to the resource is a "
+        },
+        {
+         "t": "i",
+         "v": "borrower"
+        },
+        {
+         "t": "text",
+         "v": ": a reference, a raw pointer, a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " or a "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": ". A borrower must not outlive what it borrows from (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "R.3",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "R.4",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ref"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A borrow for the length of a call is almost always safe, because the caller's object outlives the call. The trouble starts when a borrow is stored: in a member, in a returned value, or in a lambda that runs later. Then someone has to guarantee that the owner lives longer, and the compiler checks nothing. Abseil's "
+        },
+        {
+         "t": "a",
+         "v": "tip #180",
+         "href": "https://abseil.io/tips/180"
+        },
+        {
+         "t": "text",
+         "v": " puts it as a rule of thumb: views are safe as parameters and risky anywhere they are stored. The storage topic's last failure case was a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " member left dangling this way."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " is a pointer and a length into characters owned by something else, which Arthur O'Dwyer calls a "
+        },
+        {
+         "t": "a",
+         "v": "borrow type",
+         "href": "https://quuxplusone.github.io/blog/2018/03/27/string-view-is-a-borrow-type/"
+        },
+        {
+         "t": "text",
+         "v": ". It makes a function accept a string literal, a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " or part of one, without copying ("
+        },
+        {
+         "t": "a",
+         "v": "Abseil tip #1",
+         "href": "https://abseil.io/tips/1"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const T>"
+        },
+        {
+         "t": "text",
+         "v": " does the same for any contiguous sequence of "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": ": a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "std::array"
+        },
+        {
+         "t": "text",
+         "v": " or a built-in array. Both are cheap to copy, so pass them by value. Neither keeps the characters or elements alive:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <string>\n#include <string_view>\n\nint main() {\n  std::string name = \"robot\";\n  const std::string_view view = name;  // borrows name's characters\n  name[0] = 'R';\n  std::cout << view << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "Robot"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The view saw the change because it holds no characters of its own. The same fact makes it dangle when "
+        },
+        {
+         "t": "code",
+         "v": "name"
+        },
+        {
+         "t": "text",
+         "v": " is destroyed or reallocates."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "trim"
+        },
+        {
+         "t": "text",
+         "v": " removes spaces at both ends and returns a view into its argument, without allocating:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n\n[[nodiscard]] std::string_view trim(std::string_view s) {\n  while (!s.empty() && s.front() == ' ') s.remove_prefix(1);\n  while (!s.empty() && s.back() == ' ') s.remove_suffix(1);\n  return s;  // points into the caller's characters\n}\n\nint main() {\n  const std::string line = \"   go to dock   \";\n  const std::string_view cmd = trim(line);\n  std::cout << std::format(\"[{}] has {} characters\\n\", cmd, cmd.size());\n}"
+      },
+      {
+       "t": "output",
+       "text": "[go to dock] has 10 characters"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Follow the ownership. "
+        },
+        {
+         "t": "code",
+         "v": "line"
+        },
+        {
+         "t": "text",
+         "v": " owns the characters. "
+        },
+        {
+         "t": "code",
+         "v": "trim"
+        },
+        {
+         "t": "text",
+         "v": " receives a view of them, shrinks the view, and returns it. "
+        },
+        {
+         "t": "code",
+         "v": "cmd"
+        },
+        {
+         "t": "text",
+         "v": " is valid exactly as long as "
+        },
+        {
+         "t": "code",
+         "v": "line"
+        },
+        {
+         "t": "text",
+         "v": " is alive and unchanged. The two loops are written out because shrinking the view is the lesson here: "
+        },
+        {
+         "t": "code",
+         "v": "remove_prefix"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "remove_suffix"
+        },
+        {
+         "t": "text",
+         "v": " move the view's ends and never touch a character."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "trim"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": " because calling it without using the result does nothing. "
+        },
+        {
+         "t": "code",
+         "v": "std::format"
+        },
+        {
+         "t": "text",
+         "v": " takes the view as a pointer and a length. That matters, because a view isn't necessarily followed by a terminating zero. A function that expects a C string, such as "
+        },
+        {
+         "t": "code",
+         "v": "std::puts"
+        },
+        {
+         "t": "text",
+         "v": ", would get only "
+        },
+        {
+         "t": "code",
+         "v": "cmd.data()"
+        },
+        {
+         "t": "text",
+         "v": " and print "
+        },
+        {
+         "t": "code",
+         "v": "go to dock"
+        },
+        {
+         "t": "text",
+         "v": " followed by three spaces, reading on to the zero at the end of "
+        },
+        {
+         "t": "code",
+         "v": "line"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same call on a temporary compiles and dangles: "
+        },
+        {
+         "t": "code",
+         "v": "const std::string_view cmd = trim(std::string(\"   go   \"));"
+        },
+        {
+         "t": "text",
+         "v": " gives a view into a string that is destroyed at the semicolon. The failure cases below show AddressSanitizer catching this."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes and work from a blank file."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "split(std::string_view text, char sep)"
+         },
+         {
+          "t": "text",
+          "v": ", which returns the pieces between separators as a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::string_view>"
+         },
+         {
+          "t": "text",
+          "v": ", without copying any characters. Build it on "
+         },
+         {
+          "t": "code",
+          "v": "std::views::split"
+         },
+         {
+          "t": "text",
+          "v": "; the work is turning each piece it yields into a "
+         },
+         {
+          "t": "code",
+          "v": "std::string_view"
+         },
+         {
+          "t": "text",
+          "v": ". Check it on "
+         },
+         {
+          "t": "code",
+          "v": "\"a,b,,c\""
+         },
+         {
+          "t": "text",
+          "v": ", which has four pieces, one of them empty."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "average(std::span<const double> values)"
+         },
+         {
+          "t": "text",
+          "v": ", which returns a "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<double>"
+         },
+         {
+          "t": "text",
+          "v": " with no value for an empty span. Call it with a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<double>"
+         },
+         {
+          "t": "text",
+          "v": ", a "
+         },
+         {
+          "t": "code",
+          "v": "std::array<double, 3>"
+         },
+         {
+          "t": "text",
+          "v": " and an empty span."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Say who owns the characters that "
+         },
+         {
+          "t": "code",
+          "v": "split"
+         },
+         {
+          "t": "text",
+          "v": "'s result points into, and write one line of code that would make the result dangle."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\n[[nodiscard]] std::vector<std::string_view> split(std::string_view text, char sep) {\n  std::vector<std::string_view> parts;\n  for (const auto piece : std::views::split(text, sep)) parts.emplace_back(piece.begin(), piece.end());\n  return parts;\n}\n\n[[nodiscard]] std::optional<double> average(std::span<const double> values) {\n  if (values.empty()) return std::nullopt;\n  return std::accumulate(values.begin(), values.end(), 0.0) / static_cast<double>(values.size());\n}\n\nint main() {\n  for (const std::string_view part : split(\"a,b,,c\", ',')) std::cout << std::format(\"[{}]\", part);\n  std::cout << '\\n';\n\n  const std::vector<double> speeds{0.5, 1.0, 1.5};\n  const std::array<double, 3> gains{1.0, 2.0, 6.0};\n  const auto show = [](std::optional<double> avg) { return avg ? std::format(\"{:.2f}\", *avg) : std::string(\"none\"); };\n  std::cout << std::format(\"{} {} {}\\n\", show(average(speeds)), show(average(gains)), show(average({})));\n}"
+      },
+      {
+       "t": "output",
+       "text": "[a][b][][c]\n1.00 3.00 none"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each piece that "
+        },
+        {
+         "t": "code",
+         "v": "std::views::split"
+        },
+        {
+         "t": "text",
+         "v": " yields is a subrange of "
+        },
+        {
+         "t": "code",
+         "v": "string_view"
+        },
+        {
+         "t": "text",
+         "v": " iterators (plain "
+        },
+        {
+         "t": "code",
+         "v": "const char*"
+        },
+        {
+         "t": "text",
+         "v": " in libstdc++), pointing into "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": ". C++23 gives "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " a constructor that takes such a range ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/string/basic_string_view/basic_string_view"
+        },
+        {
+         "t": "text",
+         "v": "), and GCC 13 has it only with "
+        },
+        {
+         "t": "code",
+         "v": "-std=c++23"
+        },
+        {
+         "t": "text",
+         "v": ". In C++20 mode the direct conversion doesn't compile, so the solution uses the C++20 constructor that takes a begin and an end:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "no matching function for call to",
+       "text": "#include <ranges>\n#include <string_view>\n#include <vector>\n\nint main() {\n  std::vector<std::string_view> parts;\n  for (const auto piece : std::views::split(std::string_view(\"a,b\"), ',')) parts.push_back(std::string_view(piece));\n  return static_cast<int>(parts.size());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For an empty "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::views::split"
+        },
+        {
+         "t": "text",
+         "v": " yields no pieces at all, where a hand-written loop that ends a piece at every separator and at the end of the text returns one empty piece. Both give two pieces for "
+        },
+        {
+         "t": "code",
+         "v": "\"a,\""
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " and an empty one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The characters belong to whatever "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": " viewed: here the string literal "
+        },
+        {
+         "t": "code",
+         "v": "\"a,b,,c\""
+        },
+        {
+         "t": "text",
+         "v": ", which has static storage and never dies. "
+        },
+        {
+         "t": "code",
+         "v": "split(std::string(\"a,b\"), ',')"
+        },
+        {
+         "t": "text",
+         "v": " would return views into a temporary string that is destroyed at the end of the statement, so every element of the result would dangle."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "average"
+        },
+        {
+         "t": "text",
+         "v": " returns an empty "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " for no values, where a 0.0 would look like a real average of zero ("
+        },
+        {
+         "t": "a",
+         "v": "Abseil tip #171",
+         "href": "https://abseil.io/tips/171"
+        },
+        {
+         "t": "text",
+         "v": "). One "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const double>"
+        },
+        {
+         "t": "text",
+         "v": " parameter accepts the vector, the array and the empty span without a copy or a template ("
+        },
+        {
+         "t": "a",
+         "v": "Core Guidelines F.24",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-range"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dangling",
+   "title": "Returning references to locals; views of temporaries",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A view of a local string, returned from a function. GCC 13 doesn't warn about this one. The local is destroyed when the function returns, and the caller reads freed memory:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n\n[[nodiscard]] std::string_view make_label(int id) {\n  const std::string label = std::format(\"waypoint number {} on the main route\", id);\n  return label;  // the view outlives the string it points into\n}\n\nint main() {\n  const std::string_view label = make_label(7);\n  std::cout << std::format(\"{} characters, starting with {}\\n\", label.size(), label[0]);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " initialised from a temporary string. The string is destroyed at the end of the statement:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n\nint main() {\n  const std::string_view view = std::string(\"a temporary string long enough to live on the heap\");\n  std::cout << std::format(\"{} {}\\n\", view.size(), view[0]);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A lambda that captures a local by reference and outlives it. The capture is a borrow, and the function that owned the local has returned:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-use-after-return",
+       "text": "#include <format>\n#include <functional>\n#include <iostream>\n\n[[nodiscard]] std::function<int()> make_counter() {\n  int count = 0;\n  return [&count] { return ++count; };  // borrows a local that dies on return\n}\n\nint main() {\n  const std::function<int()> next = make_counter();\n  std::cout << std::format(\"{}\\n\", next());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "All three compile without a warning under GCC 13 with "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra"
+        },
+        {
+         "t": "text",
+         "v": ", which is why the rule matters: a borrow must not outlive its owner, and in C++ you have to check that yourself. Return owning types such as "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " from functions (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "F.43",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-dangle"
+        },
+        {
+         "t": "text",
+         "v": " says it for pointers and references, and a view is a pointer). Capture by value in a lambda that outlives its scope ("
+        },
+        {
+         "t": "a",
+         "v": "F.53",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-value-capture"
+        },
+        {
+         "t": "text",
+         "v": "): "
+        },
+        {
+         "t": "code",
+         "v": "[count = 0]() mutable { return ++count; }"
+        },
+        {
+         "t": "text",
+         "v": " gives the lambda its own counter. And store owners, not views, in members unless something clearly guarantees the owner's lifetime."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say how a reference differs from a pointer, how to read "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " in a declaration, and how you choose a parameter type. Explain who owns what when a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": " is involved, and name three ways a borrow ends up outliving its owner."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "r = b"
+     },
+     {
+      "t": "text",
+      "v": " do when "
+     },
+     {
+      "t": "code",
+      "v": "r"
+     },
+     {
+      "t": "text",
+      "v": " is a reference, and what does "
+     },
+     {
+      "t": "code",
+      "v": "p = &b"
+     },
+     {
+      "t": "text",
+      "v": " do when "
+     },
+     {
+      "t": "code",
+      "v": "p"
+     },
+     {
+      "t": "text",
+      "v": " is a pointer?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which of "
+     },
+     {
+      "t": "code",
+      "v": "const int*"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "int* const"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "const int&"
+     },
+     {
+      "t": "text",
+      "v": " let you change the int, and which can refer to another int later?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "By what rules do you choose between passing by value, by "
+     },
+     {
+      "t": "code",
+      "v": "const&"
+     },
+     {
+      "t": "text",
+      "v": ", by "
+     },
+     {
+      "t": "code",
+      "v": "&"
+     },
+     {
+      "t": "text",
+      "v": " and by pointer?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a class often need a "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " and a non-"
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " version of "
+     },
+     {
+      "t": "code",
+      "v": "at"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "Route::find"
+     },
+     {
+      "t": "text",
+      "v": " return a pointer and not a "
+     },
+     {
+      "t": "code",
+      "v": "std::optional<Waypoint>"
+     },
+     {
+      "t": "text",
+      "v": ", and what must every caller do with it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a "
+     },
+     {
+      "t": "code",
+      "v": "split"
+     },
+     {
+      "t": "text",
+      "v": " that returns "
+     },
+     {
+      "t": "code",
+      "v": "std::string_view"
+     },
+     {
+      "t": "text",
+      "v": "s, and one line that makes its result dangle."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Pointers, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Mike_Shah_CPPCON_2021_Back_to_Basics__Pointers.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=0zd8eznWv4k"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Ben Saks, Back to Basics: Pointers and Memory, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rqVWj0aVSxg"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Dan Saks, Back to Basics: Const as a Promise, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=NZtr93iL3R0"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Functions, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Back_to_Basics_Functions_cppcon_2023.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=CpHX1Du5R0Q"
+     },
+     {
+      "t": "text",
+      "v": ". Parameter passing."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jasmine Lopez and Prithvi Okade, string_view, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Unraveling_string_view.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=PEvkBmuMIr8"
+     },
+     {
+      "t": "text",
+      "v": ". Why views help, then how they dangle: returned from a function, stored in a member."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, Back to Basics: Strings and Character Sequences, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Back_To_Basics_Strings_and_Character_Sequences.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=LVU7lq9aL8o"
+     },
+     {
+      "t": "text",
+      "v": ". A view is a pointer and a length, cheap to copy, and it doesn't own."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Algorithms and projections instead of hand-written loops."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Ranges, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Back_To_Basics_Ranges.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=Q434UHWRzI0"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jason Turner, C++ Weekly episode 425 on using "
+     },
+     {
+      "t": "code",
+      "v": "string_view"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "span"
+     },
+     {
+      "t": "text",
+      "v": " and pointers safely: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=cUvdtLTJeec"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "F.16",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-in"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.17",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-inout"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.18",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-consume"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-out"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.24",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-range"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.42",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-return-ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.43",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-dangle"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.53",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-value-capture"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.60",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-ptr-ref"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ref"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "SL.str.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rstr-view"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.107",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Con.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconst-ref"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, "
+     },
+     {
+      "t": "a",
+      "v": "string_view is a borrow type",
+      "href": "https://quuxplusone.github.io/blog/2018/03/27/string-view-is-a-borrow-type/"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tips "
+     },
+     {
+      "t": "a",
+      "v": "#1",
+      "href": "https://abseil.io/tips/1"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "string_view"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values, "
+     },
+     {
+      "t": "a",
+      "v": "#180",
+      "href": "https://abseil.io/tips/180"
+     },
+     {
+      "t": "text",
+      "v": " on dangling references and "
+     },
+     {
+      "t": "a",
+      "v": "#234",
+      "href": "https://abseil.io/tips/234"
+     },
+     {
+      "t": "text",
+      "v": " on passing by value, pointer or reference."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, C++17 The Complete Guide, chapter 19 on "
+     },
+     {
+      "t": "code",
+      "v": "std::string_view"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "a",
+      "v": "book",
+      "href": "https://leanpub.com/cpp17"
+     },
+     {
+      "t": "text",
+      "v": "; and C++20 The Complete Guide, chapter 9 on "
+     },
+     {
+      "t": "code",
+      "v": "std::span"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "a",
+      "v": "book",
+      "href": "https://leanpub.com/cpp20"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "string_view",
+      "href": "https://en.cppreference.com/cpp/string/basic_string_view"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "its constructors",
+      "href": "https://en.cppreference.com/cpp/string/basic_string_view/basic_string_view"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "span",
+      "href": "https://en.cppreference.com/cpp/container/span"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": " of a reference for C++26: "
+     },
+     {
+      "t": "a",
+      "v": "P2988R12",
+      "href": "https://wg21.link/p2988r12"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

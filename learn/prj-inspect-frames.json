@@ -1,0 +1,1478 @@
+{
+ "id": "prj-inspect-frames",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage gives us two drawings of the running robot that came from the bench's own tools rather than from memory: the transform tree, taken from "
+    },
+    {
+     "t": "code",
+     "v": "view_frames"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "tf2_echo"
+    },
+    {
+     "t": "text",
+     "v": ", and the command chain from a terminal to the wheels, taken from "
+    },
+    {
+     "t": "code",
+     "v": "ros2 topic info"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "rqt_graph"
+    },
+    {
+     "t": "text",
+     "v": ". A new node, "
+    },
+    {
+     "t": "code",
+     "v": "frame_watch"
+    },
+    {
+     "t": "text",
+     "v": ", watches one edge of that tree and logs when it goes stale."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is treating a transform's freshness differently from a topic's. The supervisor measures a message's age from when it arrived; a transform's age has to come from its own stamp, the time tf2 interpolates at, because a broadcaster can keep delivering the same old pose and every delivery would otherwise look fresh. We proved the split matters by stopping the relay and watching "
+    },
+    {
+     "t": "code",
+     "v": "/odom"
+    },
+    {
+     "t": "text",
+     "v": " go silent while "
+    },
+    {
+     "t": "code",
+     "v": "/tf"
+    },
+    {
+     "t": "text",
+     "v": " carried on unchanged, since the bridge publishes transforms directly: a complete frame tree is no evidence that the odometry path works."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: "
+    },
+    {
+     "t": "code",
+     "v": "frame_watch"
+    },
+    {
+     "t": "text",
+     "v": " reports an age close to the delay "
+    },
+    {
+     "t": "code",
+     "v": "tf2_monitor"
+    },
+    {
+     "t": "text",
+     "v": " measured, correctly calls the same edge stale once given a limit below that delay, and correctly stays fresh through a stopped relay, which is the exact split the bench will read against when a scenario fails."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "inspect",
+   "title": "Inspect frames and commands with tf2 tools and RViz",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, you have two drawings of the bench that came out of its own tools rather than out of memory: the frame tree, and the path a command takes from your terminal to the wheels. "
+        },
+        {
+         "t": "code",
+         "v": "bench_sim"
+        },
+        {
+         "t": "text",
+         "v": " installs an RViz configuration that shows the robot, its frames and its scan, and "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes"
+        },
+        {
+         "t": "text",
+         "v": " has a "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " node that reports the age of one transform and says when it has gone stale."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two drawings describe the same robot, and a failure usually shows up in one of them only. The supervisor reads "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", a topic. RViz places the laser scan through "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": ", a chain in the transform tree. Stopping the relay ends "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " and leaves the tree untouched, because the bridge publishes "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": " itself. Half of the work when a scenario fails is deciding which of the two pictures the symptom belongs to, so build both now, while the bench still works."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Start the bench with the window, and drive it. Source "
+         },
+         {
+          "t": "code",
+          "v": "~/test_bench/install/setup.bash"
+         },
+         {
+          "t": "text",
+          "v": " in every terminal:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim bench.launch.py headless:=False                # terminal 1: world and supervisor\nros2 run bench_nodes odom_relay                                      # terminal 2\nros2 topic pub --rate 10 /cmd_vel_nav geometry_msgs/msg/TwistStamped \"{twist: {linear: {x: 0.2}}}\"   # terminal 3\nmkdir -p ~/bench-inspect && cd ~/bench-inspect                       # terminal 4: the tools run here"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "view_frames"
+        },
+        {
+         "t": "text",
+         "v": " writes its files into the current folder, and those files stay out of the repository."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Take the tree from tf2 itself:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run tf2_ros tf2_echo odom base_link          # the transform once a second, or the reason it fails\nros2 run tf2_tools view_frames                    # listens 5 s, then writes frames_<date>.gv and .pdf\nxdg-open frames_*.pdf"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Compare the picture with the tree you drew in the frames topic. It has "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " at the top, "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": " under it, then "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": ", and under "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " the lidar frame "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "imu_link"
+        },
+        {
+         "t": "text",
+         "v": ", the camera frames, the two wheels and the casters. There is no "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ": nothing localises the robot yet. Write down, for every edge, the parent, the child, the node that publishes it and its average rate. The fixed edges from the URDF read a rate of 10000 and times of 0, which is how a static transform looks: one stored copy, valid at every time. The "
+        },
+        {
+         "t": "code",
+         "v": ".gv"
+        },
+        {
+         "t": "text",
+         "v": " file is text, so "
+        },
+        {
+         "t": "code",
+         "v": "grep"
+        },
+        {
+         "t": "text",
+         "v": " finds an edge faster than reading the picture."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Measure the two things a drawing can't show: how often each edge arrives, and how old it is by the time a listener has it."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic hz /tf                                                    # every moving edge together\nros2 topic echo /tf_static --once --qos-durability transient_local    # the whole fixed set, in one message\nros2 run tf2_ros tf2_monitor odom base_link --ros-args -p use_sim_time:=true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "tf2_monitor"
+        },
+        {
+         "t": "text",
+         "v": " prints the chain of frames between the two you named and, per broadcaster, the average rate and the average and largest delay between a transform's stamp and the moment it reached the buffer. The durability flag on the echo is there to be explicit, and with the world already running a plain "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic echo /tf_static --once"
+        },
+        {
+         "t": "text",
+         "v": " returns the same latched set: unless one of the QoS flags is given, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic echo"
+        },
+        {
+         "t": "text",
+         "v": " looks at the publishers of the topic and asks for transient local when every one of them offers it ("
+        },
+        {
+         "t": "a",
+         "v": "echo.py",
+         "href": "https://github.com/ros2/ros2cli/blob/jazzy/ros2topic/ros2topic/verb/echo.py"
+        },
+        {
+         "t": "text",
+         "v": "). The flag earns its place when no publisher is up yet. With nothing to look at, the echo returns its default profile, which is volatile, and the message the broadcaster is holding never arrives however long you wait. If "
+        },
+        {
+         "t": "code",
+         "v": "tf2_monitor"
+        },
+        {
+         "t": "text",
+         "v": " reports delays of about 1.79 billion seconds even with "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": ", it is comparing simulated stamps with the wall clock; take the delay from "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " in step 7 instead, which runs on the bench's own clock. Write down the rate of "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": " and the delay of the "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": " edge. Step 10 needs both numbers."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Look at the same data in RViz, which is how you will look at a failed scenario later:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run rviz2 rviz2 --ros-args -p use_sim_time:=true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Set Fixed Frame to "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": ". Add the TF display, the LaserScan display on "
+        },
+        {
+         "t": "code",
+         "v": "/scan"
+        },
+        {
+         "t": "text",
+         "v": ", and the RobotModel display with its description topic set to "
+        },
+        {
+         "t": "code",
+         "v": "/robot_description"
+        },
+        {
+         "t": "text",
+         "v": ", which "
+        },
+        {
+         "t": "code",
+         "v": "robot_state_publisher"
+        },
+        {
+         "t": "text",
+         "v": " offers. The robot and its frames appear, and the scan points land on the walls of the sandbox. Drive it with terminal 3 and watch the frames move together while "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " stays where it is."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then set Fixed Frame to "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": ". Everything disappears and RViz says that the fixed frame doesn't exist, which is the same failure "
+        },
+        {
+         "t": "code",
+         "v": "tf2_echo map base_link"
+        },
+        {
+         "t": "text",
+         "v": " reports from the command line. Set it back to "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": ", and save the configuration as "
+        },
+        {
+         "t": "code",
+         "v": "~/test_bench/src/bench_sim/rviz/bench.rviz"
+        },
+        {
+         "t": "text",
+         "v": ". Install it by changing the install line of "
+        },
+        {
+         "t": "code",
+         "v": "bench_sim/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "install(DIRECTORY launch rviz DESTINATION share/${PROJECT_NAME})"
+        },
+        {
+         "t": "text",
+         "v": ", and open it from the installed copy after the next build:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run rviz2 rviz2 -d $(ros2 pkg prefix bench_sim)/share/bench_sim/rviz/bench.rviz --ros-args -p use_sim_time:=true"
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Follow one command through the system. Every arrow below has a command that proves it, and none of them is a guess:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 node info /supervisor            # what it subscribes to and what it publishes\nros2 topic info -v /cmd_vel           # publisher count 1, the supervisor; subscriber, the bridge\nros2 topic info -v /cmd_vel_nav       # your ros2 topic pub, and the supervisor\nros2 topic hz /cmd_vel                # 10 while commands flow, 20 while the supervisor stops the robot\nros2 run rqt_graph rqt_graph          # the same picture, drawn"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The chain is your terminal, then "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel_nav"
+        },
+        {
+         "t": "text",
+         "v": ", then the supervisor, then "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": ", then the bridge, then Gazebo's DiffDrive system and the wheels. The robot moves, Gazebo's odometry measures it, the bridge publishes it as "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " and as the "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": " edge of "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": ", and the relay republishes "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " as "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", which closes the loop at the supervisor. Draw that chain with the message type on every arrow."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Now separate the two pictures. Stop the relay in terminal 2 with Ctrl+C, and watch what changes and what doesn't:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic hz /odom        # nothing arrives any more\nros2 topic hz /tf          # unchanged\nros2 run tf2_ros tf2_echo odom base_link     # still answers, with a fresh stamp"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The supervisor logs that odometry is stale and the robot stops, while the frame tree carries on: the bridge publishes "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": " directly, and only "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " travels through the relay. So a complete transform tree is no evidence that the bench's odometry path works, and the missing-input scenario later depends on exactly this split. Start the relay again."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Before writing the node, settle what \"stale\" means for a transform. The supervisor measures the age of a message from when it arrived, because a command's stamp can be zero or can come from a recording. A transform is different: its stamp is the time at which the pose was true, and it is the time tf2 interpolates at, so a transform that arrives again with an old stamp is old data however fresh its delivery is. "
+         },
+         {
+          "t": "code",
+          "v": "bench::Freshness"
+         },
+         {
+          "t": "text",
+          "v": " from "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " answers both questions; the difference is the time you hand it. This program feeds one copy the stamps and the other the arrivals:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <chrono>\n#include <compare>\n#include <format>\n#include <iostream>\n#include <optional>\n\nnamespace bench {\n\n// From bench/time.hpp: a reading of a node's clock, in nanoseconds since that clock's zero.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\n// From bench/supervisor.hpp: whether a stream is fresh, its last entry at most max_age old.\nclass Freshness {\n public:\n  explicit Freshness(std::chrono::nanoseconds max_age) : max_age_(max_age) {}\n\n  void on_message(Time now) { last_ = now; }\n\n  [[nodiscard]] bool fresh(Time now) const {\n    return last_ && *last_ <= now && now.since_epoch - last_->since_epoch <= max_age_;\n  }\n\n private:\n  std::chrono::nanoseconds max_age_;\n  std::optional<Time> last_;\n};\n\n}  // namespace bench\n\n// One transform as a watcher sees it: the time it was true, and the time it arrived.\nstruct Delivery {\n  std::chrono::milliseconds stamp;\n  std::chrono::milliseconds arrived;\n};\n\nint main() {\n  using namespace std::chrono_literals;\n  const auto at = [](std::chrono::nanoseconds t) { return bench::Time{t}; };\n\n  // The bridge delivers each transform 20 ms after the pose was measured. From 300 ms the\n  // simulator's odometry stops advancing, and the same transform arrives again and again.\n  constexpr std::array<Delivery, 7> run{{{.stamp = 200ms, .arrived = 220ms},\n                                         {.stamp = 250ms, .arrived = 270ms},\n                                         {.stamp = 300ms, .arrived = 320ms},\n                                         {.stamp = 300ms, .arrived = 420ms},\n                                         {.stamp = 300ms, .arrived = 520ms},\n                                         {.stamp = 300ms, .arrived = 570ms},\n                                         {.stamp = 300ms, .arrived = 620ms}}};\n  bench::Freshness by_stamp(250ms);\n  bench::Freshness by_arrival(250ms);\n  for (const Delivery& delivery : run) {\n    by_stamp.on_message(at(delivery.stamp));\n    by_arrival.on_message(at(delivery.arrived));\n    std::cout << std::format(\"stamp {:3} ms, arrived {:3} ms: fresh by stamp {:5}, by arrival {}\\n\",\n                             delivery.stamp.count(), delivery.arrived.count(), by_stamp.fresh(at(delivery.arrived)),\n                             by_arrival.fresh(at(delivery.arrived)));\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "stamp 200 ms, arrived 220 ms: fresh by stamp true , by arrival true\nstamp 250 ms, arrived 270 ms: fresh by stamp true , by arrival true\nstamp 300 ms, arrived 320 ms: fresh by stamp true , by arrival true\nstamp 300 ms, arrived 420 ms: fresh by stamp true , by arrival true\nstamp 300 ms, arrived 520 ms: fresh by stamp true , by arrival true\nstamp 300 ms, arrived 570 ms: fresh by stamp false, by arrival true\nstamp 300 ms, arrived 620 ms: fresh by stamp false, by arrival true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The arrival answer stays "
+        },
+        {
+         "t": "code",
+         "v": "true"
+        },
+        {
+         "t": "text",
+         "v": " to the end, because something keeps arriving. The stamp answer turns "
+        },
+        {
+         "t": "code",
+         "v": "false"
+        },
+        {
+         "t": "text",
+         "v": " at the 570 ms delivery, once the newest stamp is more than 250 ms old, and that 250 ms is the limit this watcher was given rather than anything tf2 decided. tf2 draws its own line much earlier, and that one is not a choice: a lookup at the current time extrapolates as soon as the current time is past the newest stamp ("
+        },
+        {
+         "t": "a",
+         "v": "cache.cpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/src/cache.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). The first three deliveries are 20 ms behind the pose they carry, and the repeats of the 300 ms pose fall further and further behind it, so "
+        },
+        {
+         "t": "code",
+         "v": "lookupTransform(parent, child, now)"
+        },
+        {
+         "t": "text",
+         "v": " fails with "
+        },
+        {
+         "t": "code",
+         "v": "Lookup would require extrapolation into the future"
+        },
+        {
+         "t": "text",
+         "v": " from the first delivery onwards, at 220 ms and at every row after it, while the watcher still calls the transform fresh until 570 ms. Two different questions, two different times. That is why "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " asks at "
+        },
+        {
+         "t": "code",
+         "v": "tf2::TimePointZero"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the newest transform whatever its age and never throws, and then judges the age against the limit you chose. A broadcaster that republishes an old pose is the case the frames topic listed as failing without an exception."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 8,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the node, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/include/bench_nodes/frame_watch.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", with its "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "src/frame_watch_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The fence has "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": "'s two pieces copied in, so that it builds on its own:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <compare>\n#include <cstdint>\n#include <memory>\n#include <optional>\n#include <string>\n\n#include <geometry_msgs/msg/transform_stamped.hpp>\n#include <rclcpp/rclcpp.hpp>\n#include <tf2/exceptions.hpp>\n#include <tf2_ros/buffer.hpp>\n#include <tf2_ros/transform_listener.hpp>\n\nnamespace bench {\n\n// In the bench these come from bench_core: bench/time.hpp and bench/supervisor.hpp.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\nclass Freshness {\n public:\n  explicit Freshness(std::chrono::nanoseconds max_age) : max_age_(max_age) {}\n\n  void on_message(Time now) { last_ = now; }\n\n  [[nodiscard]] bool fresh(Time now) const {\n    return last_ && *last_ <= now && now.since_epoch - last_->since_epoch <= max_age_;\n  }\n\n private:\n  std::chrono::nanoseconds max_age_;\n  std::optional<Time> last_;\n};\n\n}  // namespace bench\n\nnamespace bench_nodes {\n\n// Looks up one edge of the frame tree ten times a second and logs each change between fresh and\n// stale. The age is measured from the transform's own stamp, the time tf2 would interpolate at.\nclass FrameWatch : public rclcpp::Node {\n public:\n  explicit FrameWatch(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"frame_watch\", options),\n        parent_(declare_parameter<std::string>(\"parent_frame\", \"odom\")),\n        child_(declare_parameter<std::string>(\"child_frame\", \"base_link\")),\n        transform_(std::chrono::milliseconds(declare_parameter<std::int64_t>(\"max_age_ms\", 250))) {\n    timer_ = create_timer(std::chrono::milliseconds(100), [this] { on_tick(); });\n  }\n\n private:\n  void on_tick() {\n    const bench::Time now_time{std::chrono::nanoseconds(now().nanoseconds())};\n    try {\n      const geometry_msgs::msg::TransformStamped latest =\n          buffer_.lookupTransform(parent_, child_, tf2::TimePointZero);\n      const rclcpp::Time stamp(latest.header.stamp);\n      transform_.on_message({std::chrono::nanoseconds(stamp.nanoseconds())});\n      RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, \"%s -> %s is %.3f s old\", parent_.c_str(),\n                           child_.c_str(), (now() - stamp).seconds());\n    } catch (const tf2::TransformException& e) {\n      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, \"no %s -> %s: %s\", parent_.c_str(), child_.c_str(),\n                           e.what());\n    }\n    report(transform_.fresh(now_time));\n  }\n\n  void report(bool fresh) {\n    if (reported_ == fresh) return;\n    reported_ = fresh;\n    if (fresh) {\n      RCLCPP_INFO(get_logger(), \"%s -> %s is fresh\", parent_.c_str(), child_.c_str());\n    } else {\n      RCLCPP_WARN(get_logger(), \"%s -> %s is stale\", parent_.c_str(), child_.c_str());\n    }\n  }\n\n  std::string parent_;\n  std::string child_;\n  bench::Freshness transform_;\n  std::optional<bool> reported_;  // empty until the first tick, so the first answer is logged\n  tf2_ros::Buffer buffer_{get_clock()};\n  tf2_ros::TransformListener listener_{buffer_};\n  rclcpp::TimerBase::SharedPtr timer_;\n};\n\n}  // namespace bench_nodes\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<bench_nodes::FrameWatch>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The node holds no rule of its own. "
+        },
+        {
+         "t": "code",
+         "v": "bench::Freshness"
+        },
+        {
+         "t": "text",
+         "v": " decides what stale means, the three parameters decide which edge and which limit, and "
+        },
+        {
+         "t": "code",
+         "v": "reported_"
+        },
+        {
+         "t": "text",
+         "v": " remembers the last answer so that each change is logged once, as the supervisor's "
+        },
+        {
+         "t": "code",
+         "v": "tick"
+        },
+        {
+         "t": "text",
+         "v": " does. "
+        },
+        {
+         "t": "code",
+         "v": "reported_"
+        },
+        {
+         "t": "text",
+         "v": " is a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<bool>"
+        },
+        {
+         "t": "text",
+         "v": ", and an empty optional compares equal to no "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": ", so the first tick always logs. The buffer takes the node's clock, so with "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": " the ages are in simulated time and a paused simulation pauses the watcher too. The buffer is declared before the listener, which holds a reference to it, and both come after the members they don't depend on."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 9,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Build it. In "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/package.xml"
+         },
+         {
+          "t": "text",
+          "v": ", add "
+         },
+         {
+          "t": "code",
+          "v": "<depend>tf2</depend>"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "<depend>tf2_ros</depend>"
+         },
+         {
+          "t": "text",
+          "v": ". In "
+         },
+         {
+          "t": "code",
+          "v": "CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "frame_watch"
+         },
+         {
+          "t": "text",
+          "v": " needs different dependencies from the supervisor and the relay, so it gets its own lines rather than joining their "
+         },
+         {
+          "t": "code",
+          "v": "foreach"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "find_package(tf2 REQUIRED)\nfind_package(tf2_ros REQUIRED)\n\nadd_executable(frame_watch src/frame_watch_node.cpp)\ntarget_include_directories(frame_watch PRIVATE include)\nament_target_dependencies(frame_watch rclcpp geometry_msgs tf2 tf2_ros)\ntarget_link_libraries(frame_watch bench_core::bench_core)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " to the "
+        },
+        {
+         "t": "code",
+         "v": "install(TARGETS ...)"
+        },
+        {
+         "t": "text",
+         "v": " line. The "
+        },
+        {
+         "t": "code",
+         "v": "target_link_libraries"
+        },
+        {
+         "t": "text",
+         "v": " call has no "
+        },
+        {
+         "t": "code",
+         "v": "PRIVATE"
+        },
+        {
+         "t": "text",
+         "v": ", for the reason the supervisor topic measured: "
+        },
+        {
+         "t": "code",
+         "v": "ament_target_dependencies"
+        },
+        {
+         "t": "text",
+         "v": " uses the plain form, and CMake refuses both forms on one target."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 10,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", then watch the edge you measured in step 3:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run bench_nodes frame_watch --ros-args -p use_sim_time:=true                       # 250 ms limit\nros2 run bench_nodes frame_watch --ros-args -p use_sim_time:=true -p max_age_ms:=5      # below the delay\nros2 run bench_nodes frame_watch --ros-args -p use_sim_time:=true -p parent_frame:=map  # a frame that isn't there"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first run logs the age once a second, and it should stay near the delay "
+        },
+        {
+         "t": "code",
+         "v": "tf2_monitor"
+        },
+        {
+         "t": "text",
+         "v": " reported. The second logs "
+        },
+        {
+         "t": "code",
+         "v": "odom -> base_link is stale"
+        },
+        {
+         "t": "text",
+         "v": " at once and stays there: the same code, with a limit below the delay you measured. That is the number to get right in any freshness check, and the way to get it right is to measure the delay first and leave room above it. The third never finds the frame and logs tf2's own message, that "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " passed to "
+        },
+        {
+         "t": "code",
+         "v": "lookupTransform"
+        },
+        {
+         "t": "text",
+         "v": " does not exist, once a second."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Leave the first one running and stop the relay again. It keeps saying fresh, which is the split from step 6 seen from the node's side. Then start "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " without "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": ": it reports an age of about 1.79 billion seconds and calls the transform stale, because its clock counts from 1970 while the stamps count from the start of the simulation."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 11,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "you have the frame tree and the command chain written down, each edge with the node that publishes it, its topic and its rate, and each taken from a command rather than from memory;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "RViz opens from the installed "
+         },
+         {
+          "t": "code",
+          "v": "bench.rviz"
+         },
+         {
+          "t": "text",
+          "v": " and shows the robot, its frames and the scan on the walls;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "frame_watch"
+         },
+         {
+          "t": "text",
+          "v": " reports an age near the delay you measured, says stale when the limit is below that delay, and says fresh while the relay is stopped."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write "
+        },
+        {
+         "t": "code",
+         "v": "docs/frames.md"
+        },
+        {
+         "t": "text",
+         "v": " in the bench. It is the proof for this topic, and the missing-input and stop-verification scenarios will be read against it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start with the two drawings. The frame tree, with parent, child, the node that publishes each edge, the topic it uses and its rate, in a table; and the command chain from "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel_nav"
+        },
+        {
+         "t": "text",
+         "v": " to the wheels and back through "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", with the message type on every arrow. Under each, give the command that produced it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then the numbers you measured: the rate of "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": ", the delay of the "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_footprint"
+        },
+        {
+         "t": "text",
+         "v": " edge, and the limit you gave "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": ", with the room you left above the delay. Then four lines on the split: what stopping the relay changes, what it leaves alone, and why a complete tree is no evidence that the odometry path works. End with the one sentence you want to read again during a failed scenario: which tool to reach for first for a frame problem, and which for a topic problem."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The Jazzy tf2 tutorials, for the tools this session uses: "
+     },
+     {
+      "t": "a",
+      "v": "introducing tf2",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Introduction-To-Tf2.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "view_frames"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "tf2_echo"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "debugging tf2 problems",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Debugging-Tf2-Problems.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "tf2_monitor"
+     },
+     {
+      "t": "text",
+      "v": " and the error messages."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "geometry2 on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "view_frames.py",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_tools/tf2_tools/view_frames.py"
+     },
+     {
+      "t": "text",
+      "v": " for the labels on each edge, "
+     },
+     {
+      "t": "a",
+      "v": "tf2_monitor.cpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/src/tf2_monitor.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for the delays it reports, and "
+     },
+     {
+      "t": "a",
+      "v": "qos.hpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/include/tf2_ros/qos.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the durability of "
+     },
+     {
+      "t": "code",
+      "v": "/tf_static"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "REP 105",
+      "href": "https://www.ros.org/reps/rep-0105.html"
+     },
+     {
+      "t": "text",
+      "v": ", on which component publishes each transform of a mobile robot."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "the command line tools",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Topics/Understanding-ROS2-Topics.html"
+     },
+     {
+      "t": "text",
+      "v": " and on "
+     },
+     {
+      "t": "a",
+      "v": "RViz and its displays",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/RViz/RViz-User-Guide/RViz-User-Guide.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the source of "
+     },
+     {
+      "t": "a",
+      "v": "ros2 topic echo",
+      "href": "https://github.com/ros2/ros2cli/blob/jazzy/ros2topic/ros2topic/verb/echo.py"
+     },
+     {
+      "t": "text",
+      "v": ", which picks the durability from the publishers it finds unless a QoS flag is given."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot 3 description and Gazebo model in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_turtlebot_simulation",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/tree/jazzy/nav2_minimal_tb3_sim"
+     },
+     {
+      "t": "text",
+      "v": ", which define every frame in the tree."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". The rule stays in a plain class and the node stays thin."
+     }
+    ]
+   ]
+  }
+ ]
+}

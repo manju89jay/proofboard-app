@@ -1,0 +1,2197 @@
+{
+ "id": "ros-qos",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Without looking anything up, write two lists. First, every QoS policy that can stop a publisher and a subscription from connecting at all, and for each one the combination that fails. Second, the policies that never stop a connection but do change what you receive, and what each of them changes. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Four policies can stop a connection, and the rule behind all four is the same. A subscription "
+     },
+     {
+      "t": "i",
+      "v": "requests"
+     },
+     {
+      "t": "text",
+      "v": " the lowest quality it will accept and a publisher "
+     },
+     {
+      "t": "i",
+      "v": "offers"
+     },
+     {
+      "t": "text",
+      "v": " the highest quality it can provide, and the pair is matched only when the offer is at least as strong as the request, policy by policy."
+     }
+    ]
+   },
+   {
+    "t": "ul",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Reliability: a best-effort publisher against a reliable subscription fails. Reliable against best effort is fine, and so are the two matching pairs."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Durability: a volatile publisher against a transient-local subscription fails. Transient local against volatile is fine."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Deadline: a publisher with no deadline against a subscription that asks for one fails, and so does a subscription whose deadline is shorter than the publisher's. Longer or equal is fine."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Liveliness: an automatic publisher against a subscription that asks for manual by topic fails. A publisher with no lease duration against a subscription that asks for one fails, and so does a shorter requested lease."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The policies that never break a connection are history, depth and lifespan. History and depth size each side's own queue, so a depth of 1 on one side and 100 on the other connect and drop different messages. Lifespan is the publisher's own expiry: a message older than the lifespan is dropped before delivery and is never seen, with no warning."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you named reliability and durability with the right failing direction and at least one of deadline and liveliness, and put history and depth in the second list. Naming the policies but getting a direction backwards is a partial pass. Putting depth in the first list is a fail, because it leads to hours spent matching queue sizes that were never the problem."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A QoS profile is the set of delivery promises every publisher and every subscription carries. Reliability says what happens to a message the network drops: best effort sends it once and moves on, reliable keeps a copy until it is acknowledged and resends it if not. Durability says what a subscription starting late receives: volatile gives it nothing sent before it joined, transient local replays what the publisher has kept. Deadline promises the longest gap between messages, and liveliness is how a subscription learns a publisher is still there."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that a publisher and a subscription must agree on these promises before a single message can flow, and getting that agreement wrong produces no error, no crash and no line in the topic listing to say so. Two nodes can find each other perfectly and still never exchange one message, because finding each other and agreeing to talk are different things."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The rule is one sentence: a subscription requests the lowest quality it will accept, a publisher offers the highest quality it can provide, and the two connect only when the offer is at least as strong as the request, policy by policy, for reliability, durability, deadline and liveliness. A stronger publisher always satisfies a weaker subscription, never the reverse, so a reliable publisher happily serves a best-effort subscriber but not the other way round. History, depth and lifespan never block a connection: they size each side's own queue or expire the publisher's own samples, changing what arrives without ever deciding whether anything can."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The costly mistake is a best-effort driver, using the sensor-data profile most drivers use, met by a reliable subscription, the default every tutorial writes: the two never connect, the topic still shows up in every listing, and the rate tools still report data because they subscribe with their own best-effort profile regardless of yours. Nothing in your own node's log has to say why, because that warning only prints while the node is spinning, and some middleware does not raise it at all. The only way to be sure is reading both endpoints' profiles side by side, not waiting for a warning that might never come."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This is the interview question itself: naming, from memory, exactly which policies can stop a connection and in which direction, and which ones only change what arrives once a connection is already made."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "policies",
+   "title": "Reliability, durability, history, depth, deadline, liveliness",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every publisher and every subscription carries a QoS profile, and the middleware carries it across during discovery, which is why you can read another process's settings from the command line:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic info /scan --verbose   # per endpoint: node name, GID, topic type hash and the full QoS profile\nros2 topic echo /scan             # matches what the publishers offer unless you pass a --qos-* option\nros2 doctor --report              # its QOS COMPATIBILITY LIST section names the mismatched pairs it can see"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first command is the one to reach for. For every publisher and every subscription on the topic it prints "
+        },
+        {
+         "t": "code",
+         "v": "Node name"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Node namespace"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Topic type"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Topic type hash"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Endpoint type"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "GID"
+        },
+        {
+         "t": "text",
+         "v": " and then a "
+        },
+        {
+         "t": "code",
+         "v": "QoS profile"
+        },
+        {
+         "t": "text",
+         "v": " block with seven lines: "
+        },
+        {
+         "t": "code",
+         "v": "Reliability"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "History (Depth)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Durability"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Lifespan"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Deadline"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Liveliness"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Liveliness lease duration"
+        },
+        {
+         "t": "text",
+         "v": ". A duration that was left at its default prints as "
+        },
+        {
+         "t": "code",
+         "v": "Infinite"
+        },
+        {
+         "t": "text",
+         "v": ", and any other prints as a count of nanoseconds ("
+        },
+        {
+         "t": "a",
+         "v": "rclpy's topic_endpoint_info.py",
+         "href": "https://github.com/ros2/rclpy/blob/jazzy/rclpy/rclpy/topic_endpoint_info.py"
+        },
+        {
+         "t": "text",
+         "v": "). Those seven lines are the whole profile, and the rest of this section is what each of them does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Reliability"
+        },
+        {
+         "t": "text",
+         "v": " chooses what happens to a message the network loses. Best effort sends it once and forgets it. Reliable makes the publisher keep a copy until the subscription acknowledges it, and resend it if it does not, which costs memory in the publisher, a return path on the network and latency on the retry. Both run over UDP in DDS; reliable is not TCP, it is acknowledgement and retransmission built on top of UDP so that multicast stays possible."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Durability"
+        },
+        {
+         "t": "text",
+         "v": " chooses what a subscription that starts later gets. Volatile means nothing that was sent before it joined. Transient local means the publisher keeps its history and delivers it to each new subscription that also asks for transient local. This is how ROS 2 does the latched topic of ROS 1, and it is why a map or a robot description published once at start-up still reaches a node started five minutes later. The publisher has to be alive for it: what transient local stores lives in the publisher, not in a broker, so when the publishing process exits the stored samples go with it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "History"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "i",
+         "v": "depth"
+        },
+        {
+         "t": "text",
+         "v": " size the queue. Keep last with depth N holds the newest N messages per publisher and per subscription and drops older ones to make room; keep all holds as many as the middleware's own resource limits allow. Depth is a queue length, not a rate and not a guarantee: it decides how much slack there is when the reader falls behind, which the executors topic measured, and nothing else. Keep last with depth 0 is a mistake rclcpp logs once, with "
+        },
+        {
+         "t": "code",
+         "v": "A zero depth with KEEP_LAST doesn't make sense; no data could be stored. This will be interpreted as SYSTEM_DEFAULT"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Deadline"
+        },
+        {
+         "t": "text",
+         "v": " is a contract about the gap between messages, in both directions. A publisher offering a deadline of 100 ms promises to publish at least that often; a subscription requesting 100 ms says it needs that. When the promise is broken, the publisher's "
+        },
+        {
+         "t": "code",
+         "v": "OfferedDeadlineMissed"
+        },
+        {
+         "t": "text",
+         "v": " event and the subscription's "
+        },
+        {
+         "t": "code",
+         "v": "RequestedDeadlineMissed"
+        },
+        {
+         "t": "text",
+         "v": " event fire, each with a total count and the change since last time. A deadline is a watchdog, not a rate limiter: it never slows a publisher down and never drops a message."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Lifespan"
+        },
+        {
+         "t": "text",
+         "v": " is the publisher's expiry date on its own samples. A message older than the lifespan is dropped instead of delivered, with no event and no log line. "
+        },
+        {
+         "t": "code",
+         "v": "/rosout"
+        },
+        {
+         "t": "text",
+         "v": " uses a lifespan of 10 seconds so that a late-joining log viewer gets recent lines and not the whole history."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Liveliness"
+        },
+        {
+         "t": "text",
+         "v": " is how a subscription learns that a publisher is still there. Automatic means the middleware treats all of a participant's publishers as alive whenever any one of them publishes. Manual by topic means a publisher must say so itself, by publishing or by calling the publisher's assert method, within the lease duration. Missing the lease fires "
+        },
+        {
+         "t": "code",
+         "v": "LivelinessLost"
+        },
+        {
+         "t": "text",
+         "v": " on the publisher and "
+        },
+        {
+         "t": "code",
+         "v": "LivelinessChanged"
+        },
+        {
+         "t": "text",
+         "v": " on the subscription. Automatic with no lease is the default everywhere in ROS 2, which means liveliness is switched off in practice until you ask for it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In rclcpp you build a profile by starting from a history and chaining setters, each of which returns the profile by reference ("
+        },
+        {
+         "t": "a",
+         "v": "qos.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/qos.hpp"
+        },
+        {
+         "t": "text",
+         "v": "):"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "const auto commands = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile();\nconst auto scans = rclcpp::SensorDataQoS();                       // keep last 5, best effort, volatile\nconst auto map = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local();\nconst auto watched = rclcpp::QoS(rclcpp::KeepLast(10)).deadline(rclcpp::Duration::from_seconds(0.2));"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The named profiles are classes in the same header, and their values come from "
+        },
+        {
+         "t": "a",
+         "v": "rmw/qos_profiles.h",
+         "href": "https://github.com/ros2/rmw/blob/jazzy/rmw/include/rmw/qos_profiles.h"
+        },
+        {
+         "t": "text",
+         "v": ". Liveliness is system default and both durations are default in all of them but the last one, so this table gives the settings that differ:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Profile"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "rclcpp class"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "History and depth"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Reliability"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Durability"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Default"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rclcpp::QoS(rclcpp::KeepLast(10))"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "keep last, 10"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "reliable"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "volatile"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Sensor data"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rclcpp::SensorDataQoS"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "keep last, 5"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "best effort"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "volatile"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Services"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rclcpp::ServicesQoS"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "keep last, 10"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "reliable"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "volatile"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Parameters"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rclcpp::ParametersQoS"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "keep last, 1000"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "reliable"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "volatile"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Parameter events"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rclcpp::ParameterEventsQoS"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "keep last, 1000"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "reliable"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "volatile"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Clock"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rclcpp::ClockQoS"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "keep last, 1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "best effort"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "volatile"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Rosout"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rclcpp::RosoutQoS"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "keep last, 1000"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "reliable"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "transient local, lifespan 10 s"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "System defaults"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rclcpp::SystemDefaultsQoS"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the middleware's"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the middleware's"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the middleware's"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Best available"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "rclcpp::BestAvailableQoS"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "keep last, 10"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "best available"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "best available"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four of those are worth holding in your head because you meet them daily. Services and service clients are reliable and volatile, and the Jazzy documentation gives the reason for volatile: a restarted server that inherited old requests would act on them, and while the client is protected against a duplicate answer, the server is not protected against acting twice. "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " keeps only the newest sample and sends it best effort, which is right for a clock, where an old value is worthless. "
+        },
+        {
+         "t": "code",
+         "v": "/rosout"
+        },
+        {
+         "t": "text",
+         "v": " is transient local with a depth of 1000 and a lifespan of 10 seconds ("
+        },
+        {
+         "t": "a",
+         "v": "rcl/logging_rosout.h",
+         "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/include/rcl/logging_rosout.h"
+        },
+        {
+         "t": "text",
+         "v": "). And sensor data is the profile most drivers use, which is where most mismatches start."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The transform topics have their own profiles in tf2_ros ("
+        },
+        {
+         "t": "a",
+         "v": "qos.hpp",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/include/tf2_ros/qos.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": " is keep last 100, reliable and volatile on both the broadcaster and the listener. "
+        },
+        {
+         "t": "code",
+         "v": "/tf_static"
+        },
+        {
+         "t": "text",
+         "v": " is transient local on both, with depth 1 on the broadcaster and depth 100 on the listener, which is exactly why a node started late still gets the static transforms and would get nothing if it subscribed to "
+        },
+        {
+         "t": "code",
+         "v": "/tf_static"
+        },
+        {
+         "t": "text",
+         "v": " with a profile of its own that forgot "
+        },
+        {
+         "t": "code",
+         "v": "transient_local()"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "BestAvailableQoS"
+        },
+        {
+         "t": "text",
+         "v": " is the escape hatch: the middleware picks reliability, durability, deadline and liveliness at the moment the endpoint is created, matching the endpoints it can see then. Its own documentation in "
+        },
+        {
+         "t": "code",
+         "v": "rmw/qos_profiles.h"
+        },
+        {
+         "t": "text",
+         "v": " warns that this races with discovery, so the profile you get depends on who had started. Use it for a tool, not for a robot."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now the rule that ties the policies together. Compatibility is decided per publisher and subscription pair, at discovery time, by "
+        },
+        {
+         "t": "code",
+         "v": "rmw_qos_profile_check_compatible"
+        },
+        {
+         "t": "text",
+         "v": ", and its result is one of ok, warning or error ("
+        },
+        {
+         "t": "a",
+         "v": "rmw_dds_common/src/qos.cpp",
+         "href": "https://github.com/ros2/rmw_dds_common/blob/jazzy/rmw_dds_common/src/qos.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). Error means no connection: the two endpoints know about each other and no message will ever pass between them. Warning means the check could not decide, which happens when a policy is system default or unknown and the middleware's value is not visible."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What you see when that happens depends on your middleware. rclcpp installs a default handler for the incompatible-QoS event on every publisher and subscription, and the subscription's version logs "
+        },
+        {
+         "t": "code",
+         "v": "New publisher discovered on topic '<name>', offering incompatible QoS. No messages will be sent to it. Last incompatible policy: <policy>"
+        },
+        {
+         "t": "text",
+         "v": ", with the publisher's version logging the mirror image ("
+        },
+        {
+         "t": "a",
+         "v": "subscription_base.cpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/subscription_base.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). Two things make that warning miss. It arrives through the executor like any other callback, so a node that is not spinning never prints it. And if the middleware does not support the event, rclcpp catches "
+        },
+        {
+         "t": "code",
+         "v": "UnsupportedEventTypeException"
+        },
+        {
+         "t": "text",
+         "v": " and does nothing at all, with the comment "
+        },
+        {
+         "t": "code",
+         "v": "// pass"
+        },
+        {
+         "t": "text",
+         "v": ". That is the genuinely silent case, and it is why you check with "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info --verbose"
+        },
+        {
+         "t": "text",
+         "v": " instead of waiting for a log line."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here are the compatibility rules as code, in the order "
+        },
+        {
+         "t": "code",
+         "v": "rmw_dds_common"
+        },
+        {
+         "t": "text",
+         "v": " checks them, run over the pairs you actually meet:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <vector>\n\nusing namespace std::chrono_literals;\n\nenum class Reliability { BestEffort, Reliable };\nenum class Durability { Volatile, TransientLocal };\nenum class Liveliness { Automatic, ManualByTopic };\n\n// A duration policy. Nothing means the value the built-in profiles call \"default\", which the\n// middleware reads as infinite: no deadline at all, or no liveliness lease at all.\nusing Limit = std::optional<std::chrono::milliseconds>;\n\nstruct Profile {\n  Reliability reliability = Reliability::Reliable;\n  Durability durability = Durability::Volatile;\n  Limit deadline = std::nullopt;\n  Limit lease = std::nullopt;\n  Liveliness liveliness = Liveliness::Automatic;\n};\n\n// The checks of rmw_dds_common/src/qos.cpp, in the order that file runs them, each named the way\n// rclcpp names it in the warning it logs. Any one of them means no connection at all.\n[[nodiscard]] std::vector<std::string> incompatible_policies(const Profile& offered, const Profile& asked) {\n  std::vector<std::string> policies;\n  if (offered.reliability == Reliability::BestEffort && asked.reliability == Reliability::Reliable) {\n    policies.emplace_back(\"RELIABILITY_QOS_POLICY\");\n  }\n  if (offered.durability == Durability::Volatile && asked.durability == Durability::TransientLocal) {\n    policies.emplace_back(\"DURABILITY_QOS_POLICY\");\n  }\n  const bool deadline_too_short = offered.deadline && asked.deadline && *asked.deadline < *offered.deadline;\n  if ((!offered.deadline && asked.deadline) || deadline_too_short) {\n    policies.emplace_back(\"DEADLINE_QOS_POLICY\");\n  }\n  const bool lease_too_short = offered.lease && asked.lease && *asked.lease < *offered.lease;\n  if ((offered.liveliness == Liveliness::Automatic && asked.liveliness == Liveliness::ManualByTopic) ||\n      (!offered.lease && asked.lease) || lease_too_short) {\n    policies.emplace_back(\"LIVELINESS_QOS_POLICY\");\n  }\n  return policies;\n}\n\nstruct Case {\n  std::string_view offered_text;\n  std::string_view asked_text;\n  Profile offered;\n  Profile asked;\n};\n\n[[nodiscard]] std::string result_of(const Case& one) {\n  const std::vector<std::string> policies = incompatible_policies(one.offered, one.asked);\n  if (policies.empty()) return \"connects\";\n  std::string result;\n  for (const std::string& policy : policies) {\n    if (!result.empty()) result += \", \";\n    result += policy;\n  }\n  return result;\n}\n\nint main() {\n  const Profile sensor_data{.reliability = Reliability::BestEffort};\n  const Profile plain{};\n  const Profile latched{.durability = Durability::TransientLocal};\n\n  const std::vector<Case> cases{\n      {.offered_text = \"best effort\", .asked_text = \"reliable\", .offered = sensor_data, .asked = plain},\n      {.offered_text = \"reliable\", .asked_text = \"best effort\", .offered = plain, .asked = sensor_data},\n      {.offered_text = \"volatile\", .asked_text = \"transient local\", .offered = plain, .asked = latched},\n      {.offered_text = \"transient local\", .asked_text = \"volatile\", .offered = latched, .asked = plain},\n      {.offered_text = \"no deadline\",\n       .asked_text = \"deadline 100 ms\",\n       .offered = plain,\n       .asked = Profile{.deadline = 100ms}},\n      {.offered_text = \"deadline 50 ms\",\n       .asked_text = \"deadline 100 ms\",\n       .offered = Profile{.deadline = 50ms},\n       .asked = Profile{.deadline = 100ms}},\n      {.offered_text = \"deadline 100 ms\",\n       .asked_text = \"deadline 50 ms\",\n       .offered = Profile{.deadline = 100ms},\n       .asked = Profile{.deadline = 50ms}},\n      {.offered_text = \"liveliness automatic\",\n       .asked_text = \"liveliness manual by topic\",\n       .offered = plain,\n       .asked = Profile{.liveliness = Liveliness::ManualByTopic}},\n      {.offered_text = \"best effort, volatile\",\n       .asked_text = \"reliable, transient local\",\n       .offered = sensor_data,\n       .asked = latched},\n  };\n\n  std::cout << std::format(\"{:<22} {:<27} {}\\n\", \"publisher offers\", \"subscription asks\", \"result\");\n  for (const Case& one : cases) {\n    std::cout << std::format(\"{:<22} {:<27} {}\\n\", one.offered_text, one.asked_text, result_of(one));\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "publisher offers       subscription asks           result\nbest effort            reliable                    RELIABILITY_QOS_POLICY\nreliable               best effort                 connects\nvolatile               transient local             DURABILITY_QOS_POLICY\ntransient local        volatile                    connects\nno deadline            deadline 100 ms             DEADLINE_QOS_POLICY\ndeadline 50 ms         deadline 100 ms             connects\ndeadline 100 ms        deadline 50 ms              DEADLINE_QOS_POLICY\nliveliness automatic   liveliness manual by topic  LIVELINESS_QOS_POLICY\nbest effort, volatile  reliable, transient local   RELIABILITY_QOS_POLICY, DURABILITY_QOS_POLICY"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three readings of the table. The two connecting rows in the middle say something that surprises people: a stronger publisher always serves a weaker subscription, so a reliable publisher feeds a best-effort subscriber and a transient-local publisher feeds a volatile one. You never have to weaken a publisher to reach a subscriber. The direction that fails is always the subscription asking for more than the publisher promised."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Second, deadline and lease read backwards from the others. A shorter requested duration is a stronger demand, so "
+        },
+        {
+         "t": "code",
+         "v": "asked < offered"
+        },
+        {
+         "t": "text",
+         "v": " is the failure, and \"no value\" counts as infinite, which is the weakest offer and the weakest demand at once. A publisher with no deadline can serve a subscription with no deadline and nothing else."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Third, the last row is why the rmw function returns a list rather than a flag: two policies are wrong at once, and the warning rclcpp logs names only the last one it found. Fixing the policy in the message and finding it still broken is normal, and it is the reason to read the whole profile from "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info --verbose"
+        },
+        {
+         "t": "text",
+         "v": " rather than the log line."
+        }
+       ]
+      }
+     ],
+     "faded": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Fill in the two blanks. The bench's supervisor watches "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " and must notice within 300 ms when odometry stops. Write the subscription's QoS so that the supervisor gets a "
+        },
+        {
+         "t": "code",
+         "v": "RequestedDeadlineMissed"
+        },
+        {
+         "t": "text",
+         "v": " event instead of polling, and say what the odometry publisher's profile has to offer for the subscription to connect at all:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "const auto odom_qos = rclcpp::QoS(rclcpp::KeepLast(10))\n                          .reliable()\n                          .deadline(/* ...  */);        // the gap the supervisor will not accept\nrclcpp::SubscriptionOptions options;\noptions.event_callbacks.deadline_callback = [this](rclcpp::QOSDeadlineRequestedInfo& info) { /* ... */ };"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The deadline is "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::Duration::from_seconds(0.3)"
+        },
+        {
+         "t": "text",
+         "v": ", and the callback logs and marks the odometry stale, using "
+        },
+        {
+         "t": "code",
+         "v": "info.total_count_change"
+        },
+        {
+         "t": "text",
+         "v": " to say how many deadlines were missed since the last call. The publisher has to offer a deadline of 300 ms or shorter, and a publisher that offers none at all cannot be matched, which is the case for every driver that uses a stock profile. That is the honest limit of deadline in ROS 2 today: it works when you own both ends, and the freshness check on the node's clock from the time topic is what you use when you do not."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "mismatch",
+   "title": "Reproduce and fix a QoS mismatch",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes in a package of your own that depends on "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "sensor_msgs"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "scan_pub"
+         },
+         {
+          "t": "text",
+          "v": ", which publishes a "
+         },
+         {
+          "t": "code",
+          "v": "sensor_msgs/msg/LaserScan"
+         },
+         {
+          "t": "text",
+          "v": " on "
+         },
+         {
+          "t": "code",
+          "v": "/scan"
+         },
+         {
+          "t": "text",
+          "v": " ten times a second. Give it a string parameter "
+         },
+         {
+          "t": "code",
+          "v": "qos"
+         },
+         {
+          "t": "text",
+          "v": " with three values. "
+         },
+         {
+          "t": "code",
+          "v": "sensor"
+         },
+         {
+          "t": "text",
+          "v": " uses "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::SensorDataQoS()"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "reliable"
+         },
+         {
+          "t": "text",
+          "v": " uses "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::QoS(rclcpp::KeepLast(10))"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "latched"
+         },
+         {
+          "t": "text",
+          "v": " uses "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::QoS(rclcpp::KeepLast(1)).transient_local()"
+         },
+         {
+          "t": "text",
+          "v": " and publishes a single scan instead of a stream."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "scan_sub"
+         },
+         {
+          "t": "text",
+          "v": ", which subscribes to "
+         },
+         {
+          "t": "code",
+          "v": "/scan"
+         },
+         {
+          "t": "text",
+          "v": " with the same parameter and the same three profiles, logs one line per scan at most once a second, and installs an incompatible-QoS event callback through "
+         },
+         {
+          "t": "code",
+          "v": "rclcpp::SubscriptionOptions"
+         },
+         {
+          "t": "text",
+          "v": " that logs the policy the middleware reports."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Predict, then run, the four combinations of "
+         },
+         {
+          "t": "code",
+          "v": "sensor"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "reliable"
+         },
+         {
+          "t": "text",
+          "v": " on the two nodes. For each, write down what the subscriber logs, what the publisher logs, and what "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic info /scan --verbose"
+         },
+         {
+          "t": "text",
+          "v": " prints for the two endpoints."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Now run "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic echo /scan"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic hz /scan"
+         },
+         {
+          "t": "text",
+          "v": " against the "
+         },
+         {
+          "t": "code",
+          "v": "sensor"
+         },
+         {
+          "t": "text",
+          "v": " publisher with no other subscriber running. Predict whether each receives anything before you run it, and explain the result from what the profiles are."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Start "
+         },
+         {
+          "t": "code",
+          "v": "scan_pub"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "latched"
+         },
+         {
+          "t": "text",
+          "v": " and wait five seconds, so its one scan is long gone by the time anything subscribes. Predict, then check, what "
+         },
+         {
+          "t": "code",
+          "v": "scan_sub"
+         },
+         {
+          "t": "text",
+          "v": " receives when it is started with "
+         },
+         {
+          "t": "code",
+          "v": "latched"
+         },
+         {
+          "t": "text",
+          "v": ", and what it receives when it is started with "
+         },
+         {
+          "t": "code",
+          "v": "sensor"
+         },
+         {
+          "t": "text",
+          "v": ". Then stop "
+         },
+         {
+          "t": "code",
+          "v": "scan_pub"
+         },
+         {
+          "t": "text",
+          "v": " with Ctrl+C, start "
+         },
+         {
+          "t": "code",
+          "v": "scan_sub"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "latched"
+         },
+         {
+          "t": "text",
+          "v": " again, and predict once more."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The publisher:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <memory>\n#include <string>\n#include <string_view>\n#include <vector>\n\n#include <rclcpp/rclcpp.hpp>\n#include <sensor_msgs/msg/laser_scan.hpp>\n\nusing namespace std::chrono_literals;\n\n// The three profiles the exercise compares, in one place so both nodes name them the same way.\n[[nodiscard]] rclcpp::QoS qos_named(std::string_view choice) {\n  if (choice == \"reliable\") return rclcpp::QoS(rclcpp::KeepLast(10));\n  if (choice == \"latched\") return rclcpp::QoS(rclcpp::KeepLast(1)).transient_local();\n  return rclcpp::SensorDataQoS();\n}\n\nclass ScanPub : public rclcpp::Node {\n public:\n  explicit ScanPub(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"scan_pub\", options) {\n    const std::string choice = declare_parameter<std::string>(\"qos\", \"sensor\");\n    once_ = choice == \"latched\";\n    publisher_ = create_publisher<sensor_msgs::msg::LaserScan>(\"scan\", qos_named(choice));\n    RCLCPP_INFO(get_logger(), \"publishing /scan with the %s profile\", choice.c_str());\n    timer_ = create_timer(100ms, [this] { publish_scan(); });\n  }\n\n private:\n  void publish_scan() {\n    sensor_msgs::msg::LaserScan scan;\n    scan.header.stamp = now();\n    scan.header.frame_id = \"base_scan\";\n    scan.range_min = 0.1F;\n    scan.range_max = 10.0F;\n    scan.ranges = std::vector<float>(360, 1.0F);\n    publisher_->publish(scan);\n    if (once_) {\n      timer_->cancel();  // the latched run publishes one scan and then keeps it for late joiners\n      RCLCPP_INFO(get_logger(), \"one scan published and kept\");\n    }\n  }\n\n  bool once_ = false;\n  rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr publisher_;\n  rclcpp::TimerBase::SharedPtr timer_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<ScanPub>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The subscriber, with the event callback and a plain class that decides when to log:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <memory>\n#include <string>\n#include <string_view>\n\n#include <rclcpp/rclcpp.hpp>\n#include <sensor_msgs/msg/laser_scan.hpp>\n\n// The same three profiles as in scan_pub.\n[[nodiscard]] rclcpp::QoS qos_named(std::string_view choice) {\n  if (choice == \"reliable\") return rclcpp::QoS(rclcpp::KeepLast(10));\n  if (choice == \"latched\") return rclcpp::QoS(rclcpp::KeepLast(1)).transient_local();\n  return rclcpp::SensorDataQoS();\n}\n\n// Lets one message in every `every`. No ROS and no clock, so a test drives it with a counter.\nclass EveryNth {\n public:\n  explicit EveryNth(std::int64_t every) : every_(every) {}\n\n  [[nodiscard]] bool passes() { return ++seen_ % every_ == 1 || every_ == 1; }\n\n private:\n  std::int64_t every_;\n  std::int64_t seen_ = 0;\n};\n\nclass ScanSub : public rclcpp::Node {\n public:\n  explicit ScanSub(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"scan_sub\", options) {\n    const std::string choice = declare_parameter<std::string>(\"qos\", \"sensor\");\n\n    rclcpp::SubscriptionOptions subscription_options;\n    subscription_options.event_callbacks.incompatible_qos_callback =\n        [this](rclcpp::QOSRequestedIncompatibleQoSInfo& info) {\n          RCLCPP_WARN(get_logger(), \"incompatible publisher, policy %s, %d in total\",\n                      rclcpp::qos_policy_name_from_kind(info.last_policy_kind).c_str(), info.total_count);\n        };\n\n    subscription_ = create_subscription<sensor_msgs::msg::LaserScan>(\n        \"scan\", qos_named(choice),\n        [this](const sensor_msgs::msg::LaserScan& scan) {\n          if (throttle_.passes()) {\n            RCLCPP_INFO(get_logger(), \"scan with %zu beams\", scan.ranges.size());\n          }\n        },\n        subscription_options);\n    RCLCPP_INFO(get_logger(), \"subscribed to /scan with the %s profile\", choice.c_str());\n  }\n\n private:\n  EveryNth throttle_{10};\n  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr subscription_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<ScanSub>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run the four combinations:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run bench_qos scan_pub --ros-args -p qos:=sensor      # terminal 1\nros2 run bench_qos scan_sub --ros-args -p qos:=reliable    # terminal 2: the one that fails\nros2 topic info /scan --verbose                            # terminal 3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The results. A "
+        },
+        {
+         "t": "code",
+         "v": "sensor"
+        },
+        {
+         "t": "text",
+         "v": " publisher with a "
+        },
+        {
+         "t": "code",
+         "v": "reliable"
+        },
+        {
+         "t": "text",
+         "v": " subscriber is the only pair that fails. The subscriber logs "
+        },
+        {
+         "t": "code",
+         "v": "incompatible publisher, policy RELIABILITY_QOS_POLICY, 1 in total"
+        },
+        {
+         "t": "text",
+         "v": " once, then nothing, for as long as you leave it running; the publisher logs the mirror warning about a subscription requesting incompatible QoS; and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info /scan --verbose"
+        },
+        {
+         "t": "text",
+         "v": " shows "
+        },
+        {
+         "t": "code",
+         "v": "Reliability: BEST_EFFORT"
+        },
+        {
+         "t": "text",
+         "v": " under one endpoint and "
+        },
+        {
+         "t": "code",
+         "v": "Reliability: RELIABLE"
+        },
+        {
+         "t": "text",
+         "v": " under the other. The other three pairs deliver scans. The pair "
+        },
+        {
+         "t": "code",
+         "v": "reliable"
+        },
+        {
+         "t": "text",
+         "v": " publisher and "
+        },
+        {
+         "t": "code",
+         "v": "sensor"
+        },
+        {
+         "t": "text",
+         "v": " subscriber works and is worth noticing: a reliable publisher satisfies a best-effort request, and the subscriber gets every scan that arrives without acknowledging any of them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4 is the part that catches people out. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic echo /scan"
+        },
+        {
+         "t": "text",
+         "v": " receives scans from the best-effort publisher, because in Jazzy "
+        },
+        {
+         "t": "code",
+         "v": "echo"
+        },
+        {
+         "t": "text",
+         "v": " starts from the sensor-data preset and then reads the publishers' profiles and adapts to them: it asks for reliable only when every publisher on the topic is reliable, and otherwise it asks for best effort, and it does the same for durability ("
+        },
+        {
+         "t": "a",
+         "v": "ros2topic's echo.py",
+         "href": "https://github.com/ros2/ros2cli/blob/jazzy/ros2topic/ros2topic/verb/echo.py"
+        },
+        {
+         "t": "text",
+         "v": "). In your step 4 the only publisher is best effort, so the fallback happens without a word: the line about some but not all publishers offering the stronger policy is printed only when at least one of them offers it. The adapting is switched off by any of "
+        },
+        {
+         "t": "code",
+         "v": "--qos-reliability"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "--qos-durability"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "--qos-depth"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "--qos-history"
+        },
+        {
+         "t": "text",
+         "v": " or the two liveliness options, after which the profile you asked for is used as given. "
+        },
+        {
+         "t": "code",
+         "v": "--qos-profile"
+        },
+        {
+         "t": "text",
+         "v": " on its own does not switch it off; it changes the preset the adapting starts from. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic hz /scan"
+        },
+        {
+         "t": "text",
+         "v": " receives the scans too, for a simpler reason: it always subscribes with the sensor-data profile ("
+        },
+        {
+         "t": "a",
+         "v": "hz.py",
+         "href": "https://github.com/ros2/ros2cli/blob/jazzy/ros2topic/ros2topic/verb/hz.py"
+        },
+        {
+         "t": "text",
+         "v": "), which is best effort and therefore compatible with almost any publisher. So both tools show data on a topic where your own node gets nothing, and \"it works with "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic echo"
+        },
+        {
+         "t": "text",
+         "v": " but not in my node\" is a QoS report, not a mystery."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5 shows what transient local does and does not promise. With "
+        },
+        {
+         "t": "code",
+         "v": "scan_pub"
+        },
+        {
+         "t": "text",
+         "v": " still running in "
+        },
+        {
+         "t": "code",
+         "v": "latched"
+        },
+        {
+         "t": "text",
+         "v": " mode, a "
+        },
+        {
+         "t": "code",
+         "v": "scan_sub"
+        },
+        {
+         "t": "text",
+         "v": " started five seconds later and also in "
+        },
+        {
+         "t": "code",
+         "v": "latched"
+        },
+        {
+         "t": "text",
+         "v": " mode logs the stored scan at once and then nothing more, because the publisher has stopped publishing. Started in "
+        },
+        {
+         "t": "code",
+         "v": "sensor"
+        },
+        {
+         "t": "text",
+         "v": " mode against the same publisher, it logs nothing: its request for best effort and volatile against a reliable transient-local offer is compatible on reliability and on durability, so the two do connect, but a volatile subscription is not sent anything that was published before it existed. Stop "
+        },
+        {
+         "t": "code",
+         "v": "scan_pub"
+        },
+        {
+         "t": "text",
+         "v": " with Ctrl+C and the "
+        },
+        {
+         "t": "code",
+         "v": "latched"
+        },
+        {
+         "t": "text",
+         "v": " subscriber gets nothing either, because the stored sample lives in the publisher and dies with the process. There is no broker holding it anywhere."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Sensor-data QoS versus reliable; late joiners",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The most common QoS failure in robotics has a fixed shape. A driver publishes "
+        },
+        {
+         "t": "code",
+         "v": "/scan"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "/camera/image_raw"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::SensorDataQoS"
+        },
+        {
+         "t": "text",
+         "v": ", because that is what the sensor-data profile is for and what the driver's template used. A consumer subscribes with "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::QoS(rclcpp::KeepLast(10))"
+        },
+        {
+         "t": "text",
+         "v": ", because that is what every tutorial writes and it is reliable. Best effort offered, reliable requested: no connection, forever. The graph looks right, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic list"
+        },
+        {
+         "t": "text",
+         "v": " shows the topic, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic hz"
+        },
+        {
+         "t": "text",
+         "v": " reports 10 Hz, and your callback never runs. Both nodes log one warning at the moment of discovery, and that single line disappears in a launch file's output, which is why the first thing to do with a silent subscription is "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info <topic> --verbose"
+        },
+        {
+         "t": "text",
+         "v": " and a look at the two "
+        },
+        {
+         "t": "code",
+         "v": "Reliability"
+        },
+        {
+         "t": "text",
+         "v": " lines."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The cure is to decide the profile from the data, not from the habit. Anything that streams and whose newest sample is the one that matters, such as scans, images, point clouds and odometry, is sensor data on both sides. Anything that is stated once and must not be lost, such as a map, a robot description or a mode, is reliable and transient local on both sides. Commands are reliable with a depth of 1. When you do not own the publisher, read its profile and match it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Late joiners bring the second shape. Transient local needs both ends to ask for it, so a node that subscribes to "
+        },
+        {
+         "t": "code",
+         "v": "/tf_static"
+        },
+        {
+         "t": "text",
+         "v": " with a profile of its own and no "
+        },
+        {
+         "t": "code",
+         "v": "transient_local()"
+        },
+        {
+         "t": "text",
+         "v": " misses every static transform, and the lookups then fail with an extrapolation error that says nothing about QoS. It also needs the publisher's depth to be large enough: a "
+        },
+        {
+         "t": "code",
+         "v": "map_server"
+        },
+        {
+         "t": "text",
+         "v": " storing depth 1 delivers the last sample only, which is right for one map and wrong for a topic where several different messages must all survive, such as "
+        },
+        {
+         "t": "code",
+         "v": "/tf_static"
+        },
+        {
+         "t": "text",
+         "v": " with more than one broadcaster. tf2 sizes its static listener at depth 100 for that reason, while its broadcaster keeps depth 1 because it republishes the whole set in one message."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three quieter failures are worth knowing before they cost you a day."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Lifespan drops messages with no event at all. A publisher with a lifespan of 1 second and a consumer that blocks for 2 seconds in a callback gets nothing when it returns, and there is no counter anywhere to say why. If you set a lifespan, set it longer than the worst callback time you are willing to accept."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Deadline is a promise that stock drivers do not make. A subscription that asks for a 200 ms deadline will not connect to any publisher that left its deadline at the default, which is every publisher in the standard packages. So the deadline policy is useful between two nodes you wrote and useless as a watchdog on somebody else's driver, where a freshness check on the node's clock is the tool."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "And the silent path is real. rclcpp only warns about an incompatible pair if the middleware supports the incompatible-QoS event, and it swallows "
+        },
+        {
+         "t": "code",
+         "v": "UnsupportedEventTypeException"
+        },
+        {
+         "t": "text",
+         "v": " when it does not ("
+        },
+        {
+         "t": "a",
+         "v": "subscription_base.cpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/subscription_base.cpp"
+        },
+        {
+         "t": "text",
+         "v": "). The warning also travels through the executor, so a node whose callbacks are blocked, which the executors topic covered, prints nothing either. Treat the warning as a bonus and the "
+        },
+        {
+         "t": "code",
+         "v": "--verbose"
+        },
+        {
+         "t": "text",
+         "v": " listing as the evidence."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the request and offer rule in one sentence, and the four policies it can break a connection on, with the failing direction of each. Say which policies never break a connection and what each of them changes instead. Write the depth and reliability of the default, sensor-data, services and "
+        },
+        {
+         "t": "code",
+         "v": "/tf_static"
+        },
+        {
+         "t": "text",
+         "v": " profiles. Say what transient local needs from both sides and what it loses when the publisher exits. Name the command that shows a mismatch and the two reasons the warning can be missing."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "State the request and offer rule, and the four policies that can stop a connection."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which direction of a reliability mismatch fails, and which one is fine?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A subscription asks for a 100 ms deadline. Which publishers can it connect to?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a shorter requested liveliness lease fail while a longer one is fine?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does history depth decide, and what does it not decide?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give the reliability, durability and depth of the sensor-data, services, clock and rosout profiles."
+     }
+    ],
+    [
+     {
+      "t": "code",
+      "v": "/tf_static"
+     },
+     {
+      "t": "text",
+      "v": " reaches a node started ten minutes late. Which policy makes that work, and what has to be true of both ends?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A publisher exits after publishing one transient-local message. What does a subscriber that starts afterwards receive?"
+     }
+    ],
+    [
+     {
+      "t": "code",
+      "v": "ros2 topic echo"
+     },
+     {
+      "t": "text",
+      "v": " prints scans and your node's callback never runs. What is the likely cause and which command confirms it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the two situations where an incompatible pair produces no warning at all."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation, "
+     },
+     {
+      "t": "a",
+      "v": "Quality of service settings",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html"
+     },
+     {
+      "t": "text",
+      "v": ": the policies, the built-in profiles, the four compatibility tables and the QoS events."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "rmw/qos_profiles.h on the jazzy branch",
+      "href": "https://github.com/ros2/rmw/blob/jazzy/rmw/include/rmw/qos_profiles.h"
+     },
+     {
+      "t": "text",
+      "v": ": the exact values of every built-in profile, and the warning on the best-available profile about racing with discovery."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "rmw_dds_common/src/qos.cpp on the jazzy branch",
+      "href": "https://github.com/ros2/rmw_dds_common/blob/jazzy/rmw_dds_common/src/qos.cpp"
+     },
+     {
+      "t": "text",
+      "v": ": the compatibility checks in the order the worked example follows them, and the difference between an error and a warning."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "qos.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/qos.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the setters and the named profile classes, "
+     },
+     {
+      "t": "a",
+      "v": "event_handler.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/event_handler.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the event callback types, "
+     },
+     {
+      "t": "a",
+      "v": "subscription_base.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/subscription_base.cpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "publisher_base.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/publisher_base.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for the default warnings and the swallowed "
+     },
+     {
+      "t": "code",
+      "v": "UnsupportedEventTypeException"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "qos.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/qos.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for the policy names the warning prints."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "rcl/include/rcl/logging_rosout.h on the jazzy branch",
+      "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/include/rcl/logging_rosout.h"
+     },
+     {
+      "t": "text",
+      "v": ": the "
+     },
+     {
+      "t": "code",
+      "v": "/rosout"
+     },
+     {
+      "t": "text",
+      "v": " profile, depth 1000, transient local, lifespan 10 seconds."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "tf2_ros/qos.hpp on the jazzy branch",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/include/tf2_ros/qos.hpp"
+     },
+     {
+      "t": "text",
+      "v": ": the four transform profiles and their depths."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ros2cli on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "echo.py",
+      "href": "https://github.com/ros2/ros2cli/blob/jazzy/ros2topic/ros2topic/verb/echo.py"
+     },
+     {
+      "t": "text",
+      "v": " for the profile matching that hides a mismatch, "
+     },
+     {
+      "t": "a",
+      "v": "hz.py",
+      "href": "https://github.com/ros2/ros2cli/blob/jazzy/ros2topic/ros2topic/verb/hz.py"
+     },
+     {
+      "t": "text",
+      "v": " for its fixed sensor-data subscription, "
+     },
+     {
+      "t": "a",
+      "v": "info.py",
+      "href": "https://github.com/ros2/ros2cli/blob/jazzy/ros2topic/ros2topic/verb/info.py"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "rclpy's topic_endpoint_info.py",
+      "href": "https://github.com/ros2/rclpy/blob/jazzy/rclpy/rclpy/topic_endpoint_info.py"
+     },
+     {
+      "t": "text",
+      "v": " for the fields "
+     },
+     {
+      "t": "code",
+      "v": "--verbose"
+     },
+     {
+      "t": "text",
+      "v": " prints, and "
+     },
+     {
+      "t": "a",
+      "v": "ros2doctor",
+      "href": "https://github.com/ros2/ros2cli/tree/jazzy/ros2doctor"
+     },
+     {
+      "t": "text",
+      "v": " for its compatibility listing."
+     }
+    ]
+   ]
+  }
+ ]
+}

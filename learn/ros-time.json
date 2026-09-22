@@ -1,0 +1,1623 @@
+{
+ "id": "ros-time",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Answer in five or six sentences, without looking anything up. What are wall time, steady time and simulation time, and what can each of them do that the others can't? Which of them does a node's "
+     },
+     {
+      "t": "code",
+      "v": "now()"
+     },
+     {
+      "t": "text",
+      "v": " return, with and without "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": "? Which clock do you use for each of these: the stamp in a message header, the time a function took, and the serial-port timeout in a motor driver? Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Wall time, which ROS calls system time, is the computer's calendar clock, counted in nanoseconds since 1 January 1970. Two machines synchronised with NTP agree on it, which is why message stamps use it, but it jumps when NTP or an administrator corrects it. Steady time counts from an arbitrary start, on Linux the boot, and only ever moves forward at a constant rate. It is the clock for measuring durations and hardware timeouts, and its value means nothing on another machine. Simulation time is the simulator's clock: Gazebo publishes it on "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": ", it stops while the simulation is paused, and it runs faster or slower than wall time when the real-time factor isn't 1. A node's "
+     },
+     {
+      "t": "code",
+      "v": "now()"
+     },
+     {
+      "t": "text",
+      "v": " returns "
+     },
+     {
+      "t": "i",
+      "v": "ROS time"
+     },
+     {
+      "t": "text",
+      "v": ", which is system time normally and the latest "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": " value when the node's "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": " parameter is true. So the header stamp comes from "
+     },
+     {
+      "t": "code",
+      "v": "now()"
+     },
+     {
+      "t": "text",
+      "v": ", and the function timing and the serial timeout use steady time."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you gave each clock a property the other two lack, said that "
+     },
+     {
+      "t": "code",
+      "v": "now()"
+     },
+     {
+      "t": "text",
+      "v": " switches with "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": ", and got the three uses right. Two of the three uses is a partial pass. Missing what "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": " changes is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A node has three clocks. System time, ROS's wall time, is the computer's calendar clock, counted from 1970; two machines synchronised with NTP agree on it, but it jumps when that correction runs. Steady time counts from an arbitrary start, only moving forward at a constant rate, meaning nothing on another machine but never jumping. ROS time is what a node's "
+    },
+    {
+     "t": "code",
+     "v": "now()"
+    },
+    {
+     "t": "text",
+     "v": " returns: system time by default, or, when "
+    },
+    {
+     "t": "code",
+     "v": "use_sim_time"
+    },
+    {
+     "t": "text",
+     "v": " is true, the latest value published on "
+    },
+    {
+     "t": "code",
+     "v": "/clock"
+    },
+    {
+     "t": "text",
+     "v": ", which is simulation time."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that a message stamped by one node must mean the same thing to another, and a duration measured on one machine must never jump backward mid-measurement, and no single clock does both. Message headers need a clock two machines agree on, ruling out steady time; a duration or a hardware timeout needs a clock that never jumps, ruling out system time when corrected. A simulated robot also needs a clock every node agrees on that can pause and run at other than real speed, which neither other can do."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "ROS time makes this possible: with "
+    },
+    {
+     "t": "code",
+     "v": "use_sim_time"
+    },
+    {
+     "t": "text",
+     "v": " false it is system time; with it true the node subscribes to "
+    },
+    {
+     "t": "code",
+     "v": "/clock"
+    },
+    {
+     "t": "text",
+     "v": " and reports the latest value, standing still while paused and running at whatever rate the simulator publishes. "
+    },
+    {
+     "t": "code",
+     "v": "create_timer"
+    },
+    {
+     "t": "text",
+     "v": " runs on this clock, firing by simulated time and stopping with the simulation; "
+    },
+    {
+     "t": "code",
+     "v": "create_wall_timer"
+    },
+    {
+     "t": "text",
+     "v": " always runs on the steady clock regardless. A time value carries its clock type with it, so comparing two of different clocks fails outright rather than silently, which is how a mixed time base gets caught."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake under pressure is a node reading a clock the rest of the system doesn't. One node left without "
+    },
+    {
+     "t": "code",
+     "v": "use_sim_time"
+    },
+    {
+     "t": "text",
+     "v": " in a simulated system stamps messages in system time while every other node uses simulation time, so a consumer computes an age of decades. Simulation time can also jump backward, on a world reset or a looped replay, and any state remembering a past timestamp, a watchdog's last message time, a rate estimate, has no reason to notice: it keeps comparing against a stamp time has passed twice, calling stale data fresh until real time catches up."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: naming what wall, steady and simulation time can each do that the others can't, saying what a node's "
+    },
+    {
+     "t": "code",
+     "v": "now()"
+    },
+    {
+     "t": "text",
+     "v": " returns with and without "
+    },
+    {
+     "t": "code",
+     "v": "use_sim_time"
+    },
+    {
+     "t": "text",
+     "v": ", and picking the right clock for a message stamp, a duration and a hardware timeout."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "clocks",
+   "title": "Wall, steady and ROS time; use_sim_time; message timestamps",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This node reads three clocks once a second, from two timers:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <memory>\n\n#include <rclcpp/rclcpp.hpp>\n\nusing namespace std::chrono_literals;\n\nclass ClockDemo : public rclcpp::Node {\n public:\n  explicit ClockDemo(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"clock_demo\", options) {\n    node_timer_ = create_timer(1s, [this] { report(\"node timer\"); });       // the node's clock: ROS time\n    wall_timer_ = create_wall_timer(1s, [this] { report(\"wall timer\"); });  // a steady clock, always\n  }\n\n private:\n  void report(const char* source) const {\n    RCLCPP_INFO(get_logger(), \"%s: ROS %.3f s, system %.3f s, steady %.3f s\", source, now().seconds(),\n                system_clock_.now().seconds(), steady_clock_.now().seconds());\n  }\n\n  rclcpp::Clock system_clock_{RCL_SYSTEM_TIME};\n  rclcpp::Clock steady_clock_{RCL_STEADY_TIME};\n  rclcpp::TimerBase::SharedPtr node_timer_;\n  rclcpp::TimerBase::SharedPtr wall_timer_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<ClockDemo>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build it in a package of your own and run it three ways. Started plainly, both timers log once a second, the ROS and system readings agree to the millisecond, and the steady reading is the time the machine has been up. Started with "
+        },
+        {
+         "t": "code",
+         "v": "--ros-args -p use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": " while "
+        },
+        {
+         "t": "code",
+         "v": "gz sim -s -r diff_drive.sdf"
+        },
+        {
+         "t": "text",
+         "v": " runs and "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " is bridged, the ROS reading is the simulation time, a few seconds or minutes since Gazebo started, and pausing Gazebo stops the node timer while the wall timer carries on with a frozen ROS reading. Started with "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": " and nothing on "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": ", only the wall timer logs, and it reports ROS time 0.000."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three clocks answer different questions. "
+        },
+        {
+         "t": "i",
+         "v": "System time"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "CLOCK_REALTIME"
+        },
+        {
+         "t": "text",
+         "v": " on Linux, the same clock as "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::system_clock"
+        },
+        {
+         "t": "text",
+         "v": ". It is meaningful across machines, so a stamp from the lidar computer can be compared with a stamp from the planner computer, but it can jump in either direction when the clock is corrected. "
+        },
+        {
+         "t": "i",
+         "v": "Steady time"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "CLOCK_MONOTONIC"
+        },
+        {
+         "t": "text",
+         "v": ", like "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::steady_clock"
+        },
+        {
+         "t": "text",
+         "v": ": it never goes back and never jumps, and it is the only right clock for \"how long did this take\" and \"give up after 200 ms\". "
+        },
+        {
+         "t": "i",
+         "v": "ROS time"
+        },
+        {
+         "t": "text",
+         "v": " is what a node's clock reports. Every node has the parameter "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": ", false by default. When it is false, ROS time is system time. When it is true, the node subscribes to "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": ", of type "
+        },
+        {
+         "t": "code",
+         "v": "rosgraph_msgs/msg/Clock"
+        },
+        {
+         "t": "text",
+         "v": ", and ROS time is the latest value received there. Until the first one arrives, it is zero, and the ROS design article on clocks says that a zero time means the time is uninitialised. You set the parameter per node with "
+        },
+        {
+         "t": "code",
+         "v": "--ros-args -p use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": ", or in a launch file with "
+        },
+        {
+         "t": "code",
+         "v": "parameters=[{'use_sim_time': True}]"
+        },
+        {
+         "t": "text",
+         "v": ", or once for every node in the current launch scope with the "
+        },
+        {
+         "t": "code",
+         "v": "SetUseSimTime(True)"
+        },
+        {
+         "t": "text",
+         "v": " action. It has to be the same for every node in a simulated system."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "rclcpp gives times and durations their own types, and the clock travels with the value:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "const rclcpp::Time stamp(msg.header.stamp);                   // a header stamp converts as ROS time\nconst rclcpp::Duration age = now() - stamp;                   // Time - Time is a Duration\nconst rclcpp::Time deadline = now() + rclcpp::Duration(500ms);  // Time + Duration is a Time\nif (age > rclcpp::Duration::from_seconds(0.2)) { /* stale */ }\nconst std::int64_t age_ns = age.nanoseconds();                // exact; seconds() is a double\nconst rclcpp::Duration wrong = now() - rclcpp::Time(0);        // throws: Time(0) is system time"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "rclcpp::Time"
+        },
+        {
+         "t": "text",
+         "v": " stores integer nanoseconds and a clock type. Comparing or subtracting two times of different clock types throws "
+        },
+        {
+         "t": "code",
+         "v": "std::runtime_error"
+        },
+        {
+         "t": "text",
+         "v": ", and the subtraction's message names the types by number: "
+        },
+        {
+         "t": "code",
+         "v": "can't subtract times with different time sources [1 != 2]"
+        },
+        {
+         "t": "text",
+         "v": ", where 1 is ROS time and 2 is system time. The last line is the classic way to meet it. The constructor from an integer defaults to system time, while "
+        },
+        {
+         "t": "code",
+         "v": "now()"
+        },
+        {
+         "t": "text",
+         "v": " on a node returns ROS time even when "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " is false. Write "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::Time(0, 0, RCL_ROS_TIME)"
+        },
+        {
+         "t": "text",
+         "v": " if you need a ROS-time zero."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The timers follow the same split, as the topics page said. "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": " runs on the node's clock, so a 100 ms timer fires ten times per simulated second: twice as often per wall second when Gazebo runs at a real-time factor of 2, and not at all while it is paused. rclcpp builds "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "RCL_STEADY_TIME"
+        },
+        {
+         "t": "text",
+         "v": " whatever "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " says. When a node-clock timer falls behind, rcl skips the missed periods instead of queueing them, so a callback that counts its own calls to measure time is wrong exactly when the system is overloaded. "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::Rate"
+        },
+        {
+         "t": "text",
+         "v": " uses system time unless you pass it "
+        },
+        {
+         "t": "code",
+         "v": "get_clock()"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A header stamp says when the data was measured, not when it was published. The producer sets "
+        },
+        {
+         "t": "code",
+         "v": "msg.header.stamp"
+        },
+        {
+         "t": "text",
+         "v": " from its node clock at the moment of capture, and a consumer computes the data's age as its own "
+        },
+        {
+         "t": "code",
+         "v": "now()"
+        },
+        {
+         "t": "text",
+         "v": " minus the stamp. That subtraction is only meaningful when both nodes use the same time base, which is why one node without "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " breaks a simulated system."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Logic that calls "
+        },
+        {
+         "t": "code",
+         "v": "now()"
+        },
+        {
+         "t": "text",
+         "v": " itself can only be tested by waiting, and it can't be tested at all with a paused clock or a clock that jumps back. So the logic takes the time as an argument, and the node is the only place that reads a clock. The Core Guidelines ask for interfaces that state their inputs ("
+        },
+        {
+         "t": "a",
+         "v": "I.1",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-explicit"
+        },
+        {
+         "t": "text",
+         "v": ") and prefer pure functions ("
+        },
+        {
+         "t": "a",
+         "v": "F.8",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-pure"
+        },
+        {
+         "t": "text",
+         "v": "), and Bilal Gill's CppCon 2023 talk applies the same idea to ROS 2 callbacks. Here is a freshness check for an input stream, written that way. A test drives it with any timeline it likes, including one where time stands still:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string>\n\nusing namespace std::chrono_literals;\n\n// A time on the node's clock, as rclcpp::Time::nanoseconds() returns it.\nstruct Stamp {\n  std::int64_t ns;\n};\n\n[[nodiscard]] constexpr Stamp at(std::chrono::nanoseconds since_zero) { return Stamp{since_zero.count()}; }\n\n// Says whether an input is fresh. It never reads a clock: every caller says what time it is.\nclass Freshness {\n public:\n  explicit Freshness(std::chrono::nanoseconds timeout) : timeout_{timeout} {}\n\n  void on_message(Stamp now) { last_ = now; }\n\n  // How long ago the last message arrived, or nothing if none has.\n  [[nodiscard]] std::optional<std::chrono::nanoseconds> silence(Stamp now) const {\n    if (!last_) return std::nullopt;\n    return std::chrono::nanoseconds{now.ns - last_->ns};\n  }\n\n  [[nodiscard]] bool is_stale(Stamp now) const {\n    const std::optional<std::chrono::nanoseconds> s = silence(now);\n    return !s || *s > timeout_;\n  }\n\n private:\n  std::chrono::nanoseconds timeout_;\n  std::optional<Stamp> last_;\n};\n\nvoid report(const Freshness& odom, Stamp now) {\n  const std::optional<std::chrono::nanoseconds> s = odom.silence(now);\n  const std::string last = s ? std::format(\", last message {} ago\", std::chrono::duration_cast<std::chrono::milliseconds>(*s))\n                             : std::string{\", nothing received\"};\n  std::cout << std::format(\"t = {:>6}: {}{}\\n\", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::nanoseconds{now.ns}),\n                           odom.is_stale(now) ? \"stale\" : \"fresh\", last);\n}\n\nint main() {\n  Freshness odom{500ms};\n  report(odom, at(0ms));\n  odom.on_message(at(100ms));\n  odom.on_message(at(200ms));\n  report(odom, at(450ms));\n  report(odom, at(700ms));\n  report(odom, at(701ms));\n}"
+      },
+      {
+       "t": "output",
+       "text": "t =    0ms: stale, nothing received\nt =  450ms: fresh, last message 250ms ago\nt =  700ms: fresh, last message 500ms ago\nt =  701ms: stale, last message 501ms ago"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The boundary is exact: at 500 ms of silence the input still counts as fresh, and 1 ms later it doesn't. That holds because the class compares integer nanoseconds, as "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::Time"
+        },
+        {
+         "t": "text",
+         "v": " does inside. With "
+        },
+        {
+         "t": "code",
+         "v": "seconds()"
+        },
+        {
+         "t": "text",
+         "v": ", which returns a "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": ", you would be comparing rounded values. The class knows nothing about ROS, simulation or pauses. When the simulation pauses, the node calls it with a time that stands still, and the answer stays the same."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "node",
+   "title": "A node that behaves correctly with simulation time",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Create a package "
+        },
+        {
+         "t": "code",
+         "v": "time_lab"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "ros2 pkg create --build-type ament_cmake time_lab --dependencies rclcpp nav_msgs"
+        },
+        {
+         "t": "text",
+         "v": ", and work in it."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Start the example world from the Gazebo topic, and bridge "
+         },
+         {
+          "t": "code",
+          "v": "/clock"
+         },
+         {
+          "t": "text",
+          "v": " and the green vehicle's odometry, which its DiffDrive system publishes at its default of 50 messages per simulated second:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "gz sim -s -r diff_drive.sdf\nros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock \\\n  /model/vehicle_green/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry"
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write a node "
+         },
+         {
+          "t": "code",
+          "v": "odom_watch"
+         },
+         {
+          "t": "text",
+          "v": ". It subscribes to "
+         },
+         {
+          "t": "code",
+          "v": "/model/vehicle_green/odometry"
+         },
+         {
+          "t": "text",
+          "v": " and hands the arrival time to the "
+         },
+         {
+          "t": "code",
+          "v": "Freshness"
+         },
+         {
+          "t": "text",
+          "v": " class from the theory, with a 500 ms timeout. Ten times a second, on the node's clock, it asks whether the odometry is stale, and it logs a warning when the answer changes to stale and an info line when it changes back. Once a second it logs the age of the latest message: its node's time minus the message's header stamp."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Run it with "
+         },
+         {
+          "t": "code",
+          "v": "--ros-args -p use_sim_time:=true"
+         },
+         {
+          "t": "text",
+          "v": ". Pause the simulation for ten seconds with the world's control service, then resume it. Before you do, predict whether "
+         },
+         {
+          "t": "code",
+          "v": "odom_watch"
+         },
+         {
+          "t": "text",
+          "v": " warns."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Stop "
+         },
+         {
+          "t": "code",
+          "v": "odom_watch"
+         },
+         {
+          "t": "text",
+          "v": " and start it again without "
+         },
+         {
+          "t": "code",
+          "v": "use_sim_time"
+         },
+         {
+          "t": "text",
+          "v": ". Predict the age it logs, then check. Pause the simulation again and predict what happens now."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <memory>\n#include <optional>\n\n#include <nav_msgs/msg/odometry.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nusing namespace std::chrono_literals;\n\n// Plain C++ with no ROS types, so a test reaches it without starting ROS.\nstruct Stamp {\n  std::int64_t ns;  // as rclcpp::Time::nanoseconds() returns it\n};\n\nclass Freshness {\n public:\n  explicit Freshness(std::chrono::nanoseconds timeout) : timeout_{timeout} {}\n\n  void on_message(Stamp now) { last_ = now; }\n\n  [[nodiscard]] bool is_stale(Stamp now) const {\n    return !last_ || std::chrono::nanoseconds{now.ns - last_->ns} > timeout_;\n  }\n\n private:\n  std::chrono::nanoseconds timeout_;\n  std::optional<Stamp> last_;\n};\n\nclass OdomWatch : public rclcpp::Node {\n public:\n  explicit OdomWatch(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"odom_watch\", options) {\n    subscription_ = create_subscription<nav_msgs::msg::Odometry>(\n        \"/model/vehicle_green/odometry\", rclcpp::QoS(rclcpp::KeepLast(10)),\n        [this](const nav_msgs::msg::Odometry& msg) { on_odometry(msg); });\n    check_timer_ = create_timer(100ms, [this] { check(); });\n    age_timer_ = create_timer(1s, [this] { report_age(); });\n  }\n\n private:\n  [[nodiscard]] Stamp stamp_now() const { return Stamp{now().nanoseconds()}; }\n\n  void on_odometry(const nav_msgs::msg::Odometry& msg) {\n    freshness_.on_message(stamp_now());\n    latest_stamp_ = rclcpp::Time(msg.header.stamp);\n  }\n\n  void check() {\n    const bool stale = freshness_.is_stale(stamp_now());\n    if (stale && !stale_) RCLCPP_WARN(get_logger(), \"no odometry for more than 500 ms\");\n    if (!stale && stale_) RCLCPP_INFO(get_logger(), \"odometry is back\");\n    stale_ = stale;\n  }\n\n  void report_age() const {\n    if (!latest_stamp_) return;\n    const rclcpp::Duration age = now() - *latest_stamp_;\n    RCLCPP_INFO(get_logger(), \"latest odometry is %.3f s old\", age.seconds());\n  }\n\n  Freshness freshness_{500ms};\n  bool stale_ = true;  // nothing has arrived yet\n  std::optional<rclcpp::Time> latest_stamp_;\n  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subscription_;\n  rclcpp::TimerBase::SharedPtr check_timer_;\n  rclcpp::TimerBase::SharedPtr age_timer_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<OdomWatch>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add the executable to "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "add_executable(odom_watch src/odom_watch.cpp)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ament_target_dependencies(odom_watch rclcpp nav_msgs)"
+        },
+        {
+         "t": "text",
+         "v": " and an "
+        },
+        {
+         "t": "code",
+         "v": "install(TARGETS ...)"
+        },
+        {
+         "t": "text",
+         "v": " line, as in the topics exercise. Then run it and drive the world from a third terminal:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run time_lab odom_watch --ros-args -p use_sim_time:=true\ngz service -s /world/diff_drive/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \\\n  --timeout 3000 --req 'pause: true'\ngz service -s /world/diff_drive/control --reqtype gz.msgs.WorldControl --reptype gz.msgs.Boolean \\\n  --timeout 3000 --req 'pause: false'"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With simulation time there is no warning during the pause. Gazebo keeps publishing "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " while paused, but always with the same time, so the node's clock stands still. Both timers wait for a time that doesn't come, and no simulated time passes without odometry. That is the right answer: the robot didn't move and nothing was missed. The age stays within a few hundredths of a second of zero, because the stamps and "
+        },
+        {
+         "t": "code",
+         "v": "now()"
+        },
+        {
+         "t": "text",
+         "v": " are both simulation time and a new message comes every 20 ms of it. There is no warning at start-up. The node begins in the stale state, and "
+        },
+        {
+         "t": "code",
+         "v": "check()"
+        },
+        {
+         "t": "text",
+         "v": " logs only when the answer changes, so the first message the node receives logs \"odometry is back\" with nothing before it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Without "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": ", the age is about 1.79 billion seconds, some 56 years in September 2026. "
+        },
+        {
+         "t": "code",
+         "v": "now()"
+        },
+        {
+         "t": "text",
+         "v": " is system time, counted from 1970, while the stamps are still simulation time, counted from the start of Gazebo. The freshness check still works, because it compares arrival times on one clock. It no longer works during a pause: system time runs on, and after 500 ms "
+        },
+        {
+         "t": "code",
+         "v": "odom_watch"
+        },
+        {
+         "t": "text",
+         "v": " warns about missing odometry in a simulation that is standing still. That false alarm is what every wall timer and steady clock inside robot logic produces in simulation."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Timestamp mismatches and time jumps",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first family of failures is a mix of time bases. One node without "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " in a simulated system stamps its messages with system time, near 1.79 billion seconds, while every other node stamps simulation time, a few hundred seconds. Consumers compute ages of decades or of minus decades, and tf2 lookups fail with "
+        },
+        {
+         "t": "code",
+         "v": "Lookup would require extrapolation into the future"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "into the past"
+        },
+        {
+         "t": "text",
+         "v": ", followed by the requested time and the time of the data, which shows the two epochs side by side. The frames topic comes back to those errors. A related bug is a stamp that is never set: a default "
+        },
+        {
+         "t": "code",
+         "v": "builtin_interfaces/msg/Time"
+        },
+        {
+         "t": "text",
+         "v": " is zero, so its age is the whole of ROS time. A zero or epoch-sized difference between two stamps is almost always one of these two faults, and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic echo <topic> --field header.stamp"
+        },
+        {
+         "t": "text",
+         "v": " next to "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic echo /clock --once"
+        },
+        {
+         "t": "text",
+         "v": " shows which."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second family is time that jumps. With simulation time, ROS time goes back when the world is reset, which rewinds Gazebo's clock to its start, and at the end of every loop of "
+        },
+        {
+         "t": "code",
+         "v": "ros2 bag play --loop --clock"
+        },
+        {
+         "t": "text",
+         "v": ", which publishes "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " from the recording. System time jumps when NTP corrects the clock. rcl reschedules a node-clock timer after a backward jump, so timers keep firing. tf2's buffer registers for jumps and clears itself, logging "
+        },
+        {
+         "t": "code",
+         "v": "Detected jump back in time. Clearing TF buffer."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Your own state doesn't clear itself. Here is the "
+        },
+        {
+         "t": "code",
+         "v": "Freshness"
+        },
+        {
+         "t": "text",
+         "v": " class from the theory with the last odometry at 30 s of simulation time. Then the world is reset, and suppose the odometry doesn't come back. The class computes 200 ms minus 30 000 ms, a negative silence, and calls the input fresh until time catches up with the old stamp. The program runs the same timeline through a wrapper that forgets everything when time goes back:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n\nusing namespace std::chrono_literals;\n\nstruct Stamp {\n  std::int64_t ns;\n};\n\n[[nodiscard]] constexpr Stamp at(std::chrono::nanoseconds since_zero) { return Stamp{since_zero.count()}; }\n\nclass Freshness {\n public:\n  explicit Freshness(std::chrono::nanoseconds timeout) : timeout_{timeout} {}\n\n  void on_message(Stamp now) { last_ = now; }\n\n  [[nodiscard]] bool is_stale(Stamp now) const {\n    return !last_ || std::chrono::nanoseconds{now.ns - last_->ns} > timeout_;\n  }\n\n private:\n  std::chrono::nanoseconds timeout_;\n  std::optional<Stamp> last_;\n};\n\n// The same check, but a time earlier than one already seen means the clock jumped back,\n// and nothing received before the jump counts any more.\nclass JumpAwareFreshness {\n public:\n  explicit JumpAwareFreshness(std::chrono::nanoseconds timeout) : timeout_{timeout}, inner_{timeout} {}\n\n  void on_message(Stamp now) {\n    see(now);\n    inner_.on_message(now);\n  }\n\n  [[nodiscard]] bool is_stale(Stamp now) {\n    see(now);\n    return inner_.is_stale(now);\n  }\n\n private:\n  void see(Stamp now) {\n    if (latest_ && now.ns < latest_->ns) inner_ = Freshness{timeout_};\n    latest_ = now;\n  }\n\n  std::chrono::nanoseconds timeout_;\n  Freshness inner_;\n  std::optional<Stamp> latest_;\n};\n\nint main() {\n  Freshness plain{500ms};\n  JumpAwareFreshness aware{500ms};\n  plain.on_message(at(30'000ms));\n  aware.on_message(at(30'000ms));\n  // The world is reset: ROS time starts again from 0, and no more odometry arrives.\n  for (const Stamp now : {at(30'200ms), at(200ms), at(20'000ms), at(30'501ms)}) {\n    std::cout << std::format(\"t = {:>7}: plain {}, jump-aware {}\\n\",\n                             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::nanoseconds{now.ns}),\n                             plain.is_stale(now) ? \"stale\" : \"fresh\", aware.is_stale(now) ? \"stale\" : \"fresh\");\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "t = 30200ms: plain fresh, jump-aware fresh\nt =   200ms: plain fresh, jump-aware stale\nt = 20000ms: plain fresh, jump-aware stale\nt = 30501ms: plain stale, jump-aware stale"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The plain check stays blind for 30.5 s of simulated time after the reset, until time passes the old stamp by the timeout. Anything that remembers a time needs this treatment: the last-seen time of a watchdog, the start of a timeout, a rate estimate. Detecting the jump from the times the logic receives keeps it on the executor thread. rclcpp can also call you on a jump, through "
+        },
+        {
+         "t": "code",
+         "v": "get_clock()->create_jump_callback(pre, post, threshold)"
+        },
+        {
+         "t": "text",
+         "v": " with an "
+        },
+        {
+         "t": "code",
+         "v": "rcl_jump_threshold_t"
+        },
+        {
+         "t": "text",
+         "v": " whose "
+        },
+        {
+         "t": "code",
+         "v": "min_backward"
+        },
+        {
+         "t": "text",
+         "v": " is negative. tf2's buffer uses the same mechanism. That callback runs on the thread that receives "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": ", which rclcpp runs apart from your executor by default, so any state it touches needs a lock, and you must keep the returned handle alive, as with every other handle."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the three clocks and one use for each, what "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " changes and how you set it, and what ROS time is before the first "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " message. Say which clock "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": " use, and what each does while the simulation is paused. Explain how a header stamp and "
+        },
+        {
+         "t": "code",
+         "v": "now()"
+        },
+        {
+         "t": "text",
+         "v": " give a message's age, the two ways time bases get mixed, and what a backward jump does to state that remembers a time."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does a node's "
+     },
+     {
+      "t": "code",
+      "v": "now()"
+     },
+     {
+      "t": "text",
+      "v": " return with "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": " false, with it true, and with it true before any "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": " message?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which clock is right for a hardware timeout, and why not ROS time?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "now() - rclcpp::Time(0)"
+     },
+     {
+      "t": "text",
+      "v": " throw, and what do you write instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A node with "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time:=true"
+     },
+     {
+      "t": "text",
+      "v": " runs while Gazebo is paused. What do its "
+     },
+     {
+      "t": "code",
+      "v": "create_timer"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "create_wall_timer"
+     },
+     {
+      "t": "text",
+      "v": " callbacks do?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A consumer reports that every message is 56 years old. What is wrong, and how do you confirm it from the command line?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What makes ROS time go backwards in a simulated system, and what does a watchdog have to do about it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: a node that checks an input's freshness on the node clock, with the check in a plain class that takes the time as an argument."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article on "
+     },
+     {
+      "t": "a",
+      "v": "clock and time",
+      "href": "https://design.ros2.org/articles/clock_and_time.html"
+     },
+     {
+      "t": "text",
+      "v": ": the three time types, "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": ", zero as uninitialised time, and jump callbacks."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "clock.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/clock.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "Clock"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "create_jump_callback"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "time.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/time.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for the clock-type checks and their messages, "
+     },
+     {
+      "t": "a",
+      "v": "duration.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/duration.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "rate.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/rate.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "timer.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/timer.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the steady clock under a wall timer, and "
+     },
+     {
+      "t": "a",
+      "v": "time_source.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/time_source.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": " subscription; with the generated API page for "
+     },
+     {
+      "t": "a",
+      "v": "rclcpp::Clock",
+      "href": "https://docs.ros.org/en/jazzy/p/rclcpp/generated/classrclcpp_1_1Clock.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rcl on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "time.h",
+      "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/include/rcl/time.h"
+     },
+     {
+      "t": "text",
+      "v": " for the clock types and jump thresholds, and "
+     },
+     {
+      "t": "a",
+      "v": "timer.c",
+      "href": "https://github.com/ros2/rcl/blob/jazzy/rcl/src/rcl/timer.c"
+     },
+     {
+      "t": "text",
+      "v": " for how timers handle jumps and skip missed periods."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "tf2_ros on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "buffer.cpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2_ros/src/buffer.cpp"
+     },
+     {
+      "t": "text",
+      "v": ": the buffer cleared on a backward jump."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "launch_ros on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "set_use_sim_time.py",
+      "href": "https://github.com/ros2/launch_ros/blob/jazzy/launch_ros/launch_ros/actions/set_use_sim_time.py"
+     },
+     {
+      "t": "text",
+      "v": ", and the Jazzy tutorial on "
+     },
+     {
+      "t": "a",
+      "v": "parameters",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Parameters/Understanding-ROS2-Parameters.html"
+     },
+     {
+      "t": "text",
+      "v": ", which shows "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": " on every node."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ros2bag on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "play.py",
+      "href": "https://github.com/ros2/rosbag2/blob/jazzy/ros2bag/ros2bag/verb/play.py"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "--clock"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "--loop"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo's "
+     },
+     {
+      "t": "a",
+      "v": "DiffDrive system",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/diff_drive/DiffDrive.cc"
+     },
+     {
+      "t": "text",
+      "v": ", which stamps odometry with simulation time, and the tutorial on "
+     },
+     {
+      "t": "a",
+      "v": "pausing and running a simulation",
+      "href": "https://gazebosim.org/api/sim/8/pause_run_simulation.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "steady_clock",
+      "href": "https://en.cppreference.com/cpp/chrono/steady_clock"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "system_clock",
+      "href": "https://en.cppreference.com/cpp/chrono/system_clock"
+     },
+     {
+      "t": "text",
+      "v": ", and Howard Hinnant's CppCon 2016 "
+     },
+     {
+      "t": "a",
+      "v": "tutorial on chrono",
+      "href": "https://www.youtube.com/watch?v=P32hvk8b13M"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "I.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-explicit"
+     },
+     {
+      "t": "text",
+      "v": " on explicit interfaces and "
+     },
+     {
+      "t": "a",
+      "v": "F.8",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-pure"
+     },
+     {
+      "t": "text",
+      "v": " on pure functions."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

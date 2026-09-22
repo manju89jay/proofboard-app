@@ -1,0 +1,1196 @@
+{
+ "id": "sd-errors-recovery",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Define "
+     },
+     {
+      "t": "i",
+      "v": "idempotent"
+     },
+     {
+      "t": "text",
+      "v": " in one sentence, and say in one more why a retry needs it. Then take these five operations from the bench and say for each whether it is idempotent as written, and if it is not, the smallest change that makes it so. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Append one sample record to "
+      },
+      {
+       "t": "code",
+       "v": "run.log"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Set the supervisor's gate to closed."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Add 1 to the trip counter."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Write "
+      },
+      {
+       "t": "code",
+       "v": "results/smoke.txt"
+      },
+      {
+       "t": "text",
+       "v": " with this content."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Ask "
+      },
+      {
+       "t": "code",
+       "v": "/odom_relay/drop"
+      },
+      {
+       "t": "text",
+       "v": " to stop forwarding for 2 seconds."
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "An operation is idempotent when applying it twice leaves the same state as applying it once. A retry needs that property because a request whose outcome you do not know has three possible pasts, not two: it never arrived, it arrived and failed, or it arrived and succeeded and only the answer was lost. A retry is a second application, and unless the second one is harmless you cannot send it."
+     }
+    ]
+   },
+   {
+    "t": "table",
+    "head": [
+     [
+      {
+       "t": "text",
+       "v": "Operation"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Idempotent?"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Smallest change"
+      }
+     ]
+    ],
+    "rows": [
+     [
+      [
+       {
+        "t": "text",
+        "v": "Append a sample record"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "No: two appends leave two records"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Give the record a sequence number and have the reader drop a number it has already seen"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Set the gate to closed"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Yes: the second call finds it closed"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "None"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Add 1 to the trip counter"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "No: two adds leave 2"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Send \"set the counter to N\" instead, or attach a request id the server remembers"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Write "
+       },
+       {
+        "t": "code",
+        "v": "results/smoke.txt"
+       },
+       {
+        "t": "text",
+        "v": " with this content"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Yes: the file ends up with that content either way"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "None, as long as the write is atomic, so write to a temporary file and rename"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Drop for 2 seconds"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Nearly: the second call extends the window instead of repeating it"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Send \"drop until time T\" instead of \"drop for 2 s\", so the second call is the same instruction"
+       }
+      ]
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The pattern behind the table is worth saying out loud. An operation phrased as a change to the current state is not idempotent; the same operation phrased as a statement about the state you want, or carrying a key the receiver remembers, is. You pass if the definition mentions applying twice, the reason mentions the unknown outcome, and at least four rows are right with a workable change. Three rows is a partial pass. Defining idempotent as \"safe to call twice because nothing happens the second time\" without the unknown outcome is a partial pass too: it is the effect, not the reason."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "An operation is idempotent when applying it twice leaves the same state as applying it once. Any call across a boundary, a disk, a socket, another process, has three outcomes once something goes wrong: it never happened, it happened and failed, or it happened, succeeded, and only the answer was lost. A retry is safe only when idempotent, since the caller cannot tell which of those three pasts is true."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that without this distinction a system cannot recover on its own: a caller unsure whether its request took effect either repeats a change it should never repeat, such as adding to a counter twice, or waits on a person for a failure that would have cleared itself. Neither is correct by default, since the right response depends on the kind of failure, not on how badly the caller wants one."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You make an operation idempotent rather than discover it: give the receiver a key it remembers and have it ignore one already applied, or phrase the request as the state you want, \"set the limit to 0.2\" rather than \"reduce it by 0.1\". The failure decides the response. A transient fault gets a retry inside a budget, an attempt count, a time limit, and a decision for when it runs out, since a retry with no budget stops being recovery and starts hiding an outage. A dead process gets a restart, working only because its state is rebuilt from the next messages or was already stored durably. A malformed request or a broken contract gets neither, since the next attempt fails the same way, so it is rejected and reported."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What is left is what neither can touch: an unknown outcome on an operation never made idempotent, or a failure with no working part to retry from. That calls for a safe state, reachable without further decisions, by a component other than the one that failed, since a controller that lost its own odometry cannot decide whether to stop itself. Reaching it must be reported, not silent: a robot stopped on purpose and one stopped for no reason look identical from outside."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: defining idempotent by what happens on a second application, not by the retry it enables, and sorting failures by their nature, transient against a retry, a dead process against a restart, a broken contract against neither."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "recovery",
+   "title": "Partial output, retries, restarts, idempotency",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Suppose the bench gains a recorder, which it does not have yet, appending one record per odometry message to "
+        },
+        {
+         "t": "code",
+         "v": "run.log"
+        },
+        {
+         "t": "text",
+         "v": " at the 30 Hz the DiffDrive system publishes. The card fills up in the middle of the 1,847th write, and this is what the next reader opens:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "offset  0   record 1: length 6, payload \"1:0.10\", checksum      complete\noffset  8   record 2: length 6, payload \"2:0.20\", checksum      complete\noffset 16   record 3: length 6, payload \"3:0.30\", checksum      complete\noffset 24   record 4: length 6, then three payload bytes        torn: the disk filled here"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every failure that crosses a boundary, a disk, a socket, a service call, has three outcomes and not two: it happened, it did not happen, or you do not know. The first two are arithmetic. The third is the whole subject, because the caller has to act without knowing which of the other two it is in, and almost every recovery bug is a wrong guess about it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Partial output"
+        },
+        {
+         "t": "text",
+         "v": " is the disk's version of the unknown outcome. "
+        },
+        {
+         "t": "code",
+         "v": "write"
+        },
+        {
+         "t": "text",
+         "v": " may return a count smaller than you asked for, the operating system may have cached bytes it never flushed, and a power cut lands wherever it lands. The file above is not \"the file minus one record\": it is the file plus four bytes of something that is not a record, and a reader that trusts the length byte at offset 24 runs off the end of the file: three more payload bytes, at offsets 28 to 30, and the checksum byte at 31, none of which were ever written. Three properties make that recoverable, and each one covers a different failure:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A length in front of every record, so the reader knows where the next one should start and can tell that the file ends too early."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A checksum after every record, so a record that is the right length and the wrong content is refused. This is the one that catches a half-flushed block, where the length arrived and the payload did not."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A rule that the file is read only up to the last complete record, and that anything after it is truncated on open. Without the rule, the first two properties tell you there is damage and leave you with nothing to do about it."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For a file that is replaced rather than appended to, there is a simpler property: write a temporary file, flush it, and rename it over the target. On one filesystem the rename is atomic, so a reader sees either the old file or the new one and never a half-written one. The bench's verdict file is the obvious candidate and does not do this yet: "
+        },
+        {
+         "t": "code",
+         "v": "scenario_runner"
+        },
+        {
+         "t": "text",
+         "v": " opens it with a plain "
+        },
+        {
+         "t": "code",
+         "v": "std::ofstream"
+        },
+        {
+         "t": "text",
+         "v": ", which truncates the target the moment it is opened, so a run killed between that moment and the write leaves exactly the empty file the property exists to prevent. Writing "
+        },
+        {
+         "t": "code",
+         "v": "<file>.part"
+        },
+        {
+         "t": "text",
+         "v": ", closing it and renaming it over the target is the change it would take, and it is worth making before anything starts reading verdicts automatically."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Retries"
+        },
+        {
+         "t": "text",
+         "v": " are what you do about the unknown outcome, and they need three things. An operation that may be applied twice, which is idempotency. A budget. And a decision for when the budget runs out."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Idempotency you make, not discover. There are two ways. Give the receiver a key it remembers, a sequence number or a request id, and have it ignore a key it has already applied; that is what the sequence number in the record format above is for. Or phrase the operation as the state you want rather than the change you want: \"set the speed limit to 0.2\" instead of \"reduce the speed limit by 0.1\", \"drop until 14:02:11\" instead of \"drop for 2 seconds\". The second is usually cheaper, because it needs no memory on the receiver, and it survives a message arriving out of order as well as twice."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A budget has three parts: how many attempts, how much total time, and what happens when either runs out. A retry loop without one is not a recovery strategy, it is a fault of its own, and it fails in a specific way: the failure stops being visible. A component that retries forever never returns an error, so nothing upstream reports anything, no alarm fires, and the first symptom the operator gets is that the robot has been standing still for ten minutes. The budget's real job is to convert an unbounded wait into a failure that somebody is told about."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Restart"
+        },
+        {
+         "t": "text",
+         "v": " is the cheapest recovery there is, and the reason it is cheap is that you already have to make it work. A process that can be killed and restarted is a process whose state is either derivable from the messages it is about to receive or stored somewhere it can read again. Build it that way, make shutdown and crash the same path, and the recovery code runs on every start rather than only in the emergency, which is the only way it stays correct. The bench's nodes are written this way: the supervisor rebuilds its freshness state from the next few messages, and the route follower starts again from the current pose. What a restart cannot recover is anything a node held only in memory and nobody else can supply, which is the test for whether a piece of state belongs on disk."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When neither a retry nor a restart applies, the system needs a "
+        },
+        {
+         "t": "i",
+         "v": "safe state"
+        },
+        {
+         "t": "text",
+         "v": ": a state that is safe without any further decisions, reachable by whatever is still working. For a wheeled robot that is zero velocity with the brakes applied; for a manipulator it is holding position rather than going limp. Two properties matter. It must be reachable by a component that is not the one that failed, which is why the bench's supervisor and not the controller owns "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": ": a controller that has lost its odometry cannot be trusted to decide to stop. And reaching it must be reported, not silent, because a robot that stopped for a reason and a robot that stopped because it finished look identical from the outside."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Which failures get which treatment is a question about the failure, not about the code that met it. A resource that is busy, a dropped packet, a peer that has not finished starting: transient, self-clearing, retry with a budget. A process that died: restart. A malformed input, a contract broken by the caller, a wrong configuration: none of the three, because the second attempt will be malformed in exactly the same way, and the right answer is to reject it, report it, and keep serving everything else. An unknown outcome on an operation you could not make idempotent: no retry, and the caller has to ask the receiver what happened, or go to the safe state and let a person decide."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last question is who decides. A supervisor decides on evidence, not on messages. The bench's supervisor does not ask the controller whether it is healthy; it watches whether odometry and commands are arriving, with "
+        },
+        {
+         "t": "code",
+         "v": "odom_timeout_ms"
+        },
+        {
+         "t": "text",
+         "v": " at 250 and "
+        },
+        {
+         "t": "code",
+         "v": "cmd_timeout_ms"
+        },
+        {
+         "t": "text",
+         "v": " at 500, and while either is stale its 20 Hz timer publishes a stop. That is a deliberately dull rule, and dullness is the point: a supervisor that reasons about the failure can be wrong about it, while one that checks whether fresh evidence exists can only be wrong about the timeout."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "design",
+   "title": "Recovery design for a failed recording write",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes, mostly on paper."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bench gains a recorder. It appends one record per odometry message to "
+        },
+        {
+         "t": "code",
+         "v": "run.log"
+        },
+        {
+         "t": "text",
+         "v": " on the robot's SD card at 30 Hz, and after the run the scenario runner reads the file and judges the run from it. The card is nearly full."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the failure table for these six failures: the card fills in the middle of a record; the card fills exactly between two records; the process is killed with SIGKILL; the power is cut; the writer produces a record whose length byte does not match what it wrote; the file contains a record written by a newer version of the format. For each give three things: how the reader detects it, what the reader does, and what the operator is told."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Give the on-disk record format and name, for each of the six, the property of the format that makes it detectable. If one of them is not detectable, say so."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "good_prefix"
+         },
+         {
+          "t": "text",
+          "v": " in plain C++: given the bytes of the file, return how many bytes at the front are complete, checksummed records. Give three numbered pass or fail checks for it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Say what the recorder node does when a write fails, and why it must not retry inside the subscription callback."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Sort the six failures into the ones a retry can fix, the ones that need a restart, and the ones that need a safe state or a person."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The format first, because the table depends on it. One record is a length byte, that many payload bytes, and a one-byte checksum of the payload. The payload starts with a sequence number, so a reader that sees a number it has already applied ignores the record, and the file carries a four-byte header with a format version. A real recorder uses a wider length and a stronger checksum, CRC-32 rather than a sum; the shape and the recovery are the same."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Failure"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Detected by"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Reader does"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Operator is told"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Card fills mid-record"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The file ends before the length byte promised"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Truncates to the last complete record"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The run is short by one record, and the disk is full"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Card fills between records"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Nothing in the file"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Reads every record, sees the run stop early"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The run ended early, and the disk is full"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "SIGKILL"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The same as mid-record, or nothing if it landed between writes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The same: truncate"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The process died; the records before it are good"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Power cut"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "A short file, or a record whose checksum fails because the block was half flushed"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Truncates at the first failing record"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "As above, plus the flush policy is worth checking"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Wrong length byte from the writer"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The checksum of the bytes the length selected does not match"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Truncates there and reports the offset"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "A writer bug, with the offset to reproduce it"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Record from a newer format"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The version in the file header is higher than the reader knows"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Refuses the whole file and does not guess"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Version mismatch, with both numbers"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two of the six are worth arguing about. The card filling exactly between records is not detectable from the file at all, and that is the honest answer to step 2: the file is a valid shorter file. Only something outside it, the expected duration or a record count written at the end, can tell a complete run from a truncated one, which is a reason to write a trailing summary record and treat its absence as \"the run did not finish\". And the wrong length byte is caught only because the checksum covers the payload the length selected; a format with a length and no checksum cannot tell a writer bug from a short file."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is "
+        },
+        {
+         "t": "code",
+         "v": "good_prefix"
+        },
+        {
+         "t": "text",
+         "v": ", with a torn file built in front of it and the idempotent replay after it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\n// One record: a length byte, that many payload bytes, and a checksum byte. A real format uses a\n// wider length and a CRC; the shape and the recovery are the same.\nusing Bytes = std::vector<std::uint8_t>;\n\n[[nodiscard]] std::uint8_t checksum_of(std::span<const std::uint8_t> payload) {\n  std::uint8_t sum = 0;\n  for (const std::uint8_t byte : payload) sum = static_cast<std::uint8_t>(sum + byte);\n  return sum;\n}\n\nvoid append(Bytes& file, std::string_view payload) {\n  const auto start = std::ssize(file);\n  file.push_back(static_cast<std::uint8_t>(payload.size()));\n  for (const char letter : payload) file.push_back(static_cast<std::uint8_t>(letter));\n  file.push_back(checksum_of(std::span<const std::uint8_t>(file).subspan(static_cast<std::size_t>(start) + 1)));\n}\n\n// How many bytes at the front of the file are complete, checksummed records. Everything after\n// that is what a torn write left behind, and the reader truncates it.\n[[nodiscard]] std::int64_t good_prefix(std::span<const std::uint8_t> file) {\n  std::int64_t good = 0;\n  while (good < std::ssize(file)) {\n    const std::int64_t length = file[static_cast<std::size_t>(good)];\n    const std::int64_t end = good + 1 + length + 1;\n    if (end > std::ssize(file)) break;  // the record is cut short\n    const auto payload = file.subspan(static_cast<std::size_t>(good) + 1, static_cast<std::size_t>(length));\n    if (checksum_of(payload) != file[static_cast<std::size_t>(end) - 1]) break;  // the record is damaged\n    good = end;\n  }\n  return good;\n}\n\n[[nodiscard]] std::vector<std::string> records_in(std::span<const std::uint8_t> file) {\n  std::vector<std::string> records;\n  std::int64_t at = 0;\n  while (at < std::ssize(file)) {\n    const std::int64_t length = file[static_cast<std::size_t>(at)];\n    std::string payload;\n    for (std::int64_t i = 0; i < length; ++i) {\n      payload.push_back(static_cast<char>(file[static_cast<std::size_t>(at + 1 + i)]));\n    }\n    records.push_back(payload);\n    at += 1 + length + 1;\n  }\n  return records;\n}\n\n// Applying a record is idempotent: the sequence number says whether it has been applied already.\nclass Run {\n public:\n  void apply(std::string_view record) {\n    const std::int64_t seq = record[0] - '0';\n    if (seq <= highest_) return;  // already applied, so a retry changes nothing\n    highest_ = seq;\n    ++applied_;\n  }\n\n  [[nodiscard]] std::string state() const { return std::format(\"{} records, highest seq {}\", applied_, highest_); }\n\n private:\n  std::int64_t applied_ = 0;\n  std::int64_t highest_ = 0;\n};\n\nint main() {\n  Bytes file;\n  for (const std::string_view record : {\"1:0.10\", \"2:0.20\", \"3:0.30\"}) append(file, record);\n  const auto complete = std::ssize(file);\n  append(file, \"4:0.40\");\n  file.resize(static_cast<std::size_t>(complete + 4));  // the card filled in the middle of record 4\n\n  const std::int64_t good = good_prefix(file);\n  std::cout << std::format(\"file {} bytes, good prefix {} bytes, torn tail {} bytes\\n\", std::ssize(file), good,\n                           std::ssize(file) - good);\n\n  const std::vector<std::string> recovered =\n      records_in(std::span<const std::uint8_t>(file).subspan(0, static_cast<std::size_t>(good)));\n  std::string names;\n  for (const std::string& record : recovered) {\n    if (!names.empty()) names += \", \";\n    names += record;\n  }\n  std::cout << std::format(\"recovered: {}\\n\", names);\n\n  Run run;\n  for (const std::string& record : recovered) run.apply(record);\n  std::cout << std::format(\"applied once:  {}\\n\", run.state());\n  for (const std::string& record : recovered) run.apply(record);\n  std::cout << std::format(\"applied twice: {}\\n\", run.state());\n}"
+      },
+      {
+       "t": "output",
+       "text": "file 28 bytes, good prefix 24 bytes, torn tail 4 bytes\nrecovered: 1:0.10, 2:0.20, 3:0.30\napplied once:  3 records, highest seq 3\napplied twice: 3 records, highest seq 3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three records of eight bytes each are 24 bytes, the torn fourth record left 4, and the reader keeps 24 and discards 4. The last two lines are the idempotency: replaying the same recovered records leaves the state exactly as it was, which is what lets a reader restart after a crash without having to remember how far it got."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three checks for "
+        },
+        {
+         "t": "code",
+         "v": "good_prefix"
+        },
+        {
+         "t": "text",
+         "v": ", and they are the ones to write as tests before the function:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "On a file of three complete records it returns the whole length, and "
+         },
+         {
+          "t": "code",
+          "v": "records_in"
+         },
+         {
+          "t": "text",
+          "v": " of that prefix gives three records with the original payloads."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "On the same file with the last record cut at any point, 1 byte short up to all but one byte, it returns the length of the first two records. A loop over every truncation length is the test, not one example."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "On a file whose third record has one payload byte changed, it returns the length of the first two, because the checksum fails. This is the check people leave out, and it is the one that separates a torn file from a damaged one."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4. When a write fails the recorder does three things and none of them is a retry. It stops writing, because the next write will fail too and the file must not gain more damage. It reports, once, at error level, with the reason and the byte offset. And it keeps the node alive and its subscription running, so the rest of the system is not taken down by a full disk; a recorder that cannot record is a degraded system, not a stopped one. It must not retry inside the subscription callback because that callback is the executor's one thread, as the executors topic measured: a retry loop there stops every other callback of the node, and a 2-second retry against a 30 Hz input costs 60 messages. If a retry is wanted, it belongs on a timer, with a budget, and with the writing state held in a plain class the callback only feeds."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5. A retry fixes none of the six on its own: a full card is not transient, and a retry that waits for space is a disguised wait for a person. A restart fixes the SIGKILL and the power cut, and only because the format makes the file recoverable, which is the whole reason for the format. A safe state or a person is needed for the full card, the writer bug and the version mismatch: the first needs space, the second needs a fix, and the third must not be guessed at. What all six share is that the run in progress is finished: the honest response is to stop the scenario, keep the good prefix, and say so."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Retry storms; non-idempotent retries",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A retry that is correct on its own can still take a system down, and the two ways it does are worth recognising on sight."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first is the retry storm. A shared dependency goes down for two seconds, thirty clients notice within a few milliseconds of each other, and all thirty retry one second later, together, and again a second after that. The dependency comes back and is immediately hit by thirty synchronised requests instead of thirty spread out, so it falls over again, and the pattern repeats with the clients now more tightly synchronised than before. Nothing in any one client is wrong. What is missing is the randomness that breaks the lockstep, which the next topic measures, and a budget that makes the herd thin out instead of retrying forever."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Retries also multiply through layers. A client that retries three times, calling a gateway that retries three times, calling a service that retries three times, sends 27 requests for one user action, and each layer's timeout has to be longer than the whole of the layer below it or the outer retry starts before the inner one has finished. That is how a system ends up with a 90-second wait nobody chose. The fix is to retry at one layer, usually the one closest to the failure that knows whether the operation is idempotent, and to pass the failure up from the others."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second family is the non-idempotent retry, and the bench has a ready-made example. The tally service from the services topic answers with the number of heartbeats since the last call and resets the counter, which means a call that is answered and whose answer is lost has already spent the count: the client retries, gets a new small number, and the first one is gone for good. Nothing reports it, and the total is quietly wrong. Making that service idempotent means changing the interface, not the implementation: answer with a running total rather than a difference, and let the caller subtract. That is the general shape. Non-idempotency is almost always a property of the interface, so it is almost always fixed at the interface."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two smaller ones close the set. A retry can succeed after the caller has given up, which means a cancelled request is not a request that did not happen: the work runs, the state changes, and the caller believes otherwise, so anything that can be cancelled needs a way to ask what actually happened. And a retry hides the failure it is recovering from: a service that retries transparently and always succeeds on the third attempt reports a healthy system right up to the day the third attempt stops working. Count the retries and publish the count, because a rising retry rate is the earliest warning any of these systems gives you."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the three outcomes of an operation that crosses a boundary and say which one costs. Define idempotent, give the two ways to make an operation idempotent, and give the bench example of an interface that is not. Name the three properties that make an appended file recoverable and which failure each one covers. Give the three parts of a retry budget and say what a missing budget does to visibility. Say which failures deserve a retry, which a restart and which a safe state, and why the supervisor and not the controller owns the stop."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What are the three outcomes of a call across a boundary, and which one makes idempotency necessary?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give two ways to make a non-idempotent operation idempotent, and say which one needs memory on the receiver."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which property of an append-only file catches a half-flushed block, and which catches a file that ends early?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is \"the disk filled exactly between two records\" not detectable from the file, and what do you add to catch it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the three parts of a retry budget, and what does a retry loop without one do to the failure it is recovering from?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which failures does a restart fix, and what has to be true of a node's state for it to work?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What makes a state a safe state, and why must the component that reaches it not be the one that failed?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why must a recorder not retry a failed write inside its subscription callback? Give the cost in messages."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A service answers with the count since the last call and resets it. What goes wrong on a retry, and where is the fix?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page in 10 minutes: the recovery design for a process that appends records to a file on a disk that can fill up."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Jim Gray, "
+     },
+     {
+      "t": "a",
+      "v": "The Transaction Concept: Virtues and Limitations",
+      "href": "https://jimgray.azurewebsites.net/papers/thetransactionconcept.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", 1981: the unknown outcome, and why an operation you may have to repeat has to be idempotent."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "George Candea and Armando Fox, "
+     },
+     {
+      "t": "a",
+      "v": "Crash-Only Software",
+      "href": "https://www.usenix.org/legacy/events/hotos03/tech/full_papers/candea/candea.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", HotOS 2003: make crash and shutdown the same path so the recovery path is always exercised."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amazon's builders' library, "
+     },
+     {
+      "t": "a",
+      "v": "Timeouts, retries and backoff with jitter",
+      "href": "https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/"
+     },
+     {
+      "t": "text",
+      "v": ": retry budgets, retry amplification through layers and why a retry storm forms."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Google, "
+     },
+     {
+      "t": "a",
+      "v": "Site Reliability Engineering",
+      "href": "https://sre.google/sre-book/handling-overload/"
+     },
+     {
+      "t": "text",
+      "v": ", on handling overload and on retry budgets at the client."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Michael Nygard, "
+     },
+     {
+      "t": "a",
+      "v": "his book on designing production systems",
+      "href": "https://pragprog.com/titles/mnee2/release-it-second-edition/"
+     },
+     {
+      "t": "text",
+      "v": ", 2nd edition: the circuit breaker, and failures that cascade through a call graph."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "POSIX description of `write`",
+      "href": "https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html"
+     },
+     {
+      "t": "text",
+      "v": ", which may return fewer bytes than requested, and of "
+     },
+     {
+      "t": "a",
+      "v": "`rename`",
+      "href": "https://pubs.opengroup.org/onlinepubs/9699919799/functions/rename.html"
+     },
+     {
+      "t": "text",
+      "v": ", which replaces the target atomically within one filesystem."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article on "
+     },
+     {
+      "t": "a",
+      "v": "actions",
+      "href": "https://design.ros2.org/articles/actions.html"
+     },
+     {
+      "t": "text",
+      "v": ", for the goal id that makes a cancel and a result request idempotent."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "E.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-raii"
+     },
+     {
+      "t": "text",
+      "v": " on RAII for cleanup on the error path, and "
+     },
+     {
+      "t": "a",
+      "v": "E.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-throw"
+     },
+     {
+      "t": "text",
+      "v": " on throwing when a function cannot do its advertised task."
+     }
+    ]
+   ]
+  }
+ ]
+}

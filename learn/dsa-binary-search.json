@@ -1,0 +1,2411 @@
+{
+ "id": "dsa-binary-search",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "first_index(sorted, value)"
+     },
+     {
+      "t": "text",
+      "v": ", which returns the index of the first element equal to "
+     },
+     {
+      "t": "code",
+      "v": "value"
+     },
+     {
+      "t": "text",
+      "v": " in a sorted "
+     },
+     {
+      "t": "code",
+      "v": "std::span<const int>"
+     },
+     {
+      "t": "text",
+      "v": ", or no value when there is none. In "
+     },
+     {
+      "t": "code",
+      "v": "{1, 2, 2, 2, 3, 5}"
+     },
+     {
+      "t": "text",
+      "v": ", the value 2 gives 1, 5 gives 5, and 4 gives no value; an empty span gives no value. Write the loop yourself, in O(log n), with signed indices, and state its invariant in one sentence. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\n[[nodiscard]] std::optional<std::ptrdiff_t> first_index(std::span<const int> sorted, int value) {\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = std::ssize(sorted);\n  // Invariant: every element before lo is < value, and every element from hi on is >= value.\n  while (lo < hi) {\n    const std::ptrdiff_t mid = lo + (hi - lo) / 2;\n    if (sorted[mid] < value)\n      lo = mid + 1;\n    else\n      hi = mid;\n  }\n  if (lo < std::ssize(sorted) && sorted[lo] == value) return lo;\n  return std::nullopt;\n}\n\n[[nodiscard]] std::string show(std::optional<std::ptrdiff_t> index) {\n  return index ? std::to_string(*index) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> v{1, 2, 2, 2, 3, 5};\n  for (const int x : {2, 1, 5, 3, 0, 4, 6}) std::cout << std::format(\"{}: {}\\n\", x, show(first_index(v, x)));\n  std::cout << std::format(\"empty: {}\\n\", show(first_index({}, 2)));\n}"
+   },
+   {
+    "t": "output",
+    "text": "2: 1\n1: 0\n5: 5\n3: 4\n0: no value\n4: no value\n6: no value\nempty: no value"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The loop keeps the unknown part of the array as the half-open range "
+     },
+     {
+      "t": "code",
+      "v": "[lo, hi)"
+     },
+     {
+      "t": "text",
+      "v": ". Everything before it is less than "
+     },
+     {
+      "t": "code",
+      "v": "value"
+     },
+     {
+      "t": "text",
+      "v": ", and everything from "
+     },
+     {
+      "t": "code",
+      "v": "hi"
+     },
+     {
+      "t": "text",
+      "v": " on is not, so when the range is empty, "
+     },
+     {
+      "t": "code",
+      "v": "lo"
+     },
+     {
+      "t": "text",
+      "v": " is the first position that holds "
+     },
+     {
+      "t": "code",
+      "v": "value"
+     },
+     {
+      "t": "text",
+      "v": " if anything does. An equal element moves "
+     },
+     {
+      "t": "code",
+      "v": "hi"
+     },
+     {
+      "t": "text",
+      "v": " down instead of stopping the loop, which is what makes it find the "
+     },
+     {
+      "t": "i",
+      "v": "first"
+     },
+     {
+      "t": "text",
+      "v": " 2 and not whichever 2 the middle hits. The last check covers a value larger than everything, where "
+     },
+     {
+      "t": "code",
+      "v": "lo"
+     },
+     {
+      "t": "text",
+      "v": " ends at "
+     },
+     {
+      "t": "code",
+      "v": "n"
+     },
+     {
+      "t": "text",
+      "v": ", and a value that is absent, where "
+     },
+     {
+      "t": "code",
+      "v": "sorted[lo]"
+     },
+     {
+      "t": "text",
+      "v": " is the next larger one. It makes ⌊log₂ n⌋ + 1 comparisons at most, and O(1) extra space."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with a correct loop, a stated invariant, and "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": " for \"absent\". A loop that stops at the first equal element and then walks left is correct but O(n) on "
+     },
+     {
+      "t": "code",
+      "v": "{2, 2, 2, …}"
+     },
+     {
+      "t": "text",
+      "v": ": a partial pass. So is a correct loop that returns -1, or computes the middle as "
+     },
+     {
+      "t": "code",
+      "v": "(lo + hi) / 2"
+     },
+     {
+      "t": "text",
+      "v": ". An off-by-one that misses the first or last element, or a loop that doesn't end, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Binary search halves a range on every step to find the boundary in a predicate that is true for a stretch of values and false for the rest, over any range partitioned that way, an array sorted with "
+    },
+    {
+     "t": "code",
+     "v": "<"
+    },
+    {
+     "t": "text",
+     "v": " being one case among several. Keeping the unknown part as the half-open range "
+    },
+    {
+     "t": "code",
+     "v": "[lo, hi)"
+    },
+    {
+     "t": "text",
+     "v": ", the invariant is that everything before "
+    },
+    {
+     "t": "code",
+     "v": "lo"
+    },
+    {
+     "t": "text",
+     "v": " fails the predicate and everything from "
+    },
+    {
+     "t": "code",
+     "v": "hi"
+    },
+    {
+     "t": "text",
+     "v": " on satisfies it; "
+    },
+    {
+     "t": "code",
+     "v": "lower_bound(x)"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "upper_bound(x)"
+    },
+    {
+     "t": "text",
+     "v": " are this loop with the predicate "
+    },
+    {
+     "t": "code",
+     "v": "element < x"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "element <= x"
+    },
+    {
+     "t": "text",
+     "v": ", and the elements equal to x sit between them."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is finding that boundary without checking every candidate. A linear scan over n elements, or over R candidate answers to a question such as the smallest battery capacity that gets a robot through its route, costs O(n) or O(R); halving the range on each step costs O(log n) or O(log R) instead, one candidate checked at a time rather than all of them."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism only needs the predicate to be true, then false, across the range, which is why it works for "
+    },
+    {
+     "t": "i",
+     "v": "searching on the answer"
+    },
+    {
+     "t": "text",
+     "v": " even with no array at all: a numeric range of candidates fits the same loop. Each step computes a midpoint inside "
+    },
+    {
+     "t": "code",
+     "v": "[lo, hi)"
+    },
+    {
+     "t": "text",
+     "v": ", and depending on whether it satisfies the predicate, moves "
+    },
+    {
+     "t": "code",
+     "v": "lo"
+    },
+    {
+     "t": "text",
+     "v": " past it or brings "
+    },
+    {
+     "t": "code",
+     "v": "hi"
+    },
+    {
+     "t": "text",
+     "v": " down to it, shrinking the range by at least one candidate every time until "
+    },
+    {
+     "t": "code",
+     "v": "lo"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "hi"
+    },
+    {
+     "t": "text",
+     "v": " meet, which is the answer."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The boundary conditions are where this goes wrong under pressure. "
+    },
+    {
+     "t": "code",
+     "v": "mid = (lo + hi) / 2"
+    },
+    {
+     "t": "text",
+     "v": " overflows once "
+    },
+    {
+     "t": "code",
+     "v": "lo"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "hi"
+    },
+    {
+     "t": "text",
+     "v": " are both large, because their sum can pass the type's limit before the division brings it back down; "
+    },
+    {
+     "t": "code",
+     "v": "lo + (hi - lo) / 2"
+    },
+    {
+     "t": "text",
+     "v": ", or "
+    },
+    {
+     "t": "code",
+     "v": "std::midpoint"
+    },
+    {
+     "t": "text",
+     "v": ", never does. A closed range "
+    },
+    {
+     "t": "code",
+     "v": "[lo, hi]"
+    },
+    {
+     "t": "text",
+     "v": " needs "
+    },
+    {
+     "t": "code",
+     "v": "hi = mid - 1"
+    },
+    {
+     "t": "text",
+     "v": ", which wraps around to a huge number with unsigned indices once "
+    },
+    {
+     "t": "code",
+     "v": "mid"
+    },
+    {
+     "t": "text",
+     "v": " is 0, and reads far outside the array; the half-open form never produces a negative or wrapped index at all. And the predicate has to actually be partitioned: running the same loop on data sorted the wrong way, or on a rotated array, returns some position with no error, because nothing checks that assumption for you."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself, finding the first occurrence of a value by moving "
+    },
+    {
+     "t": "code",
+     "v": "hi"
+    },
+    {
+     "t": "text",
+     "v": " down instead of stopping at the first match, and the half-open invariant is what you say out loud to show the loop, and its boundary, are correct."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Invariants, lower_bound and upper_bound, searching on the answer",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The standard library has the cold check's loop in four forms. Run them on one sorted vector with a repeated value:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <vector>\n\nint main() {\n  const std::vector<int> v{10, 20, 20, 20, 30, 40};\n  const auto index = [&v](auto it) { return it - v.begin(); };\n\n  std::cout << std::format(\"lower_bound(20) = {}\\n\", index(std::ranges::lower_bound(v, 20)));\n  std::cout << std::format(\"upper_bound(20) = {}\\n\", index(std::ranges::upper_bound(v, 20)));\n  const auto [first, last] = std::ranges::equal_range(v, 20);\n  std::cout << std::format(\"equal_range(20) = [{}, {})\\n\", index(first), index(last));\n  std::cout << std::format(\"lower_bound(25) = {}, lower_bound(50) = {}\\n\", index(std::ranges::lower_bound(v, 25)),\n                           index(std::ranges::lower_bound(v, 50)));\n  std::cout << std::format(\"partition_point(x < 25) = {}\\n\",\n                           index(std::ranges::partition_point(v, [](int x) { return x < 25; })));\n}"
+      },
+      {
+       "t": "output",
+       "text": "lower_bound(20) = 1\nupper_bound(20) = 4\nequal_range(20) = [1, 4)\nlower_bound(25) = 4, lower_bound(50) = 6\npartition_point(x < 25) = 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "lower_bound(x)"
+        },
+        {
+         "t": "text",
+         "v": " is the first position whose element is not less than x, the first "
+        },
+        {
+         "t": "code",
+         "v": ">= x"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "upper_bound(x)"
+        },
+        {
+         "t": "text",
+         "v": " is the first position whose element is greater than x. Between them lie the elements equal to x, which "
+        },
+        {
+         "t": "code",
+         "v": "equal_range"
+        },
+        {
+         "t": "text",
+         "v": " returns as one subrange, so "
+        },
+        {
+         "t": "code",
+         "v": "upper_bound - lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " counts them. For an absent value both return the same position, the place where x would be inserted to keep the vector sorted, and for a value greater than everything they return the end. They answer \"where\", not \"whether\": "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::binary_search"
+        },
+        {
+         "t": "text",
+         "v": " returns only a "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " and is rarely the call you want."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The hand-written loop rests on one invariant, and every line of it follows from the invariant. With "
+        },
+        {
+         "t": "code",
+         "v": "[lo, hi)"
+        },
+        {
+         "t": "text",
+         "v": " as the unknown range, the invariant for "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " says that every element before "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " is less than x and every element from "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " on is not. At the start, "
+        },
+        {
+         "t": "code",
+         "v": "lo = 0"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "hi = n"
+        },
+        {
+         "t": "text",
+         "v": " make both parts empty, so it holds. "
+        },
+        {
+         "t": "code",
+         "v": "mid = lo + (hi - lo) / 2"
+        },
+        {
+         "t": "text",
+         "v": " lies in "
+        },
+        {
+         "t": "code",
+         "v": "[lo, hi)"
+        },
+        {
+         "t": "text",
+         "v": " whenever the range isn't empty. If "
+        },
+        {
+         "t": "code",
+         "v": "v[mid] < x"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "v[mid]"
+        },
+        {
+         "t": "text",
+         "v": " and everything before it is less than x, because the array is sorted, so "
+        },
+        {
+         "t": "code",
+         "v": "lo = mid + 1"
+        },
+        {
+         "t": "text",
+         "v": " keeps the invariant. Otherwise "
+        },
+        {
+         "t": "code",
+         "v": "v[mid]"
+        },
+        {
+         "t": "text",
+         "v": " is not less than x, and "
+        },
+        {
+         "t": "code",
+         "v": "hi = mid"
+        },
+        {
+         "t": "text",
+         "v": " keeps it. Both updates shrink the range by at least one, so the loop ends, and it ends with "
+        },
+        {
+         "t": "code",
+         "v": "lo == hi"
+        },
+        {
+         "t": "text",
+         "v": ": the boundary between the two parts, the answer. Change the test to "
+        },
+        {
+         "t": "code",
+         "v": "v[mid] <= x"
+        },
+        {
+         "t": "text",
+         "v": " and the same loop is "
+        },
+        {
+         "t": "code",
+         "v": "upper_bound"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The half-open range is what keeps this free of special cases. An empty array starts with "
+        },
+        {
+         "t": "code",
+         "v": "lo == hi == 0"
+        },
+        {
+         "t": "text",
+         "v": ", and the loop doesn't run. The answer can be "
+        },
+        {
+         "t": "code",
+         "v": "n"
+        },
+        {
+         "t": "text",
+         "v": ", past the last element, which is the right answer for a value larger than everything. No index is ever -1, so signed or unsigned, nothing underflows. A closed range "
+        },
+        {
+         "t": "code",
+         "v": "[lo, hi]"
+        },
+        {
+         "t": "text",
+         "v": " needs "
+        },
+        {
+         "t": "code",
+         "v": "hi = n - 1"
+        },
+        {
+         "t": "text",
+         "v": ", which is -1 for an empty array, and "
+        },
+        {
+         "t": "code",
+         "v": "hi = mid - 1"
+        },
+        {
+         "t": "text",
+         "v": ", which is -1 again when "
+        },
+        {
+         "t": "code",
+         "v": "mid"
+        },
+        {
+         "t": "text",
+         "v": " is 0. The failure section shows that version reading outside its array."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Look at what the loop needs from the array: only that "
+        },
+        {
+         "t": "code",
+         "v": "v[i] < x"
+        },
+        {
+         "t": "text",
+         "v": " is true for a first stretch of positions and false for the rest. The array doesn't have to be sorted, only "
+        },
+        {
+         "t": "i",
+         "v": "partitioned"
+        },
+        {
+         "t": "text",
+         "v": " by the question. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::partition_point(v, pred)"
+        },
+        {
+         "t": "text",
+         "v": " is the general form: it returns the first position where "
+        },
+        {
+         "t": "code",
+         "v": "pred"
+        },
+        {
+         "t": "text",
+         "v": " is false, for any "
+        },
+        {
+         "t": "code",
+         "v": "pred"
+        },
+        {
+         "t": "text",
+         "v": " that is true, then false, over the range. "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound(x)"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "partition_point"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "pred = [x](int e) { return e < x; }"
+        },
+        {
+         "t": "text",
+         "v": ", and the last line of the program shows it. When you write a binary search by hand, first write down its predicate and check that it is true, then false. Then the loop is always the same, and only the predicate changes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The predicate doesn't need an array at all, which is "
+        },
+        {
+         "t": "i",
+         "v": "searching on the answer"
+        },
+        {
+         "t": "text",
+         "v": ". When a question asks for the smallest value that makes something possible, such as the smallest battery, the lowest speed or the shortest time, and making it larger never makes it impossible again, the question \"is v too small?\" is true, then false, over all candidate values. Binary search finds the boundary with O(log R) checks for R candidates, and each check can be an O(n) simulation. "
+        },
+        {
+         "t": "code",
+         "v": "std::views::iota(lo, hi)"
+        },
+        {
+         "t": "text",
+         "v": " makes the candidates into a range that "
+        },
+        {
+         "t": "code",
+         "v": "partition_point"
+        },
+        {
+         "t": "text",
+         "v": " can search without storing them, which the worked example does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The cost is ⌊log₂ n⌋ + 1 comparisons at most: 20 for a million elements, 31 for two billion. That needs random access to jump to the middle. On a "
+        },
+        {
+         "t": "code",
+         "v": "std::list"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " still makes O(log n) comparisons but O(n) iterator steps, so it is no faster than a linear scan."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A delivery robot drives a route of legs, in order, with the lengths below in metres. It starts with a full battery, can recharge only between legs, and may recharge at most once. What is the smallest battery capacity, in whole metres of driving, that completes the route?"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The question \"does capacity c complete the route?\" is false for small c and true from some c on, because a larger battery never needs more stops. The answer lies between the longest leg, below which one leg can't be driven at all, and the total length, which needs no recharge. So search the half-open range "
+        },
+        {
+         "t": "code",
+         "v": "[longest, total + 1)"
+        },
+        {
+         "t": "text",
+         "v": ", printing each step:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <ranges>\n#include <span>\n#include <vector>\n\n// Can a battery of this capacity drive the legs in order, recharging at most `recharges` times between legs?\n[[nodiscard]] bool completes(std::span<const std::int64_t> legs, std::int64_t capacity_m, std::int64_t recharges) {\n  std::int64_t charge_m = capacity_m;\n  for (const std::int64_t leg : legs) {\n    if (leg > capacity_m) return false;  // no full battery drives this leg\n    if (leg > charge_m) {                // recharge before this leg\n      if (recharges == 0) return false;\n      --recharges;\n      charge_m = capacity_m;\n    }\n    charge_m -= leg;\n  }\n  return true;\n}\n\nint main() {\n  const std::vector<std::int64_t> legs{7, 2, 5, 10, 8};\n  const std::int64_t longest = std::ranges::max(legs);\n  const std::int64_t total = std::accumulate(legs.begin(), legs.end(), std::int64_t{0});\n\n  // Invariant: every capacity below lo fails, and every capacity from hi on completes.\n  std::int64_t lo = longest;\n  std::int64_t hi = total + 1;\n  while (lo < hi) {\n    const std::int64_t mid = lo + (hi - lo) / 2;\n    const bool ok = completes(legs, mid, 1);\n    std::cout << std::format(\"lo {:2}  hi {:2}  mid {:2}  {}\\n\", lo, hi, mid, ok ? \"completes\" : \"fails\");\n    if (ok)\n      hi = mid;\n    else\n      lo = mid + 1;\n  }\n  std::cout << std::format(\"by hand: {} m\\n\", lo);\n\n  const auto capacities = std::views::iota(longest, total + 1);\n  const auto it = std::ranges::partition_point(capacities, [&](std::int64_t c) { return !completes(legs, c, 1); });\n  std::cout << std::format(\"partition_point: {} m\\n\", *it);\n}"
+      },
+      {
+       "t": "output",
+       "text": "lo 10  hi 33  mid 21  completes\nlo 10  hi 21  mid 15  fails\nlo 16  hi 21  mid 18  completes\nlo 16  hi 18  mid 17  fails\nby hand: 18 m\npartition_point: 18 m"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the trace against the invariant. At 21, the robot drives 7 + 2 + 5 = 14, recharges, and drives 10 + 8 = 18, so 21 works and "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " moves down to 21. At 15, it drives 14, recharges, drives 10, and needs a second recharge for the 8: fail, so "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " moves up past 15. At 18 the second stint of 10 + 8 fits exactly, and at 17 it doesn't. The range is empty after four checks, with "
+        },
+        {
+         "t": "code",
+         "v": "lo == hi == 18"
+        },
+        {
+         "t": "text",
+         "v": "; 23 candidates need at most ⌊log₂ 23⌋ + 1 = 5 checks."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "completes"
+        },
+        {
+         "t": "text",
+         "v": " is a greedy check: it drives as far as the charge allows before recharging, and that is never worse than recharging earlier. Each check is O(n) for n legs, and the search makes O(log S) checks for a total length S, so the whole answer is O(n log S) time and O(1) extra space."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "partition_point"
+        },
+        {
+         "t": "text",
+         "v": " line says the same thing without a loop: over the capacities from "
+        },
+        {
+         "t": "code",
+         "v": "longest"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "total"
+        },
+        {
+         "t": "text",
+         "v": ", find the first one for which \"fails\" stops being true. The predicate is the negation of "
+        },
+        {
+         "t": "code",
+         "v": "completes"
+        },
+        {
+         "t": "text",
+         "v": ", because "
+        },
+        {
+         "t": "code",
+         "v": "partition_point"
+        },
+        {
+         "t": "text",
+         "v": " wants true first. "
+        },
+        {
+         "t": "code",
+         "v": "std::views::iota"
+        },
+        {
+         "t": "text",
+         "v": " produces the candidates on demand, so nothing is stored, and the call makes O(log S) calls to the predicate, as the loop does. If no capacity worked, "
+        },
+        {
+         "t": "code",
+         "v": "it"
+        },
+        {
+         "t": "text",
+         "v": " would be "
+        },
+        {
+         "t": "code",
+         "v": "capacities.end()"
+        },
+        {
+         "t": "text",
+         "v": ". Here the total length always works, so the result can be dereferenced."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Exact match; first and last occurrence; search in a rotated array",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. An IMU driver logs "
+        },
+        {
+         "t": "code",
+         "v": "struct Sample { std::int64_t stamp_ms; double yaw_rad; };"
+        },
+        {
+         "t": "text",
+         "v": " with strictly increasing time stamps. A camera frame arrives with its own time stamp, and you need the IMU sample that goes with it."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "find_exact(samples, stamp_ms)"
+         },
+         {
+          "t": "text",
+          "v": ", which returns the index of the sample with exactly that stamp, or no value. Write the loop by hand once, then replace it with "
+         },
+         {
+          "t": "code",
+          "v": "std::ranges::lower_bound"
+         },
+         {
+          "t": "text",
+          "v": " and a projection."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "nearest(samples, stamp_ms)"
+         },
+         {
+          "t": "text",
+          "v": ", which returns the index of the sample closest in time, the earlier one on a tie, or no value when there are no samples."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test with the stamps "
+        },
+        {
+         "t": "code",
+         "v": "{100, 110, 120, 135, 150}"
+        },
+        {
+         "t": "text",
+         "v": ": an exact 120 is at 2, and 125 has no exact match. The nearest to 125 is 2, to 130 is 3, to 115 is 1 (a tie), to 10 is 0 and to 999 is 4. Both run in O(log n)."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The hand-written loop is the cold check's with "
+        },
+        {
+         "t": "code",
+         "v": "samples[mid].stamp_ms"
+        },
+        {
+         "t": "text",
+         "v": " in place of "
+        },
+        {
+         "t": "code",
+         "v": "sorted[mid]"
+        },
+        {
+         "t": "text",
+         "v": ". The library form passes the member as a projection, so the algorithm compares "
+        },
+        {
+         "t": "code",
+         "v": "sample.stamp_ms"
+        },
+        {
+         "t": "text",
+         "v": " with the stamp, and there is no comparison lambda to get wrong:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Sample {\n  std::int64_t stamp_ms;  // strictly increasing\n  double yaw_rad;\n};\n\n[[nodiscard]] std::optional<std::ptrdiff_t> find_exact(std::span<const Sample> samples, std::int64_t stamp_ms) {\n  const auto it = std::ranges::lower_bound(samples, stamp_ms, {}, &Sample::stamp_ms);\n  if (it == samples.end() || it->stamp_ms != stamp_ms) return std::nullopt;\n  return it - samples.begin();\n}\n\n// The sample closest in time to stamp_ms; the earlier one on a tie.\n[[nodiscard]] std::optional<std::ptrdiff_t> nearest(std::span<const Sample> samples, std::int64_t stamp_ms) {\n  if (samples.empty()) return std::nullopt;\n  const auto after = std::ranges::lower_bound(samples, stamp_ms, {}, &Sample::stamp_ms);  // first at or after\n  if (after == samples.begin()) return 0;\n  if (after == samples.end()) return std::ssize(samples) - 1;\n  const auto before = std::prev(after);\n  const bool earlier_wins = stamp_ms - before->stamp_ms <= after->stamp_ms - stamp_ms;\n  return (earlier_wins ? before : after) - samples.begin();\n}\n\n[[nodiscard]] std::string show(std::optional<std::ptrdiff_t> index) {\n  return index ? std::to_string(*index) : \"no value\";\n}\n\nint main() {\n  std::vector<Sample> samples;\n  for (const std::int64_t stamp : {100, 110, 120, 135, 150}) samples.push_back({.stamp_ms = stamp, .yaw_rad = 0.0});\n\n  for (const std::int64_t stamp : {120, 125, 99, 150})\n    std::cout << std::format(\"exact {}: {}\\n\", stamp, show(find_exact(samples, stamp)));\n  for (const std::int64_t stamp : {125, 130, 115, 10, 999})\n    std::cout << std::format(\"nearest {}: {}\\n\", stamp, show(nearest(samples, stamp)));\n  std::cout << std::format(\"nearest in no samples: {}\\n\", show(nearest({}, 125)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "exact 120: 2\nexact 125: no value\nexact 99: no value\nexact 150: 4\nnearest 125: 2\nnearest 130: 3\nnearest 115: 1\nnearest 10: 0\nnearest 999: 4\nnearest in no samples: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both are O(log n) time and O(1) extra space. "
+        },
+        {
+         "t": "code",
+         "v": "nearest"
+        },
+        {
+         "t": "text",
+         "v": " uses the fact that "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " returns the first sample at or after the stamp, so the closest sample is either that one or the one before it. The two ends are the edge cases: before the first sample there is no earlier candidate, and after the last there is no later one. The projection applies to the elements only, and the stamp you search for is compared as it is, which is why the element and the value can have different types here ("
+        },
+        {
+         "t": "a",
+         "v": "ranges::lower_bound",
+         "href": "https://en.cppreference.com/cpp/algorithm/ranges/lower_bound"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "first_and_last(sorted, value)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the indices of the first and the last element equal to "
+        },
+        {
+         "t": "code",
+         "v": "value"
+        },
+        {
+         "t": "text",
+         "v": " as "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::pair<std::ptrdiff_t, std::ptrdiff_t>>"
+        },
+        {
+         "t": "text",
+         "v": ", or no value, in O(log n). Write it twice: once by hand, with two binary searches that share one helper, and once with a standard algorithm. Test that both agree on "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 2, 2, 3}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{7, 7, 7, 7}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{5}"
+        },
+        {
+         "t": "text",
+         "v": " and the empty array, for every value from 0 to 8. How many times does "
+        },
+        {
+         "t": "code",
+         "v": "value"
+        },
+        {
+         "t": "text",
+         "v": " occur, in terms of the result?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both searches are the same loop with a different predicate, so the helper takes the predicate. "
+        },
+        {
+         "t": "code",
+         "v": "first_true(n, pred)"
+        },
+        {
+         "t": "text",
+         "v": " returns the first index in "
+        },
+        {
+         "t": "code",
+         "v": "[0, n)"
+        },
+        {
+         "t": "text",
+         "v": " where "
+        },
+        {
+         "t": "code",
+         "v": "pred"
+        },
+        {
+         "t": "text",
+         "v": " is true, for a predicate that is false, then true: a hand-written "
+        },
+        {
+         "t": "code",
+         "v": "partition_point"
+        },
+        {
+         "t": "text",
+         "v": " with the sense turned around. The first occurrence is the first index whose element is "
+        },
+        {
+         "t": "code",
+         "v": ">= value"
+        },
+        {
+         "t": "text",
+         "v": ", and one past the last is the first index whose element is "
+        },
+        {
+         "t": "code",
+         "v": "> value"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <utility>\n#include <vector>\n\nusing Occurrences = std::optional<std::pair<std::ptrdiff_t, std::ptrdiff_t>>;\n\n// The first index in [0, n) where pred is true, or n; pred must be false for a first stretch, then true.\ntemplate <typename Pred>\n[[nodiscard]] std::ptrdiff_t first_true(std::ptrdiff_t n, Pred pred) {\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = n;\n  while (lo < hi) {\n    const std::ptrdiff_t mid = lo + (hi - lo) / 2;\n    if (pred(mid))\n      hi = mid;\n    else\n      lo = mid + 1;\n  }\n  return lo;\n}\n\n[[nodiscard]] Occurrences first_and_last_by_hand(std::span<const int> sorted, int value) {\n  const std::ptrdiff_t n = std::ssize(sorted);\n  const std::ptrdiff_t first = first_true(n, [&](std::ptrdiff_t i) { return sorted[i] >= value; });\n  const std::ptrdiff_t end = first_true(n, [&](std::ptrdiff_t i) { return sorted[i] > value; });\n  if (first == end) return std::nullopt;\n  return std::pair{first, end - 1};\n}\n\n[[nodiscard]] Occurrences first_and_last(std::span<const int> sorted, int value) {\n  const auto found = std::ranges::equal_range(sorted, value);\n  if (found.empty()) return std::nullopt;\n  return std::pair{found.begin() - sorted.begin(), found.end() - sorted.begin() - 1};\n}\n\nint main() {\n  const std::vector<std::vector<int>> arrays{{1, 2, 2, 2, 3}, {7, 7, 7, 7}, {5}, {}};\n  bool agree = true;\n  for (const std::vector<int>& a : arrays)\n    for (int value = 0; value <= 8; ++value)\n      agree = agree && first_and_last(a, value) == first_and_last_by_hand(a, value);\n  std::cout << std::format(\"hand-written and equal_range agree: {}\\n\", agree);\n\n  for (const int value : {2, 1, 3, 4}) {\n    const Occurrences r = first_and_last(arrays[0], value);\n    if (r) std::cout << std::format(\"{}: first {}, last {}, count {}\\n\", value, r->first, r->second, r->second - r->first + 1);\n    else std::cout << std::format(\"{}: no value\\n\", value);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "hand-written and equal_range agree: true\n2: first 1, last 3, count 3\n1: first 0, last 0, count 1\n3: first 4, last 4, count 1\n4: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both are O(log n) time and O(1) extra space: two searches of ⌊log₂ n⌋ + 1 steps each, and "
+        },
+        {
+         "t": "code",
+         "v": "equal_range"
+        },
+        {
+         "t": "text",
+         "v": " makes at most 2·log₂ n + O(1) comparisons ("
+        },
+        {
+         "t": "a",
+         "v": "ranges::equal_range",
+         "href": "https://en.cppreference.com/cpp/algorithm/ranges/equal_range"
+        },
+        {
+         "t": "text",
+         "v": "). The count is "
+        },
+        {
+         "t": "code",
+         "v": "last - first + 1"
+        },
+        {
+         "t": "text",
+         "v": ", which is also "
+        },
+        {
+         "t": "code",
+         "v": "upper_bound - lower_bound"
+        },
+        {
+         "t": "text",
+         "v": ". Counting the equal elements by walking outwards from one found element is O(k) for k copies, which is O(n) for "
+        },
+        {
+         "t": "code",
+         "v": "{7, 7, 7, 7}"
+        },
+        {
+         "t": "text",
+         "v": ", and interviewers ask for exactly this input."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The value is absent when both searches return the same index. Checking that is enough, and no element needs to be read, so an empty array or a value past the end needs no special case."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. A sorted array of distinct values has been rotated at an unknown position, such as "
+        },
+        {
+         "t": "code",
+         "v": "{40, 50, 60, 0, 10, 20, 30}"
+        },
+        {
+         "t": "text",
+         "v": ". Write "
+        },
+        {
+         "t": "code",
+         "v": "find_rotated(v, value)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the index of "
+        },
+        {
+         "t": "code",
+         "v": "value"
+        },
+        {
+         "t": "text",
+         "v": " or no value, in O(log n). Test it on every rotation of "
+        },
+        {
+         "t": "code",
+         "v": "{0, 10, 20, 30, 40, 50, 60}"
+        },
+        {
+         "t": "text",
+         "v": ", including no rotation, for every value from -5 to 65 in steps of 5, against a linear search. Then answer: which part of your solution needs the values to be distinct?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two named searches solve it. The array is a sorted run followed by a second sorted run of smaller values, and the first run is exactly the elements "
+        },
+        {
+         "t": "code",
+         "v": ">= v.front()"
+        },
+        {
+         "t": "text",
+         "v": ". So "
+        },
+        {
+         "t": "code",
+         "v": "x >= v.front()"
+        },
+        {
+         "t": "text",
+         "v": " is true, then false, over the array, and its partition point is where the rotation happened. Then search the run that can hold "
+        },
+        {
+         "t": "code",
+         "v": "value"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <vector>\n\n[[nodiscard]] std::optional<std::ptrdiff_t> find_rotated(std::span<const int> v, int value) {\n  if (v.empty()) return std::nullopt;\n  const auto split = std::ranges::partition_point(v, [&](int x) { return x >= v.front(); });\n  const auto run = value >= v.front() ? std::ranges::subrange(v.begin(), split) : std::ranges::subrange(split, v.end());\n  const auto it = std::ranges::lower_bound(run, value);\n  if (it == run.end() || *it != value) return std::nullopt;\n  return it - v.begin();\n}\n\n// The one-loop version: one side of mid is always sorted.\n[[nodiscard]] std::optional<std::ptrdiff_t> find_rotated_one_loop(std::span<const int> v, int value) {\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = std::ssize(v);  // if value is in v, it is in [lo, hi)\n  while (lo < hi) {\n    const std::ptrdiff_t mid = lo + (hi - lo) / 2;\n    if (v[mid] == value) return mid;\n    if (v[lo] <= v[mid]) {  // [lo, mid] is sorted\n      if (v[lo] <= value && value < v[mid])\n        hi = mid;\n      else\n        lo = mid + 1;\n    } else {  // [mid, hi) is sorted\n      if (v[mid] < value && value <= v[hi - 1])\n        lo = mid + 1;\n      else\n        hi = mid;\n    }\n  }\n  return std::nullopt;\n}\n\nint main() {\n  const std::vector<int> sorted{0, 10, 20, 30, 40, 50, 60};\n  bool all_right = true;\n  for (std::ptrdiff_t shift = 0; shift < std::ssize(sorted); ++shift) {\n    std::vector<int> v = sorted;\n    std::ranges::rotate(v, v.begin() + shift);\n    for (int value = -5; value <= 65; value += 5) {\n      const auto found = std::ranges::find(v, value);\n      const std::optional<std::ptrdiff_t> expected =\n          found == v.end() ? std::nullopt : std::optional<std::ptrdiff_t>{found - v.begin()};\n      all_right = all_right && find_rotated(v, value) == expected && find_rotated_one_loop(v, value) == expected;\n    }\n  }\n  std::cout << std::format(\"7 rotations, 15 values each, both versions right: {}\\n\", all_right);\n\n  const std::vector<int> v{40, 50, 60, 0, 10, 20, 30};\n  std::cout << std::format(\"10 is at {}, 50 is at {}, 35 found: {}\\n\", find_rotated(v, 10).value(),\n                           find_rotated(v, 50).value(), find_rotated(v, 35).has_value());\n  std::cout << std::format(\"empty: {}\\n\", find_rotated({}, 10).has_value());\n}"
+      },
+      {
+       "t": "output",
+       "text": "7 rotations, 15 values each, both versions right: true\n10 is at 4, 50 is at 1, 35 found: false\nempty: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both are O(log n) time and O(1) extra space; the two-search version makes two binary searches, the one-loop version one. For an array that isn't rotated, "
+        },
+        {
+         "t": "code",
+         "v": "x >= v.front()"
+        },
+        {
+         "t": "text",
+         "v": " is true everywhere, "
+        },
+        {
+         "t": "code",
+         "v": "split"
+        },
+        {
+         "t": "text",
+         "v": " is the end, and every value below "
+        },
+        {
+         "t": "code",
+         "v": "v.front()"
+        },
+        {
+         "t": "text",
+         "v": " searches an empty run."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Distinct values matter in both. With duplicates, "
+        },
+        {
+         "t": "code",
+         "v": "{2, 2, 2, 0, 2}"
+        },
+        {
+         "t": "text",
+         "v": " is a rotation of "
+        },
+        {
+         "t": "code",
+         "v": "{0, 2, 2, 2, 2}"
+        },
+        {
+         "t": "text",
+         "v": ", but "
+        },
+        {
+         "t": "code",
+         "v": "x >= v.front()"
+        },
+        {
+         "t": "text",
+         "v": " is true, false, then true again, so it has no partition point, and the one-loop version can't tell which side of "
+        },
+        {
+         "t": "code",
+         "v": "mid"
+        },
+        {
+         "t": "text",
+         "v": " is sorted when "
+        },
+        {
+         "t": "code",
+         "v": "v[lo] == v[mid]"
+        },
+        {
+         "t": "text",
+         "v": ". With duplicates the worst case is O(n), because an array of equal values with one different element can hide that element anywhere."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Overflow in the midpoint; empty ranges",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is a search on the answer over all non-negative "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " values, cut down to its skeleton: the predicate is "
+        },
+        {
+         "t": "code",
+         "v": "mid >= target"
+        },
+        {
+         "t": "text",
+         "v": ", so the answer is "
+        },
+        {
+         "t": "code",
+         "v": "target"
+        },
+        {
+         "t": "text",
+         "v": " itself. It works for 1000 and fails for two billion:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "ubsan:signed integer overflow",
+       "text": "#include <format>\n#include <iostream>\n#include <limits>\n\n[[nodiscard]] int first_at_least(int target) {\n  int lo = 0;\n  int hi = std::numeric_limits<int>::max();\n  while (lo < hi) {\n    const int mid = (lo + hi) / 2;\n    if (mid < target)\n      lo = mid + 1;\n    else\n      hi = mid;\n  }\n  return lo;\n}\n\nint main() {\n  std::cout << std::format(\"{}\\n\", first_at_least(1000));\n  std::cout << std::format(\"{}\\n\", first_at_least(2'000'000'000));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "UndefinedBehaviorSanitizer stops it at the second call with \"signed integer overflow: 1073741824 + 2147483647 cannot be represented in type 'int'\". Once "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " passes about a billion, "
+        },
+        {
+         "t": "code",
+         "v": "lo + hi"
+        },
+        {
+         "t": "text",
+         "v": " is larger than the largest "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ". Signed overflow is undefined behaviour ("
+        },
+        {
+         "t": "a",
+         "v": "ES.103",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-overflow"
+        },
+        {
+         "t": "text",
+         "v": "); without the sanitizer, the sum usually wraps to a negative number and the program reads a negative index or loops forever. Joshua Bloch described this bug in 2006: it had been in the JDK's "
+        },
+        {
+         "t": "code",
+         "v": "Arrays.binarySearch"
+        },
+        {
+         "t": "text",
+         "v": ", which he wrote, for about nine years, and it is in the binary search that Jon Bentley proves correct in "
+        },
+        {
+         "t": "i",
+         "v": "Programming Pearls"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "Google's research blog",
+         "href": "https://research.google/blog/extra-extra-read-all-about-it-nearly-all-binary-searches-and-mergesorts-are-broken/"
+        },
+        {
+         "t": "text",
+         "v": "). With array indices it needs an array of more than 2³⁰ elements, which is why tests rarely find it. A search on the answer over a large numeric range finds it at once."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "There are two fixes, and the second is the one to use:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <limits>\n#include <numeric>\n\n[[nodiscard]] int first_at_least(int target) {\n  int lo = 0;\n  int hi = std::numeric_limits<int>::max();\n  while (lo < hi) {\n    const int mid = std::midpoint(lo, hi);  // never overflows; rounds towards lo\n    if (mid < target)\n      lo = mid + 1;\n    else\n      hi = mid;\n  }\n  return lo;\n}\n\nint main() {\n  std::cout << std::format(\"{}\\n\", first_at_least(2'000'000'000));\n  std::cout << std::format(\"midpoint(-2000000000, 2000000000) = {}\\n\", std::midpoint(-2'000'000'000, 2'000'000'000));\n  std::cout << std::format(\"midpoint(4, 7) = {}, midpoint(7, 4) = {}\\n\", std::midpoint(4, 7), std::midpoint(7, 4));\n}"
+      },
+      {
+       "t": "output",
+       "text": "2000000000\nmidpoint(-2000000000, 2000000000) = 0\nmidpoint(4, 7) = 5, midpoint(7, 4) = 6"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "lo + (hi - lo) / 2"
+        },
+        {
+         "t": "text",
+         "v": " can't overflow when "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " are indices, because both are between 0 and n, so "
+        },
+        {
+         "t": "code",
+         "v": "hi - lo"
+        },
+        {
+         "t": "text",
+         "v": " is too. It can overflow when the range holds negative values: for "
+        },
+        {
+         "t": "code",
+         "v": "lo = -2'000'000'000"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "hi = 2'000'000'000"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "hi - lo"
+        },
+        {
+         "t": "text",
+         "v": " is four billion. "
+        },
+        {
+         "t": "code",
+         "v": "std::midpoint"
+        },
+        {
+         "t": "text",
+         "v": " (C++20, "
+        },
+        {
+         "t": "code",
+         "v": "<numeric>"
+        },
+        {
+         "t": "text",
+         "v": ") never overflows, for any two integers of the same type, and for an odd sum it rounds towards its first argument ("
+        },
+        {
+         "t": "a",
+         "v": "midpoint",
+         "href": "https://en.cppreference.com/cpp/numeric/midpoint"
+        },
+        {
+         "t": "text",
+         "v": "). Pass "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " first, and "
+        },
+        {
+         "t": "code",
+         "v": "mid"
+        },
+        {
+         "t": "text",
+         "v": " stays in "
+        },
+        {
+         "t": "code",
+         "v": "[lo, hi)"
+        },
+        {
+         "t": "text",
+         "v": ", which the loop needs. With iterators the question doesn't arise: you can't add two iterators, which is why the standard algorithms advance "
+        },
+        {
+         "t": "code",
+         "v": "first"
+        },
+        {
+         "t": "text",
+         "v": " by half the distance."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Empty ranges are the other classic. The closed-range version, which many people learned first, starts with "
+        },
+        {
+         "t": "code",
+         "v": "hi = n - 1"
+        },
+        {
+         "t": "text",
+         "v": " and moves "
+        },
+        {
+         "t": "code",
+         "v": "hi = mid - 1"
+        },
+        {
+         "t": "text",
+         "v": ". With "
+        },
+        {
+         "t": "code",
+         "v": "std::size_t"
+        },
+        {
+         "t": "text",
+         "v": " indices, both wrap round below zero. This one searches three elements for a value smaller than all of them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-buffer-overflow",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <vector>\n\n// Closed range [lo, hi] with unsigned indices.\n[[nodiscard]] std::optional<std::size_t> find(std::span<const int> v, int value) {\n  std::size_t lo = 0;\n  std::size_t hi = v.size() - 1;\n  while (lo <= hi) {\n    const std::size_t mid = lo + (hi - lo) / 2;\n    if (v[mid] == value) return mid;\n    if (v[mid] < value)\n      lo = mid + 1;\n    else\n      hi = mid - 1;\n  }\n  return std::nullopt;\n}\n\nint main() {\n  const std::vector<int> v{10, 20, 30};\n  std::cout << std::format(\"found 5: {}\\n\", find(v, 5).has_value());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "After two steps "
+        },
+        {
+         "t": "code",
+         "v": "mid"
+        },
+        {
+         "t": "text",
+         "v": " is 0 and "
+        },
+        {
+         "t": "code",
+         "v": "hi = mid - 1"
+        },
+        {
+         "t": "text",
+         "v": " wraps to the largest "
+        },
+        {
+         "t": "code",
+         "v": "std::size_t"
+        },
+        {
+         "t": "text",
+         "v": ", so "
+        },
+        {
+         "t": "code",
+         "v": "lo <= hi"
+        },
+        {
+         "t": "text",
+         "v": " stays true and the next "
+        },
+        {
+         "t": "code",
+         "v": "mid"
+        },
+        {
+         "t": "text",
+         "v": " is about 2⁶³. AddressSanitizer reports a heap-buffer-overflow: a read 4 bytes before the array, because the address arithmetic wraps round too. On an empty vector the first line already wraps, and a sanitizer stops the program at the first "
+        },
+        {
+         "t": "code",
+         "v": "v[mid]"
+        },
+        {
+         "t": "text",
+         "v": ". The half-open loop from the cold check has neither problem: with "
+        },
+        {
+         "t": "code",
+         "v": "[lo, hi)"
+        },
+        {
+         "t": "text",
+         "v": " no index goes below 0, and with signed indices a mistake gives -1, which a sanitizer or an "
+        },
+        {
+         "t": "code",
+         "v": "assert"
+        },
+        {
+         "t": "text",
+         "v": " catches, instead of a huge number ("
+        },
+        {
+         "t": "a",
+         "v": "ES.107",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two mistakes can't be shown with a sanitizer, because the program never ends or quietly returns a wrong answer:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "lo = mid"
+         },
+         {
+          "t": "text",
+          "v": " instead of "
+         },
+         {
+          "t": "code",
+          "v": "lo = mid + 1"
+         },
+         {
+          "t": "text",
+          "v": " in a "
+         },
+         {
+          "t": "code",
+          "v": "while (lo < hi)"
+         },
+         {
+          "t": "text",
+          "v": " loop. With "
+         },
+         {
+          "t": "code",
+          "v": "lo = 3"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "hi = 4"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "mid"
+         },
+         {
+          "t": "text",
+          "v": " is 3, and if the test sends the search right, "
+         },
+         {
+          "t": "code",
+          "v": "lo"
+         },
+         {
+          "t": "text",
+          "v": " stays 3 forever. Every update has to shrink "
+         },
+         {
+          "t": "code",
+          "v": "[lo, hi)"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "mid + 1"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "hi = mid"
+         },
+         {
+          "t": "text",
+          "v": " is what does it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A predicate that isn't true, then false, over the range. "
+         },
+         {
+          "t": "code",
+          "v": "lower_bound"
+         },
+         {
+          "t": "text",
+          "v": " on data sorted in descending order with the default "
+         },
+         {
+          "t": "code",
+          "v": "<"
+         },
+         {
+          "t": "text",
+          "v": ", or a rotated array searched as if it were sorted, returns some position without any error. Descending data needs the same order in the search, "
+         },
+         {
+          "t": "code",
+          "v": "std::ranges::lower_bound(v, x, std::ranges::greater{})"
+         },
+         {
+          "t": "text",
+          "v": ", and anything else needs the predicate written down and checked, as in Exercise 3."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. State the invariant of the half-open lower-bound loop and show how each update keeps it. Define "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "upper_bound"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "equal_range"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "partition_point"
+        },
+        {
+         "t": "text",
+         "v": ", and say what they return for an absent value and for an empty range. Describe searching on the answer with the battery example, and its cost. Write the overflowing midpoint and the two fixes, and say which one is safe for negative ranges."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "State the invariant of "
+     },
+     {
+      "t": "code",
+      "v": "while (lo < hi)"
+     },
+     {
+      "t": "text",
+      "v": " with "
+     },
+     {
+      "t": "code",
+      "v": "lo = mid + 1"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "hi = mid"
+     },
+     {
+      "t": "text",
+      "v": ". Why does the loop end, and why is "
+     },
+     {
+      "t": "code",
+      "v": "lo"
+     },
+     {
+      "t": "text",
+      "v": " the answer?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What do "
+     },
+     {
+      "t": "code",
+      "v": "lower_bound"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "upper_bound"
+     },
+     {
+      "t": "text",
+      "v": " return for a value that is absent, and for one greater than every element?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "partition_point"
+     },
+     {
+      "t": "text",
+      "v": " need from its range, and how is "
+     },
+     {
+      "t": "code",
+      "v": "lower_bound"
+     },
+     {
+      "t": "text",
+      "v": " a special case of it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When does "
+     },
+     {
+      "t": "code",
+      "v": "(lo + hi) / 2"
+     },
+     {
+      "t": "text",
+      "v": " overflow, when does "
+     },
+     {
+      "t": "code",
+      "v": "lo + (hi - lo) / 2"
+     },
+     {
+      "t": "text",
+      "v": ", and what does "
+     },
+     {
+      "t": "code",
+      "v": "std::midpoint"
+     },
+     {
+      "t": "text",
+      "v": " do instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How do you recognise a problem that is a search on the answer, and what is the predicate in the battery example?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: first and last occurrence by hand, with one shared helper."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Joshua Bloch, "
+     },
+     {
+      "t": "a",
+      "v": "the binary search overflow bug",
+      "href": "https://research.google/blog/extra-extra-read-all-about-it-nearly-all-binary-searches-and-mergesorts-are-broken/"
+     },
+     {
+      "t": "text",
+      "v": ", Google research blog, 2006."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Edsger W. Dijkstra, "
+     },
+     {
+      "t": "a",
+      "v": "Why numbering should start at zero",
+      "href": "https://www.cs.utexas.edu/users/EWD/transcriptions/EWD08xx/EWD831.html"
+     },
+     {
+      "t": "text",
+      "v": ", EWD 831, 1982: why half-open ranges avoid special cases."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.103",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-overflow"
+     },
+     {
+      "t": "text",
+      "v": ", don't overflow, and "
+     },
+     {
+      "t": "a",
+      "v": "ES.107",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+     },
+     {
+      "t": "text",
+      "v": ", don't use unsigned for subscripts."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "lower_bound",
+      "href": "https://en.cppreference.com/cpp/algorithm/lower_bound"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::lower_bound",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/lower_bound"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::equal_range",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/equal_range"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::partition_point",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/partition_point"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "iota_view",
+      "href": "https://en.cppreference.com/cpp/ranges/iota_view"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "midpoint",
+      "href": "https://en.cppreference.com/cpp/numeric/midpoint"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

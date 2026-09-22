@@ -1,0 +1,3022 @@
+{
+ "id": "cpp-containers",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "For each task, name the container you would use, and give the cost of one lookup and of one insert. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "The speeds of a mecanum base's four wheels, written in every control cycle."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A route that a planner appends waypoints to and a follower walks from start to end."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Parameters looked up by name, which a status page prints in alphabetical order."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The ids of messages already handled, so that a repeated message can be dropped."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Commands from a teleop node, added at the back and executed from the front."
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "table",
+    "head": [
+     [
+      {
+       "t": "text",
+       "v": "Task"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Container"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Lookup"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Insert"
+      }
+     ]
+    ],
+    "rows": [
+     [
+      [
+       {
+        "t": "text",
+        "v": "1"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "std::array<double, 4>"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "O(1) by index"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "none: the size is part of the type"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "2"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "std::vector<Waypoint>"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "O(1) by index, O(n) by name"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "amortised O(1) at the back"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "3"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "std::map<std::string, Param, std::less<>>"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "O(log n)"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "O(log n)"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "4"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "std::unordered_set<std::uint64_t>"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "O(1) on average, O(n) at worst"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "O(1) on average, O(n) at worst"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "5"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "std::deque<Command>"
+       },
+       {
+        "t": "text",
+        "v": ", or a "
+       },
+       {
+        "t": "code",
+        "v": "std::queue<Command>"
+       },
+       {
+        "t": "text",
+        "v": ", which holds one"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "O(1) at either end"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "O(1) at either end"
+       }
+      ]
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "One reason for each. Four wheels are a count fixed at compile time, so the elements can sit inside the object with no allocation. The route is appended to and walked in order, which is what one contiguous block does best. The parameters must come out sorted, and only an ordered container gives that without sorting for every print. The message ids need only \"have I seen this one?\", which a hash set answers without keeping any order. The commands leave from the front, and a vector has no O(1) way to remove its first element."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with five defensible choices and the right costs, including \"on average\" for the hash set and \"amortised\" for the vector. Two alternatives are as good: a sorted "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " of pairs for task 3, if the parameters are loaded once and never change, and a ring buffer over a "
+     },
+     {
+      "t": "code",
+      "v": "std::array"
+     },
+     {
+      "t": "text",
+      "v": " for task 5, if the queue has a fixed bound. One or two wrong costs or missing reasons are a partial pass. A "
+     },
+     {
+      "t": "code",
+      "v": "std::list"
+     },
+     {
+      "t": "text",
+      "v": " without a reason that needs one, or more than two misses, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "STL, the standard template library, is the part of C++ that gives you containers: types that store a collection of objects and promise a fixed cost for reading, inserting and erasing them. Those costs come from how a container lays out its elements. A "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " and a "
+    },
+    {
+     "t": "code",
+     "v": "std::string"
+    },
+    {
+     "t": "text",
+     "v": " keep every element in one heap block; a "
+    },
+    {
+     "t": "code",
+     "v": "std::deque"
+    },
+    {
+     "t": "text",
+     "v": " keeps them in fixed blocks reached through a table of pointers; "
+    },
+    {
+     "t": "code",
+     "v": "std::map"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "std::set"
+    },
+    {
+     "t": "text",
+     "v": " keep each element in its own node, linked into a sorted tree; "
+    },
+    {
+     "t": "code",
+     "v": "std::unordered_map"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "std::unordered_set"
+    },
+    {
+     "t": "text",
+     "v": " keep each element in its own node too, reached through a hash and a bucket. "
+    },
+    {
+     "t": "code",
+     "v": "std::array"
+    },
+    {
+     "t": "text",
+     "v": " needs no heap, because its element count is part of its type, so the elements sit inside the object."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that the wrong choice quietly costs a robot cycles, or memory, it didn't need to spend. A "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " has no O(1) way to drop its own front element, because everything behind it has to shift left. A hash table like "
+    },
+    {
+     "t": "code",
+     "v": "std::unordered_map"
+    },
+    {
+     "t": "text",
+     "v": " answers \"is this key present\" fast but can't answer \"which key comes right before this one\" without checking every entry, a question only a sorted tree answers directly."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism behind the choice is what each layout makes cheap. One contiguous block gives O(1) access by index and the fastest walk, because the processor can prefetch what comes next, so it wins whenever you read sequentially or by position. A tree keeps every search, insert and erase at O(log n) by staying balanced, paid for with a node and three pointers per element. A hash table trades that order for O(1) lookup on average, built from a hash function and buckets."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs to default to a tree or a hash table everywhere is memory: a node adds pointers and an allocation per element that a plain block never spends, which is why the Core Guidelines default to "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " up to a few kilobytes. What it costs to always reach for a vector is the operations its layout can't do cheaply, such as an insert at the front or a lookup by key."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this choice built into the robot at every turn: "
+    },
+    {
+     "t": "code",
+     "v": "std::array<double, 4>"
+    },
+    {
+     "t": "text",
+     "v": " for four wheel speeds fixed at compile time, "
+    },
+    {
+     "t": "code",
+     "v": "std::vector<Waypoint>"
+    },
+    {
+     "t": "text",
+     "v": " for a route walked start to end, "
+    },
+    {
+     "t": "code",
+     "v": "std::map"
+    },
+    {
+     "t": "text",
+     "v": " for parameters a status page prints in order, "
+    },
+    {
+     "t": "code",
+     "v": "std::unordered_set"
+    },
+    {
+     "t": "text",
+     "v": " for message ids you only ever ask \"have I seen this\" about. That is the interview question itself, asked as five small tasks and a cost for each."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "sequence",
+   "title": "vector, array, deque and string: layout, growth, complexity",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is what one object of each of the four containers costs before it holds anything, with GCC 13's library:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <string>\n#include <vector>\n\nint main() {\n  std::cout << std::format(\"array<int, 4> {:>3} bytes\\n\", sizeof(std::array<int, 4>));\n  std::cout << std::format(\"vector<int>   {:>3} bytes\\n\", sizeof(std::vector<int>));\n  std::cout << std::format(\"string        {:>3} bytes\\n\", sizeof(std::string));\n  std::cout << std::format(\"deque<int>    {:>3} bytes\\n\", sizeof(std::deque<int>));\n  const std::string empty;\n  std::cout << std::format(\"an empty string has room for {} characters\\n\", empty.capacity());\n}"
+      },
+      {
+       "t": "output",
+       "text": "array<int, 4>  16 bytes\nvector<int>    24 bytes\nstring         32 bytes\ndeque<int>     80 bytes\nan empty string has room for 15 characters"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::array<int, 4>"
+        },
+        {
+         "t": "text",
+         "v": " is 16 bytes because it is the four "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": "s. The elements are inside the object, the size is part of the type, and nothing is allocated. A local "
+        },
+        {
+         "t": "code",
+         "v": "std::array"
+        },
+        {
+         "t": "text",
+         "v": " lives on the stack like a C array, but it knows its size, copies and compares as a value, and doesn't turn into a pointer when you pass it to a function. That is why the Core Guidelines prefer it to a C array ("
+        },
+        {
+         "t": "a",
+         "v": "SL.con.1",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-arrays"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The other three keep their elements on the heap. A "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " in GCC's library is three pointers: to the first element, to one past the last element, and to one past the end of the allocated block. The distance from the first to the second is "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": ", and from the first to the third is "
+        },
+        {
+         "t": "code",
+         "v": "capacity()"
+        },
+        {
+         "t": "text",
+         "v": ". A "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " is a pointer, a length and a 16-byte buffer inside the object. Up to 15 characters and the terminating zero fit in that buffer, so a short string allocates nothing; this is the "
+        },
+        {
+         "t": "i",
+         "v": "small string optimisation"
+        },
+        {
+         "t": "text",
+         "v": ". A "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": " keeps its elements in blocks of 512 bytes and a table of pointers to the blocks, and its 80 bytes are the table's address and size and two iterators that mark the first and the last element. The DSA topic on stacks and queues counts a deque's allocations: 576 bytes while empty, then one more block for every 128 "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": "s, and no element ever moves."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Size against capacity is where a vector's costs show. This program pushes a million poses and counts the pushes that find the vector full, then tries the calls that change the capacity:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string>\n#include <vector>\n\nstruct Pose {\n  double x_m = 0;\n  double y_m = 0;\n  double theta_rad = 0;\n};\n\nstruct Growth {\n  std::int64_t reallocations = 0;\n  std::int64_t relocated = 0;  // elements carried over to a new block\n};\n\nint main() {\n  std::vector<Pose> poses;\n  Growth doubling;\n  for (int i = 0; i < 1'000'000; ++i) {\n    if (poses.size() == poses.capacity()) {  // full, so this push allocates a new block\n      ++doubling.reallocations;\n      doubling.relocated += std::ssize(poses);\n    }\n    poses.push_back({});\n  }\n  std::cout << std::format(\"{} poses: capacity {}, {} reallocations, {} elements relocated\\n\", poses.size(),\n                           poses.capacity(), doubling.reallocations, doubling.relocated);\n  poses.clear();\n  std::cout << std::format(\"after clear: size {}, capacity {}\\n\", poses.size(), poses.capacity());\n  poses.shrink_to_fit();\n  std::cout << std::format(\"after shrink_to_fit: size {}, capacity {}\\n\", poses.size(), poses.capacity());\n\n  std::vector<Pose> exact;\n  Growth one_more;\n  for (int i = 0; i < 1000; ++i) {\n    const auto before = exact.capacity();\n    exact.reserve(exact.size() + 1);  // room for one more, every time\n    if (exact.capacity() != before) {\n      ++one_more.reallocations;\n      one_more.relocated += std::ssize(exact);\n    }\n    exact.push_back({});\n  }\n  std::cout << std::format(\"reserve(size() + 1) before each of 1000 pushes: {} reallocations, {} elements relocated\\n\",\n                           one_more.reallocations, one_more.relocated);\n\n  std::string frame;\n  std::string capacities = std::to_string(frame.capacity());\n  for (int i = 0; i < 200; ++i) {\n    const auto before = frame.capacity();\n    frame += 'x';\n    if (frame.capacity() != before) capacities += \" \" + std::to_string(frame.capacity());\n  }\n  std::cout << \"string capacity while appending 200 characters: \" << capacities << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "1000000 poses: capacity 1048576, 21 reallocations, 1048575 elements relocated\nafter clear: size 0, capacity 1048576\nafter shrink_to_fit: size 0, capacity 0\nreserve(size() + 1) before each of 1000 pushes: 1000 reallocations, 499500 elements relocated\nstring capacity while appending 200 characters: 15 30 60 120 240"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Twenty-one pushes found the vector full. The first allocated room for one pose, and each later one allocated a block twice as large, moved every pose across and freed the old block, so the capacity went 1, 2, 4 and on to 2²⁰ = 1,048,576, and the vector relocated 1 + 2 + … + 2¹⁹ = 1,048,575 poses for a million pushes. That is the amortised O(1) of "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " that the complexity topic derives: fewer than two relocations per element, whatever the count. The rule-of-five topic shows the other half of the story: the relocations are moves only when the move constructor is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", and copies otherwise. "
+        },
+        {
+         "t": "code",
+         "v": "std::move_if_noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", which the vector uses for this, falls back to a copy only when the type has a copy constructor to fall back to, so a move-only type with a throwing move is moved anyway, and a throwing move then leaves the vector's contents unspecified."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The next two lines are rules worth knowing by heart. "
+        },
+        {
+         "t": "code",
+         "v": "clear()"
+        },
+        {
+         "t": "text",
+         "v": " destroys the elements and keeps the block, so a vector that is refilled in every cycle of a loop allocates only in the first cycles. "
+        },
+        {
+         "t": "code",
+         "v": "shrink_to_fit()"
+        },
+        {
+         "t": "text",
+         "v": " is a request that the standard allows a library to ignore. GCC's library honours it and frees the block."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "reserve(n)"
+        },
+        {
+         "t": "text",
+         "v": " only ever grows the capacity, and in GCC's library it grows it to exactly n. That exactness is the trap in the fourth line. Calling "
+        },
+        {
+         "t": "code",
+         "v": "reserve(size() + 1)"
+        },
+        {
+         "t": "text",
+         "v": " before every push turns the doubling off: 1000 pushes make 1000 allocations and relocate 0 + 1 + … + 999 = 499,500 elements, which is O(n²). Reserve once, with the final count, or leave growth to the vector. A "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " grows the same way from its 15-character buffer: 30, 60, 120, 240. Kevin Carpenter's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on vector",
+         "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) runs the same size and capacity experiments, including "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "shrink_to_fit"
+        },
+        {
+         "t": "text",
+         "v": ". Its title on the programme is a question, \"Almost Always Vector?\", and the last slides answer it by weighing a vector against a "
+        },
+        {
+         "t": "code",
+         "v": "std::list"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The costs, for n elements:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Operation"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "array"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "vector"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "deque"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "string"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "read or write element i"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(1)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(1)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(1), through the block table"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(1)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "add or remove at the back"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not possible"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "amortised O(1)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(1)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "amortised O(1)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "add or remove at the front"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not possible"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(1)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "insert or erase in the middle"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not possible"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(n)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "elements in memory"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "one block, inside the object"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "one block"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "blocks of 512 bytes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "one block, zero-terminated"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Finding a value is O(n) in all four, and O(log n) with a binary search when the elements are sorted. A deque inserting in the middle moves the elements on the shorter side, so its O(n) is at most half of them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The Core Guidelines make "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " the default ("
+        },
+        {
+         "t": "a",
+         "v": "SL.con.2",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+        },
+        {
+         "t": "text",
+         "v": "), for three reasons that all come from the single block: the fastest random access, the order of memory that the processor's prefetcher expects when you walk it, and no memory spent per element. The same rule adds that a vector usually still beats a map or a list for containers up to a few KB. So choose something else only with a reason: "
+        },
+        {
+         "t": "code",
+         "v": "std::array"
+        },
+        {
+         "t": "text",
+         "v": " when the count is fixed at compile time, "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": " when elements leave from the front or must keep their addresses while you add at the ends, and "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " for text only. SL.con.2 asks for a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<char>"
+        },
+        {
+         "t": "text",
+         "v": " or a "
+        },
+        {
+         "t": "code",
+         "v": "std::array"
+        },
+        {
+         "t": "text",
+         "v": " when you want a buffer of bytes rather than text."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes, and answer 2 and 3 before you run anything."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A lidar driver receives a scan as ranges in metres, one per beam, with a fixed angle between neighbouring beams. Write "
+         },
+         {
+          "t": "code",
+          "v": "to_points(std::span<const float> ranges_m, float angle_step_rad)"
+         },
+         {
+          "t": "text",
+          "v": ", which returns the scan as a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<Point>"
+         },
+         {
+          "t": "text",
+          "v": " of x and y coordinates and allocates exactly once. Name the guarantee in the standard that makes \"exactly once\" true."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Starting from an empty "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<int> v"
+         },
+         {
+          "t": "text",
+          "v": ", give the size and the capacity after each of these calls, with GCC's library: "
+         },
+         {
+          "t": "code",
+          "v": "v.resize(5)"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "v.push_back(1)"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "v.reserve(4)"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "v.shrink_to_fit()"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "v.clear()"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "v.push_back(2)"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Does a "
+         },
+         {
+          "t": "code",
+          "v": "std::string"
+         },
+         {
+          "t": "text",
+          "v": " holding "
+         },
+         {
+          "t": "code",
+          "v": "\"base_link\""
+         },
+         {
+          "t": "text",
+          "v": " allocate? And one holding "
+         },
+         {
+          "t": "code",
+          "v": "\"base_footprint_front_left_wheel\""
+         },
+         {
+          "t": "text",
+          "v": "? Check both by testing whether "
+         },
+         {
+          "t": "code",
+          "v": "data()"
+         },
+         {
+          "t": "text",
+          "v": " points inside the string object."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cmath>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\nstruct Point {\n  float x_m;\n  float y_m;\n};\n\n// One allocation: reserve makes room for every point, and push_back never reallocates below capacity.\n[[nodiscard]] std::vector<Point> to_points(std::span<const float> ranges_m, float angle_step_rad) {\n  std::vector<Point> points;\n  points.reserve(ranges_m.size());\n  for (const std::ptrdiff_t i : std::views::iota(std::ptrdiff_t{0}, std::ssize(ranges_m))) {\n    const float angle = angle_step_rad * static_cast<float>(i);\n    points.push_back({.x_m = ranges_m[i] * std::cos(angle), .y_m = ranges_m[i] * std::sin(angle)});\n  }\n  return points;\n}\n\nvoid show(std::string_view step, const std::vector<int>& v) {\n  std::cout << std::format(\"{:<16} size {}, capacity {}\\n\", step, v.size(), v.capacity());\n}\n\n[[nodiscard]] bool stored_inside(const std::string& s) {\n  const auto object = reinterpret_cast<std::uintptr_t>(&s);\n  const auto chars = reinterpret_cast<std::uintptr_t>(s.data());\n  return chars >= object && chars < object + sizeof(s);\n}\n\nint main() {\n  const std::vector<float> scan(360, 2.0F);\n  const std::vector<Point> points = to_points(scan, 0.0174533F);\n  std::cout << std::format(\"{} points, capacity {}\\n\", points.size(), points.capacity());\n\n  std::vector<int> v;\n  v.resize(5);\n  show(\"resize(5)\", v);\n  v.push_back(1);\n  show(\"push_back(1)\", v);\n  v.reserve(4);\n  show(\"reserve(4)\", v);\n  v.shrink_to_fit();\n  show(\"shrink_to_fit()\", v);\n  v.clear();\n  show(\"clear()\", v);\n  v.push_back(2);\n  show(\"push_back(2)\", v);\n\n  for (const std::string frame : {\"base_link\", \"base_footprint_front_left_wheel\"}) {\n    std::cout << std::format(\"{}: {} characters, capacity {}, inside the object: {}\\n\", frame, frame.size(),\n                             frame.capacity(), stored_inside(frame));\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "360 points, capacity 360\nresize(5)        size 5, capacity 5\npush_back(1)     size 6, capacity 10\nreserve(4)       size 6, capacity 10\nshrink_to_fit()  size 6, capacity 6\nclear()          size 0, capacity 6\npush_back(2)     size 1, capacity 6\nbase_link: 9 characters, capacity 15, inside the object: true\nbase_footprint_front_left_wheel: 31 characters, capacity 31, inside the object: false"
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "reserve(360)"
+         },
+         {
+          "t": "text",
+          "v": " allocates room for 360 points, and the standard guarantees that no insertion after a "
+         },
+         {
+          "t": "code",
+          "v": "reserve"
+         },
+         {
+          "t": "text",
+          "v": " reallocates until the size would pass the capacity ("
+         },
+         {
+          "t": "a",
+          "v": "vector.capacity",
+          "href": "https://eel.is/c++draft/vector.capacity"
+         },
+         {
+          "t": "text",
+          "v": "). So the 360 pushes allocate nothing more. Constructing "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<Point> points(n)"
+         },
+         {
+          "t": "text",
+          "v": " and assigning to each element also allocates once, but it first builds n default points, and it doesn't work for a type without a default constructor. The loop runs over signed indices from "
+         },
+         {
+          "t": "code",
+          "v": "std::views::iota"
+         },
+         {
+          "t": "text",
+          "v": ", because the angle needs the index."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "resize(5)"
+         },
+         {
+          "t": "text",
+          "v": " allocates room for exactly 5. The sixth element finds the vector full and doubles it to 10. "
+         },
+         {
+          "t": "code",
+          "v": "reserve(4)"
+         },
+         {
+          "t": "text",
+          "v": " asks for less than the capacity and does nothing. "
+         },
+         {
+          "t": "code",
+          "v": "shrink_to_fit()"
+         },
+         {
+          "t": "text",
+          "v": " reallocates to 6, and "
+         },
+         {
+          "t": "code",
+          "v": "clear()"
+         },
+         {
+          "t": "text",
+          "v": " keeps those 6 slots, so the last push uses one of them without allocating."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "\"base_link\""
+         },
+         {
+          "t": "text",
+          "v": " is 9 characters and fits in the buffer inside the object, so it allocates nothing. The 31-character name doesn't fit, and the string allocates a heap block for its 31 characters and the terminating zero. Many of a robot's frame names fit in the buffer, so copying them costs no allocation, but a topic path such as "
+         },
+         {
+          "t": "code",
+          "v": "/lidar/front/points_filtered"
+         },
+         {
+          "t": "text",
+          "v": " doesn't."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "associative",
+   "title": "map and set versus unordered_map and unordered_set: order, hashing, custom keys",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot records its pose with a timestamp, and a sensor message stamped at 250 ms needs the pose at that time. The question to answer is \"which pose is the last one at or before 250?\", not \"which pose has the stamp 250?\", and only an ordered container answers it without looking at every entry:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <map>\n#include <optional>\n\nstruct Pose {\n  double x_m = 0;\n  double y_m = 0;\n};\n\nusing History = std::map<std::int64_t, Pose>;  // stamp in milliseconds -> pose, kept sorted by stamp\n\n// The last pose recorded at or before stamp_ms, if there is one.\n[[nodiscard]] std::optional<Pose> pose_at(const History& history, std::int64_t stamp_ms) {\n  const auto after = history.upper_bound(stamp_ms);  // first entry later than stamp_ms\n  if (after == history.begin()) return std::nullopt;\n  return std::prev(after)->second;\n}\n\nint main() {\n  History history;\n  history.emplace(300, Pose{.x_m = 0.3, .y_m = 0.0});\n  history.emplace(100, Pose{.x_m = 0.1, .y_m = 0.0});\n  history.emplace(200, Pose{.x_m = 0.2, .y_m = 0.1});\n  for (const auto& [stamp_ms, pose] : history) std::cout << std::format(\"{} ms: ({}, {})\\n\", stamp_ms, pose.x_m, pose.y_m);\n  for (const std::int64_t t : {250, 100, 50}) {\n    const std::optional<Pose> p = pose_at(history, t);\n    std::cout << std::format(\"pose at {} ms: {}\\n\", t, p ? std::format(\"({}, {})\", p->x_m, p->y_m) : \"none yet\");\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "100 ms: (0.1, 0)\n200 ms: (0.2, 0.1)\n300 ms: (0.3, 0)\npose at 250 ms: (0.2, 0.1)\npose at 100 ms: (0.1, 0)\npose at 50 ms: none yet"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " keeps its keys sorted, here by stamp, whatever the order of insertion, and iterating visits them in that order. "
+        },
+        {
+         "t": "code",
+         "v": "upper_bound(t)"
+        },
+        {
+         "t": "text",
+         "v": " finds the first key greater than t, and the entry before it is the answer. "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound(t)"
+        },
+        {
+         "t": "text",
+         "v": " finds the first key not less than t. Every search, insert and erase costs O(log n), because a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " is a balanced binary search tree, a red-black tree in GCC's library. A "
+        },
+        {
+         "t": "code",
+         "v": "std::set"
+        },
+        {
+         "t": "text",
+         "v": " is the same tree holding keys without values."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": " answers only exact questions: is this key present, and what is its value? It answers them in O(1) on average and O(n) at worst, and it iterates in no useful order. The DSA topic on hash maps shows how buckets give that average and how colliding keys give the worst case, so this topic doesn't repeat it. Choose by the questions you need to ask. Nearest, first, last, a range of keys or sorted output need a tree. Exact lookups alone need a hash table, or, for a few dozen entries, a sorted vector."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The other difference is memory. Every element of either container lives in a heap node of its own, and the node carries links. This program counts what 1000 entries from "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " cost, with an allocator that counts each request and then allocates as usual:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <map>\n#include <memory>\n#include <string_view>\n#include <unordered_map>\n#include <utility>\n#include <vector>\n\nstruct Tally {\n  std::int64_t allocations = 0;\n  std::int64_t bytes_held = 0;\n};\n\n// Counts every allocation in a Tally the caller owns, then allocates as usual.\ntemplate <typename T>\nstruct Counting {\n  using value_type = T;\n  Tally* tally;\n  explicit Counting(Tally* t) : tally(t) {}\n  template <typename U>\n  Counting(const Counting<U>& other) : tally(other.tally) {}  // containers allocate nodes and buckets too\n  [[nodiscard]] T* allocate(std::size_t n) {\n    ++tally->allocations;\n    tally->bytes_held += static_cast<std::int64_t>(n * sizeof(T));\n    return std::allocator<T>{}.allocate(n);\n  }\n  void deallocate(T* p, std::size_t n) {\n    tally->bytes_held -= static_cast<std::int64_t>(n * sizeof(T));\n    std::allocator<T>{}.deallocate(p, n);\n  }\n  template <typename U>\n  bool operator==(const Counting<U>& other) const { return tally == other.tally; }\n};\n\nusing Entry = std::pair<const int, int>;\nconstexpr int n = 1000;\n\nvoid report(std::string_view name, const Tally& t) {\n  std::cout << std::format(\"{:<14} {:>4} allocations, {:>5} bytes held, {:>4.1f} bytes per element\\n\", name,\n                           t.allocations, t.bytes_held, static_cast<double>(t.bytes_held) / n);\n}\n\nint main() {\n  Tally tree;\n  std::map<int, int, std::less<>, Counting<Entry>> by_tree(Counting<Entry>{&tree});\n  for (int i = 0; i < n; ++i) by_tree.emplace(i, i);\n  report(\"map\", tree);\n\n  Tally hash;\n  std::unordered_map<int, int, std::hash<int>, std::equal_to<>, Counting<Entry>> by_hash(\n      0, std::hash<int>{}, std::equal_to<>{}, Counting<Entry>{&hash});\n  for (int i = 0; i < n; ++i) by_hash.emplace(i, i);\n  report(\"unordered_map\", hash);\n  std::cout << std::format(\"{:<14} {} buckets for {} elements\\n\", \"\", by_hash.bucket_count(), by_hash.size());\n\n  Tally flat;\n  std::vector<std::pair<int, int>, Counting<std::pair<int, int>>> sorted(Counting<std::pair<int, int>>{&flat});\n  sorted.reserve(n);\n  for (int i = 0; i < n; ++i) sorted.emplace_back(i, i);\n  report(\"sorted vector\", flat);\n  const auto it = std::ranges::lower_bound(sorted, 640, {}, &std::pair<int, int>::first);\n  std::cout << std::format(\"{:<14} lower_bound finds key {}\\n\", \"\", it->first);\n}"
+      },
+      {
+       "t": "output",
+       "text": "map            1000 allocations, 40000 bytes held, 40.0 bytes per element\nunordered_map  1007 allocations, 24872 bytes held, 24.9 bytes per element\n               1109 buckets for 1000 elements\nsorted vector     1 allocations,  8000 bytes held,  8.0 bytes per element\n               lower_bound finds key 640"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The data in each entry is 8 bytes, two "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": "s. A "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " node adds a colour and three pointers, to the parent and the two children, for 40 bytes and one allocation per element. An "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": " node adds one pointer, to the next node, for 16 bytes, and the table adds one pointer per bucket: 1109 buckets for 1000 elements. Its 1007 allocations are the 1000 nodes and the seven bucket arrays it used as it grew. A sorted "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " of pairs holds the same entries in one block of 8000 bytes, and "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " with the pair's "
+        },
+        {
+         "t": "code",
+         "v": "first"
+        },
+        {
+         "t": "text",
+         "v": " as a projection searches it in O(log n). Inserting into it is O(n), so it suits data that is built once and read many times, such as joint names or parameters loaded at startup. C++23 adds the same design as "
+        },
+        {
+         "t": "code",
+         "v": "std::flat_map"
+        },
+        {
+         "t": "text",
+         "v": ", which keeps the sorted keys and the values in two vectors."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "These are the bytes the containers asked for. The allocator asks for more: glibc's "
+        },
+        {
+         "t": "code",
+         "v": "malloc"
+        },
+        {
+         "t": "text",
+         "v": " puts an 8-byte header in front of every block and rounds the rest up to a multiple of 16, so a 40-byte map node takes 48 bytes of heap and a 16-byte hash node takes 32. The gap between the three containers is wider than the numbers above, not narrower."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The node per element also has an advantage, which the next topic builds on: nodes never move. Inserting into a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " or erasing from it never invalidates a reference to another element, and neither does a rehash of an "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": ". The standard requires that, which rules out storing the elements in the table itself. Abseil's tip "
+        },
+        {
+         "t": "a",
+         "v": "#136",
+         "href": "https://abseil.io/tips/136"
+        },
+        {
+         "t": "text",
+         "v": " describes the trade from the other side: its "
+        },
+        {
+         "t": "code",
+         "v": "flat_hash_map"
+        },
+        {
+         "t": "text",
+         "v": " stores elements in the table, which is faster and gives up that stability, and its "
+        },
+        {
+         "t": "code",
+         "v": "node_hash_map"
+        },
+        {
+         "t": "text",
+         "v": " keeps the stability at the cost of a node per element."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A key type of your own needs what the container uses. "
+        },
+        {
+         "t": "code",
+         "v": "std::map<K, V>"
+        },
+        {
+         "t": "text",
+         "v": " compares keys with "
+        },
+        {
+         "t": "code",
+         "v": "std::less<K>"
+        },
+        {
+         "t": "text",
+         "v": ", so K needs a "
+        },
+        {
+         "t": "code",
+         "v": "<"
+        },
+        {
+         "t": "text",
+         "v": " that is a strict weak ordering, the rule the algorithms topic takes apart. "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map<K, V>"
+        },
+        {
+         "t": "text",
+         "v": " needs a hash and "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": ". For a struct of plain fields, one defaulted operator gives both "
+        },
+        {
+         "t": "code",
+         "v": "<"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "struct SensorId {\n  std::int32_t bus;\n  std::int32_t address;\n  auto operator<=>(const SensorId&) const = default;  // bus first, then address; also declares ==\n};"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The hash is yours to write, and it should be "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ". The standard doesn't require that: "
+        },
+        {
+         "t": "code",
+         "v": "Cpp17Hash"
+        },
+        {
+         "t": "text",
+         "v": " says nothing about exceptions, and "
+        },
+        {
+         "t": "a",
+         "v": "unord.req.except",
+         "href": "https://eel.is/c++draft/unord.req.except"
+        },
+        {
+         "t": "text",
+         "v": " defines what happens when a hash does throw. The containers assume it doesn't, Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.89",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-hash"
+        },
+        {
+         "t": "text",
+         "v": " asks for "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " outright, and libstdc++ charges you for a hash that isn't. It then stores every element's hash code in the node: the comment on the switch in "
+        },
+        {
+         "t": "code",
+         "v": "bits/hashtable.h"
+        },
+        {
+         "t": "text",
+         "v": " reads \"Mandatory to have erase not throwing\", because "
+        },
+        {
+         "t": "code",
+         "v": "erase(iterator)"
+        },
+        {
+         "t": "text",
+         "v": " may not throw at all, while "
+        },
+        {
+         "t": "a",
+         "v": "unord.req.except",
+         "href": "https://eel.is/c++draft/unord.req.except"
+        },
+        {
+         "t": "text",
+         "v": " does excuse a hash that throws during a "
+        },
+        {
+         "t": "code",
+         "v": "rehash"
+        },
+        {
+         "t": "text",
+         "v": ". Measured with a key of two "
+        },
+        {
+         "t": "code",
+         "v": "std::int32_t"
+        },
+        {
+         "t": "text",
+         "v": " fields and an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " value, that takes the node from 24 requested bytes to 32, and with glibc's rounding from a 32-byte chunk to a 48-byte one: 16 bytes per element, or 16,000 bytes of heap for 1000 elements. Equal keys must hash equal, and different keys should spread. The DSA topic on hash maps packs two 32-bit fields into one 64-bit value, which the exercise below reuses. For more fields, Victor Ciura's "
+        },
+        {
+         "t": "a",
+         "v": "talk on hashing",
+         "href": "https://www.youtube.com/watch?v=lNR_AWs0q9w"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) shows why the common "
+        },
+        {
+         "t": "code",
+         "v": "hash_combine"
+        },
+        {
+         "t": "text",
+         "v": " with its constant 0x9e3779b9 is a patch, and how feeding every field into one hash algorithm, "
+        },
+        {
+         "t": "code",
+         "v": "hash_append"
+        },
+        {
+         "t": "text",
+         "v": ", avoids it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Looking up a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " key by a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " is a trap of its own. With the default comparison, "
+        },
+        {
+         "t": "code",
+         "v": "std::less<std::string>"
+        },
+        {
+         "t": "text",
+         "v": ", the map compares strings only, and a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " doesn't convert to a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " by itself:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "no matching function for call to",
+       "text": "#include <map>\n#include <string>\n#include <string_view>\n\n[[nodiscard]] bool has_port(const std::map<std::string, int>& ports, std::string_view name) {\n  return ports.find(name) != ports.end();  // std::less<std::string> compares strings only\n}\n\nint main() { return has_port({{\"lidar\", 2368}}, \"lidar\") ? 0 : 1; }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The tempting fix, "
+        },
+        {
+         "t": "code",
+         "v": "ports.find(std::string(name))"
+        },
+        {
+         "t": "text",
+         "v": ", builds a string for every lookup, and allocates for any name longer than 15 characters. The fix that costs nothing is in the type: "
+        },
+        {
+         "t": "code",
+         "v": "std::map<std::string, int, std::less<>>"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "std::less<>"
+        },
+        {
+         "t": "text",
+         "v": " compares any two types that have a "
+        },
+        {
+         "t": "code",
+         "v": "<"
+        },
+        {
+         "t": "text",
+         "v": " between them, and it declares itself "
+        },
+        {
+         "t": "i",
+         "v": "transparent"
+        },
+        {
+         "t": "text",
+         "v": ", which tells the map to pass your "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " to the comparison as it is ("
+        },
+        {
+         "t": "a",
+         "v": "Abseil tip #144",
+         "href": "https://abseil.io/tips/144"
+        },
+        {
+         "t": "text",
+         "v": "). Ordered containers have had this "
+        },
+        {
+         "t": "i",
+         "v": "heterogeneous lookup"
+        },
+        {
+         "t": "text",
+         "v": " since C++14. Unordered containers have had it since C++20, and there both the hash and the equality must be transparent: a hash struct that declares "
+        },
+        {
+         "t": "code",
+         "v": "using is_transparent = void;"
+        },
+        {
+         "t": "text",
+         "v": " and takes a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "std::equal_to<>"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. A robot registers its sensors by name, such as "
+        },
+        {
+         "t": "code",
+         "v": "\"lidar/front\""
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "\"imu\""
+        },
+        {
+         "t": "text",
+         "v": ", each with a rate in Hz and a frame name."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Choose the registry's type so that a lookup by "
+         },
+         {
+          "t": "code",
+          "v": "std::string_view"
+         },
+         {
+          "t": "text",
+          "v": " allocates nothing, and a status report lists the sensors in name order."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "find_sensor(registry, name)"
+         },
+         {
+          "t": "text",
+          "v": ", which returns the sensor's information, or no value."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "names_under(registry, prefix)"
+         },
+         {
+          "t": "text",
+          "v": ", which returns the names that start with a prefix such as "
+         },
+         {
+          "t": "code",
+          "v": "\"lidar/\""
+         },
+         {
+          "t": "text",
+          "v": ", in O(log n + k) for k results."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Sensors on an I2C bus are also known by a "
+         },
+         {
+          "t": "code",
+          "v": "SensorId"
+         },
+         {
+          "t": "text",
+          "v": ", a bus number and an address. Make "
+         },
+         {
+          "t": "code",
+          "v": "SensorId"
+         },
+         {
+          "t": "text",
+          "v": " usable as the key of a "
+         },
+         {
+          "t": "code",
+          "v": "std::map"
+         },
+         {
+          "t": "text",
+          "v": " and of a "
+         },
+         {
+          "t": "code",
+          "v": "std::unordered_map"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Say which of 1 to 3 would get slower if the registry were an "
+         },
+         {
+          "t": "code",
+          "v": "std::unordered_map"
+         },
+         {
+          "t": "text",
+          "v": ", and by how much."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <compare>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <map>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <unordered_map>\n#include <vector>\n\nstruct SensorInfo {\n  std::int32_t rate_hz;\n  std::string frame;\n};\n\n// std::less<> compares a std::string key with a std::string_view without building a string.\nusing Registry = std::map<std::string, SensorInfo, std::less<>>;\n\n[[nodiscard]] std::optional<SensorInfo> find_sensor(const Registry& registry, std::string_view name) {\n  const auto it = registry.find(name);\n  if (it == registry.end()) return std::nullopt;\n  return it->second;\n}\n\n// Names that start with prefix, in order. Copies, because the caller keeps them.\n[[nodiscard]] std::vector<std::string> names_under(const Registry& registry, std::string_view prefix) {\n  std::vector<std::string> names;\n  for (auto it = registry.lower_bound(prefix); it != registry.end() && it->first.starts_with(prefix); ++it) {\n    names.push_back(it->first);\n  }\n  return names;\n}\n\nstruct SensorId {\n  std::int32_t bus;\n  std::int32_t address;\n  auto operator<=>(const SensorId&) const = default;  // also gives ==\n};\n\nstruct SensorIdHash {\n  [[nodiscard]] std::size_t operator()(const SensorId& id) const noexcept {\n    const std::uint64_t high = static_cast<std::uint32_t>(id.bus);\n    const std::uint64_t low = static_cast<std::uint32_t>(id.address);\n    return std::hash<std::uint64_t>{}((high << 32) | low);\n  }\n};\n\nint main() {\n  const Registry registry{{\"lidar/front\", {.rate_hz = 10, .frame = \"lidar_front\"}},\n                          {\"camera/rgb\", {.rate_hz = 30, .frame = \"camera_link\"}},\n                          {\"lidar/rear\", {.rate_hz = 10, .frame = \"lidar_rear\"}},\n                          {\"imu\", {.rate_hz = 200, .frame = \"imu_link\"}}};\n  for (const std::string_view name : {\"imu\", \"sonar\"}) {\n    const std::optional<SensorInfo> info = find_sensor(registry, name);\n    std::cout << std::format(\"{}: {}\\n\", name, info ? std::format(\"{} Hz in {}\", info->rate_hz, info->frame) : \"not registered\");\n  }\n  std::cout << \"under lidar/:\";\n  for (const std::string& name : names_under(registry, \"lidar/\")) std::cout << ' ' << name;\n  std::cout << \"\\nstatus report:\";\n  for (const auto& [name, info] : registry) std::cout << std::format(\" {}@{}Hz\", name, info.rate_hz);\n  std::cout << '\\n';\n\n  const std::map<SensorId, std::string> ordered{{{.bus = 1, .address = 0x68}, \"imu\"}, {{.bus = 0, .address = 0x29}, \"tof\"}};\n  const std::unordered_map<SensorId, std::string, SensorIdHash> hashed{{{.bus = 1, .address = 0x68}, \"imu\"}};\n  std::cout << std::format(\"first by (bus, address): {}; hashed lookup of 1/0x68: {}\\n\", ordered.begin()->second,\n                           hashed.at({.bus = 1, .address = 0x68}));\n}"
+      },
+      {
+       "t": "output",
+       "text": "imu: 200 Hz in imu_link\nsonar: not registered\nunder lidar/: lidar/front lidar/rear\nstatus report: camera/rgb@30Hz imu@200Hz lidar/front@10Hz lidar/rear@10Hz\nfirst by (bus, address): tof; hashed lookup of 1/0x68: imu"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::less<>"
+        },
+        {
+         "t": "text",
+         "v": " lets both "
+        },
+        {
+         "t": "code",
+         "v": "find"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " take the view. The prefix query works because every name with a given prefix sits in one run of the sorted order, which starts at the first name not less than the prefix. "
+        },
+        {
+         "t": "code",
+         "v": "lower_bound"
+        },
+        {
+         "t": "text",
+         "v": " finds that name in O(log n), and the loop stops at the first name without the prefix, so it visits k + 1 entries. The names come back as copies. Returning "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": "s into the map's keys would save those copies and hand the caller handles that die when the entry is erased, which is the rule the borrowing topic gives for views: take them as parameters, return owners. The defaulted "
+        },
+        {
+         "t": "code",
+         "v": "<=>"
+        },
+        {
+         "t": "text",
+         "v": " orders "
+        },
+        {
+         "t": "code",
+         "v": "SensorId"
+        },
+        {
+         "t": "text",
+         "v": "s by bus, then by address, which is why "
+        },
+        {
+         "t": "code",
+         "v": "tof"
+        },
+        {
+         "t": "text",
+         "v": " on bus 0 comes first, and the hash packs both 32-bit fields into 64 bits, so two different ids never share a hash value before the bucket step."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With an "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "find_sensor"
+        },
+        {
+         "t": "text",
+         "v": " stays fast: O(1) on average, and it allocates nothing if the hash is transparent and the equality is "
+        },
+        {
+         "t": "code",
+         "v": "std::equal_to<>"
+        },
+        {
+         "t": "text",
+         "v": ". The status report needs a copy of the names and a sort, O(n log n) instead of O(n). "
+        },
+        {
+         "t": "code",
+         "v": "names_under"
+        },
+        {
+         "t": "text",
+         "v": " has to test every name, O(n) instead of O(log n + k)."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "choose",
+   "title": "Choosing containers for small tasks",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. For each task, choose the container, give the cost of the operations the task names, and say in one sentence why. Then write the cache of task 5."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "An occupancy grid of 400 by 300 cells, each a value from 0 to 100, read and written by (x, y) ten times a second."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The last 200 odometry samples for a smoothing filter; each new sample replaces the oldest."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Timers ordered by deadline: add a timer, cancel one by its id, and fire the one with the earliest deadline."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The index of each of an arm's 12 joints, looked up by joint name, built at startup and needed in every control cycle."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A cache of map tiles for a viewer, holding at most N tiles. When it is full, a new tile replaces the one used least recently. Write it with "
+         },
+         {
+          "t": "code",
+          "v": "get(id)"
+         },
+         {
+          "t": "text",
+          "v": ", which returns the tile or no value, and "
+         },
+         {
+          "t": "code",
+          "v": "put(id, tile)"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Task"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Container"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Costs"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Why"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::vector<std::uint8_t>"
+          },
+          {
+           "t": "text",
+           "v": " of 120,000 cells, indexed by "
+          },
+          {
+           "t": "code",
+           "v": "y * width + x"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(1) read and write"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "one block of 120 KB that a pass over the map walks in memory order; the size is known only at run time"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a ring buffer: "
+          },
+          {
+           "t": "code",
+           "v": "std::array<Sample, 200>"
+          },
+          {
+           "t": "text",
+           "v": " and the index of the oldest sample"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "O(1) add, O(1) read of any sample"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a fixed bound and no allocation in the control loop; a "
+          },
+          {
+           "t": "code",
+           "v": "std::deque"
+          },
+          {
+           "t": "text",
+           "v": " with "
+          },
+          {
+           "t": "code",
+           "v": "push_back"
+          },
+          {
+           "t": "text",
+           "v": " and "
+          },
+          {
+           "t": "code",
+           "v": "pop_front"
+          },
+          {
+           "t": "text",
+           "v": " works too, but allocates and frees blocks as it moves along"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::set<std::pair<std::int64_t, TimerId>>"
+          },
+          {
+           "t": "text",
+           "v": " in deadline order, and "
+          },
+          {
+           "t": "code",
+           "v": "std::unordered_map<TimerId, std::int64_t>"
+          },
+          {
+           "t": "text",
+           "v": " from id to deadline"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "add O(log n), cancel O(log n), earliest O(1) with "
+          },
+          {
+           "t": "code",
+           "v": "begin()"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "cancelling has to find any timer, which a "
+          },
+          {
+           "t": "code",
+           "v": "std::priority_queue"
+          },
+          {
+           "t": "text",
+           "v": " can't; with one, a cancelled timer stays in the heap until it reaches the top and is skipped"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a sorted "
+          },
+          {
+           "t": "code",
+           "v": "std::vector"
+          },
+          {
+           "t": "text",
+           "v": " of name and index, or better, no lookup in the loop"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "about 4 comparisons with "
+          },
+          {
+           "t": "code",
+           "v": "lower_bound"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "resolve each name to its index once at startup, and let the control cycle use the indices"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "5"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::list<Tile>"
+          },
+          {
+           "t": "text",
+           "v": " in order of use, and "
+          },
+          {
+           "t": "code",
+           "v": "std::unordered_map<Id, std::list<Tile>::iterator>"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "get"
+          },
+          {
+           "t": "text",
+           "v": " and "
+          },
+          {
+           "t": "code",
+           "v": "put"
+          },
+          {
+           "t": "text",
+           "v": " O(1) on average"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "splice"
+          },
+          {
+           "t": "text",
+           "v": " moves a used tile to the front by relinking one node, and every iterator in the map stays valid"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Task 5 is the case the DSA topic on linked lists names as the one where a "
+        },
+        {
+         "t": "code",
+         "v": "std::list"
+        },
+        {
+         "t": "text",
+         "v": " earns its place: something else holds iterators into it that must survive while other elements move and leave."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <list>\n#include <optional>\n#include <stdexcept>\n#include <string>\n#include <unordered_map>\n#include <utility>\n\nstruct Tile {\n  std::int64_t id;\n  std::string pixels;  // stands in for the image data\n};\n\n// Holds at most `capacity` tiles and evicts the one used least recently.\nclass TileCache {\n public:\n  explicit TileCache(std::ptrdiff_t capacity) : capacity_(capacity) {\n    if (capacity < 1) throw std::invalid_argument(\"a tile cache needs room for at least one tile\");\n  }\n\n  [[nodiscard]] std::optional<std::string> get(std::int64_t id) {\n    const auto it = index_.find(id);\n    if (it == index_.end()) return std::nullopt;\n    tiles_.splice(tiles_.begin(), tiles_, it->second);  // relinks one node: nothing moves, no iterator dies\n    return it->second->pixels;\n  }\n\n  void put(std::int64_t id, std::string pixels) {\n    if (const auto it = index_.find(id); it != index_.end()) {\n      it->second->pixels = std::move(pixels);\n      tiles_.splice(tiles_.begin(), tiles_, it->second);\n      return;\n    }\n    if (std::ssize(tiles_) == capacity_) {\n      index_.erase(tiles_.back().id);\n      tiles_.pop_back();\n    }\n    tiles_.push_front({.id = id, .pixels = std::move(pixels)});\n    index_.emplace(id, tiles_.begin());\n  }\n\n private:\n  std::ptrdiff_t capacity_;\n  std::list<Tile> tiles_;  // most recently used first\n  std::unordered_map<std::int64_t, std::list<Tile>::iterator> index_;\n};\n\nint main() {\n  TileCache cache(2);\n  cache.put(7, \"tile 7\");\n  cache.put(8, \"tile 8\");\n  const auto show = [&cache](std::int64_t id) {\n    std::cout << std::format(\"get({}): {}\\n\", id, cache.get(id).value_or(\"miss\"));\n  };\n  show(7);                 // 7 becomes the most recent\n  cache.put(9, \"tile 9\");  // full: evicts 8, the least recent\n  show(8);\n  show(7);\n  show(9);\n}"
+      },
+      {
+       "t": "output",
+       "text": "get(7): tile 7\nget(8): miss\nget(7): tile 7\nget(9): tile 9"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The list holds the tiles in order of use, and the hash map holds, for each id, an iterator to its tile. "
+        },
+        {
+         "t": "code",
+         "v": "get"
+        },
+        {
+         "t": "text",
+         "v": " finds the iterator in O(1) on average and splices the node to the front in O(1). "
+        },
+        {
+         "t": "code",
+         "v": "put"
+        },
+        {
+         "t": "text",
+         "v": " evicts from the back of the list, erases the evicted id from the map, and pushes the new tile at the front. The constructor refuses a capacity below 1, because "
+        },
+        {
+         "t": "code",
+         "v": "put"
+        },
+        {
+         "t": "text",
+         "v": " would otherwise pop from an empty list. "
+        },
+        {
+         "t": "code",
+         "v": "get"
+        },
+        {
+         "t": "text",
+         "v": " returns a copy of the tile; a real cache of images would return a pointer or a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " to avoid copying pixels, with the lifetime question that brings."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a vector, a string and a deque keep in their objects and on the heap, what size and capacity are, and what "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "clear"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "shrink_to_fit"
+        },
+        {
+         "t": "text",
+         "v": " do to the capacity. Give the reallocation count for a million pushes, and why "
+        },
+        {
+         "t": "code",
+         "v": "reserve(size() + 1)"
+        },
+        {
+         "t": "text",
+         "v": " in a loop is O(n²). Say which questions need a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " rather than an "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": ", what each costs per element, and what a key type needs for each. End with your containers for the five tasks of the last exercise."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What are a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": "'s 24 bytes, and what does "
+     },
+     {
+      "t": "code",
+      "v": "capacity() - size()"
+     },
+     {
+      "t": "text",
+      "v": " tell you?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How many reallocations does a doubling vector make on the way to a million elements, and how many elements does it relocate?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is calling "
+     },
+     {
+      "t": "code",
+      "v": "reserve(size() + 1)"
+     },
+     {
+      "t": "text",
+      "v": " before every "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " slower than never calling "
+     },
+     {
+      "t": "code",
+      "v": "reserve"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which question does "
+     },
+     {
+      "t": "code",
+      "v": "std::map"
+     },
+     {
+      "t": "text",
+      "v": " answer in O(log n) that "
+     },
+     {
+      "t": "code",
+      "v": "std::unordered_map"
+     },
+     {
+      "t": "text",
+      "v": " can answer only in O(n)?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::less<>"
+     },
+     {
+      "t": "text",
+      "v": " change about a "
+     },
+     {
+      "t": "code",
+      "v": "std::map<std::string, V>"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a key type need for "
+     },
+     {
+      "t": "code",
+      "v": "std::map"
+     },
+     {
+      "t": "text",
+      "v": ", and what for "
+     },
+     {
+      "t": "code",
+      "v": "std::unordered_map"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file in 20 minutes: an LRU cache with "
+     },
+     {
+      "t": "code",
+      "v": "std::list"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "splice"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::unordered_map"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". Size against capacity, "
+     },
+     {
+      "t": "code",
+      "v": "reserve"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "shrink_to_fit"
+     },
+     {
+      "t": "text",
+      "v": ", and vector against list and deque."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bob Steagall, Back to Basics: Classic STL, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/back_to_basics_classic_stl__bob_steagall__cppcon_2021_1.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=tXUXl_RzkAk"
+     },
+     {
+      "t": "text",
+      "v": ". The container families and the complexity each one promises."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Victor Ciura, So You Think You Can Hash, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/So_You_Think_You_Can_Hash.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=lNR_AWs0q9w"
+     },
+     {
+      "t": "text",
+      "v": ". Hashing a key type of your own."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Standard Library Containers, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ZMUKa2kWtTk"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-arrays"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "C.89",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-hash"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bjarne Stroustrup, A Tour of C++, 3rd edition, chapter 12 on containers: "
+     },
+     {
+      "t": "a",
+      "v": "contents",
+      "href": "https://www.stroustrup.com/tour3toc.pdf"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tips "
+     },
+     {
+      "t": "a",
+      "v": "#136",
+      "href": "https://abseil.io/tips/136"
+     },
+     {
+      "t": "text",
+      "v": " on unordered containers and "
+     },
+     {
+      "t": "a",
+      "v": "#144",
+      "href": "https://abseil.io/tips/144"
+     },
+     {
+      "t": "text",
+      "v": " on heterogeneous lookup."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "containers",
+      "href": "https://en.cppreference.com/cpp/container"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "vector::reserve",
+      "href": "https://en.cppreference.com/cpp/container/vector/reserve"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "map",
+      "href": "https://en.cppreference.com/cpp/container/map"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::less<>",
+      "href": "https://en.cppreference.com/cpp/utility/functional/less_void"
+     },
+     {
+      "t": "text",
+      "v": "; the standard on "
+     },
+     {
+      "t": "a",
+      "v": "vector capacity",
+      "href": "https://eel.is/c++draft/vector.capacity"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

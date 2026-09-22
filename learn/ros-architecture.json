@@ -1,0 +1,508 @@
+{
+ "id": "ros-architecture",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A small wheeled robot has wheel encoders, an IMU and a 2D lidar, and it must drive to a goal in a known building. On paper, draw the loop from its sensors to its motors: the stages, what flows between them, and roughly how often each stage runs. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "text",
+    "tag": "",
+    "expect": "",
+    "text": " wheel encoders (50 Hz), IMU (200 Hz), lidar (10 Hz)\n      |  raw measurements with timestamps\n      v\n estimation: odometry from wheels + IMU, localisation against the map with the lidar\n      |  pose and velocity, with uncertainty\n      v\n planning: a path from the current pose to the goal (about 1 Hz), avoiding obstacles\n      |  path\n      v\n control: velocity commands that follow the path (about 20 Hz)\n      |  linear and angular velocity\n      v\n actuation: motor drivers turn wheel speed targets into motor current\n      |\n      v\n the robot moves, and the sensors see the change: that is the feedback"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you had the five stages in order, the feedback from the motion back to the sensors, and rates that are faster for control than for planning. Missing the feedback or the rates is a partial pass, and a different order is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Almost every mobile robot's software is one feedback loop with five stages, each turning the stage before it into what the next one needs. "
+    },
+    {
+     "t": "i",
+     "v": "Sensing"
+    },
+    {
+     "t": "text",
+     "v": " produces raw, timestamped measurements, encoder ticks, IMU rates, lidar ranges, that alone don't say where the robot is. "
+    },
+    {
+     "t": "i",
+     "v": "Estimation"
+    },
+    {
+     "t": "text",
+     "v": " turns them into state: a pose, a velocity, and how uncertain each is. "
+    },
+    {
+     "t": "i",
+     "v": "Planning"
+    },
+    {
+     "t": "text",
+     "v": " decides what to do, typically a path to a goal. "
+    },
+    {
+     "t": "i",
+     "v": "Control"
+    },
+    {
+     "t": "text",
+     "v": " computes the linear and angular velocity that follows that plan. "
+    },
+    {
+     "t": "i",
+     "v": "Actuation"
+    },
+    {
+     "t": "text",
+     "v": " turns those commands into motor current that moves the robot."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this split solves is that no single piece of code can sense, decide and move at once: sensor data alone says nothing about position, deciding where to go needs a stable estimate rather than a raw reading, and following that decision needs commands issued far more often than a plan is computed. Splitting the work lets each stage run at the rate it needs."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Estimation combines two techniques that fail oppositely: odometry integrates wheel and IMU data, fast but drifting as small errors add up, while localisation compares scans against a map, slower but not drifting; combining them anchors a smooth pose. The loop closes through "
+    },
+    {
+     "t": "i",
+     "v": "feedback"
+    },
+    {
+     "t": "text",
+     "v": ": actuation moves the robot, sensing measures the result, and control corrects on what happened rather than what it asked for. Each stage is only as current as its input, so a delay in the estimate means control corrects for where the robot used to be."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Naming where failures enter this loop, a stale sensor, drifting odometry, a controller asking more than the motors can give, is the core of robotics interviews. The mistake under pressure is trusting a command as proof of what happened: the stage after a failure usually cannot tell its own input is wrong, and a stop command that was published is not evidence the robot stopped. Real systems add a supervisor that checks the outcome independently, from the robot's own measured state, rather than the messages nodes sent each other."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: drawing the loop for a small wheeled robot from its encoders, IMU and lidar to its motors, with the feedback arrow back to the sensors and control running faster than planning."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "loop",
+   "title": "The sense-estimate-plan-control-act loop and feedback",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Almost every mobile robot is a feedback loop with five stages. They run at different rates, and each stage turns the output of the one before into something the next can use."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Sensing"
+        },
+        {
+         "t": "text",
+         "v": " produces raw measurements, each with a timestamp: wheel encoder ticks, IMU angular rates and accelerations, lidar ranges, camera images. On their own, they don't say where the robot is."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Estimation"
+        },
+        {
+         "t": "text",
+         "v": " turns measurements into state: where the robot is, how fast it moves, and how uncertain that is. Odometry integrates wheel and IMU data, which is smooth and fast but drifts, because every small error adds up. Localisation compares lidar scans with a map, which is slower and noisier but doesn't drift. Combining the two gives a pose that is both smooth and anchored. In ROS 2 this is the reason for two transforms: "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " from odometry, and "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " from localisation. The frames topic covers them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Planning"
+        },
+        {
+         "t": "text",
+         "v": " decides what to do. A global planner finds a path through the map to the goal, perhaps once a second. A local planner or controller turns that path into motion that avoids obstacles the map didn't have."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Control"
+        },
+        {
+         "t": "text",
+         "v": " computes commands that make the robot follow the plan, using the estimated state as feedback. For a wheeled robot these are a linear and an angular velocity, typically 10 to 50 times a second, published in ROS 2 on "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": ", usually as "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/Twist"
+        },
+        {
+         "t": "text",
+         "v": ". On Jazzy, ros2_control's diff_drive_controller takes "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/TwistStamped"
+        },
+        {
+         "t": "text",
+         "v": " instead, which adds a header with a time stamp."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Actuation"
+        },
+        {
+         "t": "text",
+         "v": " executes the commands. A differential-drive base converts the two velocities into left and right wheel speeds, and motor drivers regulate each motor to its speed. The robot moves, the sensors measure the new situation, and the loop closes. That closing is "
+        },
+        {
+         "t": "i",
+         "v": "feedback"
+        },
+        {
+         "t": "text",
+         "v": ": the controller corrects based on what actually happened, not on what it asked for."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rates matter because each stage can only be as current as its input. A controller running at 20 Hz on a pose that is updated at 1 Hz is steering on old information. Latency adds up along the loop in the same way: a 100 ms delay in the estimate means the controller always corrects for where the robot was 100 ms ago."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Failures enter at every stage, and naming where is the core of robotics interviews:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "a sensor stops or delivers stale data;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "odometry drifts when a wheel slips;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "localisation locks onto the wrong place;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the map is out of date;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the controller asks for more than the motors can give, which is saturation;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a motor driver faults."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The stage after the failure usually can't tell that its input is wrong. That is why real systems add a supervisor that checks the loop independently: is the data fresh, did the robot actually stop when told to? The Test Bench project builds exactly that."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "robot",
+   "title": "Draw the loop for a differential-drive robot",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes. Draw the loop for the Test Bench robot: a differential-drive robot in Gazebo, driven by ROS 2 nodes. For every arrow, write the ROS 2 topic name and message type. Mark where the supervisor sits and which topics it watches. Then mark where the bench's missing-odometry and cancellation scenarios inject their failure or event. Its third scenario, normal operation, injects nothing."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A drawing with these contents passes. Names can differ if your robot uses others:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": " Gazebo: sensors, and the DiffDrive system, whose odometry is the estimate (no map yet)\n   | ros_gz_bridge, Gazebo to ROS\n   | /scan      sensor_msgs/msg/LaserScan   (10 Hz)\n   | /odom_raw  nav_msgs/msg/Odometry       (for example 50 Hz)\n   | /tf        tf2_msgs/msg/TFMessage      odom -> base_link\n   v\n relay: republishes /odom_raw as /odom          <- missing odometry: the relay stops forwarding\n   | /odom      nav_msgs/msg/Odometry\n   v\n mission node: plans a short route to the goal, accepts a cancel request   <- cancellation: cancel mid-route\n   | /route     nav_msgs/msg/Path\n   v\n controller: follows the route, with /odom as feedback\n   | /cmd_vel_nav  geometry_msgs/msg/Twist  (20 Hz)\n   v\n supervisor, independent of the controller: watches /odom, forwards /cmd_vel_nav\n   to /cmd_vel while /odom is fresh, and publishes a zero velocity when it is stale\n   | /cmd_vel   geometry_msgs/msg/Twist     (20 Hz)\n   v\n ros_gz_bridge, ROS to Gazebo -> DiffDrive system -> wheels -> robot moves -> sensors (feedback)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Normal operation needs no injection. The scenario checks that the robot reaches the goal within its position and time tolerances. Missing odometry is injected by the relay, which republishes the bridge's "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " as "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " and stops forwarding on cue. It needs an input topic of its own: if the bridge also published "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", stopping the relay would change nothing. The supervisor must notice the stale "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " and stop the robot. For that it sits between the controller and the bridge, as the only publisher on "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": ". A supervisor that published a zero velocity next to the controller would lose, because the DiffDrive system uses the last command it received and the controller sends a new one 20 times a second. The "
+        },
+        {
+         "t": "code",
+         "v": "twist_mux"
+        },
+        {
+         "t": "text",
+         "v": " package is built on the same idea: one node chooses which of several command sources reaches the robot. Cancellation is injected at the mission node, which must stop the motion and release what it holds. In both failure scenarios, the pass criterion comes from the simulator's own state, the robot's actual speed, and not from the messages the nodes sent. A stop command that was published isn't proof that the robot stopped."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the five stages and what flows between them, why odometry and localisation are combined, and why control runs faster than planning. Describe three places where failures enter the loop, and why an independent supervisor checks the outcome rather than the command."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does each stage of the loop consume and produce, and roughly how often does it run?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does odometry drift, and what corrects it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What happens to control when the estimate arrives late?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name four ways the loop can fail, and which stage notices each."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: draw the loop for a differential-drive robot with ROS 2 topic names and message types."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": null
+}

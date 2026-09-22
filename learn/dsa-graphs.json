@@ -1,0 +1,1403 @@
+{
+ "id": "dsa-graphs",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "An occupancy grid comes in as rows of characters, "
+     },
+     {
+      "t": "code",
+      "v": "#"
+     },
+     {
+      "t": "text",
+      "v": " for occupied and "
+     },
+     {
+      "t": "code",
+      "v": "."
+     },
+     {
+      "t": "text",
+      "v": " for free. Write "
+     },
+     {
+      "t": "code",
+      "v": "count_islands(grid)"
+     },
+     {
+      "t": "text",
+      "v": ", which returns the number of groups of "
+     },
+     {
+      "t": "code",
+      "v": "#"
+     },
+     {
+      "t": "text",
+      "v": " cells joined up, down, left or right. Diagonals do not join. Take the grid as "
+     },
+     {
+      "t": "code",
+      "v": "std::span<const std::string>"
+     },
+     {
+      "t": "text",
+      "v": " and do not change it, and use a loop with your own stack rather than recursion. Test the grid below, an all-free grid, an all-occupied grid, a single cell and an empty grid. Say what the time and the extra space are. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "text",
+    "tag": "",
+    "expect": "",
+    "text": "##..#\n#..#.\n.#..#\n###.."
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\nstruct Cell {\n  std::ptrdiff_t row = 0;\n  std::ptrdiff_t col = 0;\n};\n\n// Groups of '#' cells joined up, down, left or right.\n[[nodiscard]] std::int64_t count_islands(std::span<const std::string> grid) {\n  const std::ptrdiff_t rows = std::ssize(grid);\n  const std::ptrdiff_t cols = rows == 0 ? 0 : std::ssize(grid.front());\n  std::vector<char> seen(static_cast<std::size_t>(rows * cols), 0);\n  const auto index = [cols](std::ptrdiff_t r, std::ptrdiff_t c) { return static_cast<std::size_t>(r * cols + c); };\n  std::int64_t islands = 0;\n  std::vector<Cell> pending;\n  for (std::ptrdiff_t r = 0; r < rows; ++r) {\n    for (std::ptrdiff_t c = 0; c < cols; ++c) {\n      if (grid[static_cast<std::size_t>(r)][static_cast<std::size_t>(c)] != '#' || seen[index(r, c)] != 0) continue;\n      ++islands;\n      seen[index(r, c)] = 1;  // marked when it is queued, not when it is taken\n      pending.push_back({.row = r, .col = c});\n      while (!pending.empty()) {\n        const Cell here = pending.back();\n        pending.pop_back();\n        const std::vector<Cell> around{{here.row - 1, here.col},\n                                       {here.row + 1, here.col},\n                                       {here.row, here.col - 1},\n                                       {here.row, here.col + 1}};\n        for (const Cell& next : around) {\n          if (next.row < 0 || next.row >= rows || next.col < 0 || next.col >= cols) continue;\n          if (grid[static_cast<std::size_t>(next.row)][static_cast<std::size_t>(next.col)] != '#') continue;\n          if (seen[index(next.row, next.col)] != 0) continue;\n          seen[index(next.row, next.col)] = 1;\n          pending.push_back(next);\n        }\n      }\n    }\n  }\n  return islands;\n}\n\nvoid report(std::string_view name, std::span<const std::string> grid) {\n  std::cout << std::format(\"{:<22}{}\\n\", name, count_islands(grid));\n}\n\nint main() {\n  const std::vector<std::string> map{\"##..#\", \"#..#.\", \".#..#\", \"###..\"};\n  for (const std::string& row : map) std::cout << row << '\\n';\n  report(\"islands\", map);\n  report(\"all water\", std::vector<std::string>{\"...\", \"...\"});\n  report(\"all land\", std::vector<std::string>{\"###\", \"###\"});\n  report(\"one cell\", std::vector<std::string>{\"#\"});\n  report(\"empty grid\", {});\n}"
+   },
+   {
+    "t": "output",
+    "text": "##..#\n#..#.\n.#..#\n###..\nislands               5\nall water             0\nall land              1\none cell              1\nempty grid            0"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The grid is a graph that nobody built. Each free-or-occupied cell is a vertex, the four neighbours are its edges, and they are computed from the coordinates rather than stored, so there is no adjacency list to allocate. Recognising that is most of what this problem tests, and the rest is a flood fill: walk over every cell, and each time you meet an unseen "
+     },
+     {
+      "t": "code",
+      "v": "#"
+     },
+     {
+      "t": "text",
+      "v": ", count one island and take its whole group out of circulation."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "It is O(rows·cols) time, because each cell is looked at a constant number of times, and O(rows·cols) extra space for "
+     },
+     {
+      "t": "code",
+      "v": "seen"
+     },
+     {
+      "t": "text",
+      "v": " plus the pending stack, which in the worst case of an all-occupied grid holds a good fraction of the cells. The "
+     },
+     {
+      "t": "code",
+      "v": "seen"
+     },
+     {
+      "t": "text",
+      "v": " array is a flat "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<char>"
+     },
+     {
+      "t": "text",
+      "v": " indexed by "
+     },
+     {
+      "t": "code",
+      "v": "r * cols + c"
+     },
+     {
+      "t": "text",
+      "v": ", the same flattening a heap uses for a tree: one allocation, and the second dimension lives in the arithmetic."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The comment on the marking line is the part to say out loud. A cell is marked the moment it goes onto the stack, never when it comes off. The last section measures what happens when you get that wrong."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with a flood fill, all five results right, and O(rows·cols) for both. A recursive flood fill is a partial pass: it is correct here and overflows the stack on a large grid, which the last section measures. Counting "
+     },
+     {
+      "t": "code",
+      "v": "#"
+     },
+     {
+      "t": "text",
+      "v": " cells instead of groups, or joining diagonals, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A graph is vertices and edges between them, and the representation is the choice everything else follows from. An "
+    },
+    {
+     "t": "i",
+     "v": "adjacency list"
+    },
+    {
+     "t": "text",
+     "v": " stores, for each vertex, the vertices it joins: O(n + m) memory, and a walk over its neighbours costing its degree, the number of edges at it. An "
+    },
+    {
+     "t": "i",
+     "v": "adjacency matrix"
+    },
+    {
+     "t": "text",
+     "v": " stores a bit or byte for every ordered pair, O(n²) whatever the edge count, answering whether an edge exists in O(1). An "
+    },
+    {
+     "t": "i",
+     "v": "implicit"
+    },
+    {
+     "t": "text",
+     "v": " graph computes its neighbours instead of storing any, which is what an occupancy grid is: a cell is a vertex, its four neighbours two lines of arithmetic."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The two searches solve exploring everything reachable from a vertex, in an order that answers a specific question, with no structure such as an array's indices to walk. Both need a set of visited vertices a tree traversal does not, since a graph, unlike a tree, can reach the same vertex more than one way."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "i",
+     "v": "Breadth-first search"
+    },
+    {
+     "t": "text",
+     "v": " keeps the frontier in a queue and takes the oldest vertex next, finishing every vertex one hop away before it looks two hops away, which is why the first time it reaches a vertex is by the fewest edges. "
+    },
+    {
+     "t": "i",
+     "v": "Depth-first search"
+    },
+    {
+     "t": "text",
+     "v": " keeps the frontier in a stack and takes the newest, running down one branch as far as it goes before backing out. Both cost O(n + m) with an adjacency list, since each vertex enters the frontier once and each edge is examined once from each end; the fewest-edges guarantee breaks once edges carry different weights, where a min-heap frontier, Dijkstra's algorithm, replaces the queue."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake that shows up under pressure is marking a vertex visited when it leaves the frontier instead of when it enters. The search still terminates and reaches everywhere it should, so a sparse test graph passes; a vertex only gets queued more than once, doubling the work, and a dense graph makes it worse, because a vertex joined to many others is queued again by every neighbour reaching it first. Each extra queueing can overwrite an already-correct hop count with a longer one, so the wrong answer appears exactly where density grows, which is what a robot's graph does as sensor range grows."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet the representation choice in the interview question itself, an occupancy grid whose vertices and edges are never built, only computed from a cell's coordinates as the flood fill visits it."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Adjacency lists, BFS, DFS, visited sets",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Pick the representation first, because every later decision follows from it. The same 1000-vertex graph with 3000 edges, stored three ways:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <random>\n#include <span>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Edge {\n  std::ptrdiff_t from = 0;\n  std::ptrdiff_t to = 0;\n};\n\n// Bytes the container actually reserved, counted from its own capacity.\n[[nodiscard]] std::int64_t bytes_of(const std::vector<std::vector<std::ptrdiff_t>>& lists) {\n  std::int64_t total = static_cast<std::int64_t>(lists.capacity() * sizeof(std::vector<std::ptrdiff_t>));\n  for (const std::vector<std::ptrdiff_t>& row : lists)\n    total += static_cast<std::int64_t>(row.capacity() * sizeof(std::ptrdiff_t));\n  return total;\n}\n\n[[nodiscard]] std::vector<std::vector<std::ptrdiff_t>> as_lists(std::ptrdiff_t n, std::span<const Edge> edges) {\n  std::vector<std::vector<std::ptrdiff_t>> lists(static_cast<std::size_t>(n));\n  for (const Edge& e : edges) {\n    lists[static_cast<std::size_t>(e.from)].push_back(e.to);\n    lists[static_cast<std::size_t>(e.to)].push_back(e.from);\n  }\n  return lists;\n}\n\n// One block: targets holds every neighbour, offsets says where each vertex's run starts.\nstruct Csr {\n  std::vector<std::ptrdiff_t> offsets;\n  std::vector<std::ptrdiff_t> targets;\n};\n\n[[nodiscard]] Csr as_csr(std::ptrdiff_t n, std::span<const Edge> edges) {\n  Csr csr;\n  csr.offsets.assign(static_cast<std::size_t>(n + 1), 0);\n  for (const Edge& e : edges) {\n    ++csr.offsets[static_cast<std::size_t>(e.from + 1)];\n    ++csr.offsets[static_cast<std::size_t>(e.to + 1)];\n  }\n  for (std::ptrdiff_t i = 0; i < n; ++i)\n    csr.offsets[static_cast<std::size_t>(i + 1)] += csr.offsets[static_cast<std::size_t>(i)];\n  csr.targets.assign(static_cast<std::size_t>(2 * std::ssize(edges)), 0);\n  std::vector<std::ptrdiff_t> next = csr.offsets;\n  for (const Edge& e : edges) {\n    csr.targets[static_cast<std::size_t>(next[static_cast<std::size_t>(e.from)]++)] = e.to;\n    csr.targets[static_cast<std::size_t>(next[static_cast<std::size_t>(e.to)]++)] = e.from;\n  }\n  return csr;\n}\n\nvoid row(std::string_view name, std::int64_t bytes, std::int64_t blocks, std::ptrdiff_t n) {\n  std::cout << std::format(\"{:<26}{:>12}{:>10}{:>12.1f}\\n\", name, bytes, blocks,\n                           static_cast<double>(bytes) / static_cast<double>(n));\n}\n\nint main() {\n  constexpr std::ptrdiff_t n = 1000;\n  constexpr std::ptrdiff_t m = 3000;\n  std::mt19937 gen{7};\n  std::vector<Edge> edges;\n  edges.reserve(static_cast<std::size_t>(m));\n  for (std::ptrdiff_t i = 0; i < m; ++i)\n    edges.push_back({.from = static_cast<std::ptrdiff_t>(gen() % static_cast<unsigned>(n)),\n                     .to = static_cast<std::ptrdiff_t>(gen() % static_cast<unsigned>(n))});\n\n  const std::vector<std::vector<std::ptrdiff_t>> lists = as_lists(n, edges);\n  const Csr csr = as_csr(n, edges);\n  const std::vector<char> matrix(static_cast<std::size_t>(n * n), 0);\n\n  std::cout << std::format(\"1000 vertices, 3000 edges{:>15}{:>10}{:>12}\\n\", \"bytes\", \"blocks\", \"per vertex\");\n  row(\"vector of vectors\", bytes_of(lists), 1 + n, n);\n  row(\"one flat pair (CSR)\",\n      static_cast<std::int64_t>((csr.offsets.capacity() + csr.targets.capacity()) * sizeof(std::ptrdiff_t)), 2, n);\n  row(\"dense matrix of char\", static_cast<std::int64_t>(matrix.capacity()), 1, n);\n\n  std::int64_t degree_sum = 0;\n  for (const std::vector<std::ptrdiff_t>& neighbours : lists) degree_sum += std::ssize(neighbours);\n  std::cout << std::format(\"degrees add up to {} = 2m, and the CSR holds {} targets\\n\", degree_sum,\n                           csr.targets.size());\n}"
+      },
+      {
+       "t": "output",
+       "text": "1000 vertices, 3000 edges          bytes    blocks  per vertex\nvector of vectors                87240      1001        87.2\none flat pair (CSR)              56008         2        56.0\ndense matrix of char           1000000         1      1000.0\ndegrees add up to 6000 = 2m, and the CSR holds 6000 targets"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An "
+        },
+        {
+         "t": "i",
+         "v": "adjacency list"
+        },
+        {
+         "t": "text",
+         "v": " stores, for each vertex, the vertices it joins. It costs O(n + m) memory and lets you walk one vertex's neighbours in time proportional to its "
+        },
+        {
+         "t": "i",
+         "v": "degree"
+        },
+        {
+         "t": "text",
+         "v": ", the number of edges at it. An "
+        },
+        {
+         "t": "i",
+         "v": "adjacency matrix"
+        },
+        {
+         "t": "text",
+         "v": " stores a bit or a byte for every ordered pair, so it costs O(n²) whatever m is, answers \"is there an edge from a to b\" in O(1), and takes O(n) to list one vertex's neighbours. The measured rows say when each one wins: at 3000 edges among 1000 vertices the matrix costs 11.5 times the vector of vectors and 17.9 times the flat pair. The last column is the same figure divided by the vertex count, 1000 bytes a vertex for the matrix against 56, and it is there because that is the number that keeps growing as the graph does. The matrix earns its place when the graph is "
+        },
+        {
+         "t": "i",
+         "v": "dense"
+        },
+        {
+         "t": "text",
+         "v": ", m close to n², or when the algorithm keeps asking about specific pairs rather than walking neighbours. Interview graphs and robot graphs are almost always sparse, so the list is the default."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::vector<std::vector<std::ptrdiff_t>>"
+        },
+        {
+         "t": "text",
+         "v": " is the interview form, and it is 1001 allocations. The flat pair, one array of every neighbour and one array of where each vertex's run begins, is the shipping form: two allocations, the neighbours of a vertex contiguous, and the same O(n + m). It has the name "
+        },
+        {
+         "t": "i",
+         "v": "compressed sparse row"
+        },
+        {
+         "t": "text",
+         "v": ", it is what graph libraries and most sparse-matrix code use, and building it is the counting-then-prefix-sum pass from the sorting topic's counting sort. The trade is that it is fixed once built, so use the vector of vectors while the graph is still changing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two more representations are worth naming. An "
+        },
+        {
+         "t": "i",
+         "v": "implicit"
+        },
+        {
+         "t": "text",
+         "v": " graph computes its neighbours instead of storing them, which is what the cold check's grid does and what a robot's occupancy grid is: free cells are vertices, the four or eight neighbours are edges, and the whole adjacency structure is two lines of arithmetic. And an "
+        },
+        {
+         "t": "i",
+         "v": "edge list"
+        },
+        {
+         "t": "text",
+         "v": ", a flat "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Edge>"
+        },
+        {
+         "t": "text",
+         "v": ", is the right shape when the algorithm sweeps all edges rather than walking from a vertex."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With a representation chosen, the two walks are the ones from the tree topic with one new part. A tree traversal could not meet the same node twice; a graph can, so every graph walk carries a "
+        },
+        {
+         "t": "i",
+         "v": "visited"
+        },
+        {
+         "t": "text",
+         "v": " set. For vertices numbered 0 to n − 1 that set is a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<char>"
+        },
+        {
+         "t": "text",
+         "v": " indexed by vertex, which is O(1) and one allocation. Reach for "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_set"
+        },
+        {
+         "t": "text",
+         "v": " only when the vertices are not small integers, such as string node names, and even then mapping the names to indices once at the start is usually faster than hashing on every step."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <queue>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nusing Graph = std::vector<std::vector<std::ptrdiff_t>>;\n\n[[nodiscard]] Graph undirected(std::ptrdiff_t n, std::span<const std::pair<std::ptrdiff_t, std::ptrdiff_t>> edges) {\n  Graph g(static_cast<std::size_t>(n));\n  for (const auto& [a, b] : edges) {\n    g[static_cast<std::size_t>(a)].push_back(b);\n    g[static_cast<std::size_t>(b)].push_back(a);\n  }\n  for (std::vector<std::ptrdiff_t>& row : g) std::ranges::sort(row);  // a fixed neighbour order\n  return g;\n}\n\nstruct Search {\n  std::vector<std::ptrdiff_t> order;                  // vertices in the order they were visited\n  std::vector<std::optional<std::ptrdiff_t>> parent;  // who reached each vertex\n  std::vector<std::optional<std::ptrdiff_t>> hops;    // edges from the start\n};\n\n[[nodiscard]] Search breadth_first(const Graph& g, std::ptrdiff_t start) {\n  Search s;\n  s.parent.assign(g.size(), std::nullopt);\n  s.hops.assign(g.size(), std::nullopt);\n  std::vector<char> seen(g.size(), 0);\n  std::queue<std::ptrdiff_t> waiting;\n  seen[static_cast<std::size_t>(start)] = 1;  // marked when it is queued\n  s.hops[static_cast<std::size_t>(start)] = 0;\n  waiting.push(start);\n  while (!waiting.empty()) {\n    const std::ptrdiff_t here = waiting.front();\n    waiting.pop();\n    s.order.push_back(here);\n    for (const std::ptrdiff_t next : g[static_cast<std::size_t>(here)]) {\n      if (seen[static_cast<std::size_t>(next)] != 0) continue;\n      seen[static_cast<std::size_t>(next)] = 1;\n      s.parent[static_cast<std::size_t>(next)] = here;\n      s.hops[static_cast<std::size_t>(next)] = *s.hops[static_cast<std::size_t>(here)] + 1;\n      waiting.push(next);\n    }\n  }\n  return s;\n}\n\n[[nodiscard]] std::vector<std::ptrdiff_t> depth_first(const Graph& g, std::ptrdiff_t start) {\n  std::vector<std::ptrdiff_t> order;\n  std::vector<char> seen(g.size(), 0);\n  std::vector<std::ptrdiff_t> pending{start};\n  while (!pending.empty()) {\n    const std::ptrdiff_t here = pending.back();\n    pending.pop_back();\n    if (seen[static_cast<std::size_t>(here)] != 0) continue;  // marked when it is taken\n    seen[static_cast<std::size_t>(here)] = 1;\n    order.push_back(here);\n    const std::vector<std::ptrdiff_t>& neighbours = g[static_cast<std::size_t>(here)];\n    for (auto it = neighbours.rbegin(); it != neighbours.rend(); ++it)\n      if (seen[static_cast<std::size_t>(*it)] == 0) pending.push_back(*it);\n  }\n  return order;\n}\n\n[[nodiscard]] std::string show(std::span<const std::ptrdiff_t> v) {\n  std::string out;\n  for (const std::ptrdiff_t x : v) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", x);\n  return out.empty() ? \"(none)\" : out;\n}\n\n[[nodiscard]] std::string path_to(const Search& s, std::ptrdiff_t target) {\n  if (!s.hops[static_cast<std::size_t>(target)]) return \"unreachable\";\n  std::vector<std::ptrdiff_t> back;\n  for (std::optional<std::ptrdiff_t> at = target; at; at = s.parent[static_cast<std::size_t>(*at)])\n    back.push_back(*at);\n  std::ranges::reverse(back);\n  return show(back);\n}\n\nint main() {\n  const std::vector<std::pair<std::ptrdiff_t, std::ptrdiff_t>> edges{{0, 1}, {0, 2}, {1, 3}, {1, 4}, {2, 4}, {3, 5}};\n  const Graph g = undirected(7, edges);\n  for (std::ptrdiff_t v = 0; v < std::ssize(g); ++v)\n    std::cout << std::format(\"{} -> {}\\n\", v, show(g[static_cast<std::size_t>(v)]));\n\n  const Search bfs = breadth_first(g, 0);\n  std::cout << std::format(\"BFS order    {}\\n\", show(bfs.order));\n  std::string hops;\n  for (std::ptrdiff_t v = 0; v < std::ssize(g); ++v)\n    hops += std::format(\"{}{}:{}\", hops.empty() ? \"\" : \" \", v,\n                        bfs.hops[static_cast<std::size_t>(v)]\n                            ? std::format(\"{}\", *bfs.hops[static_cast<std::size_t>(v)])\n                            : \"-\");\n  std::cout << std::format(\"hops from 0  {}\\n\", hops);\n  std::cout << std::format(\"path to 5    {}\\n\", path_to(bfs, 5));\n  std::cout << std::format(\"path to 6    {}\\n\", path_to(bfs, 6));\n  std::cout << std::format(\"DFS order    {}\\n\", show(depth_first(g, 0)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "0 -> 1 2\n1 -> 0 3 4\n2 -> 0 4\n3 -> 1 5\n4 -> 1 2\n5 -> 3\n6 -> (none)\nBFS order    0 1 2 3 4 5\nhops from 0  0:0 1:1 2:1 3:2 4:2 5:3 6:-\npath to 5    0 1 3 5\npath to 6    unreachable\nDFS order    0 1 3 5 4 2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two functions differ in one word. "
+        },
+        {
+         "t": "i",
+         "v": "Breadth-first search"
+        },
+        {
+         "t": "text",
+         "v": " keeps the frontier in a "
+        },
+        {
+         "t": "code",
+         "v": "std::queue"
+        },
+        {
+         "t": "text",
+         "v": " and takes the oldest vertex next, so it finishes everything one hop away before it looks at anything two hops away. "
+        },
+        {
+         "t": "i",
+         "v": "Depth-first search"
+        },
+        {
+         "t": "text",
+         "v": " keeps it in a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " used as a stack and takes the newest, so it runs down one branch as far as it goes. The orders above show it: BFS gives 0 1 2 3 4 5, level by level, while DFS gives 0 1 3 5 4 2, diving to 5 before it comes back for 2."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That one word is the whole reason BFS answers shortest paths. When a vertex is first reached, it is reached from the closest layer that could reach it, because every vertex at distance d is dequeued before any vertex at distance d + 1 is, and a vertex is marked the first time it is queued. So "
+        },
+        {
+         "t": "code",
+         "v": "hops"
+        },
+        {
+         "t": "text",
+         "v": " above is the fewest edges from vertex 0, and the "
+        },
+        {
+         "t": "code",
+         "v": "parent"
+        },
+        {
+         "t": "text",
+         "v": " array replays the route: follow it back from the target and reverse, which is how "
+        },
+        {
+         "t": "code",
+         "v": "path_to"
+        },
+        {
+         "t": "text",
+         "v": " prints "
+        },
+        {
+         "t": "code",
+         "v": "0 1 3 5"
+        },
+        {
+         "t": "text",
+         "v": ". This holds only when every edge costs the same. Give the edges different weights and the fewest-edges path stops being the cheapest one, and you need Dijkstra's algorithm, which replaces the queue with the min-heap from the previous topic and always expands the cheapest unexplored vertex, or A\\*, which adds an estimate of the distance still to go. That is what a robot's global planner runs, and it is the next topic's material rather than this one's."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both walks are O(n + m) with an adjacency list: every vertex enters the frontier at most once and every edge is looked at once from each end. Their memory differs the way the tree topic measured. BFS holds a frontier, which on a wide graph is large, and its stack use is O(1) because it is a loop. DFS holds one entry per vertex on the current path, which on a long thin graph is large, and the recursive version holds that path as call frames, which is the failure the last section measures. Reach for BFS when the question is about distance or layers, and for DFS when the question is about reachability, structure or an ordering. For \"can I get there at all\" the two are equally good, and DFS is the shorter code."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two structural questions come up often enough to know cold. A "
+        },
+        {
+         "t": "i",
+         "v": "cycle"
+        },
+        {
+         "t": "text",
+         "v": " in an undirected graph is a neighbour that is already visited and is not the vertex you came from; forgetting the second half reports a cycle for every single edge. In a directed graph that test is wrong, because a visited vertex may sit in a finished branch, and the right test is whether the vertex is on the current path, which a DFS tracks with three states: untouched, on the path, and finished. A "
+        },
+        {
+         "t": "i",
+         "v": "topological order"
+        },
+        {
+         "t": "text",
+         "v": " of a directed graph lists every vertex before all the vertices it points to, which exists exactly when the graph has no cycle. The worked example builds one."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Bringing a robot up has an order: the udev rules before the CAN bus, the driver before odometry, odometry and the lidar before SLAM. Write those down as edges and the order falls out, and so does the answer to whether an order exists at all:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <queue>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nusing Graph = std::vector<std::vector<std::ptrdiff_t>>;\n\n// Kahn's algorithm: repeatedly take a step whose prerequisites are all done.\n// Returns the order, or no value when some steps can never start, which means a cycle.\n[[nodiscard]] std::optional<std::vector<std::ptrdiff_t>> bring_up_order(const Graph& after) {\n  std::vector<std::ptrdiff_t> waiting_on(after.size(), 0);\n  for (const std::vector<std::ptrdiff_t>& nexts : after)\n    for (const std::ptrdiff_t next : nexts) ++waiting_on[static_cast<std::size_t>(next)];\n  std::queue<std::ptrdiff_t> ready;\n  for (std::ptrdiff_t v = 0; v < std::ssize(after); ++v)\n    if (waiting_on[static_cast<std::size_t>(v)] == 0) ready.push(v);\n  std::vector<std::ptrdiff_t> order;\n  while (!ready.empty()) {\n    const std::ptrdiff_t here = ready.front();\n    ready.pop();\n    order.push_back(here);\n    for (const std::ptrdiff_t next : after[static_cast<std::size_t>(here)])\n      if (--waiting_on[static_cast<std::size_t>(next)] == 0) ready.push(next);\n  }\n  if (std::ssize(order) != std::ssize(after)) return std::nullopt;  // something never became ready\n  return order;\n}\n\n[[nodiscard]] std::vector<std::ptrdiff_t> still_blocked(const Graph& after,\n                                                        std::span<const std::ptrdiff_t> ordered) {\n  std::vector<char> done(after.size(), 0);\n  for (const std::ptrdiff_t v : ordered) done[static_cast<std::size_t>(v)] = 1;\n  std::vector<std::ptrdiff_t> left;\n  for (std::ptrdiff_t v = 0; v < std::ssize(after); ++v)\n    if (done[static_cast<std::size_t>(v)] == 0) left.push_back(v);\n  return left;\n}\n\nint main() {\n  const std::vector<std::string> step{\"udev-rules\", \"can-bus\", \"driver\",    \"odometry\",\n                                      \"lidar\",      \"slam\",    \"navigation\"};\n  const std::vector<std::pair<std::ptrdiff_t, std::ptrdiff_t>> before{{0, 1}, {1, 2}, {2, 3}, {0, 4},\n                                                                      {3, 5}, {4, 5}, {5, 6}};\n  Graph after(step.size());\n  for (const auto& [a, b] : before) after[static_cast<std::size_t>(a)].push_back(b);\n\n  const std::optional<std::vector<std::ptrdiff_t>> order = bring_up_order(after);\n  std::string line;\n  for (const std::ptrdiff_t v : order.value())\n    line += std::format(\"{}{}\", line.empty() ? \"\" : \" -> \", step[static_cast<std::size_t>(v)]);\n  std::cout << std::format(\"bring-up order: {}\\n\", line);\n\n  Graph broken = after;\n  broken[6].push_back(1);  // navigation before can-bus: nonsense, and a cycle\n  const std::optional<std::vector<std::ptrdiff_t>> none = bring_up_order(broken);\n  std::cout << std::format(\"with navigation -> can-bus: order found: {}\\n\", none.has_value());\n\n  // Kahn's partial result names the steps caught in the cycle.\n  std::vector<std::ptrdiff_t> waiting_on(broken.size(), 0);\n  for (const std::vector<std::ptrdiff_t>& nexts : broken)\n    for (const std::ptrdiff_t next : nexts) ++waiting_on[static_cast<std::size_t>(next)];\n  std::queue<std::ptrdiff_t> ready;\n  for (std::ptrdiff_t v = 0; v < std::ssize(broken); ++v)\n    if (waiting_on[static_cast<std::size_t>(v)] == 0) ready.push(v);\n  std::vector<std::ptrdiff_t> placed;\n  while (!ready.empty()) {\n    const std::ptrdiff_t here = ready.front();\n    ready.pop();\n    placed.push_back(here);\n    for (const std::ptrdiff_t next : broken[static_cast<std::size_t>(here)])\n      if (--waiting_on[static_cast<std::size_t>(next)] == 0) ready.push(next);\n  }\n  std::string stuck;\n  for (const std::ptrdiff_t v : still_blocked(broken, placed))\n    stuck += std::format(\"{}{}\", stuck.empty() ? \"\" : \" \", step[static_cast<std::size_t>(v)]);\n  std::cout << std::format(\"{} of {} steps placed, still blocked: {}\\n\", placed.size(), step.size(), stuck);\n}"
+      },
+      {
+       "t": "output",
+       "text": "bring-up order: udev-rules -> can-bus -> lidar -> driver -> odometry -> slam -> navigation\nwith navigation -> can-bus: order found: false\n2 of 7 steps placed, still blocked: can-bus driver odometry slam navigation"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The algorithm is Kahn's, and it is a BFS over prerequisites ("
+        },
+        {
+         "t": "a",
+         "v": "Wikipedia's page on topological sorting",
+         "href": "https://en.wikipedia.org/wiki/Topological_sorting"
+        },
+        {
+         "t": "text",
+         "v": " gives it in full). "
+        },
+        {
+         "t": "code",
+         "v": "waiting_on[v]"
+        },
+        {
+         "t": "text",
+         "v": " is the "
+        },
+        {
+         "t": "i",
+         "v": "in-degree"
+        },
+        {
+         "t": "text",
+         "v": " of v, the number of steps that must finish before it may start. Everything with an in-degree of zero is ready at the start. Taking a step off the queue finishes it, which decrements the in-degree of everything it unblocks, and anything that reaches zero joins the queue. It is O(n + m): the in-degrees are one pass over all the edges, and each edge is decremented once."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The returned order is one of several valid ones. "
+        },
+        {
+         "t": "code",
+         "v": "lidar"
+        },
+        {
+         "t": "text",
+         "v": " comes third here because the queue happened to hold it when "
+        },
+        {
+         "t": "code",
+         "v": "can-bus"
+        },
+        {
+         "t": "text",
+         "v": " was taken; swap the queue for the min-heap of the previous topic and you get the lexicographically smallest valid order instead, which is how build systems make their output reproducible."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Cycle detection comes free, and that is the part worth remembering. If the graph has a cycle, no vertex in it ever reaches in-degree zero, because each one waits on another member of the cycle. So the loop finishes with fewer than n vertices emitted, and "
+        },
+        {
+         "t": "code",
+         "v": "bring_up_order"
+        },
+        {
+         "t": "text",
+         "v": " returns no value rather than a plausible order that is wrong. Adding "
+        },
+        {
+         "t": "code",
+         "v": "navigation -> can-bus"
+        },
+        {
+         "t": "text",
+         "v": " left five steps stuck, and those five are exactly the cycle and everything downstream of it, which is the error message you want: it names the steps that cannot start, rather than reporting a cycle somewhere in the graph and leaving you to find it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The alternative is a DFS that emits each vertex after its descendants and reverses the result, tracking three states per vertex to tell a back edge from a cross edge. It is the same complexity and it finds the actual cycle rather than the blocked set. Kahn's version is easier to get right under time pressure and does not recurse, which on a long chain of dependencies matters for the reason the next section measures."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Connected components; shortest path in a grid",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "components(n, edges)"
+        },
+        {
+         "t": "text",
+         "v": " for an undirected graph with vertices numbered 0 to n − 1 and an edge list of "
+        },
+        {
+         "t": "code",
+         "v": "std::pair<std::ptrdiff_t, std::ptrdiff_t>"
+        },
+        {
+         "t": "text",
+         "v": ". Return, in one struct: a label per vertex saying which component it belongs to, the number of components, and the size of the largest. Number the components 0 upwards in order of the smallest vertex in each, so the answer is the same on every run. Use no recursion."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test the seven-vertex graph from the theory section, where vertex 6 has no edges; five vertices with no edges at all; zero vertices; one vertex; two disjoint pairs; and a triangle plus a spare vertex. State the time and the extra space in terms of n and m, and say what you would use instead if edges kept arriving and you had to answer \"are these two in the same component\" after each one."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build the adjacency list once, then sweep the vertices in order. Each unlabelled vertex starts a new component and a flood fill labels everything it can reach, which is the cold check's loop over a graph you did build:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nusing Edge = std::pair<std::ptrdiff_t, std::ptrdiff_t>;\n\nstruct Components {\n  std::vector<std::ptrdiff_t> label;  // which component each vertex belongs to\n  std::ptrdiff_t count = 0;\n  std::ptrdiff_t largest = 0;\n};\n\n[[nodiscard]] Components components(std::ptrdiff_t n, std::span<const Edge> edges) {\n  std::vector<std::vector<std::ptrdiff_t>> neighbours(static_cast<std::size_t>(n));\n  for (const auto& [a, b] : edges) {\n    neighbours[static_cast<std::size_t>(a)].push_back(b);\n    neighbours[static_cast<std::size_t>(b)].push_back(a);\n  }\n  Components out;\n  out.label.assign(static_cast<std::size_t>(n), -1);\n  std::vector<std::ptrdiff_t> pending;\n  for (std::ptrdiff_t start = 0; start < n; ++start) {\n    if (out.label[static_cast<std::size_t>(start)] != -1) continue;\n    const std::ptrdiff_t id = out.count++;\n    std::ptrdiff_t size = 0;\n    out.label[static_cast<std::size_t>(start)] = id;  // labelled when it is queued\n    pending.push_back(start);\n    while (!pending.empty()) {\n      const std::ptrdiff_t here = pending.back();\n      pending.pop_back();\n      ++size;\n      for (const std::ptrdiff_t next : neighbours[static_cast<std::size_t>(here)]) {\n        if (out.label[static_cast<std::size_t>(next)] != -1) continue;\n        out.label[static_cast<std::size_t>(next)] = id;\n        pending.push_back(next);\n      }\n    }\n    out.largest = std::max(out.largest, size);\n  }\n  return out;\n}\n\n[[nodiscard]] std::string show(std::span<const std::ptrdiff_t> v) {\n  std::string out;\n  for (const std::ptrdiff_t x : v) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", x);\n  return out.empty() ? \"(none)\" : out;\n}\n\nvoid report(std::string_view name, std::ptrdiff_t n, std::span<const Edge> edges) {\n  const Components c = components(n, edges);\n  std::cout << std::format(\"{:<24}{} components, largest {}, labels {}\\n\", name, c.count, c.largest,\n                           show(c.label));\n}\n\nint main() {\n  const std::vector<Edge> waypoints{{0, 1}, {0, 2}, {1, 3}, {1, 4}, {2, 4}, {3, 5}};\n  report(\"7 vertices, 6 edges\", 7, waypoints);\n  report(\"5 vertices, no edges\", 5, {});\n  report(\"no vertices\", 0, {});\n  report(\"one vertex\", 1, {});\n  const std::vector<Edge> two{{0, 1}, {2, 3}};\n  report(\"two pairs\", 4, two);\n  const std::vector<Edge> loop{{0, 1}, {1, 2}, {2, 0}};\n  report(\"a triangle plus a spare\", 4, loop);\n}"
+      },
+      {
+       "t": "output",
+       "text": "7 vertices, 6 edges     2 components, largest 6, labels 0 0 0 0 0 0 1\n5 vertices, no edges    5 components, largest 1, labels 0 1 2 3 4\nno vertices             0 components, largest 0, labels (none)\none vertex              1 components, largest 1, labels 0\ntwo pairs               2 components, largest 2, labels 0 0 1 1\na triangle plus a spare 2 components, largest 3, labels 0 0 0 1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Building the lists is O(n + m) and the sweep is O(n + m) again, because the outer loop touches each vertex once and the inner fill walks each edge twice, once from each end. The extra space is O(n + m) for the lists plus O(n) for the labels and the stack. The label array doubles as the visited set, which is why there is no separate "
+        },
+        {
+         "t": "code",
+         "v": "seen"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "-1"
+        },
+        {
+         "t": "text",
+         "v": " means unvisited, which is a sentinel, a value stolen from the domain to mean \"no value\". It is safe here because a label is a count and can never be negative, and the form to reach for when that is not certain is "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::ptrdiff_t>"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "Abseil tip #171",
+         "href": "https://abseil.io/tips/171"
+        },
+        {
+         "t": "text",
+         "v": "), which the search tree and dynamic programming topics use for the same reason."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every edge case in the list is really the same question: does the code treat \"a vertex with no edges\" as a component? It must, which is why the sweep runs over vertices rather than over edges. Five isolated vertices are five components, and an empty graph has none."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The stack is declared once outside the outer loop and reused, since it is empty every time a fill finishes. That keeps the allocation count at one for the whole sweep rather than one per component, which matters when a lidar frame has thousands of small clusters."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last part of the question is where this algorithm stops being the answer. When edges arrive one at a time and each one is followed by a query, rebuilding the labels is O(n + m) per edge. The structure for that is a "
+        },
+        {
+         "t": "i",
+         "v": "disjoint-set union"
+        },
+        {
+         "t": "text",
+         "v": ", also called union-find: an array where each vertex points at a representative, with path compression and union by size, which answers both \"join these two\" and \"are these two joined\" in near-constant amortised time. It cannot list a component's members without a sweep, so the two are complementary."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. A grid comes in as rows of "
+        },
+        {
+         "t": "code",
+         "v": "."
+        },
+        {
+         "t": "text",
+         "v": " for free and "
+        },
+        {
+         "t": "code",
+         "v": "#"
+        },
+        {
+         "t": "text",
+         "v": " for blocked. Write "
+        },
+        {
+         "t": "code",
+         "v": "shortest_route(grid, start, goal)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the shortest route from "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "goal"
+        },
+        {
+         "t": "text",
+         "v": " moving up, down, left or right through free cells, as the list of cells including both ends, together with the number of moves. Return no value when either end is blocked or off the grid, or when no route exists. Moving to a blocked cell is not allowed, and diagonals do not count."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Use BFS, and reconstruct the route rather than only counting the moves. Test a five-by-five room with interior walls: a route that has to go around, a start equal to the goal, a route that has to take the long way round, a goal inside a wall, and a grid split in two by a full wall. State the time and the extra space, and say what you would change if each cell had a different cost to cross."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "BFS gives the distance and a "
+        },
+        {
+         "t": "code",
+         "v": "came_from"
+        },
+        {
+         "t": "text",
+         "v": " entry for each cell the first time it is reached. Walking "
+        },
+        {
+         "t": "code",
+         "v": "came_from"
+        },
+        {
+         "t": "text",
+         "v": " backwards from the goal and reversing gives the route:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <queue>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\nstruct Cell {\n  std::ptrdiff_t row = 0;\n  std::ptrdiff_t col = 0;\n};\n\n[[nodiscard]] bool operator==(const Cell& a, const Cell& b) { return a.row == b.row && a.col == b.col; }\n\nstruct Route {\n  std::vector<Cell> cells;  // start first, goal last\n  std::int64_t steps = 0;   // moves, which is one fewer than the cells\n};\n\n// The fewest moves from start to goal through '.' cells, or no value when there is no way through.\n[[nodiscard]] std::optional<Route> shortest_route(std::span<const std::string> grid, Cell start, Cell goal) {\n  const std::ptrdiff_t rows = std::ssize(grid);\n  const std::ptrdiff_t cols = rows == 0 ? 0 : std::ssize(grid.front());\n  const auto open = [&](Cell c) {\n    return c.row >= 0 && c.row < rows && c.col >= 0 && c.col < cols &&\n           grid[static_cast<std::size_t>(c.row)][static_cast<std::size_t>(c.col)] == '.';\n  };\n  if (!open(start) || !open(goal)) return std::nullopt;\n  const auto id = [cols](Cell c) { return static_cast<std::size_t>(c.row * cols + c.col); };\n  std::vector<std::optional<Cell>> came_from(static_cast<std::size_t>(rows * cols), std::nullopt);\n  std::vector<char> seen(static_cast<std::size_t>(rows * cols), 0);\n  std::queue<Cell> waiting;\n  seen[id(start)] = 1;  // marked when it is queued\n  waiting.push(start);\n  while (!waiting.empty()) {\n    const Cell here = waiting.front();\n    waiting.pop();\n    if (here == goal) {\n      Route route;\n      for (std::optional<Cell> at = here; at; at = came_from[id(*at)]) route.cells.push_back(*at);\n      std::ranges::reverse(route.cells);\n      route.steps = std::ssize(route.cells) - 1;\n      return route;\n    }\n    const std::vector<Cell> around{\n        {here.row - 1, here.col}, {here.row + 1, here.col}, {here.row, here.col - 1}, {here.row, here.col + 1}};\n    for (const Cell& next : around) {\n      if (!open(next) || seen[id(next)] != 0) continue;\n      seen[id(next)] = 1;\n      came_from[id(next)] = here;\n      waiting.push(next);\n    }\n  }\n  return std::nullopt;\n}\n\nvoid report(std::string_view name, std::span<const std::string> grid, Cell start, Cell goal) {\n  const std::optional<Route> route = shortest_route(grid, start, goal);\n  if (!route) {\n    std::cout << std::format(\"{:<26}no way through\\n\", name);\n    return;\n  }\n  std::string path;\n  for (const Cell& c : route->cells) path += std::format(\"{}({},{})\", path.empty() ? \"\" : \" \", c.row, c.col);\n  std::cout << std::format(\"{:<26}{} steps: {}\\n\", name, route->steps, path);\n}\n\nint main() {\n  const std::vector<std::string> room{\".....\", \".###.\", \".#...\", \".#.#.\", \"...#.\"};\n  for (const std::string& line : room) std::cout << line << '\\n';\n  report(\"(0,0) to (4,4)\", room, {0, 0}, {4, 4});\n  report(\"(0,0) to (0,0)\", room, {0, 0}, {0, 0});\n  report(\"(0,0) to (2,2)\", room, {0, 0}, {2, 2});\n  report(\"(0,0) to (1,1), a wall\", room, {0, 0}, {1, 1});\n  const std::vector<std::string> split{\"..#..\", \"..#..\", \"..#..\"};\n  report(\"across a full wall\", split, {0, 0}, {0, 4});\n}"
+      },
+      {
+       "t": "output",
+       "text": ".....\n.###.\n.#...\n.#.#.\n...#.\n(0,0) to (4,4)            8 steps: (0,0) (0,1) (0,2) (0,3) (0,4) (1,4) (2,4) (3,4) (4,4)\n(0,0) to (0,0)            0 steps: (0,0)\n(0,0) to (2,2)            8 steps: (0,0) (1,0) (2,0) (3,0) (4,0) (4,1) (4,2) (3,2) (2,2)\n(0,0) to (1,1), a wall    no way through\nacross a full wall        no way through"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(rows·cols) time and O(rows·cols) extra space for "
+        },
+        {
+         "t": "code",
+         "v": "seen"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "came_from"
+        },
+        {
+         "t": "text",
+         "v": " and the queue, because every free cell enters the queue at most once and has four neighbours. The route to (4,4) takes 8 moves, which is the straight-line Manhattan distance, since nothing blocks the way round the top. The route to (2,2) also takes 8 where the Manhattan distance is 4, and that gap is the wall: BFS found the shortest route that exists rather than the shortest route you would draw."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three things are worth defending. The goal test is on the way out of the queue rather than on the way in, which costs one extra layer of work and keeps the code honest if the start equals the goal; testing on the way in is a common tightening and needs a separate check for that case. "
+        },
+        {
+         "t": "code",
+         "v": "came_from"
+        },
+        {
+         "t": "text",
+         "v": " is a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::optional<Cell>>"
+        },
+        {
+         "t": "text",
+         "v": " with no value at the start, which ends the reconstruction loop without a sentinel cell such as "
+        },
+        {
+         "t": "code",
+         "v": "{-1, -1}"
+        },
+        {
+         "t": "text",
+         "v": ". And "
+        },
+        {
+         "t": "code",
+         "v": "open"
+        },
+        {
+         "t": "text",
+         "v": " checks the bounds and the wall together, so no caller can index outside the grid, which is the same argument for one guard that the traversal topic made about null children."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Different costs per cell are where this stops working. BFS assumes every move costs the same, so a grid where grass costs 1 and gravel costs 5 breaks the layer argument the theory section gave. That is Dijkstra's algorithm, which swaps the queue for a min-heap keyed by cost so far, and A\\* if you also have an admissible estimate of the distance remaining, which on a grid is the Manhattan distance. A robot's global planner is usually one of those two over exactly this occupancy grid."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Marking visited too late; recursion depth",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every BFS and DFS on this page marks a vertex as the code puts it in the frontier. Moving that one line to where the vertex comes out still produces a graph walk that terminates and looks right:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <queue>\n#include <string_view>\n#include <vector>\n\nusing Graph = std::vector<std::vector<std::ptrdiff_t>>;\n\nstruct Cost {\n  std::int64_t pushes = 0;\n  std::ptrdiff_t widest = 0;\n  std::int64_t hops_to_last = 0;\n};\n\n// Correct: a vertex is marked the moment it is put in the queue.\n[[nodiscard]] Cost mark_on_push(const Graph& g) {\n  Cost cost;\n  std::vector<char> seen(g.size(), 0);\n  std::vector<std::int64_t> hops(g.size(), 0);\n  std::queue<std::ptrdiff_t> waiting;\n  seen[0] = 1;\n  waiting.push(0);\n  ++cost.pushes;\n  while (!waiting.empty()) {\n    cost.widest = std::max(cost.widest, std::ssize(waiting));\n    const std::ptrdiff_t here = waiting.front();\n    waiting.pop();\n    for (const std::ptrdiff_t next : g[static_cast<std::size_t>(here)]) {\n      if (seen[static_cast<std::size_t>(next)] != 0) continue;\n      seen[static_cast<std::size_t>(next)] = 1;\n      hops[static_cast<std::size_t>(next)] = hops[static_cast<std::size_t>(here)] + 1;\n      waiting.push(next);\n      ++cost.pushes;\n    }\n  }\n  cost.hops_to_last = hops.back();\n  return cost;\n}\n\n// The bug: a vertex is marked only when it comes out, so it is queued once per neighbour that\n// reached it first. The answers still come out right, which is why nobody notices.\n[[nodiscard]] Cost mark_on_pop(const Graph& g) {\n  Cost cost;\n  std::vector<char> seen(g.size(), 0);\n  std::vector<std::int64_t> hops(g.size(), 0);\n  std::queue<std::ptrdiff_t> waiting;\n  waiting.push(0);\n  ++cost.pushes;\n  while (!waiting.empty()) {\n    cost.widest = std::max(cost.widest, std::ssize(waiting));\n    const std::ptrdiff_t here = waiting.front();\n    waiting.pop();\n    if (seen[static_cast<std::size_t>(here)] != 0) continue;\n    seen[static_cast<std::size_t>(here)] = 1;\n    for (const std::ptrdiff_t next : g[static_cast<std::size_t>(here)]) {\n      if (seen[static_cast<std::size_t>(next)] != 0) continue;\n      hops[static_cast<std::size_t>(next)] = hops[static_cast<std::size_t>(here)] + 1;\n      waiting.push(next);\n      ++cost.pushes;\n    }\n  }\n  cost.hops_to_last = hops.back();\n  return cost;\n}\n\nvoid row(std::string_view shape, const Graph& g) {\n  const Cost good = mark_on_push(g);\n  const Cost bad = mark_on_pop(g);\n  std::cout << std::format(\"{:<20}{:>9}{:>9}{:>9}{:>9}{:>8}{:>6}\\n\", shape, good.pushes, bad.pushes, good.widest,\n                           bad.widest, good.hops_to_last, bad.hops_to_last);\n}\n\n[[nodiscard]] Graph complete(std::ptrdiff_t n) {\n  Graph g(static_cast<std::size_t>(n));\n  for (std::ptrdiff_t a = 0; a < n; ++a)\n    for (std::ptrdiff_t b = 0; b < n; ++b)\n      if (a != b) g[static_cast<std::size_t>(a)].push_back(b);\n  return g;\n}\n\n[[nodiscard]] Graph grid(std::ptrdiff_t side) {\n  Graph g(static_cast<std::size_t>(side * side));\n  const auto id = [side](std::ptrdiff_t r, std::ptrdiff_t c) { return r * side + c; };\n  for (std::ptrdiff_t r = 0; r < side; ++r)\n    for (std::ptrdiff_t c = 0; c < side; ++c) {\n      if (r + 1 < side) {\n        g[static_cast<std::size_t>(id(r, c))].push_back(id(r + 1, c));\n        g[static_cast<std::size_t>(id(r + 1, c))].push_back(id(r, c));\n      }\n      if (c + 1 < side) {\n        g[static_cast<std::size_t>(id(r, c))].push_back(id(r, c + 1));\n        g[static_cast<std::size_t>(id(r, c + 1))].push_back(id(r, c));\n      }\n    }\n  return g;\n}\n\nint main() {\n  std::cout << std::format(\"{:<20}{:>9}{:>9}{:>9}{:>9}{:>8}{:>6}\\n\", \"graph\", \"pushes\", \"late\", \"widest\", \"late\",\n                           \"hops\", \"late\");\n  row(\"200 all joined\", complete(200));\n  row(\"100 by 100 grid\", grid(100));\n}"
+      },
+      {
+       "t": "output",
+       "text": "graph                  pushes     late   widest     late    hops  late\n200 all joined            200    19901      199    19702       1   199\n100 by 100 grid         10000    19801      100      199     198   198"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the grid row first, because that is the row your test suite has. Marking late cost twice the pushes and twice the peak queue, and the distance to the far corner came out as 198 either way. The answer is right, the code is slower, and nothing tells you."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now the dense row. With 200 vertices all joined to each other, marking late queued 19,901 vertices instead of 200 and held 19,702 of them at once, 99 times the memory. And the distance to the last vertex came back as 199 where the truth is 1, because the vertex is queued again by every vertex popped before it, and each requeue overwrites its hop count with a longer one. So the same one-line slip is a performance bug on a sparse graph and a wrong answer on a dense one, and a robot's graph gets denser as the sensor range grows."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rule is short enough to say in an interview. Mark a vertex when you put it into the frontier, not when you take it out, because the frontier is what the mark is protecting. The only walk on this page that marks on the way out is the iterative DFS in the theory section, and it does so deliberately: a DFS wants the "
+        },
+        {
+         "t": "i",
+         "v": "last"
+        },
+        {
+         "t": "text",
+         "v": " path that reached a vertex to be the one it explores, so it pushes duplicates and skips them on the way out, which costs O(m) stack entries and is the standard shape. If that bound bothers you, check "
+        },
+        {
+         "t": "code",
+         "v": "seen"
+        },
+        {
+         "t": "text",
+         "v": " before pushing as well, which is what the theory version does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is the one from the recursion topic, wearing a graph. A corridor of cells, each joined to the next, is a perfectly ordinary map, and a recursive DFS over it recurses once per cell:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-overflow",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <vector>\n\nusing Graph = std::vector<std::vector<std::ptrdiff_t>>;\n\n// A corridor: every cell joined to the next one, the shape a wall-following map produces.\n[[nodiscard]] Graph corridor(std::ptrdiff_t n) {\n  Graph g(static_cast<std::size_t>(n));\n  for (std::ptrdiff_t v = 0; v + 1 < n; ++v) {\n    g[static_cast<std::size_t>(v)].push_back(v + 1);\n    g[static_cast<std::size_t>(v + 1)].push_back(v);\n  }\n  return g;\n}\n\nstd::int64_t visit(const Graph& g, std::ptrdiff_t here, std::vector<char>& seen) {\n  seen[static_cast<std::size_t>(here)] = 1;\n  std::int64_t reached = 1;\n  for (const std::ptrdiff_t next : g[static_cast<std::size_t>(here)])\n    if (seen[static_cast<std::size_t>(next)] == 0) reached += visit(g, next, seen);\n  return reached;\n}\n\nint main() {\n  const Graph g = corridor(1'000'000);\n  std::vector<char> seen(g.size(), 0);\n  std::cout << std::format(\"reached {} cells\\n\", visit(g, 0, seen));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports a stack-overflow. The recursion is correct: the visited check is in the right place, nothing is visited twice, and it terminates on any graph. The depth is the length of the longest simple path the search takes, which on a corridor is every cell. Built the way this page's examples are built, that function returned at 34,000 cells and crashed at 36,000, which is the same 8 MB and the same arithmetic the recursion topic measured. The corridor is not a contrived graph: a wall-following exploration, a lane graph and a replayed trajectory all produce one, and so does a grid BFS frontier when the free space is a corridor."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two repairs, and they are the ones from the recursion and traversal topics. Use the iterative DFS with an explicit "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " as its stack, which puts the pending work on the heap, where a million entries is a few megabytes rather than a crash. Or use BFS, whose frontier is already on the heap and whose loop uses O(1) stack; on a long thin graph its queue never holds more than a couple of vertices, which is the mirror image of the tree topic's perfect tree of 2047 nodes, where the queue held 1024 while the depth-first stack held 21 frames for that page's frame walker, or 11 entries for the plain stack of node pointers in its cold check. The shape of the graph decides which one is cheap, and only one of the two can run out of stack."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the three representations with their memory, including the measured bytes for 1000 vertices and 3000 edges, and say when a matrix wins. Say what a grid has instead of an adjacency list. Give the frontier container of BFS and of DFS and the order each produced on the seven-vertex graph. Say in one sentence why BFS gives shortest paths and what breaks that guarantee. Say how a topological order is built and how the same pass detects a cycle. Say where a vertex must be marked, and give the measured cost of marking it late on the dense graph. Say at what depth the recursive DFS crashed and what you write instead."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Give the memory of an adjacency list, a flat CSR pair and a dense matrix for n vertices and m edges. When does the matrix win?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the adjacency structure of an occupancy grid, and how much memory does it take?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which container holds the frontier in BFS, and which in DFS? Give the order each one produced on the seven-vertex graph."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does BFS give the fewest-edges path, and what one change to the graph breaks that?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How do you recover the path itself, beyond its length?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How does Kahn's algorithm build a topological order, and how does the same run tell you the graph has a cycle?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A vertex is marked when it leaves the queue instead of when it enters. What happened to the push count, the peak queue and the answer on 200 vertices all joined?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "At what depth did the recursive DFS on a corridor crash, and what are the two ways out?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 20 minutes: shortest route through a grid, with the route itself returned."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". Why a flat pair of arrays beats a vector of vectors, and what a thousand small allocations cost."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh and Adam Segoli Schubert, Back to Basics: Algorithmic Complexity, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Algorithmic_Complexity.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=AY2FqpDCBGs"
+     },
+     {
+      "t": "text",
+      "v": ". Counting a walk's work as O(n + m), and the recursion stack as extra space."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Functions, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Back_to_Basics_Functions_cppcon_2023.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=CpHX1Du5R0Q"
+     },
+     {
+      "t": "text",
+      "v": ". What a call frame holds, which is what the explicit stack carries instead."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": " on preferring the library, "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " as the default container, "
+     },
+     {
+      "t": "a",
+      "v": "Per.14",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-alloc"
+     },
+     {
+      "t": "text",
+      "v": " on keeping the allocation count down, and "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": " on measuring before claiming."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "Wikipedia on topological sorting",
+      "href": "https://en.wikipedia.org/wiki/Topological_sorting"
+     },
+     {
+      "t": "text",
+      "v": ", which gives Kahn's algorithm in full, including the test that reports a cycle when the output is short."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::queue",
+      "href": "https://en.cppreference.com/cpp/container/queue"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::deque",
+      "href": "https://en.cppreference.com/cpp/container/deque"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ranges::reverse",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/reverse"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "AddressSanitizer",
+      "href": "https://clang.llvm.org/docs/AddressSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": ", which names a deep recursion's crash instead of leaving a bare segmentation fault."
+     }
+    ]
+   ]
+  }
+ ]
+}

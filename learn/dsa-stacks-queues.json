@@ -1,0 +1,2457 @@
+{
+ "id": "dsa-stacks-queues",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "is_balanced(s)"
+     },
+     {
+      "t": "text",
+      "v": ", which says whether the brackets "
+     },
+     {
+      "t": "code",
+      "v": "()"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "[]"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "{}"
+     },
+     {
+      "t": "text",
+      "v": " in "
+     },
+     {
+      "t": "code",
+      "v": "s"
+     },
+     {
+      "t": "text",
+      "v": " are balanced: every closing bracket closes the most recent bracket still open, and of the same kind. Other characters don't matter. "
+     },
+     {
+      "t": "code",
+      "v": "\"([]{})\""
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "\"f(a[i]) { return; }\""
+     },
+     {
+      "t": "text",
+      "v": " are balanced, while "
+     },
+     {
+      "t": "code",
+      "v": "\"([)]\""
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "\"((\""
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "\")(\""
+     },
+     {
+      "t": "text",
+      "v": " are not, and the empty string is. Take "
+     },
+     {
+      "t": "code",
+      "v": "std::string_view"
+     },
+     {
+      "t": "text",
+      "v": ", state the time and space, and take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <format>\n#include <iostream>\n#include <optional>\n#include <string_view>\n#include <vector>\n\n// The opening bracket that `c` closes, or no value if `c` isn't a closing bracket.\n[[nodiscard]] constexpr std::optional<char> opener_of(char c) {\n  switch (c) {\n    case ')': return '(';\n    case ']': return '[';\n    case '}': return '{';\n    default: return std::nullopt;\n  }\n}\n\n[[nodiscard]] bool is_balanced(std::string_view s) {\n  std::vector<char> open;  // brackets still waiting to be closed, the most recent at the back\n  for (const char c : s) {\n    if (c == '(' || c == '[' || c == '{') {\n      open.push_back(c);\n    } else if (const std::optional<char> opener = opener_of(c)) {\n      if (open.empty() || open.back() != *opener) return false;\n      open.pop_back();\n    }\n  }\n  return open.empty();\n}\n\nint main() {\n  for (const std::string_view s : {\"([]{})\", \"f(a[i]) { return; }\", \"([)]\", \"((\", \")(\", \"\"})\n    std::cout << std::format(\"{:<24}{}\\n\", std::format(\"\\\"{}\\\"\", s), is_balanced(s));\n}"
+   },
+   {
+    "t": "output",
+    "text": "\"([]{})\"                true\n\"f(a[i]) { return; }\"   true\n\"([)]\"                  false\n\"((\"                    false\n\")(\"                    false\n\"\"                      true"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The bracket that must close next is always the one opened last, which is what a stack gives back. A string fails in three ways, and the code checks each one: a closing bracket of the wrong kind, a closing bracket when nothing is open, and brackets still open at the end. The "
+     },
+     {
+      "t": "code",
+      "v": "open.empty()"
+     },
+     {
+      "t": "text",
+      "v": " check comes before "
+     },
+     {
+      "t": "code",
+      "v": "open.back()"
+     },
+     {
+      "t": "text",
+      "v": ", because "
+     },
+     {
+      "t": "code",
+      "v": "back()"
+     },
+     {
+      "t": "text",
+      "v": " on an empty vector is undefined behaviour; "
+     },
+     {
+      "t": "code",
+      "v": "\")(\""
+     },
+     {
+      "t": "text",
+      "v": " is the test for it. It is O(n) time and O(n) space in the worst case, when every character opens a bracket."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The stack is a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<char>"
+     },
+     {
+      "t": "text",
+      "v": ". It does everything a stack needs, with "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "back"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "pop_back"
+     },
+     {
+      "t": "text",
+      "v": ", and the theory below says why it is the default over "
+     },
+     {
+      "t": "code",
+      "v": "std::stack"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with a stack that checks all three failures. Counting each kind of bracket instead of using a stack answers true for "
+     },
+     {
+      "t": "code",
+      "v": "\"([)]\""
+     },
+     {
+      "t": "text",
+      "v": ", and a missing empty check reads outside the vector on "
+     },
+     {
+      "t": "code",
+      "v": "\")(\""
+     },
+     {
+      "t": "text",
+      "v": ": either is a partial pass. Anything less is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A stack and a queue are the two disciplines for the order work comes back out. A stack is last in, first out: whatever you pushed most recently is the only thing you can read or remove. A queue is first in, first out: whatever you pushed longest ago is the one that comes out next. In C++ both are adaptors in the sense that matters for an interview: the operations they allow, not the container underneath, are the whole point."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The shape of problem that signals a stack is anything with a most-recent-first cancellation: matching brackets or tags, undoing the last edit, walking a tree or graph depth-first, or evaluating an expression where an operator needs its two most recent operands. A queue is signalled by fairness or arrival order: handling messages or commands in the order they arrived, or a breadth-first search, where the next node to visit is the oldest one still waiting."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism, in C++, is choosing the container the discipline actually needs. A "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " used with "
+    },
+    {
+     "t": "code",
+     "v": "push_back"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "back"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "pop_back"
+    },
+    {
+     "t": "text",
+     "v": " is a stack with everything O(1), amortised for the push, and it is the default: reach for "
+    },
+    {
+     "t": "code",
+     "v": "std::stack"
+    },
+    {
+     "t": "text",
+     "v": " only when the type itself must forbid indexing or iterating. A queue needs O(1) removal from the front, which a vector doesn't give, so "
+    },
+    {
+     "t": "code",
+     "v": "std::queue"
+    },
+    {
+     "t": "text",
+     "v": " defaults to a "
+    },
+    {
+     "t": "code",
+     "v": "std::deque"
+    },
+    {
+     "t": "text",
+     "v": ", and a fixed-size queue in a loop that must not allocate is a ring buffer instead. The same discipline, kept under an extra invariant, gives a monotonic stack, one that never lets a smaller element sit above a larger one, answering \"next larger element\" style questions in one pass."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What trips people up under pressure is popping past empty: reading "
+    },
+    {
+     "t": "code",
+     "v": "top()"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "front()"
+    },
+    {
+     "t": "text",
+     "v": " or "
+    },
+    {
+     "t": "code",
+     "v": "back()"
+    },
+    {
+     "t": "text",
+     "v": " on an empty container is undefined behaviour that a plain build won't flag, so the fix is checking "
+    },
+    {
+     "t": "code",
+     "v": "empty()"
+    },
+    {
+     "t": "text",
+     "v": " first or returning "
+    },
+    {
+     "t": "code",
+     "v": "std::optional"
+    },
+    {
+     "t": "text",
+     "v": " from your own pop. The other is treating \"amortised O(1)\" as \"O(1) every time\": a structure such as a two-stack queue moves every element exactly once over its whole life, but one particular call can still move all of them at once, which a real-time loop with a deadline can't absorb."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: check whether a string's brackets are balanced, which is a stack problem the moment you notice that the bracket due to close next is always the one that opened most recently."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Stack and queue uses; std::stack, std::queue, std::deque",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program pushes 1000 ints onto two stacks, one with the default container and one on a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ", and counts the memory each asks for. The allocator only counts, and then allocates as usual:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <stack>\n#include <string_view>\n#include <vector>\n\nstruct Tally {\n  std::int64_t bytes = 0;\n  std::int64_t allocations = 0;\n};\n\ntemplate <typename T>\nstruct Counting {\n  using value_type = T;\n  Tally* tally;\n  explicit Counting(Tally* t) : tally(t) {}\n  template <typename U>\n  Counting(const Counting<U>& other) : tally(other.tally) {}  // a container may allocate other types too\n  [[nodiscard]] T* allocate(std::size_t n) {\n    tally->bytes += static_cast<std::int64_t>(n * sizeof(T));\n    ++tally->allocations;\n    return std::allocator<T>{}.allocate(n);\n  }\n  void deallocate(T* p, std::size_t n) { std::allocator<T>{}.deallocate(p, n); }\n  template <typename U>\n  bool operator==(const Counting<U>& other) const { return tally == other.tally; }\n};\n\ntemplate <typename Container>\nvoid measure(std::string_view name) {\n  Tally tally;\n  std::stack<int, Container> stack(Counting<int>{&tally});\n  std::cout << std::format(\"{}: {} bytes in {} allocations while empty\", name, tally.bytes, tally.allocations);\n  for (int i = 0; i < 1000; ++i) stack.push(i);\n  std::cout << std::format(\", {} bytes in {} after 1000 pushes\\n\", tally.bytes, tally.allocations);\n}\n\nint main() {\n  measure<std::deque<int, Counting<int>>>(\"stack on deque\");\n  measure<std::vector<int, Counting<int>>>(\"stack on vector\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "stack on deque: 576 bytes in 2 allocations while empty, 4304 bytes in 10 after 1000 pushes\nstack on vector: 0 bytes in 0 allocations while empty, 8188 bytes in 11 after 1000 pushes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::stack"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::queue"
+        },
+        {
+         "t": "text",
+         "v": " are "
+        },
+        {
+         "t": "i",
+         "v": "container adaptors"
+        },
+        {
+         "t": "text",
+         "v": ". Each holds a container and lets you reach only the elements its discipline allows: a stack pushes, reads and pops at the back, and a queue pushes at the back and reads and pops at the front. Both use "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": " unless you name another container as the second template argument (cppreference, "
+        },
+        {
+         "t": "a",
+         "v": "stack",
+         "href": "https://en.cppreference.com/cpp/container/stack"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "queue",
+         "href": "https://en.cppreference.com/cpp/container/queue"
+        },
+        {
+         "t": "text",
+         "v": "). The counts are totals over the run, including memory freed on the way. With GCC 13's library, an empty deque already holds 576 bytes: a table of 8 block pointers, 64 bytes, and a first block of 512 bytes. After that it adds one 512-byte block per 128 ints, and once replaces its table of 8 block pointers with one of 18, 144 bytes: 10 allocations in all, 2 tables and 8 blocks. It never moves an element. The vector allocates nothing until the first push, then allocates 11 times on the way to 1000 elements, doubling its capacity each time and copying 1023 elements as it grows; a "
+        },
+        {
+         "t": "code",
+         "v": "reserve(1000)"
+        },
+        {
+         "t": "text",
+         "v": " makes that one allocation."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Neither result makes one of them faster in general, and a benchmark would decide a hot loop. What decides the default is the shape of the memory. A vector keeps its elements in one block, which is the fastest layout to walk and to prefetch, and it costs nothing while empty. The Core Guidelines make it the default container ("
+        },
+        {
+         "t": "a",
+         "v": "SL.con.2",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+        },
+        {
+         "t": "text",
+         "v": "), and Kevin Carpenter's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk",
+         "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) gives the same advice: start with a vector, and choose a deque when you need to add and remove at both ends."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So, for a stack, use a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " directly: "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "back"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "pop_back"
+        },
+        {
+         "t": "text",
+         "v": " are all O(1), the push amortised. It also lets you iterate, which a depth-first search needs to print its current path. Reach for "
+        },
+        {
+         "t": "code",
+         "v": "std::stack"
+        },
+        {
+         "t": "text",
+         "v": " when the type itself should say \"last in, first out\" and forbid everything else, as for a member that the rest of a class must not index or iterate. Then give it the vector: "
+        },
+        {
+         "t": "code",
+         "v": "std::stack<Waypoint, std::vector<Waypoint>>"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A queue is different, because a vector has no O(1) way to remove its first element: "
+        },
+        {
+         "t": "code",
+         "v": "erase(begin())"
+        },
+        {
+         "t": "text",
+         "v": " moves every other element. "
+        },
+        {
+         "t": "code",
+         "v": "std::queue"
+        },
+        {
+         "t": "text",
+         "v": " needs "
+        },
+        {
+         "t": "code",
+         "v": "pop_front"
+        },
+        {
+         "t": "text",
+         "v": " from its container, and "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " doesn't have one. The error appears only when you call "
+        },
+        {
+         "t": "code",
+         "v": "pop()"
+        },
+        {
+         "t": "text",
+         "v": ", because a class template's member functions are compiled only when they are used:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "no member named",
+       "text": "#include <queue>\n#include <vector>\n\nint main() {\n  std::queue<int, std::vector<int>> commands;  // compiles\n  commands.push(1);                            // compiles\n  commands.pop();                              // needs std::vector<int>::pop_front\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC reports that "
+        },
+        {
+         "t": "code",
+         "v": "class std::vector<int>"
+        },
+        {
+         "t": "text",
+         "v": " has no member named "
+        },
+        {
+         "t": "code",
+         "v": "pop_front"
+        },
+        {
+         "t": "text",
+         "v": ", from inside "
+        },
+        {
+         "t": "code",
+         "v": "stl_queue.h"
+        },
+        {
+         "t": "text",
+         "v": ". For a queue, the default "
+        },
+        {
+         "t": "code",
+         "v": "std::queue<T>"
+        },
+        {
+         "t": "text",
+         "v": ", with its deque, is the right choice. Use a "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": " directly when you need both ends, as the faded example below does, or when elements must keep their addresses while you add at the ends: pushing at either end of a deque invalidates its iterators, but not pointers or references to its elements (cppreference, "
+        },
+        {
+         "t": "a",
+         "v": "deque",
+         "href": "https://en.cppreference.com/cpp/container/deque"
+        },
+        {
+         "t": "text",
+         "v": "). A bounded queue in a control loop that must not allocate after start-up is a ring buffer over a fixed "
+        },
+        {
+         "t": "code",
+         "v": "std::array"
+        },
+        {
+         "t": "text",
+         "v": ", which the C++20 library doesn't provide."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Stacks answer \"the most recent one first\": the bracket to close next, the last edit to undo, the next node of a depth-first search, and the pending operands when you evaluate an expression. Queues answer \"the oldest one first\": the next node of a breadth-first search, and messages or commands handled in the order they arrived."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One detail of the adaptors surprises people: "
+        },
+        {
+         "t": "code",
+         "v": "pop()"
+        },
+        {
+         "t": "text",
+         "v": " returns nothing, so you read "
+        },
+        {
+         "t": "code",
+         "v": "top()"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "front()"
+        },
+        {
+         "t": "text",
+         "v": " first and then pop. A "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " that returned the element would have to remove it first and then copy it out, and if that copy threw, the element would be lost: gone from the stack and never returned. Tom Cargill described that problem in 1994. Jonathan Wakely's unpublished 2022 draft "
+        },
+        {
+         "t": "a",
+         "v": "D2518R0",
+         "href": "https://isocpp.org/files/papers/D2518R0.html"
+        },
+        {
+         "t": "text",
+         "v": " proposes a "
+        },
+        {
+         "t": "code",
+         "v": "pop_value()"
+        },
+        {
+         "t": "text",
+         "v": " only for types whose move can't throw, and Brian Bi's published proposal "
+        },
+        {
+         "t": "a",
+         "v": "P3182R1",
+         "href": "https://wg21.link/p3182r1"
+        },
+        {
+         "t": "text",
+         "v": " (2024) proposes value-returning pops for the containers and adaptors. Calling "
+        },
+        {
+         "t": "code",
+         "v": "top()"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "pop()"
+        },
+        {
+         "t": "text",
+         "v": " on an empty adaptor is undefined behaviour, as it is for "
+        },
+        {
+         "t": "code",
+         "v": "back()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "pop_back()"
+        },
+        {
+         "t": "text",
+         "v": " on a vector; the last section of this topic shows what happens."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "monotonic stack"
+        },
+        {
+         "t": "text",
+         "v": " keeps its elements in sorted order by removing, before each push, every element that the new one makes useless. It answers \"for each element, the next one that is larger\" in O(n). A robot records range readings; for each reading, how many steps later does a higher reading come, or does none come? For "
+        },
+        {
+         "t": "code",
+         "v": "{5, 3, 4, 8, 6, 7, 2}"
+        },
+        {
+         "t": "text",
+         "v": " the answers are 3, 1, 1, none, 1, none, none."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The stack holds the indices of readings still waiting for a higher one. Their readings never increase from the bottom of the stack to the top, and that is the invariant. When a reading arrives, it is the answer for every waiting reading lower than itself, and those are all at the top:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\n// For each reading, how many steps later the next higher reading comes, or no value if none does.\n[[nodiscard]] std::vector<std::optional<std::ptrdiff_t>> steps_to_higher(std::span<const int> readings) {\n  std::vector<std::optional<std::ptrdiff_t>> steps(readings.size());\n  std::vector<std::ptrdiff_t> waiting;  // indices; their readings never increase towards the back\n  for (std::ptrdiff_t i = 0; i < std::ssize(readings); ++i) {\n    while (!waiting.empty() && readings[waiting.back()] < readings[i]) {\n      steps[waiting.back()] = i - waiting.back();\n      waiting.pop_back();\n    }\n    waiting.push_back(i);\n  }\n  return steps;  // indices still waiting keep no value\n}\n\nint main() {\n  const std::vector<int> readings{5, 3, 4, 8, 6, 7, 2};\n  std::string_view separator;\n  for (const std::optional<std::ptrdiff_t>& s : steps_to_higher(readings)) {\n    std::cout << separator << (s ? std::to_string(*s) : \"none\");\n    separator = \" \";\n  }\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "3 1 1 none 1 none none"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Trace it, writing each waiting index with its reading:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "i"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "reading"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "popped, with its answer"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "waiting after the step"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "0"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "5"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "0 (5)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "1"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "0 (5), 1 (3)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1: 1 step"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0 (5), 2 (4)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "8"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2: 1 step, 0: 3 steps"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3 (8)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "6"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "3 (8), 4 (6)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "5"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "7"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4: 1 step"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3 (8), 5 (7)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "6"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "2"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "3 (8), 5 (7), 6 (2)"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "At i = 3 the reading 8 answers both waiting readings at once and empties the stack; in general the pops stop at the first waiting reading that isn't lower. Every index is pushed once and popped at most once, so the "
+        },
+        {
+         "t": "code",
+         "v": "while"
+        },
+        {
+         "t": "text",
+         "v": " runs at most n times in the whole run: O(n) time, like the sliding window's inner loop. The space is O(n), reached when the readings only fall, as the last three rows begin to show. The comparison is "
+        },
+        {
+         "t": "code",
+         "v": "<"
+        },
+        {
+         "t": "text",
+         "v": ", so an equal reading doesn't count as higher; with "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": " it would. The result is "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " because \"no higher reading\" isn't a number of steps, and 0 or -1 in its place would be a sentinel that a caller could add to an index."
+        }
+       ]
+      }
+     ],
+     "faded": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same idea with a second end gives the maximum of every window of k consecutive readings in O(n). A "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": " holds indices of readings that could still be the maximum of some window, their readings falling from front to back, so the front is the current maximum. For "
+        },
+        {
+         "t": "code",
+         "v": "{4, 2, 12, 3, 8, 1, 7}"
+        },
+        {
+         "t": "text",
+         "v": " and k = 3 the maxima are 12, 12, 12, 8 and 8. Fill in the two missing lines, then compare with the full version."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "[[nodiscard]] std::vector<int> window_maxima(std::span<const int> readings, std::ptrdiff_t k) {\n  std::vector<int> maxima;\n  std::deque<std::ptrdiff_t> candidates;  // indices; their readings fall from front to back\n  for (std::ptrdiff_t i = 0; i < std::ssize(readings); ++i) {\n    // 1. drop the candidates at the back that readings[i] makes useless\n    candidates.push_back(i);\n    // 2. drop the candidate at the front if it has left the window\n    if (i >= k - 1) maxima.push_back(readings[candidates.front()]);\n  }\n  return maxima;\n}"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <deque>\n#include <iostream>\n#include <span>\n#include <vector>\n\n[[nodiscard]] std::vector<int> window_maxima(std::span<const int> readings, std::ptrdiff_t k) {\n  std::vector<int> maxima;\n  if (k < 1) return maxima;\n  std::deque<std::ptrdiff_t> candidates;\n  for (std::ptrdiff_t i = 0; i < std::ssize(readings); ++i) {\n    while (!candidates.empty() && readings[candidates.back()] <= readings[i]) candidates.pop_back();\n    candidates.push_back(i);\n    if (candidates.front() <= i - k) candidates.pop_front();\n    if (i >= k - 1) maxima.push_back(readings[candidates.front()]);\n  }\n  return maxima;\n}\n\nint main() {\n  const std::vector<int> readings{4, 2, 12, 3, 8, 1, 7};\n  for (const std::ptrdiff_t k : {3, 1, 8}) {\n    std::cout << \"k = \" << k << ':';\n    for (const int m : window_maxima(readings, k)) std::cout << ' ' << m;\n    std::cout << '\\n';\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "k = 3: 12 12 12 8 8\nk = 1: 4 2 12 3 8 1 7\nk = 8:"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A reading that has a higher or equal reading after it can never again be a window's maximum, so it leaves at the back. The front leaves when its index falls out of the window, and at most one index leaves that way per step, so an "
+        },
+        {
+         "t": "code",
+         "v": "if"
+        },
+        {
+         "t": "text",
+         "v": " is enough there. Each index enters and leaves once: O(n) time and O(k) space. With k larger than the input there is no full window and no output. This deque of indices with sorted values is also the missing piece for the shortest subarray with a sum of at least k when numbers can be negative: the same structure, over prefix sums."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Queue using two stacks; minimum stack; evaluate reverse Polish notation",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write a class template "
+        },
+        {
+         "t": "code",
+         "v": "TwoStackQueue<T>"
+        },
+        {
+         "t": "text",
+         "v": " built from two "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<T>"
+        },
+        {
+         "t": "text",
+         "v": " used only as stacks, with "
+        },
+        {
+         "t": "code",
+         "v": "push(value)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "pop()"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the oldest element as "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<T>"
+        },
+        {
+         "t": "text",
+         "v": " or no value when the queue is empty, "
+        },
+        {
+         "t": "code",
+         "v": "empty()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": ". Every operation must be amortised O(1). Count how many elements move from one stack to the other during 1000 pushes followed by 1000 pops, and explain the number."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "New elements go onto "
+        },
+        {
+         "t": "code",
+         "v": "in_"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " takes from "
+        },
+        {
+         "t": "code",
+         "v": "out_"
+        },
+        {
+         "t": "text",
+         "v": ", and when "
+        },
+        {
+         "t": "code",
+         "v": "out_"
+        },
+        {
+         "t": "text",
+         "v": " is empty it first moves all of "
+        },
+        {
+         "t": "code",
+         "v": "in_"
+        },
+        {
+         "t": "text",
+         "v": " across, which reverses them, so the oldest element ends up at the back of "
+        },
+        {
+         "t": "code",
+         "v": "out_"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <optional>\n#include <ranges>\n#include <string>\n#include <type_traits>\n#include <utility>\n#include <vector>\n\ntemplate <typename T>\nclass TwoStackQueue {\n  static_assert(std::is_nothrow_move_constructible_v<T>, \"pop returns by value, so a move must not throw\");\n\n public:\n  void push(T value) { in_.push_back(std::move(value)); }\n\n  [[nodiscard]] std::optional<T> pop() {\n    if (out_.empty()) {\n      moves_ += std::ssize(in_);\n      std::ranges::move(in_ | std::views::reverse, std::back_inserter(out_));  // the oldest lands at the back\n      in_.clear();\n    }\n    if (out_.empty()) return std::nullopt;\n    std::optional<T> oldest{std::move(out_.back())};\n    out_.pop_back();\n    return oldest;\n  }\n\n  [[nodiscard]] bool empty() const { return in_.empty() && out_.empty(); }\n  [[nodiscard]] std::ptrdiff_t size() const { return std::ssize(in_) + std::ssize(out_); }\n  [[nodiscard]] std::int64_t moves() const { return moves_; }\n\n private:\n  std::vector<T> in_;   // the newest element at the back\n  std::vector<T> out_;  // the oldest element at the back\n  std::int64_t moves_ = 0;\n};\n\nint main() {\n  TwoStackQueue<std::string> commands;\n  commands.push(\"dock\");\n  commands.push(\"charge\");\n  std::cout << commands.pop().value_or(\"none\");\n  commands.push(\"undock\");\n  for (int i = 0; i < 3; ++i) std::cout << ' ' << commands.pop().value_or(\"none\");\n  std::cout << '\\n';\n\n  TwoStackQueue<int> queue;\n  for (int i = 0; i < 1000; ++i) queue.push(i);\n  const std::optional<int> first = queue.pop();\n  const std::int64_t moves_in_first_pop = queue.moves();\n  bool in_order = first == 0;\n  for (int i = 1; i < 1000; ++i) in_order = in_order && queue.pop() == i;\n  std::cout << std::format(\"in order: {}, moves: {} in total, {} in the first pop, empty: {}\\n\", in_order,\n                           queue.moves(), moves_in_first_pop, queue.empty());\n}"
+      },
+      {
+       "t": "output",
+       "text": "dock charge undock none\nin order: true, moves: 1000 in total, 1000 in the first pop, empty: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The count is 1000, one move per element. Each element is pushed onto "
+        },
+        {
+         "t": "code",
+         "v": "in_"
+        },
+        {
+         "t": "text",
+         "v": " once, moved to "
+        },
+        {
+         "t": "code",
+         "v": "out_"
+        },
+        {
+         "t": "text",
+         "v": " at most once, and popped from "
+        },
+        {
+         "t": "code",
+         "v": "out_"
+        },
+        {
+         "t": "text",
+         "v": " once, so n pushes and n pops cost O(n) together, and each operation is amortised O(1). A single "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " is not O(1): the first pop here moved all 1000 elements. The "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::move"
+        },
+        {
+         "t": "text",
+         "v": " over a reversed view names the transfer that a "
+        },
+        {
+         "t": "code",
+         "v": "while"
+        },
+        {
+         "t": "text",
+         "v": " loop with "
+        },
+        {
+         "t": "code",
+         "v": "back"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "pop_back"
+        },
+        {
+         "t": "text",
+         "v": " would spell out."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two mistakes are common. Moving the elements back to "
+        },
+        {
+         "t": "code",
+         "v": "in_"
+        },
+        {
+         "t": "text",
+         "v": " after every pop makes each operation O(n) and 1000 pops cost about a million moves. Moving from "
+        },
+        {
+         "t": "code",
+         "v": "in_"
+        },
+        {
+         "t": "text",
+         "v": " whenever it isn't empty, instead of only when "
+        },
+        {
+         "t": "code",
+         "v": "out_"
+        },
+        {
+         "t": "text",
+         "v": " is empty, puts newer elements on top of older ones and breaks the order; the string test catches it, because \"undock\" must come out after \"charge\". The "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": " states the condition under which returning the element by value is safe: the one Wakely's draft D2518R0 proposes for "
+        },
+        {
+         "t": "code",
+         "v": "pop_value"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "MinStack"
+        },
+        {
+         "t": "text",
+         "v": ", a stack of "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "push(x)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "pop()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "top()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "min()"
+        },
+        {
+         "t": "text",
+         "v": ", each O(1). "
+        },
+        {
+         "t": "code",
+         "v": "pop()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "top()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "min()"
+        },
+        {
+         "t": "text",
+         "v": " return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int>"
+        },
+        {
+         "t": "text",
+         "v": ", with no value when the stack is empty; "
+        },
+        {
+         "t": "code",
+         "v": "pop()"
+        },
+        {
+         "t": "text",
+         "v": " returns the removed value. Test the sequence push 5, 3, 3, 7, then four pops, checking "
+        },
+        {
+         "t": "code",
+         "v": "min()"
+        },
+        {
+         "t": "text",
+         "v": " after each pop: it should be 3, 3, 5 and then no value."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Store the minimum next to every value. The minimum of the stack below an element never changes while that element is on the stack, so each entry can carry the minimum as it was when the entry was pushed:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <vector>\n\nclass MinStack {\n public:\n  void push(int x) {\n    const int smallest = entries_.empty() ? x : std::min(x, entries_.back().min);\n    entries_.push_back({.value = x, .min = smallest});\n  }\n\n  std::optional<int> pop() {\n    if (entries_.empty()) return std::nullopt;\n    const int value = entries_.back().value;\n    entries_.pop_back();\n    return value;\n  }\n\n  [[nodiscard]] std::optional<int> top() const {\n    return entries_.empty() ? std::nullopt : std::optional<int>{entries_.back().value};\n  }\n\n  [[nodiscard]] std::optional<int> min() const {\n    return entries_.empty() ? std::nullopt : std::optional<int>{entries_.back().min};\n  }\n\n private:\n  struct Entry {\n    int value;\n    int min;  // the smallest value in this entry and every entry below it\n  };\n  std::vector<Entry> entries_;\n};\n\n[[nodiscard]] std::string show(const std::optional<int>& x) {\n  return x ? std::to_string(*x) : \"none\";\n}\n\nint main() {\n  MinStack stack;\n  for (const int x : {5, 3, 3, 7}) stack.push(x);\n  std::cout << \"min \" << show(stack.min()) << \", top \" << show(stack.top()) << '\\n';\n  for (int i = 0; i < 5; ++i) {\n    const std::optional<int> popped = stack.pop();\n    std::cout << \"popped \" << show(popped) << \", min \" << show(stack.min()) << '\\n';\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "min 3, top 7\npopped 7, min 3\npopped 3, min 3\npopped 3, min 5\npopped 5, min none\npopped none, min none"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every operation is O(1) time, and the stack uses O(n) extra space: one more "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " per element. "
+        },
+        {
+         "t": "code",
+         "v": "pop()"
+        },
+        {
+         "t": "text",
+         "v": " has no "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": ", because popping without reading the value is a normal use."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A variant saves space by keeping a second stack of minimums that grows only when a new minimum arrives. It must push when "
+        },
+        {
+         "t": "code",
+         "v": "x <= min()"
+        },
+        {
+         "t": "text",
+         "v": ". With "
+        },
+        {
+         "t": "code",
+         "v": "x < min()"
+        },
+        {
+         "t": "text",
+         "v": ", pushing 5, 3, 3 records the 3 once, the first pop of a 3 removes that record, and "
+        },
+        {
+         "t": "code",
+         "v": "min()"
+        },
+        {
+         "t": "text",
+         "v": " then says 5 while a 3 is still on the stack. The test sequence above has the repeated 3 for that reason. In the worst case, a falling input, the variant saves nothing."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. In reverse Polish notation an operator follows its two operands: "
+        },
+        {
+         "t": "code",
+         "v": "2 1 + 3 *"
+        },
+        {
+         "t": "text",
+         "v": " means (2 + 1) × 3. Write "
+        },
+        {
+         "t": "code",
+         "v": "evaluate_rpn(tokens)"
+        },
+        {
+         "t": "text",
+         "v": ", where each token is an integer, possibly negative, or one of "
+        },
+        {
+         "t": "code",
+         "v": "+"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "-"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "*"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "/"
+        },
+        {
+         "t": "text",
+         "v": ". Return the value, or no value when the input is malformed: an operator without two operands, a token that is neither, operands left over at the end, an empty input, or a division by zero. Division truncates towards zero, as in C++. "
+        },
+        {
+         "t": "code",
+         "v": "{\"2\", \"1\", \"+\", \"3\", \"*\"}"
+        },
+        {
+         "t": "text",
+         "v": " gives 9, "
+        },
+        {
+         "t": "code",
+         "v": "{\"4\", \"13\", \"5\", \"/\", \"+\"}"
+        },
+        {
+         "t": "text",
+         "v": " gives 6, "
+        },
+        {
+         "t": "code",
+         "v": "{\"-7\", \"2\", \"/\"}"
+        },
+        {
+         "t": "text",
+         "v": " gives -3, and "
+        },
+        {
+         "t": "code",
+         "v": "{\"1\", \"+\"}"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "{\"1\", \"0\", \"/\"}"
+        },
+        {
+         "t": "text",
+         "v": " give no value. Take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const std::string_view>"
+        },
+        {
+         "t": "text",
+         "v": " and return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::int64_t>"
+        },
+        {
+         "t": "text",
+         "v": ". You may assume no result overflows."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Operands wait on a stack until an operator takes the top two. The one on top is the right-hand operand:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <charconv>\n#include <cstdint>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <string_view>\n#include <system_error>\n#include <vector>\n\n[[nodiscard]] std::optional<std::int64_t> parse_integer(std::string_view token) {\n  std::int64_t value = 0;\n  const char* const last = token.data() + token.size();\n  const std::from_chars_result parsed = std::from_chars(token.data(), last, value);\n  if (parsed.ec != std::errc{} || parsed.ptr != last) return std::nullopt;  // not a number, or trailing characters\n  return value;\n}\n\n[[nodiscard]] std::optional<std::int64_t> apply_operator(char op, std::int64_t lhs, std::int64_t rhs) {\n  switch (op) {\n    case '+': return lhs + rhs;\n    case '-': return lhs - rhs;\n    case '*': return lhs * rhs;\n    case '/': return rhs == 0 ? std::nullopt : std::optional<std::int64_t>{lhs / rhs};\n    default: return std::nullopt;\n  }\n}\n\n[[nodiscard]] std::optional<std::int64_t> evaluate_rpn(std::span<const std::string_view> tokens) {\n  std::vector<std::int64_t> operands;\n  for (const std::string_view token : tokens) {\n    if (token == \"+\" || token == \"-\" || token == \"*\" || token == \"/\") {\n      if (std::ssize(operands) < 2) return std::nullopt;\n      const std::int64_t rhs = operands.back();  // the top is the right-hand operand\n      operands.pop_back();\n      const std::int64_t lhs = operands.back();\n      operands.pop_back();\n      const std::optional<std::int64_t> result = apply_operator(token.front(), lhs, rhs);\n      if (!result) return std::nullopt;\n      operands.push_back(*result);\n    } else if (const std::optional<std::int64_t> value = parse_integer(token)) {\n      operands.push_back(*value);\n    } else {\n      return std::nullopt;\n    }\n  }\n  if (operands.size() != 1) return std::nullopt;\n  return operands.back();\n}\n\nint main() {\n  const std::vector<std::vector<std::string_view>> cases{\n      {\"2\", \"1\", \"+\", \"3\", \"*\"}, {\"4\", \"13\", \"5\", \"/\", \"+\"}, {\"-7\", \"2\", \"/\"}, {\"1\", \"+\"},\n      {\"1\", \"0\", \"/\"},           {\"1\", \"2\"},                 {\"2\", \"x\", \"+\"}, {}};\n  for (const std::vector<std::string_view>& tokens : cases) {\n    std::string line;\n    for (const std::string_view token : tokens) line.append(token).append(\" \");\n    if (line.empty()) line = \"(empty) \";\n    const std::optional<std::int64_t> value = evaluate_rpn(tokens);\n    std::cout << line << \"= \" << (value ? std::to_string(*value) : \"no value\") << '\\n';\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "2 1 + 3 * = 9\n4 13 5 / + = 6\n-7 2 / = -3\n1 + = no value\n1 0 / = no value\n1 2 = no value\n2 x + = no value\n(empty) = no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time and O(n) space for the operand stack. The operators are checked before the numbers, because "
+        },
+        {
+         "t": "code",
+         "v": "\"-\""
+        },
+        {
+         "t": "text",
+         "v": " is an operator and "
+        },
+        {
+         "t": "code",
+         "v": "\"-7\""
+        },
+        {
+         "t": "text",
+         "v": " is a number, and "
+        },
+        {
+         "t": "code",
+         "v": "std::from_chars"
+        },
+        {
+         "t": "text",
+         "v": " accepts a leading minus but no plus sign and no spaces. Comparing "
+        },
+        {
+         "t": "code",
+         "v": "parsed.ptr"
+        },
+        {
+         "t": "text",
+         "v": " with the end of the token rejects "
+        },
+        {
+         "t": "code",
+         "v": "\"12abc\""
+        },
+        {
+         "t": "text",
+         "v": ", which "
+        },
+        {
+         "t": "code",
+         "v": "from_chars"
+        },
+        {
+         "t": "text",
+         "v": " would otherwise read as 12."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The operand order is the usual bug: popping "
+        },
+        {
+         "t": "code",
+         "v": "lhs"
+        },
+        {
+         "t": "text",
+         "v": " first turns "
+        },
+        {
+         "t": "code",
+         "v": "13 5 /"
+        },
+        {
+         "t": "text",
+         "v": " into 5 / 13, which is 0, and the second test then gives 4 instead of 6. The one division that overflows is the most negative "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " divided by -1, which the statement rules out; code that takes untrusted input checks for it too."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Empty pops; amortised cost",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program pops one element too many. It compiles without a warning, runs clean under both sanitizers, and leaves a vector that says it isn't empty:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <vector>\n\nint main() {\n  std::vector<int> stack{7};\n  stack.pop_back();\n  stack.pop_back();  // one pop too many: undefined behaviour\n  std::cout << std::format(\"size {}, empty {}\\n\", stack.size(), stack.empty());\n}"
+      },
+      {
+       "t": "output",
+       "text": "size 18446744073709551615, empty false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The behaviour is undefined, and this is what GCC 13 does at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": ": the second "
+        },
+        {
+         "t": "code",
+         "v": "pop_back"
+        },
+        {
+         "t": "text",
+         "v": " moves the vector's end one element before its start, and "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": " computes end minus start, which wraps round to 2⁶⁴ − 1. Neither sanitizer sees it, because no memory is read or written. Reading "
+        },
+        {
+         "t": "code",
+         "v": "back()"
+        },
+        {
+         "t": "text",
+         "v": " on the empty vector would be caught: AddressSanitizer reports a heap-buffer-overflow 4 bytes before the vector's block. libstdc++'s assertions catch both. They are off by default in GCC 13 and on for unoptimised builds from GCC 15 ("
+        },
+        {
+         "t": "a",
+         "v": "release notes",
+         "href": "https://gcc.gnu.org/gcc-15/changes.html"
+        },
+        {
+         "t": "text",
+         "v": "):"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -g -D_GLIBCXX_ASSERTIONS extra_pop.cpp -o extra_pop && ./extra_pop"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "/usr/include/c++/13/bits/stl_vector.h:1324: constexpr void std::vector<_Tp, _Alloc>::pop_back() [with _Tp = int; _Alloc = std::allocator<int>]: Assertion '!this->empty()' failed."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The program then aborts, with exit status 134, at the second "
+        },
+        {
+         "t": "code",
+         "v": "pop_back"
+        },
+        {
+         "t": "text",
+         "v": " instead of printing a size. C++26 names this "
+        },
+        {
+         "t": "i",
+         "v": "standard library hardening"
+        },
+        {
+         "t": "text",
+         "v": ": in a hardened implementation, "
+        },
+        {
+         "t": "code",
+         "v": "pop_back"
+        },
+        {
+         "t": "text",
+         "v": " on an empty vector is a contract violation instead of undefined behaviour (cppreference, "
+        },
+        {
+         "t": "a",
+         "v": "vector::pop_back",
+         "href": "https://en.cppreference.com/cpp/container/vector/pop_back"
+        },
+        {
+         "t": "text",
+         "v": "). In your own code, check "
+        },
+        {
+         "t": "code",
+         "v": "empty()"
+        },
+        {
+         "t": "text",
+         "v": " before "
+        },
+        {
+         "t": "code",
+         "v": "back()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "top()"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "pop()"
+        },
+        {
+         "t": "text",
+         "v": ", or give your own containers a "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " that returns "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": ", as the three exercises do. Turn on "
+        },
+        {
+         "t": "code",
+         "v": "-D_GLIBCXX_ASSERTIONS"
+        },
+        {
+         "t": "text",
+         "v": " in debug and test builds with GCC 13 and 14."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second trap is reading \"amortised O(1)\" as \"O(1) every time\". In Exercise 1, 1000 pops moved 1000 elements in total, but the first pop moved all 1000 at once. An amortised bound limits the cost of the whole sequence and says nothing about one call. That matters in a control loop with a deadline: a queue that sometimes spends 1000 moves on one "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " can miss a cycle. The same holds for "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": ", where one push in a while copies the whole vector; "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": " moves that cost to start-up. For a per-call bound, use a ring buffer over a fixed "
+        },
+        {
+         "t": "code",
+         "v": "std::array"
+        },
+        {
+         "t": "text",
+         "v": ", sized at start-up, and say \"amortised\" whenever you quote an average over a sequence."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say which container you use as a stack and why, what "
+        },
+        {
+         "t": "code",
+         "v": "std::stack"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::queue"
+        },
+        {
+         "t": "text",
+         "v": " use by default, and why "
+        },
+        {
+         "t": "code",
+         "v": "std::queue"
+        },
+        {
+         "t": "text",
+         "v": " can't sit on a vector. Describe the monotonic stack, its invariant and why it is O(n). Explain why the two-stack queue is amortised O(1) and why one of its pops can be O(n). Say what an extra "
+        },
+        {
+         "t": "code",
+         "v": "pop_back"
+        },
+        {
+         "t": "text",
+         "v": " does and which build flag catches it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Why is a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " the default stack, and when is "
+     },
+     {
+      "t": "code",
+      "v": "std::stack<T, std::vector<T>>"
+     },
+     {
+      "t": "text",
+      "v": " the better type?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the default container of "
+     },
+     {
+      "t": "code",
+      "v": "std::stack"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::queue"
+     },
+     {
+      "t": "text",
+      "v": ", and why can't "
+     },
+     {
+      "t": "code",
+      "v": "std::queue"
+     },
+     {
+      "t": "text",
+      "v": " use a vector?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "std::stack::pop"
+     },
+     {
+      "t": "text",
+      "v": " return "
+     },
+     {
+      "t": "code",
+      "v": "void"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What invariant does the monotonic stack keep in the \"next higher reading\" problem, and why is the whole run O(n)?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In the two-stack queue, when do elements move from one stack to the other, and why is that amortised O(1)?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What happens on a second "
+     },
+     {
+      "t": "code",
+      "v": "pop_back"
+     },
+     {
+      "t": "text",
+      "v": " of a one-element vector with GCC 13, and how do you make it fail loudly?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: evaluate reverse Polish notation, with tests for a missing operand and a division by zero."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". Start with a vector; choose a deque for work at both ends."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Standard Library Containers, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ZMUKa2kWtTk"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+     },
+     {
+      "t": "text",
+      "v": ", vector by default, and "
+     },
+     {
+      "t": "a",
+      "v": "Per.19",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-access"
+     },
+     {
+      "t": "text",
+      "v": ", access memory predictably."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jonathan Wakely, exception-safe stack pop, unpublished 2022 draft "
+     },
+     {
+      "t": "a",
+      "v": "D2518R0",
+      "href": "https://isocpp.org/files/papers/D2518R0.html"
+     },
+     {
+      "t": "text",
+      "v": ": why "
+     },
+     {
+      "t": "code",
+      "v": "pop"
+     },
+     {
+      "t": "text",
+      "v": " returns "
+     },
+     {
+      "t": "code",
+      "v": "void"
+     },
+     {
+      "t": "text",
+      "v": ", and the condition under which returning the element is safe. Brian Bi, container pops that return the value, "
+     },
+     {
+      "t": "a",
+      "v": "P3182R1",
+      "href": "https://wg21.link/p3182r1"
+     },
+     {
+      "t": "text",
+      "v": ", 2024."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "GCC: the libstdc++ manual on "
+     },
+     {
+      "t": "a",
+      "v": "_GLIBCXX_ASSERTIONS",
+      "href": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_macros.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "GCC 15 release notes",
+      "href": "https://gcc.gnu.org/gcc-15/changes.html"
+     },
+     {
+      "t": "text",
+      "v": ", which turn it on for unoptimised builds."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::stack",
+      "href": "https://en.cppreference.com/cpp/container/stack"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::queue",
+      "href": "https://en.cppreference.com/cpp/container/queue"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::deque",
+      "href": "https://en.cppreference.com/cpp/container/deque"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "vector::pop_back",
+      "href": "https://en.cppreference.com/cpp/container/vector/pop_back"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::from_chars",
+      "href": "https://en.cppreference.com/cpp/utility/from_chars"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

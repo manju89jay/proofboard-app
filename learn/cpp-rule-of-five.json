@@ -1,0 +1,2690 @@
+{
+ "id": "cpp-rule-of-five",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "From memory, write a class "
+     },
+     {
+      "t": "code",
+      "v": "IntBuffer"
+     },
+     {
+      "t": "text",
+      "v": " that owns a heap array of "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " through a raw "
+     },
+     {
+      "t": "code",
+      "v": "int*"
+     },
+     {
+      "t": "text",
+      "v": ", with a constructor that takes the size and fills the array with zeros, and all five special members. Copies must be deep, a move must leave its source empty, and copy assignment must leave the target unchanged if allocating the copy throws. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "This page is the one place where the course writes "
+     },
+     {
+      "t": "code",
+      "v": "new[]"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "delete[]"
+     },
+     {
+      "t": "text",
+      "v": " as correct code; elsewhere they appear only as bugs. The reason is the subject itself. "
+     },
+     {
+      "t": "code",
+      "v": "IntBuffer"
+     },
+     {
+      "t": "text",
+      "v": " is a resource handle: a small class whose only job is to own one resource. Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "R.11",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-newdelete"
+     },
+     {
+      "t": "text",
+      "v": " calls a naked "
+     },
+     {
+      "t": "code",
+      "v": "delete"
+     },
+     {
+      "t": "text",
+      "v": " in application code, as opposed to code devoted to resource management, a likely bug; "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " is resource management inside, and so is this class. Andre Kostur, Arthur O'Dwyer and Ben Saks all teach the special members with such a class in their talks, because the members exist to manage exactly this kind of pointer."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <algorithm>\n#include <cstddef>\n#include <iostream>\n#include <span>\n#include <string_view>\n#include <utility>\n\n// Owns an array of ints through a raw pointer: a resource handle, the one kind of class where new[] and delete[] belong.\nclass IntBuffer {\n public:\n  explicit IntBuffer(std::ptrdiff_t size) : size_(size), data_(new int[size]{}) {}\n  ~IntBuffer() { delete[] data_; }\n\n  IntBuffer(const IntBuffer& other) : size_(other.size_), data_(new int[other.size_]) {\n    std::ranges::copy(other.values(), data_);\n  }\n  IntBuffer& operator=(const IntBuffer& other) {\n    IntBuffer copy(other);  // the only step that can throw, and *this is still untouched\n    swap(copy);\n    return *this;  // copy's destructor frees the old array\n  }\n\n  IntBuffer(IntBuffer&& other) noexcept\n      : size_(std::exchange(other.size_, 0)), data_(std::exchange(other.data_, nullptr)) {}\n  IntBuffer& operator=(IntBuffer&& other) noexcept {\n    IntBuffer taken(std::move(other));  // empties other, even when other is *this\n    swap(taken);\n    return *this;\n  }\n\n  void swap(IntBuffer& other) noexcept {\n    std::swap(size_, other.size_);\n    std::swap(data_, other.data_);\n  }\n  friend void swap(IntBuffer& a, IntBuffer& b) noexcept { a.swap(b); }\n\n  [[nodiscard]] std::span<int> values() { return {data_, static_cast<std::size_t>(size_)}; }\n  [[nodiscard]] std::span<const int> values() const { return {data_, static_cast<std::size_t>(size_)}; }\n\n private:\n  std::ptrdiff_t size_;\n  int* data_;\n};\n\nvoid show(std::string_view label, const IntBuffer& buffer) {\n  std::cout << label << ':';\n  for (const int v : buffer.values()) std::cout << ' ' << v;\n  std::cout << '\\n';\n}\n\n// Assign through two references, which is how self-assignment reaches real code.\nvoid copy_into(IntBuffer& target, const IntBuffer& source) { target = source; }\nvoid move_into(IntBuffer& target, IntBuffer& source) { target = std::move(source); }\n\nint main() {\n  IntBuffer a(3);\n  a.values()[0] = 7;\n  IntBuffer b = a;\n  b.values()[1] = 8;\n  show(\"a\", a);\n  show(\"b\", b);\n\n  IntBuffer c(5);\n  c = b;\n  IntBuffer d = std::move(c);\n  show(\"c after the move\", c);\n  show(\"d\", d);\n\n  copy_into(d, d);\n  move_into(d, d);\n  show(\"d after self-assignment and self-move\", d);\n}"
+   },
+   {
+    "t": "output",
+    "text": "a: 7 0 0\nb: 7 8 0\nc after the move:\nd: 7 8 0\nd after self-assignment and self-move: 7 8 0"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Each member has one job. The destructor frees the array. The copy constructor allocates an array of its own and copies the values into it, so "
+     },
+     {
+      "t": "code",
+      "v": "b"
+     },
+     {
+      "t": "text",
+      "v": " can change without touching "
+     },
+     {
+      "t": "code",
+      "v": "a"
+     },
+     {
+      "t": "text",
+      "v": ". Copy assignment is "
+     },
+     {
+      "t": "i",
+      "v": "copy-and-swap"
+     },
+     {
+      "t": "text",
+      "v": ": it builds a complete copy first, then swaps it into "
+     },
+     {
+      "t": "code",
+      "v": "*this"
+     },
+     {
+      "t": "text",
+      "v": " with operations that can't throw, and the local copy's destructor frees the old array on the way out. The only step that can throw is the "
+     },
+     {
+      "t": "code",
+      "v": "new"
+     },
+     {
+      "t": "text",
+      "v": " inside the copy constructor, and it runs before "
+     },
+     {
+      "t": "code",
+      "v": "*this"
+     },
+     {
+      "t": "text",
+      "v": " changes, so a failed assignment leaves the target as it was. That is the "
+     },
+     {
+      "t": "i",
+      "v": "strong exception guarantee"
+     },
+     {
+      "t": "text",
+      "v": ". It also makes "
+     },
+     {
+      "t": "code",
+      "v": "d = d"
+     },
+     {
+      "t": "text",
+      "v": " safe without a test, because the copy is complete before anything is freed. The moves take the pointer and the size and leave "
+     },
+     {
+      "t": "code",
+      "v": "nullptr"
+     },
+     {
+      "t": "text",
+      "v": " and 0 behind with "
+     },
+     {
+      "t": "code",
+      "v": "std::exchange"
+     },
+     {
+      "t": "text",
+      "v": ", and they are "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": " because moving a pointer and an integer can't fail. Move assignment moves into a local and swaps, which survives a self-move for the reason given in the topic on copy and move."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Copy assignment reuses the copy constructor, and move assignment the move constructor, so each pair can't drift apart: Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "C.22",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-matched"
+     },
+     {
+      "t": "text",
+      "v": " asks for exactly that consistency. The free "
+     },
+     {
+      "t": "code",
+      "v": "swap"
+     },
+     {
+      "t": "text",
+      "v": " lets "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::swap"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "code",
+      "v": "using std::swap; swap(a, b);"
+     },
+     {
+      "t": "text",
+      "v": " idiom find the cheap member swap instead of three moves."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if all five are there, the copies are deep, the moves are "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": " and leave the source empty, and copy assignment allocates before it frees. A copy assignment that checks "
+     },
+     {
+      "t": "code",
+      "v": "this != &other"
+     },
+     {
+      "t": "text",
+      "v": ", then allocates and copies into a new array before freeing the old one, also passes. One that frees first is a fail, because it leaves a dangling pointer when the allocation throws and breaks on self-assignment, as the failure cases show. Missing "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": " on the moves is a partial pass: the class is correct, and "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<IntBuffer>"
+     },
+     {
+      "t": "text",
+      "v": " copies it on every growth."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The five special members are the functions that create, copy, move and destroy an object of a class: the destructor, the copy constructor, the copy assignment operator, the move constructor and the move assignment operator. Declaring any one of them yourself changes what the compiler still generates for the rest, so Core Guidelines C.21 asks you to declare all five together, the moves included, even when some are only "
+    },
+    {
+     "t": "code",
+     "v": "= default"
+    },
+    {
+     "t": "text",
+     "v": "."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem shows up in a class that owns a resource through a raw handle, a pointer to a heap array it allocated itself. With only a destructor declared, the compiler still generates a copy constructor that copies the pointer, so two objects own one array, and both destructors free it: a double free. The same destructor also removes the compiler's move constructor and move assignment, so an rvalue falls back to copying instead of moving, or to a deleted operation if copying was disabled."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is one job per member. The destructor frees the array once. The copy constructor allocates an array of its own and copies the values into it, so the copy can change without touching the original. The moves take the pointer and the size with "
+    },
+    {
+     "t": "code",
+     "v": "std::exchange"
+    },
+    {
+     "t": "text",
+     "v": ", leaving the source empty, and they are "
+    },
+    {
+     "t": "code",
+     "v": "noexcept"
+    },
+    {
+     "t": "text",
+     "v": " because moving a pointer and an integer cannot fail. Copy assignment is written as copy-and-swap: it builds the complete copy first, the only step that can throw, then swaps it into "
+    },
+    {
+     "t": "code",
+     "v": "*this"
+    },
+    {
+     "t": "text",
+     "v": " with operations that cannot throw, which gives the strong exception guarantee and survives self-assignment without a test for it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is writing and testing five functions correctly, for every class that does this. When every member already manages itself, a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " copies deeply, moves without throwing, and survives self-assignment on its own, so the compiler's member-wise versions are already correct, and hand-written ones only add code that can go wrong. That is the Rule of Zero: hold resources through members that already behave, and declare none of the five yourself."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this split in the robot's own classes: the rare one that wraps a raw resource directly writes all five, and everything that instead holds a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " or a "
+    },
+    {
+     "t": "code",
+     "v": "std::string"
+    },
+    {
+     "t": "text",
+     "v": " gets them for free. The interview question's second half is exactly this choice, why the answer with zero declared members is the better one whenever you can reach it."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "five",
+   "title": "Owning buffer: destructor, copy, move, copy-and-swap",
+   "steps": [
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the answer's "
+        },
+        {
+         "t": "code",
+         "v": "IntBuffer"
+        },
+        {
+         "t": "text",
+         "v": " with a line printed wherever memory changes hands. Follow one array at a time through the output: every allocation must be matched by exactly one free."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <span>\n#include <utility>\n\n// IntBuffer from the answer, with a line printed wherever memory changes hands.\nclass IntBuffer {\n public:\n  explicit IntBuffer(std::ptrdiff_t size) : size_(size), data_(new int[size]{}) {\n    std::cout << std::format(\"  constructor: allocate {} ints\\n\", size_);\n  }\n  ~IntBuffer() {\n    if (data_ == nullptr) {\n      std::cout << \"  destructor: nothing to free\\n\";\n    } else {\n      std::cout << std::format(\"  destructor: free {} ints\\n\", size_);\n    }\n    delete[] data_;\n  }\n\n  IntBuffer(const IntBuffer& other) : size_(other.size_), data_(new int[other.size_]) {\n    std::cout << std::format(\"  copy constructor: allocate {} ints, copy them\\n\", size_);\n    std::ranges::copy(other.values(), data_);\n  }\n  IntBuffer& operator=(const IntBuffer& other) {\n    std::cout << \"  copy assignment: copy, then swap\\n\";\n    IntBuffer copy(other);\n    swap(copy);\n    return *this;\n  }\n\n  IntBuffer(IntBuffer&& other) noexcept\n      : size_(std::exchange(other.size_, 0)), data_(std::exchange(other.data_, nullptr)) {\n    std::cout << std::format(\"  move constructor: take {} ints\\n\", size_);\n  }\n  IntBuffer& operator=(IntBuffer&& other) noexcept {\n    std::cout << \"  move assignment: move, then swap\\n\";\n    IntBuffer taken(std::move(other));\n    swap(taken);\n    return *this;\n  }\n\n  void swap(IntBuffer& other) noexcept {\n    std::swap(size_, other.size_);\n    std::swap(data_, other.data_);\n  }\n\n  [[nodiscard]] std::span<int> values() { return {data_, static_cast<std::size_t>(size_)}; }\n  [[nodiscard]] std::span<const int> values() const { return {data_, static_cast<std::size_t>(size_)}; }\n\n private:\n  std::ptrdiff_t size_;\n  int* data_;\n};\n\n[[nodiscard]] IntBuffer make_ramp(std::ptrdiff_t size) {\n  IntBuffer ramp(size);\n  int next = 0;\n  for (int& v : ramp.values()) v = next++;\n  return ramp;\n}\n\nint main() {\n  std::cout << \"IntBuffer a = make_ramp(3);\\n\";\n  IntBuffer a = make_ramp(3);\n  std::cout << \"IntBuffer b = a;\\n\";\n  IntBuffer b = a;\n  std::cout << \"IntBuffer c(5); c = a;\\n\";\n  IntBuffer c(5);\n  c = a;\n  std::cout << \"IntBuffer d = std::move(a);\\n\";\n  IntBuffer d = std::move(a);\n  std::cout << \"b = std::move(d);\\n\";\n  b = std::move(d);\n  std::cout << \"end of main\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "IntBuffer a = make_ramp(3);\n  constructor: allocate 3 ints\nIntBuffer b = a;\n  copy constructor: allocate 3 ints, copy them\nIntBuffer c(5); c = a;\n  constructor: allocate 5 ints\n  copy assignment: copy, then swap\n  copy constructor: allocate 3 ints, copy them\n  destructor: free 5 ints\nIntBuffer d = std::move(a);\n  move constructor: take 3 ints\nb = std::move(d);\n  move assignment: move, then swap\n  move constructor: take 3 ints\n  destructor: free 3 ints\nend of main\n  destructor: nothing to free\n  destructor: free 3 ints\n  destructor: free 3 ints\n  destructor: nothing to free"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "make_ramp"
+         },
+         {
+          "t": "text",
+          "v": " allocates once and nothing else happens: "
+         },
+         {
+          "t": "code",
+          "v": "return ramp;"
+         },
+         {
+          "t": "text",
+          "v": " is NRVO, as measured in the topic on copy and move, so the array built inside the function is the one "
+         },
+         {
+          "t": "code",
+          "v": "a"
+         },
+         {
+          "t": "text",
+          "v": " owns."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "In "
+         },
+         {
+          "t": "code",
+          "v": "c = a"
+         },
+         {
+          "t": "text",
+          "v": ", the copy of "
+         },
+         {
+          "t": "code",
+          "v": "a"
+         },
+         {
+          "t": "text",
+          "v": " is allocated before "
+         },
+         {
+          "t": "code",
+          "v": "c"
+         },
+         {
+          "t": "text",
+          "v": "'s 5 ints are freed. The free happens in the local "
+         },
+         {
+          "t": "code",
+          "v": "copy"
+         },
+         {
+          "t": "text",
+          "v": "'s destructor, after the swap handed it the old array. If the allocation had thrown, "
+         },
+         {
+          "t": "code",
+          "v": "c"
+         },
+         {
+          "t": "text",
+          "v": " would still hold its 5 ints."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The moves allocate nothing. "
+         },
+         {
+          "t": "code",
+          "v": "d"
+         },
+         {
+          "t": "text",
+          "v": " takes "
+         },
+         {
+          "t": "code",
+          "v": "a"
+         },
+         {
+          "t": "text",
+          "v": "'s array, and "
+         },
+         {
+          "t": "code",
+          "v": "b = std::move(d)"
+         },
+         {
+          "t": "text",
+          "v": " moves "
+         },
+         {
+          "t": "code",
+          "v": "d"
+         },
+         {
+          "t": "text",
+          "v": " into a local, swaps, and the local's destructor frees the array "
+         },
+         {
+          "t": "code",
+          "v": "b"
+         },
+         {
+          "t": "text",
+          "v": " held before."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The output has four "
+         },
+         {
+          "t": "code",
+          "v": "allocate"
+         },
+         {
+          "t": "text",
+          "v": " lines and four "
+         },
+         {
+          "t": "code",
+          "v": "free"
+         },
+         {
+          "t": "text",
+          "v": " lines, one free for each array. The two objects that were moved from, "
+         },
+         {
+          "t": "code",
+          "v": "a"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "d"
+         },
+         {
+          "t": "text",
+          "v": ", print \"nothing to free\" at the end of "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", where the destructors run in reverse order of construction: "
+         },
+         {
+          "t": "code",
+          "v": "d"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "c"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "b"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "a"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Each special member does the minimum for its job, and the two assignments are built from the two constructors plus "
+         },
+         {
+          "t": "code",
+          "v": "swap"
+         },
+         {
+          "t": "text",
+          "v": ". Arthur O'Dwyer's "
+         },
+         {
+          "t": "code",
+          "v": "Vec"
+         },
+         {
+          "t": "text",
+          "v": ", at the end of his talk, has a single by-value "
+         },
+         {
+          "t": "code",
+          "v": "operator=(Vec copy)"
+         },
+         {
+          "t": "text",
+          "v": " instead of two assignment operators: the caller's argument is copied or moved into the parameter, which is then swapped in. That saves writing one function. Against a move assignment that frees its own array and takes the other's pointer directly, it costs one extra move, the move into the parameter. "
+         },
+         {
+          "t": "code",
+          "v": "IntBuffer"
+         },
+         {
+          "t": "text",
+          "v": "'s move-and-swap pays the same extra move, in exchange for the self-move safety of the topic on copy and move."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. From a blank file, write "
+        },
+        {
+         "t": "code",
+         "v": "Samples"
+        },
+        {
+         "t": "text",
+         "v": ", which owns a raw array of "
+        },
+        {
+         "t": "code",
+         "v": "std::int16_t"
+        },
+        {
+         "t": "text",
+         "v": " sensor samples and their count. Give it:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "a default constructor for an empty object, a constructor that takes a size and zero-fills, and one that copies from a "
+         },
+         {
+          "t": "code",
+          "v": "std::span<const std::int16_t>"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "all five special members, with copy-and-swap for copy assignment, "
+         },
+         {
+          "t": "code",
+          "v": "noexcept"
+         },
+         {
+          "t": "text",
+          "v": " moves that leave the source empty, and a free "
+         },
+         {
+          "t": "code",
+          "v": "swap"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "resize(new_size)"
+         },
+         {
+          "t": "text",
+          "v": ", which keeps the first "
+         },
+         {
+          "t": "code",
+          "v": "min(size, new_size)"
+         },
+         {
+          "t": "text",
+          "v": " samples, zero-fills the rest, and leaves the object unchanged if the allocation throws;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "view()"
+         },
+         {
+          "t": "text",
+          "v": ", returning a "
+         },
+         {
+          "t": "code",
+          "v": "std::span"
+         },
+         {
+          "t": "text",
+          "v": " over the samples, in a "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": " and a non-"
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": " version."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then test these in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Copies are deep: change a copy and print both."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A moved-from object is empty and can be assigned a new value."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Self-assignment and self-move through two references keep the samples."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "When a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<Samples>"
+         },
+         {
+          "t": "text",
+          "v": " grows, it moves its elements rather than copying them. Show it without adding any output to the class."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "resize"
+         },
+         {
+          "t": "text",
+          "v": " grows and shrinks correctly, and when it throws, the samples are unchanged."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test 5 needs an allocation that fails. Under AddressSanitizer, a request too large to satisfy is reported and the program stops, instead of "
+        },
+        {
+         "t": "code",
+         "v": "new"
+        },
+        {
+         "t": "text",
+         "v": " throwing "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_alloc"
+        },
+        {
+         "t": "text",
+         "v": ", so find another way to make the new-expression throw."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <cstddef>\n#include <cstdint>\n#include <iostream>\n#include <new>\n#include <span>\n#include <string_view>\n#include <utility>\n#include <vector>\n\n// Owns a raw array of sensor samples.\nclass Samples {\n public:\n  Samples() = default;\n  explicit Samples(std::ptrdiff_t size) : size_(size), data_(new std::int16_t[size]{}) {}  // zero-filled\n  explicit Samples(std::span<const std::int16_t> values) : Samples(std::ssize(values)) {\n    std::ranges::copy(values, data_);\n  }\n  ~Samples() { delete[] data_; }\n\n  Samples(const Samples& other) : Samples(other.view()) {}\n  Samples& operator=(const Samples& other) {\n    Samples copy(other);\n    swap(copy);\n    return *this;\n  }\n  Samples(Samples&& other) noexcept\n      : size_(std::exchange(other.size_, 0)), data_(std::exchange(other.data_, nullptr)) {}\n  Samples& operator=(Samples&& other) noexcept {\n    Samples taken(std::move(other));\n    swap(taken);\n    return *this;\n  }\n\n  void swap(Samples& other) noexcept {\n    std::swap(size_, other.size_);\n    std::swap(data_, other.data_);\n  }\n  friend void swap(Samples& a, Samples& b) noexcept { a.swap(b); }\n\n  // Keeps the first min(size, new_size) samples and zero-fills the rest. If the allocation\n  // throws, *this is unchanged: the strong guarantee.\n  void resize(std::ptrdiff_t new_size) {\n    Samples resized(new_size);\n    std::ranges::copy(view().first(static_cast<std::size_t>(std::min(size_, new_size))), resized.data_);\n    swap(resized);\n  }\n\n  [[nodiscard]] std::span<std::int16_t> view() { return {data_, static_cast<std::size_t>(size_)}; }\n  [[nodiscard]] std::span<const std::int16_t> view() const { return {data_, static_cast<std::size_t>(size_)}; }\n\n private:\n  std::ptrdiff_t size_ = 0;\n  std::int16_t* data_ = nullptr;\n};\n\nvoid show(std::string_view label, const Samples& samples) {\n  std::cout << label << ':';\n  for (const std::int16_t s : samples.view()) std::cout << ' ' << s;\n  std::cout << '\\n';\n}\n\nvoid copy_into(Samples& target, const Samples& source) { target = source; }\nvoid move_into(Samples& target, Samples& source) { target = std::move(source); }\n\nint main() {\n  constexpr std::array<std::int16_t, 4> raw{812, 790, 1204, 655};\n  Samples scan(raw);\n\n  // 1. Copies are deep.\n  Samples copy = scan;\n  copy.view()[0] = 0;\n  show(\"1 scan\", scan);\n  show(\"1 copy\", copy);\n\n  // 2. A moved-from object is empty and can be assigned again.\n  Samples moved = std::move(copy);\n  show(\"2 copy after the move\", copy);\n  copy = scan;\n  show(\"2 copy reassigned\", copy);\n\n  // 3. Self-assignment and self-move keep the value.\n  copy_into(scan, scan);\n  move_into(scan, scan);\n  show(\"3 scan\", scan);\n\n  // 4. Growth moves the elements: the first scan keeps its array.\n  std::vector<Samples> scans;\n  scans.push_back(scan);\n  const std::int16_t* const before = scans.front().view().data();\n  scans.push_back(scan);  // capacity 1 -> 2: the first element is relocated\n  std::cout << \"4 after growth: \" << (scans.front().view().data() == before ? \"same array, moved\" : \"new array, copied\")\n            << '\\n';\n\n  // 5. resize keeps a prefix, and a failed allocation leaves the samples as they were.\n  scan.resize(6);\n  show(\"5 grown\", scan);\n  scan.resize(2);\n  show(\"5 shrunk\", scan);\n  try {\n    scan.resize(-1);\n  } catch (const std::bad_alloc& e) {\n    std::cout << \"5 resize(-1) threw \" << e.what() << '\\n';\n  }\n  show(\"5 unchanged\", scan);\n}"
+      },
+      {
+       "t": "output",
+       "text": "1 scan: 812 790 1204 655\n1 copy: 0 790 1204 655\n2 copy after the move:\n2 copy reassigned: 812 790 1204 655\n3 scan: 812 790 1204 655\n4 after growth: same array, moved\n5 grown: 812 790 1204 655 0 0\n5 shrunk: 812 790\n5 resize(-1) threw std::bad_array_new_length\n5 unchanged: 812 790"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test 4 measures without instrumenting the class. A move takes the pointer, so after growth the relocated element still owns the same array; a copy would allocate a new one. Deleting "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " from the move constructor and running again prints "
+        },
+        {
+         "t": "code",
+         "v": "4 after growth: new array, copied"
+        },
+        {
+         "t": "text",
+         "v": ": the vector now copies every element whenever it grows. The failure cases below count this with a counting type."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test 5 uses the simplest allocation failure to trigger under AddressSanitizer: a negative size. The new-expression checks the size before it asks for memory and throws "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_array_new_length"
+        },
+        {
+         "t": "text",
+         "v": ", which derives from "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_alloc"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "resize"
+        },
+        {
+         "t": "text",
+         "v": " builds the new array in a local "
+        },
+        {
+         "t": "code",
+         "v": "Samples"
+        },
+        {
+         "t": "text",
+         "v": ", fills it, and only then swaps it in, so the throw leaves "
+        },
+        {
+         "t": "code",
+         "v": "scan"
+        },
+        {
+         "t": "text",
+         "v": " as it was. It is copy-and-swap again, and the general rule behind the strong guarantee: do everything that can fail on the side, then commit with operations that can't."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two more things are worth copying from this solution. The copy constructor delegates to the span constructor, so there is one place that allocates and copies. And the default member initialisers, "
+        },
+        {
+         "t": "code",
+         "v": "= 0"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "= nullptr"
+        },
+        {
+         "t": "text",
+         "v": ", make the default constructor and the moved-from state the same state, which is what Core Guidelines C.64 hopes for."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "zero",
+   "title": "Rule of Zero: let members manage themselves",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is "
+        },
+        {
+         "t": "code",
+         "v": "IntBuffer"
+        },
+        {
+         "t": "text",
+         "v": " again, with a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<int>"
+        },
+        {
+         "t": "text",
+         "v": " doing the owning. It declares none of the five, and the "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": "s check that it still has all of them, with "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " moves:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <concepts>\n#include <cstddef>\n#include <iostream>\n#include <span>\n#include <string_view>\n#include <type_traits>\n#include <utility>\n#include <vector>\n\n// The IntBuffer of the answer, with the vector doing the owning: no special members at all.\nclass IntBuffer {\n public:\n  explicit IntBuffer(std::ptrdiff_t size) : values_(static_cast<std::size_t>(size)) {}\n  [[nodiscard]] std::span<int> values() { return values_; }\n  [[nodiscard]] std::span<const int> values() const { return values_; }\n\n private:\n  std::vector<int> values_;\n};\n\nstatic_assert(std::copyable<IntBuffer>);\nstatic_assert(std::is_nothrow_move_constructible_v<IntBuffer> && std::is_nothrow_move_assignable_v<IntBuffer>);\n\nvoid show(std::string_view label, const IntBuffer& buffer) {\n  std::cout << label << ':';\n  for (const int v : buffer.values()) std::cout << ' ' << v;\n  std::cout << '\\n';\n}\n\nvoid copy_into(IntBuffer& target, const IntBuffer& source) { target = source; }\n\nint main() {\n  IntBuffer a(3);\n  a.values()[0] = 7;\n  IntBuffer b = a;\n  b.values()[1] = 8;\n  show(\"a\", a);\n  show(\"b\", b);\n  const IntBuffer c = std::move(b);\n  show(\"b after the move\", b);\n  show(\"c\", c);\n  copy_into(a, a);\n  show(\"a after self-assignment\", a);\n}"
+      },
+      {
+       "t": "output",
+       "text": "a: 7 0 0\nb: 7 8 0\nb after the move:\nc: 7 8 0\na after self-assignment: 7 0 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The compiler-generated members work member by member: the copy constructor copies each member, the move constructor moves each one, the assignments assign each one, and the destructor destroys them in reverse order. When every member already does the right thing for its own resource, the member-wise version is correct for the class too. "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " copies deeply, moves without throwing, and handles self-assignment (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.62",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-copy-self"
+        },
+        {
+         "t": "text",
+         "v": " uses it as the example), so this "
+        },
+        {
+         "t": "code",
+         "v": "IntBuffer"
+        },
+        {
+         "t": "text",
+         "v": " gets all of that for free. This is the "
+        },
+        {
+         "t": "i",
+         "v": "Rule of Zero"
+        },
+        {
+         "t": "text",
+         "v": ", Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.20",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-zero"
+        },
+        {
+         "t": "text",
+         "v": ": if you can avoid defining the default operations, do. Kostur's talk ends at the same place, replacing his hand-written string class with a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " member. The moved-from "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " printing nothing is GCC 13's vector leaving its source empty."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two versions differ in one detail of copy assignment. "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": "'s copy assignment reuses the target's array when it is large enough, which copy-and-swap never does, so it saves an allocation. For "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " elements, whose copies can't throw, the only step that can fail is the allocation, and GCC 13's library allocates and copies before it frees the old array when it needs a larger one. So the Rule of Zero version is at least as fast, and as safe, here."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "O'Dwyer sorts well-designed classes into two kinds. Resource handles manage one resource each, are small, and write the special members themselves: "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", the "
+        },
+        {
+         "t": "code",
+         "v": "File"
+        },
+        {
+         "t": "text",
+         "v": " of the RAII topic, and the hand-written "
+        },
+        {
+         "t": "code",
+         "v": "IntBuffer"
+        },
+        {
+         "t": "text",
+         "v": ". Everything else holds resource handles as members and follows the Rule of Zero. So write the five yourself only when you are writing a new kind of resource handle, and check first whether "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " with a deleter or an existing class already is one. Most classes in an application, from a lidar scan to a robot's state, belong to the second kind."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A middle step exists, and Kostur shows it: keep a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<int[]>"
+        },
+        {
+         "t": "text",
+         "v": " member for the array and write only the copy operations, with the destructor and the moves "
+        },
+        {
+         "t": "code",
+         "v": "= default"
+        },
+        {
+         "t": "text",
+         "v": ". For this class it has a trap. A defaulted move constructor moves the "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", which leaves "
+        },
+        {
+         "t": "code",
+         "v": "nullptr"
+        },
+        {
+         "t": "text",
+         "v": ", and copies the "
+        },
+        {
+         "t": "code",
+         "v": "size_"
+        },
+        {
+         "t": "text",
+         "v": " member, so the moved-from object claims 3 elements it no longer has. Kostur's string needs no size member, because its text ends with a zero. With a size, the vector version has nothing to keep in step."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Write two classes with none of the five special members:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "Scan"
+         },
+         {
+          "t": "text",
+          "v": ": a lidar scan with a "
+         },
+         {
+          "t": "code",
+          "v": "frame"
+         },
+         {
+          "t": "text",
+          "v": " name and "
+         },
+         {
+          "t": "code",
+          "v": "ranges_mm"
+         },
+         {
+          "t": "text",
+          "v": ", a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::int32_t>"
+         },
+         {
+          "t": "text",
+          "v": " of ranges in millimetres;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "ScanRecorder"
+         },
+         {
+          "t": "text",
+          "v": ": owns a log file, opened from a path in its constructor (throw if it fails), and keeps every "
+         },
+         {
+          "t": "code",
+          "v": "Scan"
+         },
+         {
+          "t": "text",
+          "v": " it records in a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<Scan>"
+         },
+         {
+          "t": "text",
+          "v": ". "
+         },
+         {
+          "t": "code",
+          "v": "record(Scan)"
+         },
+         {
+          "t": "text",
+          "v": " writes one line with the frame and the number of ranges to the file, then stores the scan."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Before compiling, write down which of the five each class gets and whether its moves are "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", then prove your answer with "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": "s from "
+        },
+        {
+         "t": "code",
+         "v": "<type_traits>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "<concepts>"
+        },
+        {
+         "t": "text",
+         "v": ". In "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", show that copying a "
+        },
+        {
+         "t": "code",
+         "v": "Scan"
+        },
+        {
+         "t": "text",
+         "v": " is deep, that a "
+        },
+        {
+         "t": "code",
+         "v": "ScanRecorder"
+        },
+        {
+         "t": "text",
+         "v": " can be returned from a factory function by value, and that two recorders fit in a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ". Last, answer without compiling: what changes if someone adds a destructor to "
+        },
+        {
+         "t": "code",
+         "v": "ScanRecorder"
+        },
+        {
+         "t": "text",
+         "v": " that prints \"recorder closed\"?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <concepts>\n#include <cstdint>\n#include <cstdio>\n#include <filesystem>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <stdexcept>\n#include <string>\n#include <type_traits>\n#include <utility>\n#include <vector>\n\nstruct Scan {\n  std::string frame;\n  std::vector<std::int32_t> ranges_mm;\n};\n\n// Writes one line per scan to a log file it owns.\nclass ScanRecorder {\n public:\n  explicit ScanRecorder(const std::filesystem::path& path) : log_(std::fopen(path.c_str(), \"w\")) {\n    if (!log_) throw std::runtime_error(\"cannot open \" + path.string());\n  }\n  void record(Scan scan) {\n    std::fputs(std::format(\"{} {}\\n\", scan.frame, scan.ranges_mm.size()).c_str(), log_.get());\n    scans_.push_back(std::move(scan));\n  }\n  [[nodiscard]] std::ptrdiff_t count() const { return std::ssize(scans_); }\n\n private:\n  struct Closer {\n    void operator()(std::FILE* f) const noexcept { std::fclose(f); }\n  };\n  std::vector<Scan> scans_;\n  std::unique_ptr<std::FILE, Closer> log_;\n};\n\nstatic_assert(std::copyable<Scan> && std::is_nothrow_move_constructible_v<Scan>);\nstatic_assert(!std::is_copy_constructible_v<ScanRecorder> && !std::is_copy_assignable_v<ScanRecorder>);\nstatic_assert(std::is_nothrow_move_constructible_v<ScanRecorder> && std::is_nothrow_move_assignable_v<ScanRecorder>);\n\n[[nodiscard]] ScanRecorder open_recorder(const std::filesystem::path& path) { return ScanRecorder(path); }\n\nint main() {\n  const Scan first{.frame = \"front_lidar\", .ranges_mm = {812, 790, 1204}};\n  Scan copy = first;\n  copy.ranges_mm.push_back(655);\n  std::cout << std::format(\"first has {} ranges, copy has {}\\n\", first.ranges_mm.size(), copy.ranges_mm.size());\n\n  std::vector<ScanRecorder> recorders;\n  recorders.push_back(open_recorder(\"front.log\"));\n  recorders.front().record(first);\n  recorders.front().record(std::move(copy));\n  recorders.push_back(open_recorder(\"rear.log\"));  // growth moves the first recorder\n  std::cout << std::format(\"front recorder holds {} scans\\n\", recorders.front().count());\n}"
+      },
+      {
+       "t": "output",
+       "text": "first has 3 ranges, copy has 4\nfront recorder holds 2 scans"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Scan"
+        },
+        {
+         "t": "text",
+         "v": " gets all five, because "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " have all five, and its moves are "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " because theirs are. "
+        },
+        {
+         "t": "code",
+         "v": "ScanRecorder"
+        },
+        {
+         "t": "text",
+         "v": " gets a destructor and two "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " moves, and its copy operations are defined as deleted, because "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " can't be copied. That is the right answer for a class that owns a file: a copy would close the file twice. Nobody wrote "
+        },
+        {
+         "t": "code",
+         "v": "= delete"
+        },
+        {
+         "t": "text",
+         "v": "; the member decided. Returning it from "
+        },
+        {
+         "t": "code",
+         "v": "open_recorder"
+        },
+        {
+         "t": "text",
+         "v": " compiles because the prvalue initialises the caller's object directly, and growing the vector moves it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The added destructor changes a lot. A user-declared destructor, even "
+        },
+        {
+         "t": "code",
+         "v": "= default"
+        },
+        {
+         "t": "text",
+         "v": ", stops the compiler from declaring the move operations. With the moves gone, an rvalue falls back to the copy constructor, which is deleted, so "
+        },
+        {
+         "t": "code",
+         "v": "ScanRecorder"
+        },
+        {
+         "t": "text",
+         "v": " can no longer be moved at all, and "
+        },
+        {
+         "t": "code",
+         "v": "recorders.push_back(open_recorder(\"front.log\"))"
+        },
+        {
+         "t": "text",
+         "v": " stops compiling. The failure cases show the error. Writing the destructor means following C.21 and declaring the other four, the moves as "
+        },
+        {
+         "t": "code",
+         "v": "= default"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pitfalls",
+   "title": "Self-assignment, noexcept move and vector growth, which members the compiler deletes",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A destructor and nothing else is the classic Rule of Three violation. The compiler still generates a copy constructor, and it copies the pointer, so two objects own one array and both destructors free it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:attempting double-free",
+       "text": "#include <cstddef>\n\n// A destructor and nothing else: the compiler still writes a copy constructor, and it copies the pointer.\nclass IntBuffer {\n public:\n  explicit IntBuffer(std::ptrdiff_t size) : size_(size), data_(new int[size]{}) {}\n  ~IntBuffer() { delete[] data_; }\n  [[nodiscard]] std::ptrdiff_t size() const { return size_; }\n\n private:\n  std::ptrdiff_t size_;\n  int* data_;\n};\n\nint main() {\n  const IntBuffer a(3);\n  const IntBuffer b = a;  // both now point at one array, and both destructors free it\n  return b.size() == 3 ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It compiles cleanly with "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra -Werror"
+        },
+        {
+         "t": "text",
+         "v": " in GCC 13. The implicit copy of a class with a user-provided destructor has been deprecated since C++11, and GCC has a warning for it, "
+        },
+        {
+         "t": "code",
+         "v": "-Wdeprecated-copy-dtor"
+        },
+        {
+         "t": "text",
+         "v": ", but neither "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": " nor "
+        },
+        {
+         "t": "code",
+         "v": "-Wextra"
+        },
+        {
+         "t": "text",
+         "v": " turns it on; add it to your build and this line becomes an error. The sibling case, a hand-written copy constructor with the copy assignment left to the compiler, is caught by "
+        },
+        {
+         "t": "code",
+         "v": "-Wextra"
+        },
+        {
+         "t": "text",
+         "v": " through "
+        },
+        {
+         "t": "code",
+         "v": "-Wdeprecated-copy"
+        },
+        {
+         "t": "text",
+         "v": " wherever the generated assignment is used."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A copy assignment that frees first breaks on self-assignment. This one even allocates into a local before it touches "
+        },
+        {
+         "t": "code",
+         "v": "data_"
+        },
+        {
+         "t": "text",
+         "v": ", which looks careful, but the free comes first, and when "
+        },
+        {
+         "t": "code",
+         "v": "other"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "*this"
+        },
+        {
+         "t": "text",
+         "v": " the copy reads the array it freed two lines earlier:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <span>\n\nclass IntBuffer {\n public:\n  explicit IntBuffer(std::ptrdiff_t size) : size_(size), data_(new int[size]{}) {}\n  ~IntBuffer() { delete[] data_; }\n  IntBuffer(const IntBuffer& other) : size_(other.size_), data_(new int[other.size_]) {\n    std::ranges::copy(other.values(), data_);\n  }\n  IntBuffer& operator=(const IntBuffer& other) {\n    delete[] data_;  // frees first\n    int* const fresh = new int[other.size_];\n    std::ranges::copy(other.values(), fresh);  // when other is *this, this reads the array freed above\n    data_ = fresh;\n    size_ = other.size_;\n    return *this;\n  }\n  [[nodiscard]] std::span<const int> values() const { return {data_, static_cast<std::size_t>(size_)}; }\n\n private:\n  std::ptrdiff_t size_;\n  int* data_;\n};\n\n// Assigns through two references, so nothing at the call site looks like self-assignment.\nvoid copy_into(IntBuffer& target, const IntBuffer& source) { target = source; }\n\nint main() {\n  IntBuffer a(3);\n  copy_into(a, a);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Core Guidelines C.62 asks copy assignment to be safe for self-assignment, and prefers a design that needs no test over a test: copy-and-swap is one. The same function also fails without self-assignment. If "
+        },
+        {
+         "t": "code",
+         "v": "new"
+        },
+        {
+         "t": "text",
+         "v": " throws, "
+        },
+        {
+         "t": "code",
+         "v": "data_"
+        },
+        {
+         "t": "text",
+         "v": " still points at the freed array, and the destructor frees it again. Nash builds his "
+        },
+        {
+         "t": "code",
+         "v": "Widget"
+        },
+        {
+         "t": "text",
+         "v": " through both of these bugs in his 2024 talk before he reaches copy-and-swap."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A move constructor without "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " makes "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " copy. When a vector grows, it moves its elements into the new array only if the move can't throw; otherwise it copies them, so that an exception halfway leaves the old array intact. That is the strong guarantee of "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/container/vector/push_back"
+        },
+        {
+         "t": "text",
+         "v": "), and the choice follows the rule of "
+        },
+        {
+         "t": "code",
+         "v": "std::move_if_noexcept"
+        },
+        {
+         "t": "text",
+         "v": ": move if the move can't throw or the type can't be copied, copy otherwise. This program pushes 20 elements into three vectors and counts every copy and move of an element. Its last two lines move a "
+        },
+        {
+         "t": "code",
+         "v": "Track"
+        },
+        {
+         "t": "text",
+         "v": ", which holds one counted member, with and without a declared destructor:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Counts {\n  int copies = 0;\n  int moves = 0;\n};\n\n// Copyable, and the move promises not to throw.\nclass NoexceptMove {\n public:\n  explicit NoexceptMove(Counts& counts) : counts_(&counts) {}\n  NoexceptMove(const NoexceptMove& other) : counts_(other.counts_) { ++counts_->copies; }\n  NoexceptMove(NoexceptMove&& other) noexcept : counts_(other.counts_) { ++counts_->moves; }\n  NoexceptMove& operator=(const NoexceptMove&) = default;\n  NoexceptMove& operator=(NoexceptMove&&) noexcept = default;\n  ~NoexceptMove() = default;\n\n private:\n  Counts* counts_;\n};\n\n// Copyable, and the move may throw.\nclass ThrowingMove {\n public:\n  explicit ThrowingMove(Counts& counts) : counts_(&counts) {}\n  ThrowingMove(const ThrowingMove& other) : counts_(other.counts_) { ++counts_->copies; }\n  ThrowingMove(ThrowingMove&& other) : counts_(other.counts_) { ++counts_->moves; }\n  ThrowingMove& operator=(const ThrowingMove&) = default;\n  ThrowingMove& operator=(ThrowingMove&&) = default;\n  ~ThrowingMove() = default;\n\n private:\n  Counts* counts_;\n};\n\n// Move-only, and the move may throw.\nclass MoveOnly {\n public:\n  explicit MoveOnly(Counts& counts) : counts_(&counts) {}\n  MoveOnly(const MoveOnly&) = delete;\n  MoveOnly(MoveOnly&& other) : counts_(other.counts_) { ++counts_->moves; }\n  MoveOnly& operator=(const MoveOnly&) = delete;\n  MoveOnly& operator=(MoveOnly&&) = default;\n  ~MoveOnly() = default;\n\n private:\n  Counts* counts_;\n};\n\nstruct Track {  // declares nothing\n  NoexceptMove points;\n};\n\nstruct TrackWithDestructor {  // someone added a destructor to set a breakpoint in\n  NoexceptMove points;\n  ~TrackWithDestructor() = default;\n};\n\ntemplate <typename T>\nvoid grow(std::string_view name) {\n  Counts counts;\n  std::vector<T> v;\n  for (int i = 0; i < 20; ++i) v.emplace_back(counts);\n  std::cout << std::format(\"{:<15}copies {:>2}, moves {:>2}, capacity {}\\n\", name, counts.copies, counts.moves,\n                           v.capacity());\n}\n\ntemplate <typename T>\nvoid move_once(std::string_view name) {\n  Counts counts;\n  T a{NoexceptMove(counts)};\n  [[maybe_unused]] const T b = std::move(a);\n  std::cout << std::format(\"{:<21}copies {}, moves {}\\n\", name, counts.copies, counts.moves);\n}\n\nint main() {\n  grow<NoexceptMove>(\"noexcept move\");\n  grow<ThrowingMove>(\"throwing move\");\n  grow<MoveOnly>(\"move-only\");\n  move_once<Track>(\"Track\");\n  move_once<TrackWithDestructor>(\"TrackWithDestructor\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "noexcept move  copies  0, moves 31, capacity 32\nthrowing move  copies 31, moves  0, capacity 32\nmove-only      copies  0, moves 31, capacity 32\nTrack                copies 0, moves 1\nTrackWithDestructor  copies 1, moves 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "emplace_back"
+        },
+        {
+         "t": "text",
+         "v": " builds each new element in place, so every count in the first three lines comes from growth. GCC 13's vector doubles its capacity, 1, 2, 4, 8, 16, 32, and relocates 1 + 2 + 4 + 8 + 16 = 31 elements on the way. With a move that isn't "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", all 31 become copies, and for a type that owns memory each copy is an allocation. Nothing warns: the program is correct and slower. O'Dwyer's post on the vector pessimisation walks through the same case, and Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.66",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-noexcept"
+        },
+        {
+         "t": "text",
+         "v": " asks for "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " moves for this reason. The third line is the exception. A move-only type has no copy to fall back on, so the vector moves it anyway and gives up the strong guarantee: if one of those moves threw, the effects would be unspecified."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last two lines show a declared destructor turning a move into a copy, silently, even "
+        },
+        {
+         "t": "code",
+         "v": "~T() = default;"
+        },
+        {
+         "t": "text",
+         "v": ". Declaring a destructor, a copy constructor or a copy assignment operator stops the compiler from declaring the moves, and an rvalue then binds to the copy constructor instead. The fix is C.21's: once you declare the destructor, declare the other four as well, the moves "
+        },
+        {
+         "t": "code",
+         "v": "noexcept = default"
+        },
+        {
+         "t": "text",
+         "v": ", and the moves come back."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For a member that can't be copied, the same fallback removes moving altogether. This is the "
+        },
+        {
+         "t": "code",
+         "v": "ScanRecorder"
+        },
+        {
+         "t": "text",
+         "v": " question from the exercise: its "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " member makes the copy constructor deleted, and a destructor added for logging removes the moves, so nothing is left to move it with:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "is implicitly deleted because the default definition would be ill-formed",
+       "text": "#include <cstdio>\n#include <iostream>\n#include <memory>\n#include <vector>\n\nstruct Closer {\n  void operator()(std::FILE* f) const noexcept { std::fclose(f); }\n};\n\nclass ScanRecorder {\n public:\n  explicit ScanRecorder(std::FILE* log) : log_(log) {}\n  ~ScanRecorder() { std::cout << \"recorder closed\\n\"; }  // added for logging\n\n private:\n  std::unique_ptr<std::FILE, Closer> log_;\n};\n\nint main() {\n  std::vector<ScanRecorder> recorders;\n  recorders.push_back(ScanRecorder(std::fopen(\"front.log\", \"w\")));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 reports a use of the deleted copy constructor, and notes that it is implicitly deleted because copying the "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " member would be ill-formed. The fix is C.21's: declare the moves "
+        },
+        {
+         "t": "code",
+         "v": "= default"
+        },
+        {
+         "t": "text",
+         "v": " next to the destructor."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rules run the other way too. Declaring a move operation makes the implicit copy operations deleted, so a class that writes only a move constructor can't be copied:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "declares a move constructor or move assignment operator",
+       "text": "#include <string>\n#include <utility>\n\nstruct Track {\n  std::string name;\n  Track() = default;\n  Track(Track&& other) noexcept : name(std::move(other.name)) {}\n};\n\nint main() {\n  const Track a;\n  const Track b = a;\n  return static_cast<int>(b.name.size());\n}"
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the five special members and what each must do in a class that owns a raw buffer. Say why copy-and-swap gives the strong guarantee and survives self-assignment, and why freeing first does neither. Say what a move that isn't "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " costs in "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ", with the numbers from the counting program, and why a move-only type is moved anyway. Say what declaring a destructor does to the moves, and state the Rule of Zero and the Rule of Five, with O'Dwyer's two kinds of class that decide between them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then check your line about the destructor against this table, after Howard Hinnant's chart that Kostur shows. It lists what the compiler provides when you declare one special member yourself. \"Not declared\" means an rvalue uses the copy operation instead, and \"deprecated\" means it is generated, but C++11 deprecated relying on it:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "You declare"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Copy constructor"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Copy assignment"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Move constructor"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Move assignment"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "nothing"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "defaulted"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "defaulted"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "defaulted"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "defaulted"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "destructor"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "defaulted, deprecated"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "defaulted, deprecated"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not declared"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not declared"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "copy constructor"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yours"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "defaulted, deprecated"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not declared"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not declared"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "copy assignment"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "defaulted, deprecated"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yours"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not declared"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not declared"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "move constructor"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "deleted"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "deleted"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yours"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not declared"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "move assignment"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "deleted"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "deleted"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not declared"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yours"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Declaring any constructor, a copy or move constructor included, also removes the implicit default constructor. And "
+        },
+        {
+         "t": "code",
+         "v": "= default"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "= delete"
+        },
+        {
+         "t": "text",
+         "v": " counts as declaring. That is why Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.21",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+        },
+        {
+         "t": "text",
+         "v": " asks you to declare all five as soon as you declare one: the reader, and the compiler, then don't depend on this table."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: "
+     },
+     {
+      "t": "code",
+      "v": "IntBuffer"
+     },
+     {
+      "t": "text",
+      "v": " with a raw "
+     },
+     {
+      "t": "code",
+      "v": "int*"
+     },
+     {
+      "t": "text",
+      "v": ", all five special members, and copy-and-swap."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does copy-and-swap give the strong guarantee, and why is it safe on self-assignment without a test?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What goes wrong with a class that has only a destructor, and which GCC warning would catch it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How many element copies does a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " of 20 elements make while growing, if the move constructor isn't "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": "? What changes for a move-only type?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "~T() = default;"
+     },
+     {
+      "t": "text",
+      "v": " do to "
+     },
+     {
+      "t": "code",
+      "v": "T"
+     },
+     {
+      "t": "text",
+      "v": "'s move operations?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which special members does a class with a "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " member get, and what happens when you add a destructor?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When do you write the five special members yourself, and when do you follow the Rule of Zero?"
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: RAII and the Rule of Zero, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_raii_and_the_rule_of_zero/back_to_basics_raii_and_the_rule_of_zero__arthur_odwyer__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=7Qgd9B1KuMQ"
+     },
+     {
+      "t": "text",
+      "v": ". The "
+     },
+     {
+      "t": "code",
+      "v": "NaiveVector"
+     },
+     {
+      "t": "text",
+      "v": " that leaks and double-frees, copy-and-swap, and the two kinds of class."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Andre Kostur, Back to Basics: The Rule of Five, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Rule_of_Five.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://youtube.com/watch?v=juAZDfsaMvY"
+     },
+     {
+      "t": "text",
+      "v": ". A raw "
+     },
+     {
+      "t": "code",
+      "v": "char*"
+     },
+     {
+      "t": "text",
+      "v": " string given its five members one at a time, then "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr<char[]>"
+     },
+     {
+      "t": "text",
+      "v": ", then "
+     },
+     {
+      "t": "code",
+      "v": "std::string"
+     },
+     {
+      "t": "text",
+      "v": ", with Hinnant's chart."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Phil Nash, Back to Basics: Lifetime Management, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Lifetime_Management.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=aMvIv6blzBs"
+     },
+     {
+      "t": "text",
+      "v": ". A "
+     },
+     {
+      "t": "code",
+      "v": "Widget"
+     },
+     {
+      "t": "text",
+      "v": " owning a raw pointer, taken through the double free, the leaking and self-assigning copy assignments, copy-and-swap and the moves."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: The Special Member Functions, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=9BM5LAvNtus"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Ben Saks, Back to Basics: Move Semantics, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Back_To_Basics_Move_Semantics.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=szU5b972F7E"
+     },
+     {
+      "t": "text",
+      "v": ". A string class that owns a raw "
+     },
+     {
+      "t": "code",
+      "v": "char"
+     },
+     {
+      "t": "text",
+      "v": " array, given a deep copy and then moves."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "C.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-zero"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.22",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-matched"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.62",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-copy-self"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.66",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-noexcept"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "R.11",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-newdelete"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, "
+     },
+     {
+      "t": "a",
+      "v": "the vector pessimisation",
+      "href": "https://quuxplusone.github.io/blog/2022/08/26/vector-pessimization/"
+     },
+     {
+      "t": "text",
+      "v": ": a missing "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": " turning growth into copies."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil "
+     },
+     {
+      "t": "a",
+      "v": "tip #131 on special member functions and `= default`",
+      "href": "https://abseil.io/tips/131"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, C++ Move Semantics: The Complete Guide, chapter 3 on move semantics in classes and chapter 7 on "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://leanpub.com/cppmove"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "the rule of three, five and zero",
+      "href": "https://en.cppreference.com/cpp/language/rule_of_three"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::move_if_noexcept",
+      "href": "https://en.cppreference.com/cpp/utility/move_if_noexcept"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "vector::push_back",
+      "href": "https://en.cppreference.com/cpp/container/vector/push_back"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

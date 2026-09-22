@@ -1,0 +1,3718 @@
+{
+ "id": "cpp-polymorphism",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "From memory, write two short programs. In the first, a "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr<Sensor>"
+     },
+     {
+      "t": "text",
+      "v": " owns a "
+     },
+     {
+      "t": "code",
+      "v": "Lidar"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "code",
+      "v": "Sensor"
+     },
+     {
+      "t": "text",
+      "v": " has virtual functions and a public destructor that isn't virtual; say what happens when the pointer is destroyed. In the second, pass a "
+     },
+     {
+      "t": "code",
+      "v": "Lidar"
+     },
+     {
+      "t": "text",
+      "v": " by value to a function that takes a "
+     },
+     {
+      "t": "code",
+      "v": "Sensor"
+     },
+     {
+      "t": "text",
+      "v": ", call a virtual function on the parameter, and say what it prints. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The first program deletes a "
+     },
+     {
+      "t": "code",
+      "v": "Lidar"
+     },
+     {
+      "t": "text",
+      "v": " through a "
+     },
+     {
+      "t": "code",
+      "v": "Sensor*"
+     },
+     {
+      "t": "text",
+      "v": ". With a non-virtual destructor that is undefined behaviour, and AddressSanitizer catches one visible symptom of it:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "asan:new-delete-type-mismatch",
+    "text": "#include <memory>\n#include <string>\n\nclass Sensor {\n public:\n  ~Sensor() = default;  // public and not virtual: the bug\n  [[nodiscard]] virtual int read_mm() const = 0;\n};\n\nclass Lidar final : public Sensor {\n public:\n  [[nodiscard]] int read_mm() const override { return 850; }\n\n private:\n  std::string frame_ = \"laser_link_on_the_front_bumper\";\n};\n\nint main() {\n  const std::unique_ptr<Sensor> sensor = std::make_unique<Lidar>();\n  return sensor->read_mm() == 850 ? 0 : 1;\n}  // the unique_ptr deletes a Lidar through a Sensor*"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Below its first line, the report says:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "text",
+    "tag": "",
+    "expect": "",
+    "text": "  object passed to delete has wrong type:\n  size of the allocated type:   40 bytes;\n  size of the deallocated type: 8 bytes."
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "delete"
+     },
+     {
+      "t": "text",
+      "v": " through a "
+     },
+     {
+      "t": "code",
+      "v": "Sensor*"
+     },
+     {
+      "t": "text",
+      "v": " calls "
+     },
+     {
+      "t": "code",
+      "v": "~Sensor"
+     },
+     {
+      "t": "text",
+      "v": " directly, so "
+     },
+     {
+      "t": "code",
+      "v": "~Lidar"
+     },
+     {
+      "t": "text",
+      "v": " never runs and "
+     },
+     {
+      "t": "code",
+      "v": "frame_"
+     },
+     {
+      "t": "text",
+      "v": " never frees its heap buffer, and the memory is returned as if it held an 8-byte "
+     },
+     {
+      "t": "code",
+      "v": "Sensor"
+     },
+     {
+      "t": "text",
+      "v": ". The standard makes the whole "
+     },
+     {
+      "t": "code",
+      "v": "delete"
+     },
+     {
+      "t": "text",
+      "v": " undefined; the leak and the size mismatch are what GCC 13 happens to do. The fix is "
+     },
+     {
+      "t": "code",
+      "v": "virtual ~Sensor() = default;"
+     },
+     {
+      "t": "text",
+      "v": ", or, when nobody should delete through a "
+     },
+     {
+      "t": "code",
+      "v": "Sensor*"
+     },
+     {
+      "t": "text",
+      "v": ", a destructor that is "
+     },
+     {
+      "t": "code",
+      "v": "protected"
+     },
+     {
+      "t": "text",
+      "v": " and not virtual (Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "C.35",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-virtual"
+     },
+     {
+      "t": "text",
+      "v": ")."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The second program slices:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <iostream>\n#include <string_view>\n\nclass Sensor {\n public:\n  virtual ~Sensor() = default;\n  [[nodiscard]] virtual std::string_view name() const { return \"generic sensor\"; }\n};\n\nclass Lidar final : public Sensor {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"lidar\"; }\n};\n\nvoid print_copy(Sensor sensor) { std::cout << \"by value:     \" << sensor.name() << '\\n'; }\nvoid print_ref(const Sensor& sensor) { std::cout << \"by reference: \" << sensor.name() << '\\n'; }\n\nint main() {\n  const Lidar lidar;\n  print_copy(lidar);\n  print_ref(lidar);\n}"
+   },
+   {
+    "t": "output",
+    "text": "by value:     generic sensor\nby reference: lidar"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The parameter of "
+     },
+     {
+      "t": "code",
+      "v": "print_copy"
+     },
+     {
+      "t": "text",
+      "v": " is a "
+     },
+     {
+      "t": "code",
+      "v": "Sensor"
+     },
+     {
+      "t": "text",
+      "v": ", so the call copies the "
+     },
+     {
+      "t": "code",
+      "v": "Sensor"
+     },
+     {
+      "t": "text",
+      "v": " part of the "
+     },
+     {
+      "t": "code",
+      "v": "Lidar"
+     },
+     {
+      "t": "text",
+      "v": " into a new "
+     },
+     {
+      "t": "code",
+      "v": "Sensor"
+     },
+     {
+      "t": "text",
+      "v": " object. That object is a "
+     },
+     {
+      "t": "code",
+      "v": "Sensor"
+     },
+     {
+      "t": "text",
+      "v": " through and through, and "
+     },
+     {
+      "t": "code",
+      "v": "name()"
+     },
+     {
+      "t": "text",
+      "v": " calls "
+     },
+     {
+      "t": "code",
+      "v": "Sensor::name"
+     },
+     {
+      "t": "text",
+      "v": ". Nothing warns: the copy constructor is implicitly generated, and a "
+     },
+     {
+      "t": "code",
+      "v": "Lidar"
+     },
+     {
+      "t": "text",
+      "v": " converts to "
+     },
+     {
+      "t": "code",
+      "v": "const Sensor&"
+     },
+     {
+      "t": "text",
+      "v": " to feed it."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you say that the first program's "
+     },
+     {
+      "t": "code",
+      "v": "delete"
+     },
+     {
+      "t": "text",
+      "v": " is undefined behaviour, that "
+     },
+     {
+      "t": "code",
+      "v": "~Lidar"
+     },
+     {
+      "t": "text",
+      "v": " doesn't run, and that the fix is a virtual destructor or a protected non-virtual one; and that the second copies only the base part, so the call prints the base class's answer, with a reference parameter or a base class that can't be copied as the fix. One of the two right is a partial pass. Saying that the by-value call prints \"lidar\" is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A virtual function is a member function where the call goes to the version the object's actual type overrides, not the type of the pointer or reference used to call it. The type the compiler sees at the call site is the static type; the type of the object really there is the dynamic type, and a virtual call through a base pointer or reference reaches the dynamic type's version. The compiler arranges this with a vtable, one per class with virtual functions, holding that class's override addresses, and a vptr, a hidden pointer in every such object pointing at its class's table."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this solves is writing code once against a base class that keeps working for every class that implements it, including ones written after that code was compiled, as long as each keeps the base's promises. Without virtual dispatch, a function taking a base reference always calls the base's own version, whatever the caller passed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is that a constructor sets the vptr as each base finishes building and each derived class takes over, so a virtual call made from a base's own constructor still reaches the base's version, never a derived one not yet built. A call through the base becomes an indirect call: load the vptr, load the function's address out of the table, and call through it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is more than the call itself. A base held by pointer needs a virtual destructor, or deleting through the base skips every derived destructor, and a base that stays copyable slices: copying through the base type keeps only the base part, silently, because the copy is a complete object of the base's own type. Composition sidesteps dispatch by holding behaviour instead of inheriting it, as a closed "
+    },
+    {
+     "t": "code",
+     "v": "std::variant"
+    },
+    {
+     "t": "text",
+     "v": " of the possible kinds or an open "
+    },
+    {
+     "t": "code",
+     "v": "std::function"
+    },
+    {
+     "t": "text",
+     "v": " of the possible behaviours: a class hierarchy is cheap to extend with a new kind and expensive to give a new operation, and a variant is the other way round."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in a robot's sensor list, a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " of owned interfaces a control loop reports through without knowing which is a lidar and which is a sonar, and it's the interview question itself: why a base pointed to by a "
+    },
+    {
+     "t": "code",
+     "v": "unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": " needs a virtual destructor, and what happens when a derived object is passed by value into a function expecting the base."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "virtual",
+   "title": "Virtual functions, vtables, virtual destructors, override and final",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <string_view>\n#include <vector>\n\nclass Sensor {\n public:\n  Sensor() = default;\n  Sensor(const Sensor&) = delete;  // no copies: the slicing section says why\n  Sensor& operator=(const Sensor&) = delete;\n  virtual ~Sensor() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n  [[nodiscard]] virtual int read_mm() const = 0;\n};\n\nclass Lidar final : public Sensor {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"lidar\"; }\n  [[nodiscard]] int read_mm() const override { return 850; }\n};\n\nclass Sonar final : public Sensor {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"sonar\"; }\n  [[nodiscard]] int read_mm() const override { return 1200; }\n};\n\n// Compiled once, knowing nothing about Lidar or Sonar.\nvoid report(const Sensor& sensor) { std::cout << std::format(\"{}: {} mm\\n\", sensor.name(), sensor.read_mm()); }\n\nint main() {\n  std::vector<std::unique_ptr<Sensor>> sensors;\n  sensors.push_back(std::make_unique<Lidar>());\n  sensors.push_back(std::make_unique<Sonar>());\n  for (const auto& sensor : sensors) report(*sensor);\n}"
+      },
+      {
+       "t": "output",
+       "text": "lidar: 850 mm\nsonar: 1200 mm"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Inside "
+        },
+        {
+         "t": "code",
+         "v": "report"
+        },
+        {
+         "t": "text",
+         "v": ", the "
+        },
+        {
+         "t": "i",
+         "v": "static type"
+        },
+        {
+         "t": "text",
+         "v": " of "
+        },
+        {
+         "t": "code",
+         "v": "sensor"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": ", the type the compiler sees. Its "
+        },
+        {
+         "t": "i",
+         "v": "dynamic type"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "Lidar"
+        },
+        {
+         "t": "text",
+         "v": " on the first call and "
+        },
+        {
+         "t": "code",
+         "v": "Sonar"
+        },
+        {
+         "t": "text",
+         "v": " on the second, the type of the object that is really there, and a virtual function call goes to the dynamic type's version. Jon Kalb's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on object-oriented programming",
+         "href": "https://www.youtube.com/watch?v=32tDTD9UJCE"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019) describes the derived classes as libraries that all implement one API, which the base class defines. Code written against the base, like "
+        },
+        {
+         "t": "code",
+         "v": "report"
+        },
+        {
+         "t": "text",
+         "v": ", works with every implementation, including ones written after it was compiled, as long as each keeps the base's promises: that is Liskov substitution. His counterexample is a logger whose "
+        },
+        {
+         "t": "code",
+         "v": "LogMessage"
+        },
+        {
+         "t": "text",
+         "v": " calls "
+        },
+        {
+         "t": "code",
+         "v": "std::exit"
+        },
+        {
+         "t": "text",
+         "v": ". It compiles and overrides correctly, and it breaks every caller."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The standard says what a virtual call does, not how. GCC and Clang on Linux follow the "
+        },
+        {
+         "t": "a",
+         "v": "Itanium C++ ABI",
+         "href": "https://itanium-cxx-abi.github.io/cxx-abi/abi.html#vtable"
+        },
+        {
+         "t": "text",
+         "v": ", and it works like this. Each class with virtual functions has one "
+        },
+        {
+         "t": "i",
+         "v": "virtual table"
+        },
+        {
+         "t": "text",
+         "v": ", an array of function addresses in read-only memory. Each object of such a class starts with a hidden pointer to its class's table, the "
+        },
+        {
+         "t": "i",
+         "v": "vptr"
+        },
+        {
+         "t": "text",
+         "v": ", which the constructors set:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "a Lidar object              the vtable for Lidar, one per class\n+----------------+          +--------------------------------+\n| vptr           | -------> | &Lidar::~Lidar  (two entries)  |\n+----------------+          | &Lidar::name                   |\n                            | &Lidar::read_mm                |\n                            +--------------------------------+\n            the offset to the object's start and a pointer to its typeinfo\n            sit just before the address the vptr points to"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "sensor.read_mm()"
+        },
+        {
+         "t": "text",
+         "v": " becomes three steps: load the vptr from the object, load the "
+        },
+        {
+         "t": "code",
+         "v": "read_mm"
+        },
+        {
+         "t": "text",
+         "v": " entry from the table, and call through it. Stephen Dewhurst's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on class layout",
+         "href": "https://www.youtube.com/watch?v=SShSV_iV1Ko"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2020) shows the instructions, and Inbal Levi's "
+        },
+        {
+         "t": "a",
+         "v": "talk on virtual dispatch and its alternatives",
+         "href": "https://www.youtube.com/watch?v=jBnIMEb2GhA"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019) writes the same table out by hand as a struct of function pointers. The table also carries what "
+        },
+        {
+         "t": "code",
+         "v": "dynamic_cast"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "typeid"
+        },
+        {
+         "t": "text",
+         "v": " need."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That gives the costs, and none of them is large on its own. Every object carries one pointer, 8 bytes on x86-64, as the worked example measures. A call through the table is indirect, and the compiler can inline it only when it can prove the dynamic type. And a polymorphic object is usually used through a pointer, so it lives on the heap: one allocation per object, and a pointer to follow before the vptr. Levi benchmarks virtual calls against CRTP and "
+        },
+        {
+         "t": "code",
+         "v": "std::visit"
+        },
+        {
+         "t": "text",
+         "v": " and finds the ranking changes with the compiler and the optimisation level, so measure your own case before choosing on speed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A base class that is deleted through a pointer to it needs a virtual destructor, as the cold check showed. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.35",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-virtual"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "C.127",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-dtor"
+        },
+        {
+         "t": "text",
+         "v": " allow two designs. Public and virtual, when owners hold the object as a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Sensor>"
+        },
+        {
+         "t": "text",
+         "v": ", as the smart pointer topic's planner factory did. Or protected and non-virtual, when the base is only an interface for callers who never own the object; then "
+        },
+        {
+         "t": "code",
+         "v": "delete"
+        },
+        {
+         "t": "text",
+         "v": " through the base doesn't compile at all:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "class ScanListener {  // callers get a ScanListener&; they never own or delete one\n public:\n  virtual void on_scan(const Scan& scan) = 0;\n\n protected:\n  ~ScanListener() = default;  // protected: delete through a ScanListener* is refused\n};"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Andreas Fertig's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on object-oriented programming",
+         "href": "https://www.youtube.com/watch?v=SuubuqI4gVA"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) adds a fact that surprises people: declaring a destructor, even "
+        },
+        {
+         "t": "code",
+         "v": "virtual ~Sensor() = default;"
+        },
+        {
+         "t": "text",
+         "v": ", stops the compiler from declaring the move operations. For a polymorphic base that is harmless, because the next section switches its copies and moves off anyway."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A function in a derived class overrides a base class's virtual function only if the name, the parameter types, "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " and the reference qualifier all match. Mark every override "
+        },
+        {
+         "t": "code",
+         "v": "override"
+        },
+        {
+         "t": "text",
+         "v": ", and the compiler checks the match ("
+        },
+        {
+         "t": "a",
+         "v": "C.128",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-override"
+        },
+        {
+         "t": "text",
+         "v": "). Here the "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " is missing:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "but does not override",
+       "text": "class Sensor {\n public:\n  virtual ~Sensor() = default;\n  [[nodiscard]] virtual int read_mm() const { return 0; }\n};\n\nclass Lidar final : public Sensor {\n public:\n  [[nodiscard]] int read_mm() override { return 850; }\n};\n\nint main() {\n  Lidar lidar;\n  return lidar.read_mm();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 says "
+        },
+        {
+         "t": "code",
+         "v": "‘int Lidar::read_mm()’ marked ‘override’, but does not override"
+        },
+        {
+         "t": "text",
+         "v": ". Without "
+        },
+        {
+         "t": "code",
+         "v": "override"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Lidar::read_mm"
+        },
+        {
+         "t": "text",
+         "v": " is a new function that hides the base's, and every call through a "
+        },
+        {
+         "t": "code",
+         "v": "Sensor&"
+        },
+        {
+         "t": "text",
+         "v": " still reaches "
+        },
+        {
+         "t": "code",
+         "v": "Sensor::read_mm"
+        },
+        {
+         "t": "text",
+         "v": ". GCC 13's "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": " happens to catch this case too, with "
+        },
+        {
+         "t": "code",
+         "v": "-Woverloaded-virtual=1"
+        },
+        {
+         "t": "text",
+         "v": ", which warns that the base function "
+        },
+        {
+         "t": "code",
+         "v": "was hidden"
+        },
+        {
+         "t": "text",
+         "v": ", but a warning depends on flags and compilers, and "
+        },
+        {
+         "t": "code",
+         "v": "override"
+        },
+        {
+         "t": "text",
+         "v": " is an error everywhere. C.128's other half: write exactly one of "
+        },
+        {
+         "t": "code",
+         "v": "virtual"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "override"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": " on each function. "
+        },
+        {
+         "t": "code",
+         "v": "virtual"
+        },
+        {
+         "t": "text",
+         "v": " introduces a new virtual function, "
+        },
+        {
+         "t": "code",
+         "v": "override"
+        },
+        {
+         "t": "text",
+         "v": " overrides one, and "
+        },
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": " overrides one that no further class may override."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": " on a class, as on "
+        },
+        {
+         "t": "code",
+         "v": "Lidar"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Sonar"
+        },
+        {
+         "t": "text",
+         "v": " above, forbids deriving from it. That also tells the compiler the dynamic type of any "
+        },
+        {
+         "t": "code",
+         "v": "Lidar&"
+        },
+        {
+         "t": "text",
+         "v": ", so it can call "
+        },
+        {
+         "t": "code",
+         "v": "Lidar"
+        },
+        {
+         "t": "text",
+         "v": "'s functions directly. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.139",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-final"
+        },
+        {
+         "t": "text",
+         "v": " asks for "
+        },
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": " on classes sparingly and for measured evidence behind any speed claim. Kalb's talk gives the rule it pairs with, which he takes from Scott Meyers: make non-leaf classes abstract. Every class is then either an abstract base or a leaf, and his leaves are "
+        },
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two more rules close the section. During a constructor or a destructor, the object has the dynamic type of the class whose constructor or destructor is running, so a virtual call made there never reaches a derived class ("
+        },
+        {
+         "t": "a",
+         "v": "C.82",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-ctor-virtual"
+        },
+        {
+         "t": "text",
+         "v": "); the worked example shows it. And default arguments are chosen by the static type, so an override that declares its own default gets the base's when called through a base reference ("
+        },
+        {
+         "t": "a",
+         "v": "C.140",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-virtual-default-arg"
+        },
+        {
+         "t": "text",
+         "v": "); Kalb's talk has the test that proves it."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program measures what the vptr costs and shows what a virtual call sees while an object is being built and torn down."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <string_view>\n\nstruct Plain {\n  int mm;\n};\n\nstruct OneVirtual {\n  virtual ~OneVirtual() = default;\n  int mm;\n};\n\nstruct FourVirtuals {\n  virtual ~FourVirtuals() = default;\n  [[nodiscard]] virtual int a() const { return 1; }\n  [[nodiscard]] virtual int b() const { return 2; }\n  [[nodiscard]] virtual int c() const { return 3; }\n  int mm;\n};\n\nclass Sensor {\n public:\n  Sensor() { std::cout << std::format(\"  Sensor() calls kind(): {}\\n\", kind()); }\n  Sensor(const Sensor&) = delete;\n  Sensor& operator=(const Sensor&) = delete;\n  virtual ~Sensor() { std::cout << std::format(\"  ~Sensor() calls kind(): {}\\n\", kind()); }\n  [[nodiscard]] virtual std::string_view kind() const { return \"Sensor\"; }\n};\n\nclass Lidar final : public Sensor {\n public:\n  Lidar() { std::cout << std::format(\"  Lidar() calls kind(): {}\\n\", kind()); }\n  ~Lidar() override { std::cout << \"  ~Lidar()\\n\"; }\n  [[nodiscard]] std::string_view kind() const override { return \"Lidar\"; }\n};\n\nint main() {\n  std::cout << std::format(\"sizeof: Plain {}, OneVirtual {}, FourVirtuals {}\\n\", sizeof(Plain), sizeof(OneVirtual),\n                           sizeof(FourVirtuals));\n  std::cout << \"make_unique<Lidar>():\\n\";\n  std::unique_ptr<Sensor> sensor = std::make_unique<Lidar>();\n  std::cout << std::format(\"sensor->kind(): {}\\n\", sensor->kind());\n  std::cout << \"reset():\\n\";\n  sensor.reset();\n}"
+      },
+      {
+       "t": "output",
+       "text": "sizeof: Plain 4, OneVirtual 16, FourVirtuals 16\nmake_unique<Lidar>():\n  Sensor() calls kind(): Sensor\n  Lidar() calls kind(): Lidar\nsensor->kind(): Lidar\nreset():\n  ~Lidar()\n  ~Sensor() calls kind(): Sensor"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "One virtual function takes the struct from 4 bytes to 16: 8 for the vptr, 4 for "
+         },
+         {
+          "t": "code",
+          "v": "mm"
+         },
+         {
+          "t": "text",
+          "v": ", and 4 of padding that keep the next array element's vptr aligned. Four virtual functions cost the same as one, because the object holds one pointer and the function addresses are in the class's table. These numbers are GCC 13 on x86-64 under the Itanium ABI; the standard doesn't mention a vptr, and Dewhurst notes that other compilers have put it elsewhere in the object."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Sensor()"
+         },
+         {
+          "t": "text",
+          "v": " runs first, and while it runs the object is a "
+         },
+         {
+          "t": "code",
+          "v": "Sensor"
+         },
+         {
+          "t": "text",
+          "v": ": its vptr points at "
+         },
+         {
+          "t": "code",
+          "v": "Sensor"
+         },
+         {
+          "t": "text",
+          "v": "'s table, so "
+         },
+         {
+          "t": "code",
+          "v": "kind()"
+         },
+         {
+          "t": "text",
+          "v": " answers \"Sensor\". "
+         },
+         {
+          "t": "code",
+          "v": "Lidar()"
+         },
+         {
+          "t": "text",
+          "v": " then points the vptr at "
+         },
+         {
+          "t": "code",
+          "v": "Lidar"
+         },
+         {
+          "t": "text",
+          "v": "'s table. Destruction runs in reverse, and "
+         },
+         {
+          "t": "code",
+          "v": "~Sensor()"
+         },
+         {
+          "t": "text",
+          "v": " sees a "
+         },
+         {
+          "t": "code",
+          "v": "Sensor"
+         },
+         {
+          "t": "text",
+          "v": " again. Calling a virtual function from a constructor is legal and never reaches the derived class, which is why C.82 says not to. A pure virtual one is worse, as the paragraph after this list shows."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "sensor.reset()"
+         },
+         {
+          "t": "text",
+          "v": " runs "
+         },
+         {
+          "t": "code",
+          "v": "~Lidar()"
+         },
+         {
+          "t": "text",
+          "v": " and then "
+         },
+         {
+          "t": "code",
+          "v": "~Sensor()"
+         },
+         {
+          "t": "text",
+          "v": " because the destructor is virtual. The cold check's program skipped the first of the two."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "~Lidar() override"
+         },
+         {
+          "t": "text",
+          "v": " is legal, and worth writing: if someone makes "
+         },
+         {
+          "t": "code",
+          "v": "~Sensor"
+         },
+         {
+          "t": "text",
+          "v": " non-virtual later, it stops compiling with "
+         },
+         {
+          "t": "code",
+          "v": "‘Lidar::~Lidar()’ marked ‘override’, but does not override"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Sensor"
+         },
+         {
+          "t": "text",
+          "v": " deletes its copy operations. The next section shows what a copy of a polymorphic object does, and why a class like this one refuses them."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A pure virtual function has no version of its own to call, so a constructor that calls one has nothing to reach. Written directly in the constructor, GCC 13 catches it, and "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " turns the warning into the error that stops this build:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "called from constructor",
+       "text": "#include <cstddef>\n#include <string_view>\n\nclass Sensor {\n public:\n  Sensor() { kind_length_ = kind().size(); }  // pure virtual, called directly\n  virtual ~Sensor() = default;\n  [[nodiscard]] virtual std::string_view kind() const = 0;\n\n private:\n  std::size_t kind_length_ = 0;\n};\n\nclass Lidar final : public Sensor {\n public:\n  [[nodiscard]] std::string_view kind() const override { return \"Lidar\"; }\n};\n\nint main() {\n  const Lidar lidar;\n  return lidar.kind().size() == 5 ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The message is "
+        },
+        {
+         "t": "code",
+         "v": "pure virtual ‘virtual std::string_view Sensor::kind() const’ called from constructor"
+        },
+        {
+         "t": "text",
+         "v": ", and without "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " the build gets one step further and fails at the link, where "
+        },
+        {
+         "t": "code",
+         "v": "ld"
+        },
+        {
+         "t": "text",
+         "v": " reports an undefined reference to "
+        },
+        {
+         "t": "code",
+         "v": "Sensor::kind() const"
+        },
+        {
+         "t": "text",
+         "v": ". Hide the call one level down, in a non-virtual member function that the constructor calls, and the compiler says nothing. The behaviour is undefined, and a GCC 13 program built that way ends at run time with "
+        },
+        {
+         "t": "code",
+         "v": "pure virtual method called"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "terminate called without an active exception"
+        },
+        {
+         "t": "text",
+         "v": ", exit status 134."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "slicing",
+   "title": "Object slicing; why interfaces are held by pointer or reference",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Copying a "
+        },
+        {
+         "t": "code",
+         "v": "Lidar"
+        },
+        {
+         "t": "text",
+         "v": " into a "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": " compiles, and keeps only the "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": " part:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <utility>\n#include <vector>\n\nclass Sensor {  // copyable on purpose: this is the bug\n public:\n  explicit Sensor(std::string frame) : frame_(std::move(frame)) {}\n  virtual ~Sensor() = default;\n  [[nodiscard]] const std::string& frame() const { return frame_; }\n  [[nodiscard]] virtual std::string describe() const { return std::format(\"sensor at {}\", frame_); }\n\n private:\n  std::string frame_;\n};\n\nclass Lidar final : public Sensor {\n public:\n  Lidar(std::string frame, int max_range_mm) : Sensor(std::move(frame)), max_range_mm_(max_range_mm) {}\n  [[nodiscard]] std::string describe() const override {\n    return std::format(\"lidar at {}, {} mm\", frame(), max_range_mm_);\n  }\n\n private:\n  int max_range_mm_;\n};\n\nint main() {\n  const Lidar lidar(\"laser\", 12000);\n  const Sensor copy = lidar;            // copies the Sensor part only\n  const std::vector<Sensor> sensors{lidar};  // the same, element by element\n  std::cout << lidar.describe() << '\\n' << copy.describe() << '\\n' << sensors.front().describe() << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "lidar at laser, 12000 mm\nsensor at laser\nsensor at laser"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is "
+        },
+        {
+         "t": "i",
+         "v": "slicing"
+        },
+        {
+         "t": "text",
+         "v": ": initialising or assigning a base class object from a derived one copies the base part and drops the rest. The copy is a complete "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": ", with "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": "'s vptr, so "
+        },
+        {
+         "t": "code",
+         "v": "describe()"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "Sensor::describe"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "max_range_mm_"
+        },
+        {
+         "t": "text",
+         "v": " is gone. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.63",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-slice"
+        },
+        {
+         "t": "text",
+         "v": " says don't slice, and "
+        },
+        {
+         "t": "a",
+         "v": "C.145",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-poly"
+        },
+        {
+         "t": "text",
+         "v": " says to reach polymorphic objects through pointers and references, because only those keep the dynamic type. The same copy hides in a by-value parameter (the cold check), a by-value return of a "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "catch (Sensor e)"
+        },
+        {
+         "t": "text",
+         "v": ", and a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Sensor>"
+        },
+        {
+         "t": "text",
+         "v": ", which can only ever hold "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": "s."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Making "
+        },
+        {
+         "t": "code",
+         "v": "Sensor"
+        },
+        {
+         "t": "text",
+         "v": " abstract, as Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.121",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-abstract"
+        },
+        {
+         "t": "text",
+         "v": " asks of a base class used as an interface, removes every one of those copies. An abstract class can't be a variable, a by-value parameter or a vector element, and GCC 13 says "
+        },
+        {
+         "t": "code",
+         "v": "cannot declare parameter ‘sensor’ to be of abstract type ‘Sensor’"
+        },
+        {
+         "t": "text",
+         "v": " for the cold check's "
+        },
+        {
+         "t": "code",
+         "v": "print_copy"
+        },
+        {
+         "t": "text",
+         "v": ". It doesn't remove assignment, which Kalb's talk calls Scott Meyers's challenge: an abstract class still has an implicitly generated copy assignment operator. That assignment reaches the base part in two shapes. One is a "
+        },
+        {
+         "t": "code",
+         "v": "Sensor&"
+        },
+        {
+         "t": "text",
+         "v": " variable on the left. The other is a pair of owning pointers, where the line reads "
+        },
+        {
+         "t": "code",
+         "v": "*a = *b"
+        },
+        {
+         "t": "text",
+         "v": " and names no base class at all:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <utility>\n#include <vector>\n\nclass Sensor {  // abstract, and still assignable: this is the bug\n public:\n  explicit Sensor(std::string frame) : frame_(std::move(frame)) {}\n  virtual ~Sensor() = default;\n  [[nodiscard]] const std::string& frame() const { return frame_; }\n  [[nodiscard]] virtual int max_range_mm() const = 0;\n\n private:\n  std::string frame_;\n};\n\nclass Lidar final : public Sensor {\n public:\n  Lidar(std::string frame, int max_range_mm) : Sensor(std::move(frame)), max_range_mm_(max_range_mm) {}\n  [[nodiscard]] int max_range_mm() const override { return max_range_mm_; }\n\n private:\n  int max_range_mm_;\n};\n\nint main() {\n  Lidar front(\"front_laser\", 12000);\n  const Lidar rear(\"rear_laser\", 8000);\n  Sensor& target = front;\n  const Sensor& source = rear;\n  target = source;  // Sensor::operator=: copies the frame, not the range\n  std::cout << std::format(\"front is now {} with {} mm\\n\", front.frame(), front.max_range_mm());\n\n  std::vector<std::unique_ptr<Sensor>> fleet;\n  fleet.push_back(std::make_unique<Lidar>(\"left_laser\", 4000));\n  fleet.push_back(std::make_unique<Lidar>(\"right_laser\", 6000));\n  *fleet[0] = *fleet[1];  // the same operator=, with no Sensor in sight\n  std::cout << std::format(\"fleet[0] is now {} with {} mm\\n\", fleet[0]->frame(), fleet[0]->max_range_mm());\n}"
+      },
+      {
+       "t": "output",
+       "text": "front is now rear_laser with 12000 mm\nfleet[0] is now right_laser with 4000 mm"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "front"
+        },
+        {
+         "t": "text",
+         "v": " is now half one lidar and half the other: the frame of the rear one and the range of the front one. "
+        },
+        {
+         "t": "code",
+         "v": "fleet[0]"
+        },
+        {
+         "t": "text",
+         "v": " ends up the same mix, from a line that names no type, so nothing in it points at "
+        },
+        {
+         "t": "code",
+         "v": "Sensor::operator="
+        },
+        {
+         "t": "text",
+         "v": ". No single line looks wrong. The fix is in the base class. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.67",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-copy-virtual"
+        },
+        {
+         "t": "text",
+         "v": " says a polymorphic class should suppress public copy and move: "
+        },
+        {
+         "t": "code",
+         "v": "= delete"
+        },
+        {
+         "t": "text",
+         "v": " them when the class has no data, and make them "
+        },
+        {
+         "t": "code",
+         "v": "protected"
+        },
+        {
+         "t": "text",
+         "v": " when it has, so derived classes can still copy their own base part. With the copy operations deleted, all three stop at compile time: the by-value copy and both assignments."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "use of deleted function",
+       "text": "#include <memory>\n#include <string_view>\n\nclass Sensor {\n public:\n  Sensor() = default;\n  Sensor(const Sensor&) = delete;\n  Sensor& operator=(const Sensor&) = delete;\n  virtual ~Sensor() = default;\n  [[nodiscard]] virtual std::string_view name() const { return \"generic sensor\"; }\n};\n\nclass Lidar final : public Sensor {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"lidar\"; }\n};\n\n[[nodiscard]] std::string_view name_of_copy(Sensor sensor) { return sensor.name(); }\n\nint main() {\n  Lidar front;\n  const Lidar rear;\n  Sensor& target = front;\n  target = rear;  // the assignment through references\n\n  const std::unique_ptr<Sensor> left = std::make_unique<Lidar>();\n  const std::unique_ptr<Sensor> right = std::make_unique<Lidar>();\n  *left = *right;  // the same assignment, through owning pointers\n\n  return name_of_copy(front).empty() ? 1 : 0;  // the by-value copy\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Deleting the copy operations also leaves the moves undeclared, so a move falls back to the deleted copy and is refused too. When a program really needs a copy of a polymorphic object, the copy has to be made by the dynamic type, which knows everything there is to copy. "
+        },
+        {
+         "t": "a",
+         "v": "C.130",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-copy"
+        },
+        {
+         "t": "text",
+         "v": " calls that function "
+        },
+        {
+         "t": "code",
+         "v": "clone"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <memory>\n#include <string>\n#include <vector>\n\nclass Sensor {\n public:\n  virtual ~Sensor() = default;\n  [[nodiscard]] virtual std::unique_ptr<Sensor> clone() const = 0;\n  [[nodiscard]] virtual std::string describe() const = 0;\n\n protected:  // for clone() in derived classes, and for nobody else\n  Sensor() = default;\n  Sensor(const Sensor&) = default;\n  Sensor& operator=(const Sensor&) = default;\n  Sensor(Sensor&&) = default;\n  Sensor& operator=(Sensor&&) = default;\n};\n\nclass Lidar final : public Sensor {\n public:\n  explicit Lidar(int max_range_mm) : max_range_mm_(max_range_mm) {}\n  [[nodiscard]] std::unique_ptr<Sensor> clone() const override { return std::make_unique<Lidar>(*this); }\n  [[nodiscard]] std::string describe() const override { return std::format(\"lidar, {} mm\", max_range_mm_); }\n\n private:\n  int max_range_mm_;\n};\n\nclass Sonar final : public Sensor {\n public:\n  [[nodiscard]] std::unique_ptr<Sensor> clone() const override { return std::make_unique<Sonar>(*this); }\n  [[nodiscard]] std::string describe() const override { return \"sonar\"; }\n};\n\nint main() {\n  std::vector<std::unique_ptr<Sensor>> fleet;\n  fleet.push_back(std::make_unique<Lidar>(12000));\n  fleet.push_back(std::make_unique<Sonar>());\n\n  std::vector<std::unique_ptr<Sensor>> spares;\n  std::ranges::transform(fleet, std::back_inserter(spares), [](const auto& sensor) { return sensor->clone(); });\n  fleet.clear();  // the spares are copies, not aliases, so they outlive the originals\n\n  for (const auto& sensor : spares) std::cout << sensor->describe() << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "lidar, 12000 mm\nsonar"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each "
+        },
+        {
+         "t": "code",
+         "v": "clone"
+        },
+        {
+         "t": "text",
+         "v": " is written in the class that knows the whole object, and calls its own copy constructor, which may use the base's protected one. "
+        },
+        {
+         "t": "code",
+         "v": "clone"
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Sensor>"
+        },
+        {
+         "t": "text",
+         "v": " in every class. C.130 explains why it can't return "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Lidar>"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "Lidar"
+        },
+        {
+         "t": "text",
+         "v": ": a covariant return type has to be a raw pointer or reference, not a smart pointer. Rainer Grimm's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on object-oriented programming",
+         "href": "https://www.youtube.com/watch?v=Ou5WsJzn7Ws"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2021) puts slicing and "
+        },
+        {
+         "t": "code",
+         "v": "clone"
+        },
+        {
+         "t": "text",
+         "v": " on one slide, as the problem and the answer."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "compare",
+   "title": "Polymorphic interface versus std::function or variant; composition over inheritance",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 35,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 35 minutes. A range reading in millimetres passes through a chain of filters before the planner sees it. There are three filters: "
+        },
+        {
+         "t": "code",
+         "v": "Clamp"
+        },
+        {
+         "t": "text",
+         "v": " limits the reading to "
+        },
+        {
+         "t": "code",
+         "v": "[min_mm, max_mm]"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Offset"
+        },
+        {
+         "t": "text",
+         "v": " adds a calibration offset "
+        },
+        {
+         "t": "code",
+         "v": "mm"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "Scale"
+        },
+        {
+         "t": "text",
+         "v": " multiplies by "
+        },
+        {
+         "t": "code",
+         "v": "percent"
+        },
+        {
+         "t": "text",
+         "v": " and divides by 100, rounding toward zero. Give each filter's settings a struct of their own, so the two limits of a "
+        },
+        {
+         "t": "code",
+         "v": "Clamp"
+        },
+        {
+         "t": "text",
+         "v": " are set by name and can't be swapped, and build each one with designated initialisers. Build the chain Offset -30, Scale 110 percent, Clamp 100 to 5000 three ways, each with a function "
+        },
+        {
+         "t": "code",
+         "v": "run(chain, reading_mm)"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "an abstract class "
+         },
+         {
+          "t": "code",
+          "v": "Filter"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "apply(int) const"
+         },
+         {
+          "t": "text",
+          "v": ", three derived classes, and a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::unique_ptr<Filter>>"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::function<int(int)>>"
+         },
+         {
+          "t": "text",
+          "v": " of lambdas;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "plain structs "
+         },
+         {
+          "t": "code",
+          "v": "Clamp"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "Offset"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "Scale"
+         },
+         {
+          "t": "text",
+          "v": " with no base class, a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::variant<Clamp, Offset, Scale>>"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "std::visit"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run the readings -50, 400 and 5200 through all three and check that they agree. Print "
+        },
+        {
+         "t": "code",
+         "v": "sizeof"
+        },
+        {
+         "t": "text",
+         "v": " of one element of each vector. Then answer four questions. What else is allocated per filter, beyond the vector's own buffer? What do you change when a fourth filter arrives? What do you change when every filter must also describe itself as text? Which of the three can a library you don't control extend with a filter of its own?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <numeric>\n#include <variant>\n#include <vector>\n\n// The settings of each filter, one struct per filter. The two limits of a Clamp are set by\n// name, and an Offset is not a Scale, so neither pair can be swapped by accident. All three\n// versions below take the same structs.\nstruct Clamp {\n  int min_mm;\n  int max_mm;\n};\nstruct Offset {\n  int mm;\n};\nstruct Scale {\n  int percent;\n};\n\n// 1. An interface and one class per filter.\nclass Filter {\n public:\n  Filter() = default;\n  Filter(const Filter&) = delete;\n  Filter& operator=(const Filter&) = delete;\n  virtual ~Filter() = default;\n  [[nodiscard]] virtual int apply(int mm) const = 0;\n};\n\nclass ClampFilter final : public Filter {\n public:\n  explicit ClampFilter(Clamp limits) : limits_(limits) {}\n  [[nodiscard]] int apply(int mm) const override { return std::clamp(mm, limits_.min_mm, limits_.max_mm); }\n\n private:\n  Clamp limits_;\n};\n\nclass OffsetFilter final : public Filter {\n public:\n  explicit OffsetFilter(Offset offset) : offset_(offset) {}\n  [[nodiscard]] int apply(int mm) const override { return mm + offset_.mm; }\n\n private:\n  Offset offset_;\n};\n\nclass ScaleFilter final : public Filter {\n public:\n  explicit ScaleFilter(Scale scale) : scale_(scale) {}\n  [[nodiscard]] int apply(int mm) const override { return mm * scale_.percent / 100; }\n\n private:\n  Scale scale_;\n};\n\n[[nodiscard]] int run(const std::vector<std::unique_ptr<Filter>>& chain, int mm) {\n  return std::accumulate(chain.begin(), chain.end(), mm, [](int acc, const auto& f) { return f->apply(acc); });\n}\n\n// 2. One callable per filter.\n[[nodiscard]] int run(const std::vector<std::function<int(int)>>& chain, int mm) {\n  return std::accumulate(chain.begin(), chain.end(), mm, [](int acc, const auto& f) { return f(acc); });\n}\n\n// 3. The same plain data, and a closed set of alternatives.\nusing AnyStep = std::variant<Clamp, Offset, Scale>;\n\ntemplate <typename... Fs>\nstruct overloaded : Fs... {\n  using Fs::operator()...;\n};\n\n[[nodiscard]] int apply(const AnyStep& step, int mm) {\n  return std::visit(overloaded{\n                        [mm](const Clamp& c) { return std::clamp(mm, c.min_mm, c.max_mm); },\n                        [mm](const Offset& o) { return mm + o.mm; },\n                        [mm](const Scale& s) { return mm * s.percent / 100; },\n                    },\n                    step);\n}\n\n[[nodiscard]] int run(const std::vector<AnyStep>& chain, int mm) {\n  return std::accumulate(chain.begin(), chain.end(), mm, [](int acc, const AnyStep& s) { return apply(s, acc); });\n}\n\nint main() {\n  std::vector<std::unique_ptr<Filter>> objects;\n  objects.push_back(std::make_unique<OffsetFilter>(Offset{.mm = -30}));\n  objects.push_back(std::make_unique<ScaleFilter>(Scale{.percent = 110}));\n  objects.push_back(std::make_unique<ClampFilter>(Clamp{.min_mm = 100, .max_mm = 5000}));\n\n  const std::vector<std::function<int(int)>> callables{\n      [offset = Offset{.mm = -30}](int mm) { return mm + offset.mm; },\n      [scale = Scale{.percent = 110}](int mm) { return mm * scale.percent / 100; },\n      [limits = Clamp{.min_mm = 100, .max_mm = 5000}](int mm) { return std::clamp(mm, limits.min_mm, limits.max_mm); },\n  };\n\n  const std::vector<AnyStep> steps{Offset{.mm = -30}, Scale{.percent = 110}, Clamp{.min_mm = 100, .max_mm = 5000}};\n\n  std::cout << \"reading  interface  function  variant\\n\";\n  for (const int mm : {-50, 400, 5200}) {\n    std::cout << std::format(\"{:>7}  {:>9}  {:>8}  {:>7}\\n\", mm, run(objects, mm), run(callables, mm), run(steps, mm));\n  }\n  std::cout << std::format(\"sizeof element: unique_ptr {}, function {}, variant {}\\n\", sizeof(objects.front()),\n                           sizeof(callables.front()), sizeof(steps.front()));\n  std::cout << std::format(\"sizeof each object behind a unique_ptr: {}, {}, {}\\n\", sizeof(OffsetFilter),\n                           sizeof(ScaleFilter), sizeof(ClampFilter));\n}"
+      },
+      {
+       "t": "output",
+       "text": "reading  interface  function  variant\n    -50        100       100      100\n    400        407       407      407\n   5200       5000      5000     5000\nsizeof element: unique_ptr 8, function 32, variant 12\nsizeof each object behind a unique_ptr: 16, 16, 16"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each filter takes its own settings struct, which is what stops the chain from being built wrong. With "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " parameters, "
+        },
+        {
+         "t": "code",
+         "v": "OffsetFilter(110)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "ScaleFilter(-30)"
+        },
+        {
+         "t": "text",
+         "v": " compile and run the readings through a 110 mm offset and a scale of -30 percent. The settings swapped between the two structs are refused where they are written:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "no known conversion for argument 1 from",
+       "text": "#include <memory>\n#include <vector>\n\nstruct Offset {\n  int mm;\n};\nstruct Scale {\n  int percent;\n};\n\nclass Filter {\n public:\n  Filter() = default;\n  Filter(const Filter&) = delete;\n  Filter& operator=(const Filter&) = delete;\n  virtual ~Filter() = default;\n  [[nodiscard]] virtual int apply(int mm) const = 0;\n};\n\nclass OffsetFilter final : public Filter {\n public:\n  explicit OffsetFilter(Offset offset) : offset_(offset) {}\n  [[nodiscard]] int apply(int mm) const override { return mm + offset_.mm; }\n\n private:\n  Offset offset_;\n};\n\nclass ScaleFilter final : public Filter {\n public:\n  explicit ScaleFilter(Scale scale) : scale_(scale) {}\n  [[nodiscard]] int apply(int mm) const override { return mm * scale_.percent / 100; }\n\n private:\n  Scale scale_;\n};\n\nint main() {\n  std::vector<std::unique_ptr<Filter>> objects;\n  objects.push_back(std::make_unique<OffsetFilter>(Scale{.percent = 110}));\n  objects.push_back(std::make_unique<ScaleFilter>(Offset{.mm = -30}));\n  return objects.front()->apply(400);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 answers the first line with "
+        },
+        {
+         "t": "code",
+         "v": "no matching function for call to ‘OffsetFilter::OffsetFilter(Scale)’"
+        },
+        {
+         "t": "text",
+         "v": ", and a note under it: "
+        },
+        {
+         "t": "code",
+         "v": "no known conversion for argument 1 from ‘Scale’ to ‘Offset’"
+        },
+        {
+         "t": "text",
+         "v": ". The second line gets the same pair with the two types exchanged."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three versions agree on all three readings, and they differ in everything around the arithmetic:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [],
+        [
+         {
+          "t": "text",
+          "v": "Interface"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::function"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::variant"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "One element"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "8-byte "
+          },
+          {
+           "t": "code",
+           "v": "unique_ptr"
+          },
+          {
+           "t": "text",
+           "v": ", plus a 16-byte object on the heap"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "32 bytes; these lambdas capture 8 bytes at most and sit inside it"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "12 bytes, nothing else"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "A fourth filter"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "one new class; nothing else changes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "one new lambda where the chain is built"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a new struct in "
+          },
+          {
+           "t": "code",
+           "v": "AnyStep"
+          },
+          {
+           "t": "text",
+           "v": "; the compiler then lists every visit that lacks it"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "describe()"
+          },
+          {
+           "t": "text",
+           "v": " too"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a new pure virtual function, written in every class"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "not possible: a "
+          },
+          {
+           "t": "code",
+           "v": "std::function"
+          },
+          {
+           "t": "text",
+           "v": " has exactly one operation"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "one new function with one "
+          },
+          {
+           "t": "code",
+           "v": "visit"
+          },
+          {
+           "t": "text",
+           "v": "; the structs don't change"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "A filter from another library"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes, by deriving from "
+          },
+          {
+           "t": "code",
+           "v": "Filter"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes, any callable with the signature"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no, the alternatives are listed in "
+          },
+          {
+           "t": "code",
+           "v": "AnyStep"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second and third rows are the trade that opens the chapter on the Visitor pattern in Iglberger's C++ Software Design (Guideline 15): a class hierarchy makes adding types cheap and adding operations expensive, and a variant is the reverse. Choose by which of the two your code will see more of. A set of sensor message kinds fixed by a protocol is closed, and a variant suits it. A set of plugins that users write is open, and an interface or a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " suits it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " is the only one of the three that keeps value semantics while staying open to filters it has never seen: it copies with the chain and takes lambdas, function objects and free functions alike, where the interface version is move-only behind a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " and the variant copies but only among the three alternatives it lists. That costs 32 bytes per element, four times the "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " and almost three times the variant, and it buys exactly one operation. Iglberger's Guidelines 22 and 23 argue for this value-based form of the Strategy pattern over a base class. The other part of the price, for callables too big for the internal buffer, is an allocation; the measurement is under Exercise 2."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Composition over inheritance is the design all three share. The chain "
+        },
+        {
+         "t": "i",
+         "v": "has"
+        },
+        {
+         "t": "text",
+         "v": " filters; nothing here derives from a sensor to change its readings. Deriving "
+        },
+        {
+         "t": "code",
+         "v": "FilteredLidar"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "Lidar"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "CalibratedFilteredLidar"
+        },
+        {
+         "t": "text",
+         "v": " from that, would fix the filters into the class hierarchy at compile time, one class for every combination, while a chain held as a member is changed by pushing another filter. Kalb's rule that public inheritance models \"is a\" and not code reuse, and Iglberger's Guideline 20, favor composition over inheritance, point the same way: inherit to share an interface, compose to reuse behaviour."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": ", a value type that can hold any object with a member function "
+        },
+        {
+         "t": "code",
+         "v": "int apply(int) const"
+        },
+        {
+         "t": "text",
+         "v": ", where the held types derive from nothing. Copying an "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " copies the object inside it. Build it the way Arthur O'Dwyer does in his "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on type erasure",
+         "href": "https://www.youtube.com/watch?v=tbUCHifyT24"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019): a private abstract class "
+        },
+        {
+         "t": "code",
+         "v": "Concept"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "clone"
+        },
+        {
+         "t": "text",
+         "v": ", a class template "
+        },
+        {
+         "t": "code",
+         "v": "Model<F>"
+        },
+        {
+         "t": "text",
+         "v": " derived from it that holds an "
+        },
+        {
+         "t": "code",
+         "v": "F"
+        },
+        {
+         "t": "text",
+         "v": ", and a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Concept>"
+        },
+        {
+         "t": "text",
+         "v": " member. Constrain the constructor template with a concept, so a type without "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": " is refused at the call, and make sure the template doesn't take over copying an "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": ", which the forwarding topic showed a constructor template can do. Test it with plain "
+        },
+        {
+         "t": "code",
+         "v": "Clamp"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Offset"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Scale"
+        },
+        {
+         "t": "text",
+         "v": " structs, each with its own "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": ", in a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<AnyFilter>"
+        },
+        {
+         "t": "text",
+         "v": ". Copy the vector, assign a different filter to one element of the copy, and show that the original chain is unchanged."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <concepts>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <numeric>\n#include <utility>\n#include <vector>\n\nstruct Clamp {\n  int min_mm;\n  int max_mm;\n  [[nodiscard]] int apply(int mm) const { return std::clamp(mm, min_mm, max_mm); }\n};\nstruct Offset {\n  int mm;\n  [[nodiscard]] int apply(int reading_mm) const { return reading_mm + mm; }\n};\nstruct Scale {\n  int percent;\n  [[nodiscard]] int apply(int mm) const { return mm * percent / 100; }\n};\n\ntemplate <typename F>\nconcept RangeFilter = std::copy_constructible<F> && requires(const F& f, int mm) {\n  { f.apply(mm) } -> std::same_as<int>;\n};\n\nclass AnyFilter {\n public:\n  // Implicit on purpose, like std::function: a Clamp converts to an AnyFilter.\n  template <RangeFilter F>\n  AnyFilter(F filter) : self_(std::make_unique<Model<F>>(std::move(filter))) {}\n\n  AnyFilter(const AnyFilter& other) : self_(other.self_->clone()) {}\n  AnyFilter& operator=(const AnyFilter& other) {\n    self_ = other.self_->clone();  // clone first: if it throws, *this is unchanged\n    return *this;\n  }\n  AnyFilter(AnyFilter&&) noexcept = default;\n  AnyFilter& operator=(AnyFilter&&) noexcept = default;\n  ~AnyFilter() = default;\n\n  [[nodiscard]] int apply(int mm) const { return self_->apply(mm); }\n\n private:\n  class Concept {\n   public:\n    Concept() = default;\n    Concept(const Concept&) = delete;\n    Concept& operator=(const Concept&) = delete;\n    virtual ~Concept() = default;\n    [[nodiscard]] virtual int apply(int mm) const = 0;\n    [[nodiscard]] virtual std::unique_ptr<Concept> clone() const = 0;\n  };\n\n  template <typename F>\n  class Model final : public Concept {\n   public:\n    explicit Model(F filter) : filter_(std::move(filter)) {}\n    [[nodiscard]] int apply(int mm) const override { return filter_.apply(mm); }\n    [[nodiscard]] std::unique_ptr<Concept> clone() const override { return std::make_unique<Model>(filter_); }\n\n   private:\n    F filter_;\n  };\n\n  std::unique_ptr<Concept> self_;\n};\n\nstatic_assert(std::constructible_from<AnyFilter, Clamp>);\nstatic_assert(!std::constructible_from<AnyFilter, int>);\n\n[[nodiscard]] int run(const std::vector<AnyFilter>& chain, int mm) {\n  return std::accumulate(chain.begin(), chain.end(), mm, [](int acc, const AnyFilter& f) { return f.apply(acc); });\n}\n\nint main() {\n  const std::vector<AnyFilter> chain{Offset{.mm = -30}, Scale{.percent = 110}, Clamp{.min_mm = 100, .max_mm = 5000}};\n  std::vector<AnyFilter> halved = chain;  // copies every filter\n  halved[1] = Scale{.percent = 50};       // changes the copy only\n\n  AnyFilter spare = Offset{.mm = 10};\n  const AnyFilter backup = spare;  // a non-const lvalue: still the copy constructor\n\n  std::cout << std::format(\"chain:  400 -> {}\\n\", run(chain, 400));\n  std::cout << std::format(\"halved: 400 -> {}\\n\", run(halved, 400));\n  std::cout << std::format(\"backup: 400 -> {}\\n\", backup.apply(400));\n  std::cout << std::format(\"sizeof(AnyFilter) = {}\\n\", sizeof(AnyFilter));\n}"
+      },
+      {
+       "t": "output",
+       "text": "chain:  400 -> 407\nhalved: 400 -> 185\nbackup: 400 -> 410\nsizeof(AnyFilter) = 8"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Type erasure"
+        },
+        {
+         "t": "text",
+         "v": " hides the held type behind a fixed set of operations: O'Dwyer's list of "
+        },
+        {
+         "t": "i",
+         "v": "affordances"
+        },
+        {
+         "t": "text",
+         "v": ", here \"apply\" and \"copy\", and implicitly \"destroy\". The constructor template is the only place that knows "
+        },
+        {
+         "t": "code",
+         "v": "F"
+        },
+        {
+         "t": "text",
+         "v": ". It builds a "
+        },
+        {
+         "t": "code",
+         "v": "Model<F>"
+        },
+        {
+         "t": "text",
+         "v": ", whose virtual functions forward to the "
+        },
+        {
+         "t": "code",
+         "v": "F"
+        },
+        {
+         "t": "text",
+         "v": ", and stores it as a "
+        },
+        {
+         "t": "code",
+         "v": "Concept"
+        },
+        {
+         "t": "text",
+         "v": ", after which nothing in "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " depends on "
+        },
+        {
+         "t": "code",
+         "v": "F"
+        },
+        {
+         "t": "text",
+         "v": " any more. Every operation is a virtual call through "
+        },
+        {
+         "t": "code",
+         "v": "self_"
+        },
+        {
+         "t": "text",
+         "v": ". So "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " is a class hierarchy on the inside and a value on the outside: "
+        },
+        {
+         "t": "code",
+         "v": "Clamp"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Offset"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Scale"
+        },
+        {
+         "t": "text",
+         "v": " derive from nothing, a copy of the vector is a deep copy, and "
+        },
+        {
+         "t": "code",
+         "v": "halved[1] = Scale{50}"
+        },
+        {
+         "t": "text",
+         "v": " changes one chain and not the other. "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " is the same design for one affordance, the call operator, and "
+        },
+        {
+         "t": "code",
+         "v": "std::any"
+        },
+        {
+         "t": "text",
+         "v": " for copying alone. Iglberger's Guideline 32 recommends this pattern as a replacement for inheritance hierarchies, and Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "T.49",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-erasure"
+        },
+        {
+         "t": "text",
+         "v": " warns that it adds a level of indirection and should be used where it earns that; "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " is its own example of where it does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "RangeFilter<F>"
+        },
+        {
+         "t": "text",
+         "v": " refuses an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " at the call, as the second "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": " shows. The constraint doesn't have to exclude "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " itself, because the constructor takes "
+        },
+        {
+         "t": "code",
+         "v": "F"
+        },
+        {
+         "t": "text",
+         "v": " by value. A constructor whose parameter is its own class by value is ill-formed, and the standard never instantiates a constructor template into one ("
+        },
+        {
+         "t": "a",
+         "v": "class.copy.ctor",
+         "href": "https://eel.is/c++draft/class.copy.ctor"
+        },
+        {
+         "t": "text",
+         "v": ", paragraph 5), so "
+        },
+        {
+         "t": "code",
+         "v": "backup"
+        },
+        {
+         "t": "text",
+         "v": " is made by the copy constructor although "
+        },
+        {
+         "t": "code",
+         "v": "spare"
+        },
+        {
+         "t": "text",
+         "v": " isn't "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A constructor taking "
+        },
+        {
+         "t": "code",
+         "v": "F&&"
+        },
+        {
+         "t": "text",
+         "v": " is where the forwarding topic's hijacked copy comes back, and the three ways to write it fail in three different places. All three deduce "
+        },
+        {
+         "t": "code",
+         "v": "F = AnyFilter&"
+        },
+        {
+         "t": "text",
+         "v": " for "
+        },
+        {
+         "t": "code",
+         "v": "const AnyFilter backup = spare;"
+        },
+        {
+         "t": "text",
+         "v": ", and wherever the compiler gets as far as comparing the two candidates, the template wins, because the copy constructor's "
+        },
+        {
+         "t": "code",
+         "v": "const AnyFilter&"
+        },
+        {
+         "t": "text",
+         "v": " binds a more qualified reference. "
+        },
+        {
+         "t": "code",
+         "v": "RangeFilter<AnyFilter&>"
+        },
+        {
+         "t": "text",
+         "v": " doesn't stop them: "
+        },
+        {
+         "t": "code",
+         "v": "std::copy_constructible<AnyFilter&>"
+        },
+        {
+         "t": "text",
+         "v": " asks whether an "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter&"
+        },
+        {
+         "t": "text",
+         "v": " initialises another "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter&"
+        },
+        {
+         "t": "text",
+         "v": ", which is true of a reference to any type, copyable or not, and "
+        },
+        {
+         "t": "code",
+         "v": "const F&"
+        },
+        {
+         "t": "text",
+         "v": " on a reference type collapses back to "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter&"
+        },
+        {
+         "t": "text",
+         "v": ", whose "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": " exists."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What the compiler does next is where they part. Storing a "
+        },
+        {
+         "t": "code",
+         "v": "Model<F>"
+        },
+        {
+         "t": "text",
+         "v": " instantiates "
+        },
+        {
+         "t": "code",
+         "v": "Model<AnyFilter&>"
+        },
+        {
+         "t": "text",
+         "v": ", whose member is a reference, and GCC 13 stops in that class with "
+        },
+        {
+         "t": "code",
+         "v": "cannot bind non-const lvalue reference of type ‘AnyFilter&’ to an rvalue of type ‘std::remove_reference<AnyFilter&>::type’ {aka ‘AnyFilter’}"
+        },
+        {
+         "t": "text",
+         "v": ". Storing a "
+        },
+        {
+         "t": "code",
+         "v": "Model<std::remove_cvref_t<F>>"
+        },
+        {
+         "t": "text",
+         "v": " compiles instead, and then each copy wraps the source in a "
+        },
+        {
+         "t": "code",
+         "v": "Model<AnyFilter>"
+        },
+        {
+         "t": "text",
+         "v": " whose by-value parameter is built by the same constructor, so the program calls itself until AddressSanitizer reports a "
+        },
+        {
+         "t": "code",
+         "v": "stack-overflow"
+        },
+        {
+         "t": "text",
+         "v": ". The answer that names the real problem comes from the third way, "
+        },
+        {
+         "t": "code",
+         "v": "requires RangeFilter<std::remove_cvref_t<F>>"
+        },
+        {
+         "t": "text",
+         "v": ", which asks the concept about "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " rather than about "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter&"
+        },
+        {
+         "t": "text",
+         "v": ": GCC 13 refuses it with an error ending "
+        },
+        {
+         "t": "code",
+         "v": "depends on itself"
+        },
+        {
+         "t": "text",
+         "v": ", over the atomic constraint "
+        },
+        {
+         "t": "code",
+         "v": "is_constructible_v<_Tp, _Args ...>"
+        },
+        {
+         "t": "text",
+         "v": " inside "
+        },
+        {
+         "t": "code",
+         "v": "std::constructible_from"
+        },
+        {
+         "t": "text",
+         "v": ", and the notes above it trace the circle from "
+        },
+        {
+         "t": "code",
+         "v": "RangeFilter<std::remove_cvref_t<F>>"
+        },
+        {
+         "t": "text",
+         "v": " through "
+        },
+        {
+         "t": "code",
+         "v": "copy_constructible<AnyFilter>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "constructible_from<AnyFilter, AnyFilter&>"
+        },
+        {
+         "t": "text",
+         "v": " back to this constructor."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "All three are fixed by putting "
+        },
+        {
+         "t": "code",
+         "v": "!std::derived_from<std::remove_cvref_t<F>, AnyFilter>"
+        },
+        {
+         "t": "text",
+         "v": " first in the constraint. A conjunction is checked left to right and stops at the first part that fails, so the template is ruled out before anything asks whether an "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " can be copied. The forwarding topic's wrapper uses "
+        },
+        {
+         "t": "code",
+         "v": "derived_from"
+        },
+        {
+         "t": "text",
+         "v": " rather than "
+        },
+        {
+         "t": "code",
+         "v": "same_as"
+        },
+        {
+         "t": "text",
+         "v": " for the same reason: "
+        },
+        {
+         "t": "code",
+         "v": "same_as"
+        },
+        {
+         "t": "text",
+         "v": " lets a class derived from "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " through. "
+        },
+        {
+         "t": "code",
+         "v": "Concept"
+        },
+        {
+         "t": "text",
+         "v": " follows C.67 and can't be copied, so "
+        },
+        {
+         "t": "code",
+         "v": "clone"
+        },
+        {
+         "t": "text",
+         "v": " builds a new "
+        },
+        {
+         "t": "code",
+         "v": "Model"
+        },
+        {
+         "t": "text",
+         "v": " from the held filter, not from the "
+        },
+        {
+         "t": "code",
+         "v": "Model"
+        },
+        {
+         "t": "text",
+         "v": ". A moved-from "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " holds no model, like a moved-from "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", so it may only be assigned to or destroyed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " allocates its "
+        },
+        {
+         "t": "code",
+         "v": "Model"
+        },
+        {
+         "t": "text",
+         "v": " on the heap. "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " avoids that for small callables by keeping them in a buffer inside the object, the optimisation Iglberger's Guideline 33 applies to type erasure. With GCC 13 the callable has to fit in 16 bytes and be trivially copyable:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <type_traits>\n\n// True when the std::function keeps the callable inside its own bytes.\ntemplate <typename F>\n[[nodiscard]] bool stored_inside(const std::function<int(int)>& f) {\n  const auto* target = reinterpret_cast<const std::byte*>(f.target<std::remove_cvref_t<F>>());\n  const auto* begin = reinterpret_cast<const std::byte*>(&f);\n  return target != nullptr && !std::less<>{}(target, begin) && std::less<>{}(target, begin + sizeof f);\n}\n\nint main() {\n  const auto small = [offset = 30](int mm) { return mm + offset; };\n  const auto medium = [a = 1, b = 2, c = 3, d = 4](int mm) { return mm + a + b + c + d; };\n  const auto large = [a = 1, b = 2, c = 3, d = 4, e = 5](int mm) { return mm + a + b + c + d + e; };\n  const auto shared = [calibration = std::make_shared<int>(5)](int mm) { return mm + *calibration; };\n  const std::function<int(int)> fs = small;\n  const std::function<int(int)> fm = medium;\n  const std::function<int(int)> fl = large;\n  const std::function<int(int)> fp = shared;\n  std::cout << std::format(\"sizeof(std::function<int(int)>) = {}\\n\", sizeof fs);\n  std::cout << std::format(\"{:>2}-byte lambda inside: {}\\n\", sizeof small, stored_inside<decltype(small)>(fs));\n  std::cout << std::format(\"{:>2}-byte lambda inside: {}\\n\", sizeof medium, stored_inside<decltype(medium)>(fm));\n  std::cout << std::format(\"{:>2}-byte lambda inside: {}\\n\", sizeof large, stored_inside<decltype(large)>(fl));\n  std::cout << std::format(\"{:>2}-byte lambda holding a shared_ptr inside: {}\\n\", sizeof shared,\n                           stored_inside<decltype(shared)>(fp));\n}"
+      },
+      {
+       "t": "output",
+       "text": "sizeof(std::function<int(int)>) = 32\n 4-byte lambda inside: true\n16-byte lambda inside: true\n20-byte lambda inside: false\n16-byte lambda holding a shared_ptr inside: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The 20-byte lambda doesn't fit. The last one fits and still goes to the heap, because copying it changes a reference count: libstdc++ stores a callable inside only when it is trivially copyable, which a lambda holding a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " is not. Both the size and the condition are a choice of each standard library, not a rule of the language. Iglberger's Guideline 34 adds the last piece: an owning wrapper like "
+        },
+        {
+         "t": "code",
+         "v": "AnyFilter"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " pays for its allocation and copy when it is built, and a non-owning one such as C++26's "
+        },
+        {
+         "t": "code",
+         "v": "std::function_ref"
+        },
+        {
+         "t": "text",
+         "v": " doesn't, when the callable outlives the wrapper."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say how a virtual call finds its function in the Itanium ABI and what that costs per object and per call; the two legal kinds of base class destructor and when each fits; what "
+        },
+        {
+         "t": "code",
+         "v": "override"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": " promise; what slicing is, the two ways it happens, and what C.67 and "
+        },
+        {
+         "t": "code",
+         "v": "clone"
+        },
+        {
+         "t": "text",
+         "v": " do about it; and when you would pick an interface, a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": " or a type-erased value, by what gets added more often, types or operations."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What are the static and dynamic types of "
+     },
+     {
+      "t": "code",
+      "v": "sensor"
+     },
+     {
+      "t": "text",
+      "v": " inside "
+     },
+     {
+      "t": "code",
+      "v": "void report(const Sensor& sensor)"
+     },
+     {
+      "t": "text",
+      "v": ", and which one decides a virtual call?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In the Itanium ABI, what does a class with virtual functions add to each object, and what does a virtual call do?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What happens when a "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr<Sensor>"
+     },
+     {
+      "t": "text",
+      "v": " deletes a "
+     },
+     {
+      "t": "code",
+      "v": "Lidar"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "~Sensor"
+     },
+     {
+      "t": "text",
+      "v": " isn't virtual? What are the two correct destructors for a base class?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "override"
+     },
+     {
+      "t": "text",
+      "v": " catch, and what does "
+     },
+     {
+      "t": "code",
+      "v": "final"
+     },
+     {
+      "t": "text",
+      "v": " on a class allow the compiler to do?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a virtual call inside a base class constructor reach, and why?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name two ways slicing happens even when the base class is abstract, and what Core Guidelines C.67 does about both."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "clone"
+     },
+     {
+      "t": "text",
+      "v": " return "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr<Sensor>"
+     },
+     {
+      "t": "text",
+      "v": " rather than "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr<Lidar>"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Interface, "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " or "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": ": which makes adding a type cheap, which makes adding an operation cheap, and which allocates per element?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a type-erased "
+     },
+     {
+      "t": "code",
+      "v": "AnyFilter"
+     },
+     {
+      "t": "text",
+      "v": " with "
+     },
+     {
+      "t": "code",
+      "v": "Concept"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "Model<F>"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "clone"
+     },
+     {
+      "t": "text",
+      "v": " and a constructor that doesn't hijack copies."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Jon Kalb, Back to Basics: Object-Oriented Programming, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_oop/back_to_basics_oop__jon_kalb__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=32tDTD9UJCE"
+     },
+     {
+      "t": "text",
+      "v": ". Derived classes as libraries behind one API, Liskov substitution, abstract bases and "
+     },
+     {
+      "t": "code",
+      "v": "final"
+     },
+     {
+      "t": "text",
+      "v": " leaves, the assignment problem, default arguments on overrides."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Inbal Levi, Back to Basics: Virtual Dispatch and its Alternatives, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_virtual_dispatch_and_its_alternatives/back_to_basics_virtual_dispatch_and_its_alternatives__inbal_levi__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=jBnIMEb2GhA"
+     },
+     {
+      "t": "text",
+      "v": ". The vtable written out by hand, CRTP, "
+     },
+     {
+      "t": "code",
+      "v": "std::visit"
+     },
+     {
+      "t": "text",
+      "v": ", and benchmarks at each optimisation level."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Type Erasure, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_type_erasure/back_to_basics_type_erasure__arthur_odwyer__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=tbUCHifyT24"
+     },
+     {
+      "t": "text",
+      "v": ". Affordances, a hand-made vtable, and the derived class template that "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::any"
+     },
+     {
+      "t": "text",
+      "v": " are built on."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Object-Oriented Programming, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/ObjectOrientedProgramming.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=Ou5WsJzn7Ws"
+     },
+     {
+      "t": "text",
+      "v": ". Static and dynamic type, "
+     },
+     {
+      "t": "code",
+      "v": "override"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "final"
+     },
+     {
+      "t": "text",
+      "v": ", virtual calls in constructors, slicing and "
+     },
+     {
+      "t": "code",
+      "v": "clone"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Andreas Fertig, Back to Basics: Object-Oriented Programming, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Object-Oriented_Programming.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=SuubuqI4gVA"
+     },
+     {
+      "t": "text",
+      "v": ". Destructors that are virtual or protected, and what a declared destructor does to the move operations."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Stephen Dewhurst, Back to Basics: Class Layout, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_class_layout/back_to_basics_class_layout__steve_dewhurst__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=SShSV_iV1Ko"
+     },
+     {
+      "t": "text",
+      "v": ". The vptr, the vtable and the instructions of a virtual call."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, C++ Software Design, O'Reilly 2022: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+     },
+     {
+      "t": "text",
+      "v": ". Guideline 15 on adding types against adding operations, 17 on "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": ", 20 on composition, 22 and 23 on value semantics and value-based strategies, 32 to 34 on type erasure."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "C.35",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-virtual"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.67",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-copy-virtual"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.82",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-ctor-virtual"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.121",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-abstract"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.127",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-dtor"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.128",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-override"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.130",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-copy"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.139",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-final"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.140",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-virtual-default-arg"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.145",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-poly"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.63",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-slice"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "T.49",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rt-erasure"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The Itanium C++ ABI, "
+     },
+     {
+      "t": "a",
+      "v": "virtual table layout",
+      "href": "https://itanium-cxx-abi.github.io/cxx-abi/abi.html#vtable"
+     },
+     {
+      "t": "text",
+      "v": ": the vptr at offset 0, offset to top, the typeinfo pointer and the function entries."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "GCC 13, "
+     },
+     {
+      "t": "a",
+      "v": "C++ dialect options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc-13.3.0/gcc/C_002b_002b-Dialect-Options.html"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "-Woverloaded-virtual"
+     },
+     {
+      "t": "text",
+      "v": " and its level 1 in "
+     },
+     {
+      "t": "code",
+      "v": "-Wall"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "virtual functions",
+      "href": "https://en.cppreference.com/cpp/language/virtual"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "override",
+      "href": "https://en.cppreference.com/cpp/language/override"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "final",
+      "href": "https://en.cppreference.com/cpp/language/final"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "abstract classes",
+      "href": "https://en.cppreference.com/cpp/language/abstract_class"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::function",
+      "href": "https://en.cppreference.com/cpp/utility/functional/function"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

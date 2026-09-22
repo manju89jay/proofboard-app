@@ -1,0 +1,3064 @@
+{
+ "id": "cpp-invalidation",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "For each of the six situations, say which of the named iterators, references and views you can still use after the last call, and why. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "code",
+       "v": "std::vector<int> v{1, 2, 3};"
+      },
+      {
+       "t": "text",
+       "v": ", whose capacity is 3, then "
+      },
+      {
+       "t": "code",
+       "v": "auto it = v.begin() + 1;"
+      },
+      {
+       "t": "text",
+       "v": " and "
+      },
+      {
+       "t": "code",
+       "v": "v.push_back(4);"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "std::vector<int> v; v.reserve(8); v.push_back(1); v.push_back(2);"
+      },
+      {
+       "t": "text",
+       "v": ", then "
+      },
+      {
+       "t": "code",
+       "v": "int& first = v[0];"
+      },
+      {
+       "t": "text",
+       "v": " and "
+      },
+      {
+       "t": "code",
+       "v": "v.push_back(3);"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "std::deque<int> d{1, 2, 3};"
+      },
+      {
+       "t": "text",
+       "v": ", then "
+      },
+      {
+       "t": "code",
+       "v": "int& front = d.front(); auto it = d.begin();"
+      },
+      {
+       "t": "text",
+       "v": " and "
+      },
+      {
+       "t": "code",
+       "v": "d.push_back(4);"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "std::unordered_map<int, Pose> m;"
+      },
+      {
+       "t": "text",
+       "v": ", then "
+      },
+      {
+       "t": "code",
+       "v": "Pose& p = m[1]; auto it = m.find(1);"
+      },
+      {
+       "t": "text",
+       "v": ", then 1000 more inserts."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "std::string path = \"maps/warehouse_level_2\"; std::string_view dir = path;"
+      },
+      {
+       "t": "text",
+       "v": ", then "
+      },
+      {
+       "t": "code",
+       "v": "path += \".yaml\";"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "std::vector<int> v{1, 2, 3, 4};"
+      },
+      {
+       "t": "text",
+       "v": ", then "
+      },
+      {
+       "t": "code",
+       "v": "auto a = v.begin(); auto c = v.begin() + 2;"
+      },
+      {
+       "t": "text",
+       "v": " and "
+      },
+      {
+       "t": "code",
+       "v": "v.erase(v.begin() + 1);"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "table",
+    "head": [
+     [],
+     [
+      {
+       "t": "text",
+       "v": "Still valid"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Invalid"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Why"
+      }
+     ]
+    ],
+    "rows": [
+     [
+      [
+       {
+        "t": "text",
+        "v": "1"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "nothing"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "it"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "the push needs a fourth slot, so the vector moves to a new block"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "2"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "first"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "only "
+       },
+       {
+        "t": "code",
+        "v": "end()"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "the push fits in the reserved capacity, so nothing moves"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "3"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "front"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "it"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "a push at either end of a deque keeps elements in place but invalidates every iterator"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "4"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "p"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "it"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "the inserts rehash the table; a rehash invalidates iterators but never moves an element"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "5"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "nothing"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "dir"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "the string needs 27 characters and has room for 22, so it reallocates"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "6"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "a"
+       }
+      ],
+      [
+       {
+        "t": "code",
+        "v": "c"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "erasing from a vector invalidates everything at and after the erased position"
+       }
+      ]
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Each answer is one rule from the table in the next section. You pass with all six right and a reason for each. Five right is a partial pass. A \"valid\" for 1 or 5, or an \"invalid\" for "
+     },
+     {
+      "t": "code",
+      "v": "p"
+     },
+     {
+      "t": "text",
+      "v": " in 4, shows a rule that needs another look."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "An iterator is an object that names a position in a container and knows how to move to the next one. A reference or a pointer names an element's address directly. A view, a "
+    },
+    {
+     "t": "code",
+     "v": "std::string_view"
+    },
+    {
+     "t": "text",
+     "v": " or a "
+    },
+    {
+     "t": "code",
+     "v": "std::span"
+    },
+    {
+     "t": "text",
+     "v": ", is a pointer and a length into elements someone else owns. All three are handles, and none owns what it refers to. Invalidation is the point where the standard withdraws its promise about a handle, after some operation on the container. Using it afterward is undefined behaviour, whatever value is still there."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that a handle can look fine and still be wrong. A container that grows or shrinks may move elements to a new block, breaking a reference into the old one, or leave every element where it was and still break an iterator, because an iterator can promise more than an address, such as which element comes next. Neither failure is a compile error, and a dead handle often still reads a plausible number, so the bug waits for whichever call finally reallocates or rehashes."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The rule is that a reference or a pointer survives exactly as long as its element stays at the same address. "
+    },
+    {
+     "t": "code",
+     "v": "std::list"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "std::map"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "std::set"
+    },
+    {
+     "t": "text",
+     "v": " and the hash containers give every element its own heap node and only relink nodes, so inserting, erasing elsewhere, or rehashing never moves one, and references into them survive all of that. A "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": ", a "
+    },
+    {
+     "t": "code",
+     "v": "std::deque"
+    },
+    {
+     "t": "text",
+     "v": " and a "
+    },
+    {
+     "t": "code",
+     "v": "std::string"
+    },
+    {
+     "t": "text",
+     "v": " can move elements: a vector or string that outgrows its block copies everything into a new one, and a deque that grows replaces only its table of block pointers, so a reference into a deque survives a push at either end while every iterator, holding a pointer into that table, does not. A view follows the same rule as an iterator into the same elements."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What this costs you is that nothing checks it at run time, so a stale handle is a bug a passing test can hide. AddressSanitizer catches a handle that reads freed memory, and libstdc++'s debug mode catches an iterator the standard has withdrawn even when its memory hasn't moved, which is why both are worth building with."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this holding a reference to a route's last waypoint across a "
+    },
+    {
+     "t": "code",
+     "v": "push_back"
+    },
+    {
+     "t": "text",
+     "v": ", or erasing a stale track from a map mid-loop, which is the interview question itself: for six operations, say which handles still work afterward."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "rules",
+   "title": "Invalidation rules per container",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program appends 999 elements to four containers and counts how often the first element changes address. It stores each address as a number before the change, so comparing it afterwards is well defined:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <list>\n#include <memory>\n#include <string_view>\n#include <unordered_map>\n#include <vector>\n\n// The first element's address as a number, so that comparing it after a change is well defined.\ntemplate <typename Container>\n[[nodiscard]] std::uintptr_t first_address(const Container& c) {\n  return reinterpret_cast<std::uintptr_t>(std::addressof(*c.begin()));\n}\n\ntemplate <typename Container>\nvoid append_999(std::string_view name) {\n  Container c{0};\n  std::int64_t moved = 0;\n  for (int i = 1; i < 1000; ++i) {\n    const std::uintptr_t before = first_address(c);\n    c.push_back(i);\n    if (first_address(c) != before) ++moved;\n  }\n  std::cout << std::format(\"{:<14} first element moved {:>2} times\\n\", name, moved);\n}\n\nint main() {\n  append_999<std::vector<int>>(\"vector\");\n  append_999<std::deque<int>>(\"deque\");\n  append_999<std::list<int>>(\"list\");\n\n  std::unordered_map<int, int> ids{{0, 0}};\n  const auto before = reinterpret_cast<std::uintptr_t>(&ids.at(0));\n  std::int64_t rehashes = 0;\n  for (int i = 1; i < 1000; ++i) {\n    const auto buckets = ids.bucket_count();\n    ids.emplace(i, i);\n    if (ids.bucket_count() != buckets) ++rehashes;\n  }\n  const bool moved = reinterpret_cast<std::uintptr_t>(&ids.at(0)) != before;\n  std::cout << std::format(\"unordered_map  {} rehashes, element 0 moved: {}\\n\", rehashes, moved);\n}"
+      },
+      {
+       "t": "output",
+       "text": "vector         first element moved 10 times\ndeque          first element moved  0 times\nlist           first element moved  0 times\nunordered_map  6 rehashes, element 0 moved: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The vector moved its elements at every reallocation, from a capacity of 1 through 2, 4 and on to 1024. The other three never moved one. A deque adds blocks and leaves the old ones where they are. A list allocates a node per element, and so does an "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": ", whose rehash relinks the nodes into a new bucket array without moving them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That is most of what you need to predict invalidation, because a reference or a pointer to an element is only the element's address: it stays valid exactly as long as the element stays where it is. An iterator can promise more than an address, so it can die while every element stays put. A deque iterator holds four pointers, one of them into the deque's table of blocks, which a push at either end may replace. An unordered container's iterator promises to visit the elements after it, and a rehash reorders the elements, so the standard invalidates the iterators and not the references. A "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": " or a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " is a pointer and a length into the owner's elements, so it lives exactly as long as an iterator into the same elements would. "
+        },
+        {
+         "t": "i",
+         "v": "Invalidated"
+        },
+        {
+         "t": "text",
+         "v": " means that the standard no longer promises anything about using the handle: reading through it is undefined behaviour, whatever it happens to print. The Core Guidelines count iterators and views as pointers for this purpose ("
+        },
+        {
+         "t": "a",
+         "v": "ES.65",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-deref"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rules, from the standard's sections on "
+        },
+        {
+         "t": "a",
+         "v": "vector",
+         "href": "https://eel.is/c++draft/vector.modifiers"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "a",
+         "v": "deque",
+         "href": "https://eel.is/c++draft/deque.modifiers"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "a",
+         "v": "list",
+         "href": "https://eel.is/c++draft/list.modifiers"
+        },
+        {
+         "t": "text",
+         "v": " and its "
+        },
+        {
+         "t": "a",
+         "v": "operations",
+         "href": "https://eel.is/c++draft/list.ops"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "a",
+         "v": "ordered containers",
+         "href": "https://eel.is/c++draft/associative.reqmts"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "a",
+         "v": "unordered containers",
+         "href": "https://eel.is/c++draft/unord.req.general"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "strings",
+         "href": "https://eel.is/c++draft/string.require"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Container"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Operation"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Iterators invalidated"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "References and pointers invalidated"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "vector"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "insert or push that reallocates; "
+          },
+          {
+           "t": "code",
+           "v": "reserve"
+          },
+          {
+           "t": "text",
+           "v": " or "
+          },
+          {
+           "t": "code",
+           "v": "shrink_to_fit"
+          },
+          {
+           "t": "text",
+           "v": " that reallocates"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "all"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "all"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "vector"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "insert or push within the capacity"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "at and after the insertion point, and "
+          },
+          {
+           "t": "code",
+           "v": "end()"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "at and after the insertion point"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "vector"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "erase"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "pop_back"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "at and after the erased position, and "
+          },
+          {
+           "t": "code",
+           "v": "end()"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "at and after the erased position"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "deque"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "push or emplace at either end"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "all"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "none"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "deque"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "insert or erase in the middle"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "all"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "all"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "deque"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "pop_front"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "pop_back"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the erased element, and "
+          },
+          {
+           "t": "code",
+           "v": "end()"
+          },
+          {
+           "t": "text",
+           "v": " after "
+          },
+          {
+           "t": "code",
+           "v": "pop_back"
+          },
+          {
+           "t": "text",
+           "v": " or after emptying the deque"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the erased element"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "list"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "insert, "
+          },
+          {
+           "t": "code",
+           "v": "splice"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "none; a spliced element's iterators now belong to the other list"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "none"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "map"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "set"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "insert, "
+          },
+          {
+           "t": "code",
+           "v": "merge"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "none; a merged element's iterators now belong to the destination"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "none"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "map"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "set"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "extract"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the extracted element's own"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "none, but the element may not be read through them while the node handle owns it"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "list"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "map"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "set"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "erase"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the erased elements"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the erased elements"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "unordered_map"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "unordered_set"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "insert that rehashes, "
+          },
+          {
+           "t": "code",
+           "v": "rehash"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "reserve"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "all"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "none"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "unordered_map"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "unordered_set"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "erase"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the erased elements"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the erased elements"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "string"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "any non-const member except "
+          },
+          {
+           "t": "code",
+           "v": "[]"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "at"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "data"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "front"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "back"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "begin"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "end"
+          },
+          {
+           "t": "text",
+           "v": " and their "
+          },
+          {
+           "t": "code",
+           "v": "r"
+          },
+          {
+           "t": "text",
+           "v": " and "
+          },
+          {
+           "t": "code",
+           "v": "c"
+          },
+          {
+           "t": "text",
+           "v": " forms; being passed by non-const reference, as to "
+          },
+          {
+           "t": "code",
+           "v": "swap"
+          },
+          {
+           "t": "text",
+           "v": " or "
+          },
+          {
+           "t": "code",
+           "v": "std::getline"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "may be all"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "may be all"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "note",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "extract"
+        },
+        {
+         "t": "text",
+         "v": " row needs one more sentence, because \"valid\" and \"usable\" part company there. A pointer or reference taken before the "
+        },
+        {
+         "t": "code",
+         "v": "extract"
+        },
+        {
+         "t": "text",
+         "v": " stays valid, and reading the element through it while the node handle owns the element is undefined behaviour; it works again once the element is inserted into a container. A pointer or reference taken from the node handle itself is invalidated by that insertion ("
+        },
+        {
+         "t": "a",
+         "v": "associative.reqmts",
+         "href": "https://eel.is/c++draft/associative.reqmts"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "cppreference keeps the same rules in "
+        },
+        {
+         "t": "a",
+         "v": "one table",
+         "href": "https://en.cppreference.com/cpp/container#Iterator_invalidation"
+        },
+        {
+         "t": "text",
+         "v": ", and Kevin Carpenter's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on vector",
+         "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) puts that link on the slide after his own demo, where a "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " leaves an iterator pointing at the wrong element."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two shortcuts cover most of the table. The first: an operation that may allocate may invalidate. A vector or a string that grows moves everything, a deque that grows replaces its table of blocks, and an unordered container that grows replaces its buckets. "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": " beforehand, when you know the final size, turns the first case into the second row of the table. The second: erasing an element always invalidates handles to that element, and in a vector or a string it also invalidates everything behind it, because the elements behind shift to close the gap. A deque is stricter still. An erase that takes out neither the first element nor the last invalidates every iterator and every reference into the deque, because it closes the gap by moving whichever side is shorter, which may be the elements in front of the hole."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The string row is the strictest in the table, and deliberately so. The standard doesn't say which calls reallocate, and a string of up to 15 characters keeps them inside the object, where even a move can change them, as the next section shows. So treat every non-const call on a string as the end of every view into it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nothing in C++ checks any of this at run time. A dead iterator often still points at memory that holds the right value, so a test passes, and the bug waits for the next reallocation. The worked example shows the two tools that catch it."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program keeps a reference and an iterator into a deque, pushes 2000 readings at the back, and then uses both. The table says the reference survives and the iterator doesn't:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <deque>\n#include <format>\n#include <iostream>\n\nint main() {\n  std::deque<int> readings{7, 8, 9};\n  const int& oldest = readings.front();  // a reference: survives pushes at either end\n  auto next = readings.begin();          // an iterator: any push at either end invalidates it\n  for (int i = 0; i < 2000; ++i) readings.push_back(i);\n  int sum = oldest;                                     // fine\n  for (; next != readings.end(); ++next) sum += *next;  // walks with a dead iterator\n  std::cout << std::format(\"sum {}\\n\", sum);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer stops the run. This is its report for the program saved as "
+        },
+        {
+         "t": "code",
+         "v": "deque_walk.cpp"
+        },
+        {
+         "t": "text",
+         "v": ", trimmed: addresses shortened to "
+        },
+        {
+         "t": "code",
+         "v": "0x..."
+        },
+        {
+         "t": "text",
+         "v": ", the directory left out of the file name, and frames inside the allocator and the C library replaced by "
+        },
+        {
+         "t": "code",
+         "v": "..."
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "==50353==ERROR: AddressSanitizer: heap-use-after-free on address 0x... at pc 0x... bp 0x... sp 0x...\nREAD of size 8 at 0x... thread T0\n    #0 0x... in std::_Deque_iterator<int, int&, int*>::_M_set_node(int**) /usr/include/c++/13/bits/stl_deque.h:266\n    #1 0x... in std::_Deque_iterator<int, int&, int*>::operator++() /usr/include/c++/13/bits/stl_deque.h:195\n    #2 0x... in main deque_walk.cpp:11\n    ...\n0x... is located 32 bytes inside of 64-byte region [0x...,0x...)\nfreed by thread T0 here:\n    ...\n    #5 0x... in std::deque<int, std::allocator<int> >::_M_reallocate_map(unsigned long, bool) /usr/include/c++/13/bits/deque.tcc:965\n    #6 0x... in std::deque<int, std::allocator<int> >::_M_reserve_map_at_back(unsigned long) /usr/include/c++/13/bits/stl_deque.h:2172\n    #7 0x... in void std::deque<int, std::allocator<int> >::_M_push_back_aux<int const&>(int const&) /usr/include/c++/13/bits/deque.tcc:496\n    #8 0x... in std::deque<int, std::allocator<int> >::push_back(int const&) /usr/include/c++/13/bits/stl_deque.h:1548\n    #9 0x... in main deque_walk.cpp:9\n    ...\npreviously allocated by thread T0 here:\n    ...\n    #7 0x... in std::deque<int, std::allocator<int> >::deque(std::initializer_list<int>, std::allocator<int> const&) /usr/include/c++/13/bits/stl_deque.h:980\n    #8 0x... in main deque_walk.cpp:6"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read it in the order the memory-bugs topic teaches: what was read, which block it belonged to, and who freed that block."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bad read is 8 bytes, a pointer, not an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ". It happens in the iterator's "
+        },
+        {
+         "t": "code",
+         "v": "operator++"
+        },
+        {
+         "t": "text",
+         "v": ", inside "
+        },
+        {
+         "t": "code",
+         "v": "_M_set_node"
+        },
+        {
+         "t": "text",
+         "v": ", the step that moves an iterator from one block to the next by reading the next entry of the deque's table of blocks. So the program read none of the readings through a freed pointer. It read the table."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The block it read is 64 bytes: the deque's first table, with room for 8 block pointers, and the read is at byte 32, the fifth entry. The \"freed by\" stack says who freed it: "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " at line 9, through "
+        },
+        {
+         "t": "code",
+         "v": "_M_reallocate_map"
+        },
+        {
+         "t": "text",
+         "v": ", which replaced the full table with a larger one. The elements stayed in their blocks, which is why reading "
+        },
+        {
+         "t": "code",
+         "v": "oldest"
+        },
+        {
+         "t": "text",
+         "v": " at line 10 was fine and why ASan said nothing about it. By the rules, the iterator was invalid from the first push. In practice it kept reading live elements through its element pointer for the rest of its first block, and touched freed memory only when it needed the table. The report came only at the first block boundary. A test that walks fewer elements passes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The libstdc++ "
+        },
+        {
+         "t": "i",
+         "v": "debug mode"
+        },
+        {
+         "t": "text",
+         "v": " finds the same bug earlier. Build with "
+        },
+        {
+         "t": "code",
+         "v": "-D_GLIBCXX_DEBUG"
+        },
+        {
+         "t": "text",
+         "v": ", which replaces the containers with checked versions whose iterators know when they have been invalidated ("
+        },
+        {
+         "t": "a",
+         "v": "libstdc++ manual",
+         "href": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode.html"
+        },
+        {
+         "t": "text",
+         "v": "). This is the start of what the same program printed before it aborted, built that way with GCC 13.3:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "/usr/include/c++/13/debug/safe_iterator.h:472:\nIn function:\n    bool gnu_debug::operator==(const _Safe_iterator<std::\n    _Deque_iterator<int, int&, int*>, std::debug::deque<int>, \n    std::forward_iterator_tag>::_Self&, const _Safe_iterator<std::\n    _Deque_iterator<int, int&, int*>, std::debug::deque<int>, \n    std::forward_iterator_tag>::_Self&)\n\nError: attempt to compare a singular iterator to a past-the-end iterator."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "singular"
+        },
+        {
+         "t": "text",
+         "v": " iterator is one that refers to no position in any container. Debug mode caught it at the first "
+        },
+        {
+         "t": "code",
+         "v": "next != readings.end()"
+        },
+        {
+         "t": "text",
+         "v": ", before a single element was read. It checks iterators only, so it can't see a dead reference or a dead "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", which is why you want both tools. It also changes the layout of the containers, so every file that passes a container to another must be built with the same setting. Run the debug build in tests, next to the sanitizer build."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "views",
+   "title": "string_view and span: borrowed views and their lifetimes",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The borrowing topic showed views that outlive their owner: a view of a local returned from a function, and a view of a temporary. Here the owner is alive, and it changes. A view is valid exactly as long as an iterator into the same elements would be, so the table of the last section applies to views too: a "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": " over a vector dies when the vector reallocates, and a "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " into a string dies at the next call that the string row allows to reallocate."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For strings, \"may be invalidated\" covers a case people get wrong. This program takes a view of a short string and of a long one, and then moves each string into a new owner:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <utility>\n\nint main() {\n  std::string short_name = \"lidar\";                        // 5 characters: in the buffer inside the object\n  std::string long_name = \"lidar/front/points_filtered\";  // 27 characters: on the heap\n  const std::string_view short_view = short_name;\n  const std::string_view long_view = long_name;\n  const std::string short_owner = std::move(short_name);\n  const std::string long_owner = std::move(long_name);\n  std::cout << std::format(\"short view still reads \\\"lidar\\\": {}\\n\", short_view == \"lidar\");\n  std::cout << std::format(\"long view still reads the path:  {}\\n\", long_view == \"lidar/front/points_filtered\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "short view still reads \"lidar\": false\nlong view still reads the path:  true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The long string's characters live in a heap block, and the move hands that block to "
+        },
+        {
+         "t": "code",
+         "v": "long_owner"
+        },
+        {
+         "t": "text",
+         "v": ", so "
+        },
+        {
+         "t": "code",
+         "v": "long_view"
+        },
+        {
+         "t": "text",
+         "v": " still points at the right characters, now owned by someone else. The short string's characters live in the 16-byte buffer inside "
+        },
+        {
+         "t": "code",
+         "v": "short_name"
+        },
+        {
+         "t": "text",
+         "v": " itself. The move copies them into "
+        },
+        {
+         "t": "code",
+         "v": "short_owner"
+        },
+        {
+         "t": "text",
+         "v": " and leaves "
+        },
+        {
+         "t": "code",
+         "v": "short_name"
+        },
+        {
+         "t": "text",
+         "v": " empty, with a zero written over its first character, and "
+        },
+        {
+         "t": "code",
+         "v": "short_view"
+        },
+        {
+         "t": "text",
+         "v": " still points into "
+        },
+        {
+         "t": "code",
+         "v": "short_name"
+        },
+        {
+         "t": "text",
+         "v": ". Neither view crashed, and one of them reads garbage. The standard lets a move invalidate views of both strings, and the second line is only what GCC's library happens to do, so treat both as dead. A "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " differs here. The standard requires its move constructor to take constant time, so it hands over its block instead of copying elements, and a view of the old vector's elements now views the new vector's."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same reasoning applies to a class that hands out views of its members. Jasmine Lopez and Prithvi Okade show the pattern on slide 44 of their "
+        },
+        {
+         "t": "a",
+         "v": "CppCon 2024 talk on string_view",
+         "href": "https://www.youtube.com/watch?v=PEvkBmuMIr8"
+        },
+        {
+         "t": "text",
+         "v": ", with a "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": ": a class hands out a view of its "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " member, the caller keeps it, and a later "
+        },
+        {
+         "t": "code",
+         "v": "Add"
+        },
+        {
+         "t": "text",
+         "v": " on the object inserts into that vector and leaves the view pointing at the old block. A view returned by a member function is valid until the next call of a non-const member function on that object, the same promise "
+        },
+        {
+         "t": "code",
+         "v": "std::string::c_str()"
+        },
+        {
+         "t": "text",
+         "v": " makes. Say so in a comment on the getter, and the caller who keeps a view longer knows to copy it into an owner."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The standard library catches one kind of dangling view for you, at compile time. A range algorithm called on a temporary container would return an iterator into a container that is destroyed at the end of the statement, so it returns a "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::dangling"
+        },
+        {
+         "t": "text",
+         "v": " instead, a type you can't dereference:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "std::ranges::dangling",
+       "text": "#include <algorithm>\n#include <iostream>\n#include <vector>\n\n[[nodiscard]] std::vector<int> load_ranges_mm() { return {820, 0, 1540}; }\n\nint main() {\n  const auto it = std::ranges::find(load_ranges_mm(), 0);  // the vector dies at the semicolon\n  std::cout << *it << '\\n';\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A temporary "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": " is different, because its iterators point into the owner's elements, not into the view. The standard calls such a type a "
+        },
+        {
+         "t": "i",
+         "v": "borrowed range"
+        },
+        {
+         "t": "text",
+         "v": ", and a range algorithm returns a real iterator for it, even from a temporary:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <concepts>\n#include <iostream>\n#include <ranges>\n#include <string>\n#include <string_view>\n\nint main() {\n  const std::string line = \"scan 42 ok\";\n  // Even from a temporary view, find returns an iterator into line, not a dangling.\n  static_assert(!std::same_as<decltype(std::ranges::find(std::string_view(line), ' ')), std::ranges::dangling>);\n\n  const std::string_view view(line);\n  const auto space = std::ranges::find(view, ' ');\n  if (space == view.end()) {\n    std::cout << \"no space in the line\\n\";\n    return 0;\n  }\n  std::cout << std::string_view(space + 1, view.end()) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "42 ok"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Borrowed is the right word: the iterator is valid as long as "
+        },
+        {
+         "t": "code",
+         "v": "line"
+        },
+        {
+         "t": "text",
+         "v": " lives and doesn't change, and nothing checks either half of that. So the rule of thumb for views stays the same: take them as parameters, use a returned view at once, and store owners. Jason Turner's "
+        },
+        {
+         "t": "a",
+         "v": "C++ Weekly episode 425",
+         "href": "https://www.youtube.com/watch?v=cUvdtLTJeec"
+        },
+        {
+         "t": "text",
+         "v": " is about using "
+        },
+        {
+         "t": "code",
+         "v": "string_view"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "span"
+        },
+        {
+         "t": "text",
+         "v": " and pointers safely."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. A "
+        },
+        {
+         "t": "code",
+         "v": "Robot"
+        },
+        {
+         "t": "text",
+         "v": " hands out views of its name and of its controller gains. The program below compiles cleanly and fails under AddressSanitizer:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nclass Robot {\n public:\n  explicit Robot(std::string name) : name_(std::move(name)) {}\n  [[nodiscard]] std::string_view name() const { return name_; }\n  [[nodiscard]] std::span<const double> gains() const { return gains_; }\n  void rename(std::string name) { name_ = std::move(name); }\n  void add_gain(double gain) { gains_.push_back(gain); }\n\n private:\n  std::string name_;\n  std::vector<double> gains_;\n};\n\nint main() {\n  Robot robot(\"turtlebot3-burger-lab-2\");\n  robot.add_gain(0.8);\n  const std::string_view name = robot.name();\n  const std::span<const double> gains = robot.gains();\n  robot.add_gain(1.2);\n  robot.rename(\"turtlebot3-waffle-lab-2\");\n  std::cout << std::format(\"{} has {} gains, the first {}\\n\", name, gains.size(), gains[0]);\n}"
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Before you run it, say after which line each of the two views is invalid, and why."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Run it. The last line uses both views, but ASan reports only one bad read. Which one, and why that one first?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Fix "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " without changing "
+         },
+         {
+          "t": "code",
+          "v": "Robot"
+         },
+         {
+          "t": "text",
+          "v": ". The program should print the old name and gains and then the new ones, and it should copy only what it keeps across a change."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write the comment that belongs on the two accessors."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "gains"
+         },
+         {
+          "t": "text",
+          "v": " dies at "
+         },
+         {
+          "t": "code",
+          "v": "robot.add_gain(1.2)"
+         },
+         {
+          "t": "text",
+          "v": ": the vector held one gain with a capacity of one, so the second push reallocates. "
+         },
+         {
+          "t": "code",
+          "v": "name"
+         },
+         {
+          "t": "text",
+          "v": " dies at "
+         },
+         {
+          "t": "code",
+          "v": "robot.rename(...)"
+         },
+         {
+          "t": "text",
+          "v": ": the name is 23 characters, so it lives on the heap, and assigning the new name replaces that block. GCC's library hands the old block to the parameter "
+         },
+         {
+          "t": "code",
+          "v": "name"
+         },
+         {
+          "t": "text",
+          "v": ", which frees it when "
+         },
+         {
+          "t": "code",
+          "v": "rename"
+         },
+         {
+          "t": "text",
+          "v": " returns."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "ASan reports an 8-byte read in a freed 8-byte block: "
+         },
+         {
+          "t": "code",
+          "v": "gains[0]"
+         },
+         {
+          "t": "text",
+          "v": ", the one "
+         },
+         {
+          "t": "code",
+          "v": "double"
+         },
+         {
+          "t": "text",
+          "v": " of the old vector. The arguments of "
+         },
+         {
+          "t": "code",
+          "v": "std::format"
+         },
+         {
+          "t": "text",
+          "v": " are evaluated before any formatting happens, and storing "
+         },
+         {
+          "t": "code",
+          "v": "gains[0]"
+         },
+         {
+          "t": "text",
+          "v": " as a formatting argument copies the "
+         },
+         {
+          "t": "code",
+          "v": "double"
+         },
+         {
+          "t": "text",
+          "v": ", which reads it. The name's characters would be read only later, while formatting. ASan stops at the first bad access, so a second bug in the same run stays hidden until you fix the first and run again."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "and 4.:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nclass Robot {\n public:\n  explicit Robot(std::string name) : name_(std::move(name)) {}\n  // Both views are valid until the next call of a non-const member function on this robot.\n  [[nodiscard]] std::string_view name() const { return name_; }\n  [[nodiscard]] std::span<const double> gains() const { return gains_; }\n  void rename(std::string name) { name_ = std::move(name); }\n  void add_gain(double gain) { gains_.push_back(gain); }\n\n private:\n  std::string name_;\n  std::vector<double> gains_;\n};\n\nint main() {\n  Robot robot(\"turtlebot3-burger-lab-2\");\n  robot.add_gain(0.8);\n  // Kept across changes to the robot, so copied into owners.\n  const std::string old_name(robot.name());\n  const std::vector<double> old_gains(robot.gains().begin(), robot.gains().end());\n  robot.add_gain(1.2);\n  robot.rename(\"turtlebot3-waffle-lab-2\");\n  std::cout << std::format(\"was {} with {} gain, the first {}\\n\", old_name, old_gains.size(), old_gains[0]);\n  // Used at once, before anything changes the robot, so a view is enough.\n  const std::span<const double> gains = robot.gains();\n  std::cout << std::format(\"now {} with {} gains, the first {}\\n\", robot.name(), gains.size(), gains[0]);\n}"
+      },
+      {
+       "t": "output",
+       "text": "was turtlebot3-burger-lab-2 with 1 gain, the first 0.8\nnow turtlebot3-waffle-lab-2 with 2 gains, the first 0.8"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The owners are built with explicit constructors: "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " has no implicit conversion from "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", which is deliberate, because it allocates, and "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " has none from a "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": ". The second half keeps views, because nothing changes the robot between taking them and using them. Returning views from the accessors is a fair design: most callers print or compare at once and should pay no copy. Changing them to return a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<double>"
+        },
+        {
+         "t": "text",
+         "v": " by value would make this bug impossible at the cost of a copy for every caller. Either way, the comment states the lifetime, so the choice is visible."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bugs",
+   "title": "Erase while iterating; push_back while holding a reference",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Erasing from a container while a loop walks it is the most common invalidation bug. This loop drops tracks that haven't been seen for half a second. "
+        },
+        {
+         "t": "code",
+         "v": "erase(it)"
+        },
+        {
+         "t": "text",
+         "v": " destroys the node "
+        },
+        {
+         "t": "code",
+         "v": "it"
+        },
+        {
+         "t": "text",
+         "v": " points to, and the loop's "
+        },
+        {
+         "t": "code",
+         "v": "++it"
+        },
+        {
+         "t": "text",
+         "v": " then reads the destroyed node to find the next one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string>\n#include <unordered_map>\n\nstruct Track {\n  std::int64_t last_seen_ms;\n};\n\nint main() {\n  std::unordered_map<std::string, Track> tracks{\n      {\"cone-1\", {.last_seen_ms = 100}}, {\"cone-2\", {.last_seen_ms = 950}},\n      {\"person-7\", {.last_seen_ms = 400}}, {\"pallet-3\", {.last_seen_ms = 990}}};\n  const std::int64_t now_ms = 1000;\n  for (auto it = tracks.begin(); it != tracks.end(); ++it) {\n    if (now_ms - it->second.last_seen_ms > 500) tracks.erase(it);  // it dies here, and ++it reads it\n  }\n  std::cout << std::format(\"{} tracks left\\n\", tracks.size());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The report shows an 8-byte read, the node's link to the next node, from the iterator's "
+        },
+        {
+         "t": "code",
+         "v": "operator++"
+        },
+        {
+         "t": "text",
+         "v": " at line 16, in a freed 56-byte block: the node, which holds the link, the "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " key, the "
+        },
+        {
+         "t": "code",
+         "v": "Track"
+        },
+        {
+         "t": "text",
+         "v": " and the key's cached hash. The \"freed by\" stack runs from "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " at line 17. The fix is C++20's "
+        },
+        {
+         "t": "code",
+         "v": "std::erase_if"
+        },
+        {
+         "t": "text",
+         "v": ", which returns how many elements it erased. It exists for every standard container whose elements you can reach and remove one by one, which leaves out "
+        },
+        {
+         "t": "code",
+         "v": "std::array"
+        },
+        {
+         "t": "text",
+         "v": ", because it can't shrink, and the three adaptors, "
+        },
+        {
+         "t": "code",
+         "v": "std::stack"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::queue"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::priority_queue"
+        },
+        {
+         "t": "text",
+         "v": ", which shrink only through "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " and never show you the elements in between:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string>\n#include <unordered_map>\n\nstruct Track {\n  std::int64_t last_seen_ms;\n};\n\nint main() {\n  std::unordered_map<std::string, Track> tracks{\n      {\"cone-1\", {.last_seen_ms = 100}}, {\"cone-2\", {.last_seen_ms = 950}},\n      {\"person-7\", {.last_seen_ms = 400}}, {\"pallet-3\", {.last_seen_ms = 990}}};\n  const std::int64_t now_ms = 1000;\n  const auto stale = [now_ms](const auto& entry) { return now_ms - entry.second.last_seen_ms > 500; };\n  const auto dropped = std::erase_if(tracks, stale);  // C++20: the loop, written once and correctly\n  std::cout << std::format(\"dropped {}, {} tracks left\\n\", dropped, tracks.size());\n}"
+      },
+      {
+       "t": "output",
+       "text": "dropped 2, 2 tracks left"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When you need the loop, for example to log each erased track, use the iterator that "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " returns, which points to the element after the erased one: "
+        },
+        {
+         "t": "code",
+         "v": "it = stale(*it) ? tracks.erase(it) : std::next(it);"
+        },
+        {
+         "t": "text",
+         "v": ", with no "
+        },
+        {
+         "t": "code",
+         "v": "++it"
+        },
+        {
+         "t": "text",
+         "v": " in the loop header."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same bug in a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " is quieter. Change "
+        },
+        {
+         "t": "code",
+         "v": "unordered_map"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " in the first program, and it runs to the end under AddressSanitizer with no report:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <map>\n#include <string>\n\nstruct Track {\n  std::int64_t last_seen_ms;\n};\n\nint main() {\n  std::map<std::string, Track> tracks{\n      {\"cone-1\", {.last_seen_ms = 100}}, {\"cone-2\", {.last_seen_ms = 950}},\n      {\"person-7\", {.last_seen_ms = 400}}, {\"pallet-3\", {.last_seen_ms = 990}}};\n  const std::int64_t now_ms = 1000;\n  for (auto it = tracks.begin(); it != tracks.end(); ++it) {\n    if (now_ms - it->second.last_seen_ms > 500) tracks.erase(it);  // the same bug, in a std::map\n  }\n  std::cout << std::format(\"{} tracks left\\n\", tracks.size());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With GCC 13 it prints "
+        },
+        {
+         "t": "code",
+         "v": "2 tracks left"
+        },
+        {
+         "t": "text",
+         "v": ", the right answer by luck. A map iterator's "
+        },
+        {
+         "t": "code",
+         "v": "++"
+        },
+        {
+         "t": "text",
+         "v": " calls "
+        },
+        {
+         "t": "code",
+         "v": "_Rb_tree_increment"
+        },
+        {
+         "t": "text",
+         "v": ", a function compiled into the shared libstdc++ library rather than into your program, and AddressSanitizer checks only code that was compiled with "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=address"
+        },
+        {
+         "t": "text",
+         "v": ". The freed node still holds its old links, so the walk carries on. Debug mode catches it at the first increment, in a build with "
+        },
+        {
+         "t": "code",
+         "v": "-D_GLIBCXX_DEBUG"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "/usr/include/c++/13/debug/safe_iterator.h:326:\nIn function:\n    gnu_debug::_Safe_iterator<_Iterator, _Sequence, _Category>& \n    gnu_debug::_Safe_iterator<_Iterator, _Sequence, _Category>::operator++() \n    [...]\n\nError: attempt to increment a singular iterator."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A vector has a third version of the bug. "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " shifts the elements behind the erased one to the left, so the element that slides into the erased slot is skipped by "
+        },
+        {
+         "t": "code",
+         "v": "++it"
+        },
+        {
+         "t": "text",
+         "v": ". And when the loop erases the last element, "
+        },
+        {
+         "t": "code",
+         "v": "it"
+        },
+        {
+         "t": "text",
+         "v": " becomes the new "
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "++it"
+        },
+        {
+         "t": "text",
+         "v": " steps past it, and "
+        },
+        {
+         "t": "code",
+         "v": "it != end()"
+        },
+        {
+         "t": "text",
+         "v": " stays true from then on:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-buffer-overflow",
+       "text": "#include <format>\n#include <iostream>\n#include <vector>\n\nint main() {\n  std::vector<int> ranges_mm{820, 0, 0, 1540, 0};  // 0 means the beam saw nothing\n  for (auto it = ranges_mm.begin(); it != ranges_mm.end(); ++it) {\n    if (*it == 0) ranges_mm.erase(it);  // shifts the rest left, then ++it skips one\n  }\n  std::cout << std::format(\"{} readings left\\n\", ranges_mm.size());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports a 4-byte read \"0 bytes after 20-byte region\": the first byte past the block of five "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": "s. With "
+        },
+        {
+         "t": "code",
+         "v": "{820, 0, 0, 1540}"
+        },
+        {
+         "t": "text",
+         "v": " the same loop runs clean under both sanitizers with GCC 13 and prints "
+        },
+        {
+         "t": "code",
+         "v": "3 readings left"
+        },
+        {
+         "t": "text",
+         "v": ": it skipped the second 0 and kept it, which only a test that checks the result would notice. "
+        },
+        {
+         "t": "code",
+         "v": "std::erase(v, value)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::erase_if(v, pred)"
+        },
+        {
+         "t": "text",
+         "v": " do the remove-and-shrink in one call, which the algorithms topic takes apart:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <vector>\n\nint main() {\n  std::vector<int> ranges_mm{820, 0, 0, 1540, 0};\n  const auto dropped = std::erase(ranges_mm, 0);  // C++20; removes every 0 and shrinks the vector\n  std::cout << std::format(\"dropped {}, kept\", dropped);\n  for (const int r : ranges_mm) std::cout << ' ' << r;\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "dropped 3, kept 820 1540"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second bug is a reference held across "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": ". The memory-bugs topic found it with pointers stored in a second vector; here it is in its plainest form. The route has two waypoints and room for two, so adding a detour moves both to a new block, and "
+        },
+        {
+         "t": "code",
+         "v": "goal"
+        },
+        {
+         "t": "text",
+         "v": " refers into the freed one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <vector>\n\nstruct Waypoint {\n  std::string name;\n  double x_m = 0;\n  double y_m = 0;\n};\n\nint main() {\n  std::vector<Waypoint> route{{.name = \"dock\"}, {.name = \"shelf-4\", .x_m = 12, .y_m = 3}};\n  const Waypoint& goal = route.back();\n  route.push_back({.name = \"detour\", .x_m = 6, .y_m = -2});  // full: reallocates, and goal dangles\n  std::cout << std::format(\"heading for {} at ({}, {})\\n\", goal.name, goal.x_m, goal.y_m);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The read is 48 bytes into a freed 96-byte block: two 48-byte waypoints, and the second one is "
+        },
+        {
+         "t": "code",
+         "v": "goal"
+        },
+        {
+         "t": "text",
+         "v": ". There are two fixes, and they aren't equal:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <string>\n#include <vector>\n\nstruct Waypoint {\n  std::string name;\n  double x_m = 0;\n  double y_m = 0;\n};\n\nint main() {\n  // Fix 1: hold an index. It names a position, and positions survive reallocation.\n  std::vector<Waypoint> route{{.name = \"dock\"}, {.name = \"shelf-4\", .x_m = 12, .y_m = 3}};\n  const std::ptrdiff_t goal = std::ssize(route) - 1;\n  route.push_back({.name = \"detour\", .x_m = 6, .y_m = -2});\n  std::cout << std::format(\"index:   heading for {} at ({}, {})\\n\", route[goal].name, route[goal].x_m, route[goal].y_m);\n\n  // Fix 2: reserve first. The reference is safe only while the pushes stay within the capacity.\n  std::vector<Waypoint> planned{{.name = \"dock\"}, {.name = \"shelf-4\", .x_m = 12, .y_m = 3}};\n  planned.reserve(planned.size() + 1);\n  const Waypoint& target = planned.back();\n  planned.push_back({.name = \"detour\", .x_m = 6, .y_m = -2});\n  std::cout << std::format(\"reserve: heading for {} at ({}, {})\\n\", target.name, target.x_m, target.y_m);\n}"
+      },
+      {
+       "t": "output",
+       "text": "index:   heading for shelf-4 at (12, 3)\nreserve: heading for shelf-4 at (12, 3)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The index is correct for any number of pushes, because it names a position, not an address. It fails only if elements are inserted or erased before it. The "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": " fix is correct for exactly as many pushes as it reserved: the standard promises no reallocation until the size passes the capacity, and the next person who adds a second detour breaks it without any warning. Use "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": " for speed, and indices for correctness."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A range-for loop hides the same bug, because it holds iterators you never wrote. Pushing into the vector the loop walks invalidates them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n#include <vector>\n\nstruct Waypoint {\n  std::string name;\n  bool blocked = false;\n};\n\nint main() {\n  std::vector<Waypoint> route{{.name = \"dock\"}, {.name = \"door\", .blocked = true}, {.name = \"shelf-4\"}};\n  for (const Waypoint& w : route) {\n    if (w.blocked) route.push_back({.name = w.name + \"-detour\"});  // the loop's hidden iterators die here\n  }\n  std::cout << std::format(\"{} waypoints\\n\", route.size());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the one place where a hand-written index loop is the right tool, because the loop's mechanics are the point: fix the number of elements to visit before the loop, and index each time, so that the vector may reallocate between steps:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <string>\n#include <vector>\n\nstruct Waypoint {\n  std::string name;\n  bool blocked = false;\n};\n\nint main() {\n  std::vector<Waypoint> route{{.name = \"dock\"}, {.name = \"door\", .blocked = true}, {.name = \"shelf-4\"}};\n  const std::ptrdiff_t planned = std::ssize(route);  // visit the original waypoints only\n  for (std::ptrdiff_t i = 0; i < planned; ++i) {\n    if (route[i].blocked) route.push_back({.name = route[i].name + \"-detour\"});\n  }\n  for (const Waypoint& w : route) std::cout << w.name << ' ';\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "dock door shelf-4 door-detour "
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Collecting the detours in a second vector and appending them after the loop is as good, and reads better when the loop does more than one thing."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say why a reference to a deque element survives a "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " while an iterator doesn't, and what a rehash does to the iterators and to the references of an "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": ". Give the rule for vector insert and erase, and why every non-const call on a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " ends its views. Name the two tools and what each one catches: AddressSanitizer for dead memory in instrumented code, debug mode for dead iterators. End with the three fixes for the two bugs of this section: "
+        },
+        {
+         "t": "code",
+         "v": "std::erase_if"
+        },
+        {
+         "t": "text",
+         "v": ", an index, and "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": ", with the limit of the last."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Which operations on a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " invalidate every iterator and reference, and which invalidate only some?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "After "
+     },
+     {
+      "t": "code",
+      "v": "d.push_back(x)"
+     },
+     {
+      "t": "text",
+      "v": " on a "
+     },
+     {
+      "t": "code",
+      "v": "std::deque"
+     },
+     {
+      "t": "text",
+      "v": ", which of your iterators, references and pointers into it are still valid?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a rehash invalidate in an "
+     },
+     {
+      "t": "code",
+      "v": "std::unordered_map"
+     },
+     {
+      "t": "text",
+      "v": ", and what does it leave valid?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why can a "
+     },
+     {
+      "t": "code",
+      "v": "std::string_view"
+     },
+     {
+      "t": "text",
+      "v": " of a short string go wrong after the string is moved, when a view of a long string seems to survive?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why did the erase-while-iterating bug in a "
+     },
+     {
+      "t": "code",
+      "v": "std::map"
+     },
+     {
+      "t": "text",
+      "v": " run clean under AddressSanitizer, and what catches it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::find"
+     },
+     {
+      "t": "text",
+      "v": " return when you pass it a temporary "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": ", and why is a temporary "
+     },
+     {
+      "t": "code",
+      "v": "std::string_view"
+     },
+     {
+      "t": "text",
+      "v": " different?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a loop that erases from a container while walking it, its ASan report, and the fix with "
+     },
+     {
+      "t": "code",
+      "v": "std::erase_if"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, Back to Basics: Iterators, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Iterators.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=26aW6aBVpk0"
+     },
+     {
+      "t": "text",
+      "v": ". Iterators as the glue between ranges and algorithms, what each category promises, and slides 35 to 37 on the removing algorithms that don't remove."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, CppCon 2024, on the programme as \"Back to Basics: Almost Always Vector?\" and published as a video without the question mark: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". The iterator that a "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " leaves behind, and the cppreference table on the slide after it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jasmine Lopez and Prithvi Okade, a close look at "
+     },
+     {
+      "t": "code",
+      "v": "std::string_view"
+     },
+     {
+      "t": "text",
+      "v": ", CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Unraveling_string_view.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=PEvkBmuMIr8"
+     },
+     {
+      "t": "text",
+      "v": ". A view returned from a function that owns the characters, a view kept as a data member of a class, and, on slide 44, a "
+     },
+     {
+      "t": "code",
+      "v": "std::span"
+     },
+     {
+      "t": "text",
+      "v": " of a vector member that a later insert invalidates."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Jason Turner, C++ Weekly episode 425 on using "
+     },
+     {
+      "t": "code",
+      "v": "string_view"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "span"
+     },
+     {
+      "t": "text",
+      "v": " and pointers safely: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=cUvdtLTJeec"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.65",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-deref"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference: the "
+     },
+     {
+      "t": "a",
+      "v": "iterator invalidation table",
+      "href": "https://en.cppreference.com/cpp/container#Iterator_invalidation"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::erase_if for vector",
+      "href": "https://en.cppreference.com/cpp/container/vector/erase2"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::dangling",
+      "href": "https://en.cppreference.com/cpp/ranges/dangling"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "borrowed_range",
+      "href": "https://en.cppreference.com/cpp/ranges/borrowed_range"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The C++ standard on invalidation for "
+     },
+     {
+      "t": "a",
+      "v": "vector",
+      "href": "https://eel.is/c++draft/vector.modifiers"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "deque",
+      "href": "https://eel.is/c++draft/deque.modifiers"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "unordered containers",
+      "href": "https://eel.is/c++draft/unord.req.general"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "basic_string",
+      "href": "https://eel.is/c++draft/string.require"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The libstdc++ manual on "
+     },
+     {
+      "t": "a",
+      "v": "debug mode",
+      "href": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

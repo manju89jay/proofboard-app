@@ -7,7 +7,7 @@
     "c": [
      {
       "t": "text",
-      "v": "For each of the five functions, write down the time and the extra space as Big-O, in terms of the input sizes. Name the variables you use. Take 10 minutes."
+      "v": "For each of the five functions, write down the time and the extra space as Big-O, in terms of the input sizes. Name the variables you use. Where the average and the worst case differ, give both. Take 10 minutes."
      }
     ]
    },
@@ -16,7 +16,7 @@
     "lang": "cpp",
     "tag": "run",
     "expect": "",
-    "text": "#include <string>\n#include <unordered_set>\n#include <vector>\n\n// 1\nlong sum(const std::vector<int>& v) {\n  long s = 0;\n  for (int x : v) s += x;\n  return s;\n}\n\n// 2\nbool has_duplicate_pairwise(const std::vector<int>& v) {\n  for (std::size_t i = 0; i < v.size(); ++i)\n    for (std::size_t j = i + 1; j < v.size(); ++j)\n      if (v[i] == v[j]) return true;\n  return false;\n}\n\n// 3\nint halvings(int n) {\n  int steps = 0;\n  while (n > 1) {\n    n /= 2;\n    ++steps;\n  }\n  return steps;\n}\n\n// 4\nbool has_duplicate_hashed(const std::vector<int>& v) {\n  std::unordered_set<int> seen;\n  for (int x : v)\n    if (!seen.insert(x).second) return true;\n  return false;\n}\n\n// 5\nstd::string repeat(const std::string& s, int k) {\n  std::string out;\n  for (int i = 0; i < k; ++i) out += s;\n  return out;\n}\n\nint main() {\n  std::vector<int> v{3, 1, 4, 1, 5};\n  bool ok = sum(v) == 14 && has_duplicate_pairwise(v) && halvings(8) == 3 && has_duplicate_hashed(v) &&\n            repeat(\"ab\", 3) == \"ababab\";\n  return ok ? 0 : 1;\n}"
+    "text": "#include <cstddef>\n#include <cstdint>\n#include <span>\n#include <string>\n#include <string_view>\n#include <unordered_set>\n#include <vector>\n\n// 1\n[[nodiscard]] std::int64_t sum(std::span<const int> v) {\n  std::int64_t s = 0;\n  for (const int x : v) s += x;\n  return s;\n}\n\n// 2\n[[nodiscard]] bool has_duplicate_pairwise(std::span<const int> v) {\n  for (std::ptrdiff_t i = 0; i < std::ssize(v); ++i)\n    for (std::ptrdiff_t j = i + 1; j < std::ssize(v); ++j)\n      if (v[i] == v[j]) return true;\n  return false;\n}\n\n// 3\n[[nodiscard]] int halvings(int n) {\n  int steps = 0;\n  while (n > 1) {\n    n /= 2;\n    ++steps;\n  }\n  return steps;\n}\n\n// 4\n[[nodiscard]] bool has_duplicate_hashed(std::span<const int> v) {\n  std::unordered_set<int> seen;\n  for (const int x : v)\n    if (!seen.insert(x).second) return true;\n  return false;\n}\n\n// 5\n[[nodiscard]] std::string repeat(std::string_view s, int k) {\n  std::string out;\n  for (int i = 0; i < k; ++i) out += s;\n  return out;\n}\n\nint main() {\n  const std::vector<int> v{3, 1, 4, 1, 5};\n  const bool ok = sum(v) == 14 && has_duplicate_pairwise(v) && halvings(8) == 3 && has_duplicate_hashed(v) &&\n                  repeat(\"ab\", 3) == \"ababab\";\n  return ok ? 0 : 1;\n}"
    }
   ],
   "answer": [
@@ -33,7 +33,7 @@
      },
      {
       "t": "text",
-      "v": ":"
+      "v": " in 1, 2 and 4, and n the argument in 3:"
      }
     ]
    },
@@ -43,7 +43,31 @@
      [
       {
        "t": "text",
-       "v": "O(n) time and O(1) extra space: one pass and one accumulator."
+       "v": "O(n) time and O(1) extra space: one pass and one accumulator. The accumulator is a "
+      },
+      {
+       "t": "code",
+       "v": "std::int64_t"
+      },
+      {
+       "t": "text",
+       "v": " because the sum of many "
+      },
+      {
+       "t": "code",
+       "v": "int"
+      },
+      {
+       "t": "text",
+       "v": "s can pass the "
+      },
+      {
+       "t": "code",
+       "v": "int"
+      },
+      {
+       "t": "text",
+       "v": " limit, and signed overflow is undefined behaviour."
       }
      ],
      [
@@ -75,9 +99,34 @@
       },
       {
        "t": "text",
-       "v": ", O(k·m) time and O(k·m) extra space. Each append copies m characters (amortised), and the result holds k·m characters. Say \"k·m\", not \"n\": an interviewer listens for whether you name the variables."
+       "v": ", O(k·m) time and O(k·m) extra space. Each "
+      },
+      {
+       "t": "code",
+       "v": "out += s"
+      },
+      {
+       "t": "text",
+       "v": " copies m characters. The occasional reallocation copies the whole string, but by the argument in the second half of this page that adds only O(1) per character appended. The result holds k·m characters. Say \"k·m\", not \"n\": an interviewer listens for whether you name the variables."
       }
      ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The loops are written out because counting them is the exercise. In real code, 1 is "
+     },
+     {
+      "t": "code",
+      "v": "std::accumulate(v.begin(), v.end(), std::int64_t{0})"
+     },
+     {
+      "t": "text",
+      "v": ", with the same O(n). A standard algorithm's cost is part of its specification, listed under \"Complexity\" on each cppreference page, so a call to one is counted the same way as a loop."
+     }
     ]
    },
    {
@@ -91,6 +140,77 @@
    }
   ]
  },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Big-O describes how the number of steps code takes grows as its input grows, once the input is large enough that constant factors stop mattering: O(n) means the step count is at most a constant multiple of n for large n. The constant, and how fast one machine runs a step, is what Big-O leaves out. "
+    },
+    {
+     "t": "i",
+     "v": "Extra space"
+    },
+    {
+     "t": "text",
+     "v": " is the same idea applied to memory: everything code allocates beyond its input, including every level of a recursion's stack."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is comparing two pieces of code without running either, without being fooled by whichever is faster on today's input. A loop over a list is fast for ten elements whatever its growth rate, and slow for a million only if the rate is bad, so reasoning about growth, not one timing, tells you which code is still running once the input is large. Two loops that look alike, one nested and one where the inner loop halves each time, cost O(n²) and O(n): counting the steps, not the shape, tells them apart."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You get Big-O by counting: add the costs of steps that run one after another and keep the largest term, multiply the costs of nested loops, and count a loop whose variable halves or doubles each time as O(log n) rather than O(n). With two independent input sizes, keep both, since O(n + m) and O(n·m) differ. "
+    },
+    {
+     "t": "i",
+     "v": "Amortised"
+    },
+    {
+     "t": "text",
+     "v": " cost extends the same counting across a sequence of calls: "
+    },
+    {
+     "t": "code",
+     "v": "push_back"
+    },
+    {
+     "t": "text",
+     "v": " occasionally costs O(n), when it must grow and move every element, but each growth doubles the capacity, so the moves to reach n elements never exceed twice n, and the cost per push, averaged over the sequence, is O(1)."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What matters once you have a rate is not blurring amortised, average and worst case together. An amortised bound holds for every sequence whatever the input; an average is taken over inputs and can still be bad for one, the way a hash-table lookup is O(1) on average but O(n) when every key lands in one bucket. Naming which of the three you mean, and naming your variables instead of one n, is what most answers leave out."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "That is why an interviewer asks for it first: a growth rate tells them, without running your code, whether it finishes at the size their system sees, and every later page on this track expects it of your solution."
+    }
+   ]
+  }
+ ],
  "subs": [
   {
    "id": "big-o",
@@ -115,7 +235,7 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <cstdio>\n\nint main() {\n  const int n = 1024;\n  long nested = 0, doubling = 0;\n  for (int i = 0; i < n; ++i)      // the inner loop runs i times\n    for (int j = 0; j < i; ++j) ++nested;\n  for (int i = 1; i < n; i *= 2)   // the inner loop also runs i times, but i doubles\n    for (int j = 0; j < i; ++j) ++doubling;\n  std::printf(\"nested: %ld steps, doubling: %ld steps\\n\", nested, doubling);\n}"
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n\nint main() {\n  constexpr int n = 1024;\n  std::int64_t nested = 0;\n  std::int64_t doubling = 0;\n  for (int i = 0; i < n; ++i)  // the inner loop runs i times\n    for (int j = 0; j < i; ++j) ++nested;\n  for (int i = 1; i < n; i *= 2)  // the inner loop also runs i times, but i doubles\n    for (int j = 0; j < i; ++j) ++doubling;\n  std::cout << std::format(\"nested: {} steps, doubling: {} steps\\n\", nested, doubling);\n}"
       },
       {
        "t": "output",
@@ -126,7 +246,7 @@
        "c": [
         {
          "t": "text",
-         "v": "The first makes n(n−1)/2 = 523,776 steps for n = 1024, which is O(n²). The second makes 1 + 2 + 4 + … + 512 = 1023 steps, which is O(n): its outer loop runs only log₂ n times, and the inner counts add up to less than 2n. You get Big-O by counting what the code does, not by looking at how its loops are nested."
+         "v": "The first makes n(n−1)/2 = 523,776 steps for n = 1024, which is O(n²). The second makes 1 + 2 + 4 + … + 512 = 1023 steps, which is O(n): its outer loop runs only log₂ n times, and the inner counts add up to less than 2n. You get Big-O by counting what the code does, not by looking at how its loops are nested. Kirsh and Segoli Schubert's Back to Basics talk on complexity (CppCon 2021) quizzes its audience with code of this kind."
         }
        ]
       },
@@ -282,7 +402,7 @@
          [
           {
            "t": "code",
-           "v": "std::sort"
+           "v": "std::ranges::sort"
           },
           {
            "t": "text",
@@ -343,7 +463,15 @@
        "c": [
         {
          "t": "text",
-         "v": "A simple loop runs roughly 10⁸ to 10⁹ steps per second on current hardware. So when a problem says n ≤ 10⁵, an O(n²) solution needs up to 10¹⁰ steps and is too slow, and you should look for O(n log n) or better."
+         "v": "The usual rule of thumb is 10⁸ to 10⁹ cheap steps per second. It is on the cautious side for a small loop: the pairwise duplicate check from the cold check, built with "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", made 32 million comparisons in 6 ms in one run under WSL, about 5·10⁹ per second. Either way, when a problem says n ≤ 10⁵, an O(n²) solution needs up to 10¹⁰ steps and is too slow, and you should look for O(n log n) or better."
         }
        ]
       },
@@ -372,7 +500,7 @@
         [
          {
           "t": "code",
-          "v": "std::sort"
+          "v": "std::ranges::sort"
          },
          {
           "t": "text",
@@ -521,7 +649,15 @@
         },
         {
          "t": "text",
-         "v": " from the cold check on inputs with no duplicates, for n = 1000, 2000, 4000 and 8000. Predict first: when n doubles, the pairwise time should grow about 4 times and the hashed time about 2 times."
+         "v": " from the cold check on inputs with no duplicates, for n = 1000, 2000, 4000 and 8000, with "
+        },
+        {
+         "t": "code",
+         "v": "std::chrono::steady_clock"
+        },
+        {
+         "t": "text",
+         "v": ". Keep each call's answer and print it. Predict first: when n doubles, the pairwise time should grow about 4 times and the hashed time about 2 times."
         }
        ]
       },
@@ -583,7 +719,7 @@
         [
          {
           "t": "text",
-          "v": "O(n log n) comparisons, each costing up to O(L), so O(L·n log n) time. "
+          "v": "O(n log n) comparisons, each costing up to O(L), so O(L·n log n) time. Moving a string costs O(1) whatever its length, so the moves add nothing to that. libstdc++'s "
          },
          {
           "t": "code",
@@ -591,7 +727,7 @@
          },
          {
           "t": "text",
-          "v": " needs O(log n) extra space."
+          "v": " is an introsort, which uses O(log n) stack."
          }
         ]
        ]
@@ -601,7 +737,23 @@
        "c": [
         {
          "t": "text",
-         "v": "For the measurement, here is one way to do it. The timings vary from run to run, so there is no fixed output to compare against. Look at the ratios between rows."
+         "v": "For the measurement, here is one way to do it. "
+        },
+        {
+         "t": "code",
+         "v": "timed"
+        },
+        {
+         "t": "text",
+         "v": " takes the check as anything that can be called with a span and answers true or false, which the "
+        },
+        {
+         "t": "code",
+         "v": "std::predicate"
+        },
+        {
+         "t": "text",
+         "v": " concept states, and returns its answer together with the time:"
         }
        ]
       },
@@ -610,7 +762,108 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <chrono>\n#include <cstdio>\n#include <numeric>\n#include <unordered_set>\n#include <vector>\n\nbool has_duplicate_pairwise(const std::vector<int>& v) {\n  for (std::size_t i = 0; i < v.size(); ++i)\n    for (std::size_t j = i + 1; j < v.size(); ++j)\n      if (v[i] == v[j]) return true;\n  return false;\n}\n\nbool has_duplicate_hashed(const std::vector<int>& v) {\n  std::unordered_set<int> seen;\n  for (int x : v)\n    if (!seen.insert(x).second) return true;\n  return false;\n}\n\ntemplate <class F>\ndouble millis(F f, const std::vector<int>& v) {\n  auto start = std::chrono::steady_clock::now();\n  volatile bool found = f(v);  // volatile: the optimiser must not skip the call\n  (void)found;\n  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();\n}\n\nint main() {\n  for (int n = 1000; n <= 8000; n *= 2) {\n    std::vector<int> v(n);\n    std::iota(v.begin(), v.end(), 0);  // 0, 1, 2, ...: no duplicates, the worst case\n    std::printf(\"n = %5d  pairwise %8.2f ms  hashed %6.2f ms\\n\", n, millis(has_duplicate_pairwise, v),\n                millis(has_duplicate_hashed, v));\n  }\n}"
+       "text": "#include <chrono>\n#include <concepts>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <span>\n#include <unordered_set>\n#include <vector>\n\n[[nodiscard]] bool has_duplicate_pairwise(std::span<const int> v) {\n  for (std::ptrdiff_t i = 0; i < std::ssize(v); ++i)\n    for (std::ptrdiff_t j = i + 1; j < std::ssize(v); ++j)\n      if (v[i] == v[j]) return true;\n  return false;\n}\n\n[[nodiscard]] bool has_duplicate_hashed(std::span<const int> v) {\n  std::unordered_set<int> seen;\n  for (const int x : v)\n    if (!seen.insert(x).second) return true;\n  return false;\n}\n\nstruct Timed {\n  bool found;\n  std::chrono::duration<double, std::milli> elapsed;\n};\n\n// Runs check(v) once. The answer comes back with the time, so the caller uses it and the call can't be dropped.\n[[nodiscard]] Timed timed(std::predicate<std::span<const int>> auto check, std::span<const int> v) {\n  const auto start = std::chrono::steady_clock::now();\n  const bool found = check(v);\n  return {.found = found, .elapsed = std::chrono::steady_clock::now() - start};\n}\n\nint main() {\n  for (const int n : {1000, 2000, 4000, 8000}) {\n    std::vector<int> v(n);\n    std::iota(v.begin(), v.end(), 0);  // 0, 1, 2, ...: no duplicates, the worst case\n    const Timed pairwise = timed(has_duplicate_pairwise, v);\n    const Timed hashed = timed(has_duplicate_hashed, v);\n    std::cout << std::format(\"n = {:4}  pairwise {:7.2f} ms  hashed {:5.2f} ms  duplicates: {}\\n\", n,\n                             pairwise.elapsed.count(), hashed.elapsed.count(), pairwise.found || hashed.found);\n  }\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The timings change from run to run, so there is no fixed output to compare against. Look at the ratios between rows. Built the way this page's examples are checked, without optimisation and with both sanitizers, one run printed pairwise times of 5.36, 23.35, 94.42 and 372.49 ms: each doubling of n multiplied the time by about 4. The hashed times were a few milliseconds and grew about 2 times per doubling, with noise at these sizes. Built with "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", the pairwise times were 0.10, 0.40, 1.50 and 6.03 ms, 54 to 63 times faster and still growing by 4. Big-O predicts the ratio, not the milliseconds, which is why Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "Per.6",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+        },
+        {
+         "t": "text",
+         "v": " asks for a measurement before any claim about speed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Printing the answer is what keeps the measurement honest. A call without side effects whose result nobody reads can be removed under the as-if rule. A version of "
+        },
+        {
+         "t": "code",
+         "v": "timed"
+        },
+        {
+         "t": "text",
+         "v": " that throws the answer away, built with "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", printed 0.00 ms for every pairwise row: GCC had deleted the loop. Here, using the result was enough for GCC 13: the "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " times still grew by 4 per doubling. The standard doesn't order that work against the "
+        },
+        {
+         "t": "code",
+         "v": "steady_clock::now()"
+        },
+        {
+         "t": "text",
+         "v": " calls, though, so a compiler may move it across them. That is why a benchmark library's "
+        },
+        {
+         "t": "code",
+         "v": "DoNotOptimize"
+        },
+        {
+         "t": "text",
+         "v": " is also a compiler barrier: with GCC and Clang, Google Benchmark's is an empty "
+        },
+        {
+         "t": "code",
+         "v": "asm volatile"
+        },
+        {
+         "t": "text",
+         "v": " statement with a memory clobber, and builds without inline assembly, such as MSVC, use a different branch ("
+        },
+        {
+         "t": "a",
+         "v": "utils.h",
+         "href": "https://github.com/google/benchmark/blob/main/include/benchmark/utils.h"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "a",
+         "v": "user guide",
+         "href": "https://github.com/google/benchmark/blob/main/docs/user_guide.md#preventing-optimization"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
       }
      ]
     }
@@ -630,7 +883,7 @@
        "c": [
         {
          "t": "text",
-         "v": "This program pushes 20 elements into an empty vector and prints a line each time the capacity changes. "
+         "v": "This program pushes 20 elements into an empty vector and prints a line each time the capacity changes. Each "
         },
         {
          "t": "code",
@@ -638,7 +891,7 @@
         },
         {
          "t": "text",
-         "v": " counts how many times the vector moves an element into a new block of memory."
+         "v": " element carries the number of times it has been moved: the move constructor gives the new element the old count plus one."
         }
        ]
       },
@@ -647,18 +900,18 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <cstdio>\n#include <vector>\n\nstruct Counted {\n  static inline int moves = 0;\n  int value;\n  explicit Counted(int v) : value(v) {}\n  Counted(Counted&& other) noexcept : value(other.value) { ++moves; }\n};\n\nint main() {\n  std::vector<Counted> v;\n  std::size_t last = v.capacity();\n  for (int i = 1; i <= 20; ++i) {\n    v.emplace_back(i);\n    if (v.capacity() != last) {\n      last = v.capacity();\n      std::printf(\"size %2zu -> capacity %zu\\n\", v.size(), last);\n    }\n  }\n  std::printf(\"20 pushes moved %d elements in total\\n\", Counted::moves);\n}"
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <ranges>\n#include <vector>\n\nstruct Counted {\n  explicit Counted(int v) : value(v) {}\n  Counted(Counted&& other) noexcept : value(other.value), moves(other.moves + 1) {}\n\n  int value;\n  std::int64_t moves = 0;\n};\n\nint main() {\n  std::vector<Counted> v;\n  auto last = v.capacity();\n  for (int i = 1; i <= 20; ++i) {\n    v.emplace_back(i);\n    if (v.capacity() != last) {\n      last = v.capacity();\n      std::cout << std::format(\"size {:2} -> capacity {}\\n\", v.size(), last);\n    }\n  }\n  const auto moves = v | std::views::transform(&Counted::moves);\n  std::cout << std::format(\"20 pushes made {} moves; element 1 moved {} times, element 20 {} times\\n\",\n                           std::accumulate(moves.begin(), moves.end(), std::int64_t{0}), v.front().moves,\n                           v.back().moves);\n}"
       },
       {
        "t": "output",
-       "text": "size  1 -> capacity 1\nsize  2 -> capacity 2\nsize  3 -> capacity 4\nsize  5 -> capacity 8\nsize  9 -> capacity 16\nsize 17 -> capacity 32\n20 pushes moved 31 elements in total"
+       "text": "size  1 -> capacity 1\nsize  2 -> capacity 2\nsize  3 -> capacity 4\nsize  5 -> capacity 8\nsize  9 -> capacity 16\nsize 17 -> capacity 32\n20 pushes made 31 moves; element 1 moved 5 times, element 20 0 times"
       },
       {
        "t": "p",
        "c": [
         {
          "t": "text",
-         "v": "Six of the 20 pushes found the vector full. Each of them allocated a block twice as large, moved every element across and freed the old block. They moved 0, 1, 2, 4, 8 and 16 elements. The other 14 pushes moved nothing."
+         "v": "Six of the 20 pushes found the vector full. Each of them allocated a new block, twice the old capacity once there was one, moved every element across and freed the old block. They moved 0, 1, 2, 4, 8 and 16 elements. The other 14 pushes moved nothing. Element 1 went through five of those moves, and element 20 arrived after the last one."
         }
        ]
       },
@@ -675,7 +928,41 @@
         },
         {
          "t": "text",
-         "v": " means. The growth factor is the library's choice. GCC's libstdc++ doubles the capacity. Microsoft's library grows it by 1.5, which is still amortised O(1), with more reallocations."
+         "v": " means, and it is what cppreference's page on "
+        },
+        {
+         "t": "a",
+         "v": "push_back",
+         "href": "https://en.cppreference.com/cpp/container/vector/push_back"
+        },
+        {
+         "t": "text",
+         "v": " gives as its complexity. The growth factor is the library's choice. GCC's libstdc++ doubles the capacity: its "
+        },
+        {
+         "t": "code",
+         "v": "_M_check_len"
+        },
+        {
+         "t": "text",
+         "v": " asks for the old size plus the larger of the old size and the number of new elements. Microsoft's library grows it by 1.5, as its "
+        },
+        {
+         "t": "code",
+         "v": "_Calculate_growth"
+        },
+        {
+         "t": "text",
+         "v": " in the "
+        },
+        {
+         "t": "a",
+         "v": "microsoft/STL sources",
+         "href": "https://github.com/microsoft/STL/blob/main/stl/inc/vector"
+        },
+        {
+         "t": "text",
+         "v": " shows, which is still amortised O(1), with more reallocations."
         }
        ]
       },
@@ -709,7 +996,16 @@
         },
         {
          "t": "text",
-         "v": " allocates once and the moves disappear. Growth also has a cost that matters more than time: it invalidates every pointer, reference and iterator into the vector. The topic on iterators and invalidation covers the bugs this causes."
+         "v": " allocates once and the moves disappear, which is Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "Per.14",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-alloc"
+        },
+        {
+         "t": "text",
+         "v": ", \"minimize the number of allocations and deallocations\". Growth also has a cost that matters more than time: it invalidates every pointer, reference and iterator into the vector. The topic on iterators and invalidation covers the bugs this causes."
         }
        ]
       }
@@ -751,7 +1047,7 @@
          },
          {
           "t": "text",
-          "v": ". Predict the printed lines and the move count, then run it."
+          "v": ". Predict the printed lines and the move counts, then run it."
          }
         ],
         [
@@ -771,7 +1067,7 @@
          },
          {
           "t": "text",
-          "v": " from the move constructor, and add a copy constructor that counts copies. Predict what the vector does when it grows, then check."
+          "v": " from the move constructor, and add a copy constructor that counts copies the same way. Predict what the vector does when it grows, then check."
          }
         ]
        ]
@@ -798,7 +1094,15 @@
         },
         {
          "t": "text",
-         "v": ", the program prints no capacity lines and the move count is 0. The capacity is already 20 when "
+         "v": ", the program prints no capacity lines, and the last line reads "
+        },
+        {
+         "t": "code",
+         "v": "20 pushes made 0 moves; element 1 moved 0 times, element 20 0 times"
+        },
+        {
+         "t": "text",
+         "v": ". The capacity is already 20 when "
         },
         {
          "t": "code",
@@ -815,7 +1119,7 @@
        "c": [
         {
          "t": "text",
-         "v": "A doubling vector reallocates about 20 times on the way to a million elements, because 2²⁰ is about 10⁶."
+         "v": "A doubling vector reallocates about 20 times on the way to a million elements, because 2²⁰ is about 10⁶. Counting capacity changes in libstdc++ gives 21: the first allocation, then 20 reallocations, ending at a capacity of 2²⁰ = 1,048,576."
         }
        ]
       },
@@ -840,7 +1144,7 @@
         },
         {
          "t": "text",
-         "v": " promises that a push which throws leaves the vector as it was: the strong exception guarantee. If a move threw halfway through, some elements would already have left the old block and that promise would be broken. So the vector moves elements only when the move constructor can't throw, which it checks with "
+         "v": " promises that a push which throws leaves the vector as it was: the strong exception guarantee. If a move threw halfway through, some elements would already have left the old block, and that promise would be broken. So the vector moves elements only when the move constructor can't throw, or when the type can't be copied at all, which is the rule "
         },
         {
          "t": "code",
@@ -848,11 +1152,20 @@
         },
         {
          "t": "text",
-         "v": ", and copies them otherwise. That is the practical reason to mark move constructors "
+         "v": " expresses, and copies them otherwise. That is the practical reason to mark move constructors "
         },
         {
          "t": "code",
          "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", and Arthur O'Dwyer calls the slow path the "
+        },
+        {
+         "t": "a",
+         "v": "vector pessimization",
+         "href": "https://quuxplusone.github.io/blog/2022/08/26/vector-pessimization/"
         },
         {
          "t": "text",
@@ -865,7 +1178,7 @@
        "lang": "cpp",
        "tag": "run",
        "expect": "",
-       "text": "#include <cstdio>\n#include <vector>\n\nstruct Counted {\n  static inline int moves = 0;\n  static inline int copies = 0;\n  int value;\n  explicit Counted(int v) : value(v) {}\n  Counted(const Counted& other) : value(other.value) { ++copies; }\n  Counted(Counted&& other) : value(other.value) { ++moves; }  // not noexcept\n};\n\nint main() {\n  std::vector<Counted> v;\n  for (int i = 1; i <= 20; ++i) v.emplace_back(i);\n  std::printf(\"moves %d, copies %d\\n\", Counted::moves, Counted::copies);\n}"
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <vector>\n\nstruct Counted {\n  explicit Counted(int v) : value(v) {}\n  Counted(const Counted& other) : value(other.value), copies(other.copies + 1), moves(other.moves) {}\n  Counted(Counted&& other) : value(other.value), copies(other.copies), moves(other.moves + 1) {}  // not noexcept\n\n  int value;\n  std::int64_t copies = 0;\n  std::int64_t moves = 0;\n};\n\nint main() {\n  std::vector<Counted> v;\n  for (int i = 1; i <= 20; ++i) v.emplace_back(i);\n  std::int64_t copies = 0;\n  std::int64_t moves = 0;\n  for (const Counted& c : v) {\n    copies += c.copies;\n    moves += c.moves;\n  }\n  std::cout << std::format(\"moves {}, copies {}\\n\", moves, copies);\n}"
       },
       {
        "t": "output",
@@ -939,7 +1252,239 @@
     [
      {
       "t": "text",
+      "v": "Why does the timing program print the answer of each check it times?"
+     }
+    ],
+    [
+     {
+      "t": "text",
       "v": "Re-solve in 10 minutes: does a vector contain a duplicate? Do it in O(n) average time, and state the extra space."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh and Adam Segoli Schubert, Back to Basics: Algorithmic Complexity, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Algorithmic_Complexity.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=AY2FqpDCBGs"
+     },
+     {
+      "t": "text",
+      "v": ". Complexity quizzes on short code, the dominant term, vector growth, time against space, and the cost of calling standard algorithms."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". Why "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " is the default container, how it manages its memory, and its trade-offs against the other containers."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": " on measuring before claiming, "
+     },
+     {
+      "t": "a",
+      "v": "Per.14",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-alloc"
+     },
+     {
+      "t": "text",
+      "v": " on allocations, "
+     },
+     {
+      "t": "a",
+      "v": "Con.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconst-immutable"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Con.5",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconst-constexpr"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "constexpr"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "ES.102",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+     },
+     {
+      "t": "text",
+      "v": " on signed arithmetic."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, "
+     },
+     {
+      "t": "a",
+      "v": "the vector pessimization",
+      "href": "https://quuxplusone.github.io/blog/2022/08/26/vector-pessimization/"
+     },
+     {
+      "t": "text",
+      "v": ": why a move constructor without "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": " makes a growing vector copy."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "vector::push_back",
+      "href": "https://en.cppreference.com/cpp/container/vector/push_back"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::move_if_noexcept",
+      "href": "https://en.cppreference.com/cpp/utility/move_if_noexcept"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::accumulate",
+      "href": "https://en.cppreference.com/cpp/algorithm/accumulate"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The growth code of both libraries: libstdc++'s "
+     },
+     {
+      "t": "a",
+      "v": "stl_vector.h",
+      "href": "https://github.com/gcc-mirror/gcc/blob/master/libstdc++-v3/include/bits/stl_vector.h"
+     },
+     {
+      "t": "text",
+      "v": " ("
+     },
+     {
+      "t": "code",
+      "v": "_M_check_len"
+     },
+     {
+      "t": "text",
+      "v": ") and Microsoft's "
+     },
+     {
+      "t": "a",
+      "v": "vector",
+      "href": "https://github.com/microsoft/STL/blob/main/stl/inc/vector"
+     },
+     {
+      "t": "text",
+      "v": " ("
+     },
+     {
+      "t": "code",
+      "v": "_Calculate_growth"
+     },
+     {
+      "t": "text",
+      "v": ")."
      }
     ]
    ]

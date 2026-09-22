@@ -1,0 +1,1100 @@
+{
+ "id": "prj-drop-relay",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage turns the relay from a plain forwarder into a tool that can take odometry away from the supervisor on command, at a moment and for a length the bench chooses, and give it back by itself. The cue is a service, not Ctrl+C, because a service has an answer: the caller knows the relay heard it and until when the drop lasts."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is that the drop's length is a duration, not a count of messages, so it can be compared directly against the supervisor's own timeout: a 2 s drop is eight timeouts whatever rate the odometry runs at, where \"sixty messages\" would mean something different on every robot. The window is half open too, from the cue up to but not including its end, so its length stays exact whichever moment within a cycle the cue lands on."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: calling "
+    },
+    {
+     "t": "code",
+     "v": "/odom_relay/drop"
+    },
+    {
+     "t": "text",
+     "v": " in the running world makes the supervisor stop the robot about 250 ms later and start it again by itself once the drop ends, watched directly rather than inferred. Two tests prove the service is reachable and that a call really withholds messages for the length asked. And a drop shorter than the supervisor's own timeout leaves the robot driving straight through it, which is the exact relationship the next scenario turns into a number."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "relay",
+   "title": "Relay node that drops messages on command",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " holds the rule that decides which messages a relay lets through, with GoogleTest tests that you wrote first and saw fail."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The supervisor topic built "
+        },
+        {
+         "t": "code",
+         "v": "odom_relay"
+        },
+        {
+         "t": "text",
+         "v": " as a plain forwarder and said a later topic would make it stop on cue. This is that topic, and the cue is what makes the next scenario possible: the bench has to take odometry away from the supervisor without touching the simulator or the bridge, at a moment it chooses, for a length it chooses, and then give it back."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Stopping the relay with Ctrl+C, which is what you did in the supervisor and frame topics, answers none of that. It needs a person at a keyboard, it happens at no particular moment, and the odometry never comes back, so a run can't check that the robot resumed. A drop with a cue and a length can be fired by the scenario runner and checked afterwards."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The length is a time and not a count of messages. The supervisor's rule is a timeout, 250 ms by default, so a drop measured in the same unit can be held against it: a 2 s drop is eight timeouts, and that stays true whatever rate the odometry runs at. A drop of \"sixty messages\" means eight timeouts on this robot and something else on the next one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The window is half open, from the cue up to but not including its end. That keeps the length exact: a 2 s drop removes whatever arrived in a 2 s stretch, whether the first message lands on the cue or a millisecond after it. And the rule reads no clock. The caller passes the arrival time in, as "
+        },
+        {
+         "t": "code",
+         "v": "bench::Freshness"
+        },
+        {
+         "t": "text",
+         "v": " does, so a test pins the boundary to the nanosecond and the node decides which clock that is."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the tests first, in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/test/drop_test.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The first case is the boundary:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <chrono>\n\n#include <gtest/gtest.h>\n\n#include \"bench/drop.hpp\"\n\nusing namespace std::chrono_literals;\n\nTEST(Dropper, DropsFromTheCueUpToButNotIncludingTheEnd) {\n  bench::Dropper relay;\n  relay.drop_for({1s}, 200ms);\n  EXPECT_FALSE(relay.forward({1s}));\n  EXPECT_FALSE(relay.forward({1s + 200ms - 1ns}));\n  EXPECT_TRUE(relay.forward({1s + 200ms}));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add one case each for: a relay with no cue forwards everything; a second cue while a drop runs replaces it rather than extending it; a clock reading earlier than the cue forwards again; and the two counters add up to the number of messages offered. Add "
+        },
+        {
+         "t": "code",
+         "v": "drop"
+        },
+        {
+         "t": "text",
+         "v": " to the list in the test part of "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_core/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", which becomes "
+        },
+        {
+         "t": "code",
+         "v": "foreach(name drive drop odometry replay scenario supervisor)"
+        },
+        {
+         "t": "text",
+         "v": ". Run "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": ": it fails to compile, because "
+        },
+        {
+         "t": "code",
+         "v": "bench/drop.hpp"
+        },
+        {
+         "t": "text",
+         "v": " doesn't exist yet."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/include/bench/drop.hpp"
+         },
+         {
+          "t": "text",
+          "v": ". The class is small, so it lives whole in the header, which includes "
+         },
+         {
+          "t": "code",
+          "v": "\"bench/time.hpp\""
+         },
+         {
+          "t": "text",
+          "v": ". Here it is with a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that offers it a stream:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <chrono>\n#include <compare>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n\nnamespace bench {\n\n// From bench/time.hpp: a reading of a node's clock, in nanoseconds since that clock's zero.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\n// bench/drop.hpp: which messages a relay lets through. It reads no clock; the caller passes the\n// arrival time in, as the supervisor's rules do.\nclass Dropper {\n public:\n  // Starts dropping at now, for length. A cue while a drop is running replaces it.\n  void drop_for(Time now, std::chrono::nanoseconds length) {\n    window_ = Window{.start = now, .end = {now.since_epoch + length}};\n  }\n\n  // Half open: a message at the cue is dropped, one at the end of the window is forwarded. A\n  // clock reading before the cue ends the drop, so a simulation that was reset forwards again.\n  [[nodiscard]] bool dropping(Time now) const {\n    return window_ && window_->start <= now && now < window_->end;\n  }\n\n  // Whether the message that arrived at now goes on, counting both answers.\n  [[nodiscard]] bool forward(Time now) {\n    if (dropping(now)) {\n      ++dropped_;\n      return false;\n    }\n    ++forwarded_;\n    return true;\n  }\n\n  [[nodiscard]] std::int64_t forwarded() const { return forwarded_; }\n  [[nodiscard]] std::int64_t dropped() const { return dropped_; }\n\n  // When the drop ends, for the log and the service's reply.\n  [[nodiscard]] std::optional<Time> ends_at() const {\n    if (!window_) return std::nullopt;\n    return window_->end;\n  }\n\n private:\n  struct Window {\n    Time start;\n    Time end;\n  };\n\n  std::optional<Window> window_;\n  std::int64_t forwarded_ = 0;\n  std::int64_t dropped_ = 0;\n};\n\n}  // namespace bench\n\nint main() {\n  using namespace std::chrono_literals;\n  const auto at = [](std::chrono::nanoseconds t) { return bench::Time{t}; };\n\n  bench::Dropper relay;\n  constexpr std::array<std::chrono::milliseconds, 9> arrivals{0ms, 50ms, 100ms, 150ms, 200ms,\n                                                              250ms, 300ms, 350ms, 400ms};\n  for (const auto arrival : arrivals) {\n    if (arrival == 150ms) {\n      relay.drop_for(at(arrival), 200ms);\n      std::cout << std::format(\"cue at {} ms: dropping until {} ms\\n\", arrival.count(),\n                               relay.ends_at()->since_epoch / 1ms);\n    }\n    std::cout << std::format(\"{:3} ms: {}\\n\", arrival.count(), relay.forward(at(arrival)) ? \"forward\" : \"drop\");\n  }\n\n  std::cout << std::format(\"clock back to 100 ms: {}\\n\", relay.forward(at(100ms)) ? \"forward\" : \"drop\");\n  std::cout << std::format(\"dropping at 350 ms minus 1 ns: {}\\n\", relay.dropping(at(350ms - 1ns)));\n  std::cout << std::format(\"dropping at 350 ms: {}\\n\", relay.dropping(at(350ms)));\n  std::cout << std::format(\"forwarded {}, dropped {}\\n\", relay.forwarded(), relay.dropped());\n}"
+      },
+      {
+       "t": "output",
+       "text": "  0 ms: forward\n 50 ms: forward\n100 ms: forward\ncue at 150 ms: dropping until 350 ms\n150 ms: drop\n200 ms: drop\n250 ms: drop\n300 ms: drop\n350 ms: forward\n400 ms: forward\nclock back to 100 ms: forward\ndropping at 350 ms minus 1 ns: true\ndropping at 350 ms: false\nforwarded 6, dropped 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four messages go missing, which at one message every 50 ms is exactly the 200 ms asked for. The message at 350 ms is forwarded: that is the half-open window, and it is why the count is four rather than five. The clock going back to 100 ms forwards, because 100 ms is before the cue, so a simulation that was reset or a bag that started again leaves the relay working rather than dropping until the end of time."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Two details are worth stating. The window is a "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<Window>"
+         },
+         {
+          "t": "text",
+          "v": " rather than a pair of times with zero meaning \"no drop\", because on a simulation clock zero is a real time and a relay started at the same moment as the world would drop its first message. And "
+         },
+         {
+          "t": "code",
+          "v": "forward"
+         },
+         {
+          "t": "text",
+          "v": " is the only method that counts, so "
+         },
+         {
+          "t": "code",
+          "v": "dropped()"
+         },
+         {
+          "t": "text",
+          "v": " reports the messages that were offered and refused, not the length of the window; a drop that lands where no message arrives counts nothing, which is what you want when you compare the count with the supervisor's reaction later."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the remaining test cases, run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " until it is green, and commit on a branch."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the drop tests pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, you saw them fail before the header existed, and the counts in the run above match what you get."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "odom_relay"
+        },
+        {
+         "t": "text",
+         "v": " drops odometry when its service is called, a GoogleTest test proves it, and you have watched the supervisor stop and restart the robot because of it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The cue arrives as a service, and not as a topic, because a cue is a request with an answer. The caller wants to know that the relay heard it and until when the drop lasts; a published message leaves it guessing, and a scenario that carries on regardless would blame the supervisor for a cue that never arrived."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The service is "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces/srv/Trigger"
+        },
+        {
+         "t": "text",
+         "v": ": an empty request, and a reply with "
+        },
+        {
+         "t": "code",
+         "v": "success"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "message"
+        },
+        {
+         "t": "text",
+         "v": ". The length of the drop is the parameter "
+        },
+        {
+         "t": "code",
+         "v": "drop_ms"
+        },
+        {
+         "t": "text",
+         "v": " rather than a field of the request, because a request carrying a number needs an interface package of its own, which the bench builds when the cancel scenario needs an action. Until then the scenario's parameter file holds the length and the service is the cue alone."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One thing changes about the relay. It used to read no clock at all, so it ran without "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": "; now the rule needs the arrival time, so the relay runs on simulated time like everything else in the bench. A relay on the wall clock next to a world on "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " would drop for 2 s of your time instead of 2 s of the robot's."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Rewrite "
+         },
+         {
+          "t": "code",
+          "v": "include/bench_nodes/odom_relay.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", with its "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " staying in "
+         },
+         {
+          "t": "code",
+          "v": "src/odom_relay_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The fence has "
+         },
+         {
+          "t": "code",
+          "v": "bench/drop.hpp"
+         },
+         {
+          "t": "text",
+          "v": " copied in, so that it builds on its own:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <compare>\n#include <cstdint>\n#include <format>\n#include <memory>\n#include <optional>\n#include <string>\n\n#include <example_interfaces/srv/trigger.hpp>\n#include <nav_msgs/msg/odometry.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nnamespace bench {\n\n// In the bench these are bench/time.hpp and bench/drop.hpp from Build 1.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\nclass Dropper {\n public:\n  void drop_for(Time now, std::chrono::nanoseconds length) {\n    window_ = Window{.start = now, .end = {now.since_epoch + length}};\n  }\n\n  [[nodiscard]] bool dropping(Time now) const {\n    return window_ && window_->start <= now && now < window_->end;\n  }\n\n  [[nodiscard]] bool forward(Time now) {\n    if (dropping(now)) {\n      ++dropped_;\n      return false;\n    }\n    ++forwarded_;\n    return true;\n  }\n\n  [[nodiscard]] std::int64_t forwarded() const { return forwarded_; }\n  [[nodiscard]] std::int64_t dropped() const { return dropped_; }\n\n  [[nodiscard]] std::optional<Time> ends_at() const {\n    if (!window_) return std::nullopt;\n    return window_->end;\n  }\n\n private:\n  struct Window {\n    Time start;\n    Time end;\n  };\n\n  std::optional<Window> window_;\n  std::int64_t forwarded_ = 0;\n  std::int64_t dropped_ = 0;\n};\n\n}  // namespace bench\n\nnamespace bench_nodes {\n\nusing Trigger = example_interfaces::srv::Trigger;\n\n// Republishes the bridge's /odom_raw as /odom, and stops for drop_ms when its service is called.\n// That is how a scenario takes odometry away from the supervisor without touching the simulator\n// or the bridge.\nclass OdomRelay : public rclcpp::Node {\n public:\n  explicit OdomRelay(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"odom_relay\", options),\n        drop_(std::chrono::milliseconds(declare_parameter<std::int64_t>(\"drop_ms\", 2000))) {\n    const rclcpp::QoS qos(rclcpp::KeepLast(10));\n    publisher_ = create_publisher<nav_msgs::msg::Odometry>(\"odom\", qos);\n    subscription_ = create_subscription<nav_msgs::msg::Odometry>(\n        \"odom_raw\", qos, [this](const nav_msgs::msg::Odometry& message) { on_odometry(message); });\n    service_ = create_service<Trigger>(\n        \"~/drop\", [this](const std::shared_ptr<Trigger::Request> request, std::shared_ptr<Trigger::Response> response) {\n          on_drop(*request, *response);\n        });\n  }\n\n  [[nodiscard]] std::int64_t forwarded() const { return dropper_.forwarded(); }\n  [[nodiscard]] std::int64_t dropped() const { return dropper_.dropped(); }\n\n private:\n  [[nodiscard]] bench::Time clock_time() const { return {std::chrono::nanoseconds(now().nanoseconds())}; }\n\n  void on_odometry(const nav_msgs::msg::Odometry& message) {\n    if (dropper_.forward(clock_time())) publisher_->publish(message);\n  }\n\n  void on_drop(const Trigger::Request&, Trigger::Response& response) {\n    dropper_.drop_for(clock_time(), drop_);\n    const double ends_s = std::chrono::duration<double>(dropper_.ends_at()->since_epoch).count();\n    response.success = true;\n    response.message = std::format(\"dropping /odom until {:.3f} s of this node's clock\", ends_s);\n    RCLCPP_WARN(get_logger(), \"%s\", response.message.c_str());\n  }\n\n  std::chrono::nanoseconds drop_;\n  bench::Dropper dropper_;\n  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher_;\n  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subscription_;\n  rclcpp::Service<Trigger>::SharedPtr service_;\n};\n\n}  // namespace bench_nodes\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<bench_nodes::OdomRelay>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The service name is "
+        },
+        {
+         "t": "code",
+         "v": "~/drop"
+        },
+        {
+         "t": "text",
+         "v": ", which resolves to "
+        },
+        {
+         "t": "code",
+         "v": "/odom_relay/drop"
+        },
+        {
+         "t": "text",
+         "v": ": a private name, under the node's own name, so a second relay in the same launch gets a service of its own rather than fighting for one. The request parameter has no name, because "
+        },
+        {
+         "t": "code",
+         "v": "Trigger"
+        },
+        {
+         "t": "text",
+         "v": " carries nothing to read and an unnamed parameter says so without a cast. The reply repeats what the log says, which matters in a scenario: the runner writes the reply into its output, so a failed run shows the cue and its answer next to the verdict."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Change the build. "
+         },
+         {
+          "t": "code",
+          "v": "odom_relay"
+         },
+         {
+          "t": "text",
+          "v": " is now the only node that uses a service interface, so it leaves the "
+         },
+         {
+          "t": "code",
+          "v": "foreach"
+         },
+         {
+          "t": "text",
+          "v": " it shared with the others rather than adding "
+         },
+         {
+          "t": "code",
+          "v": "example_interfaces"
+         },
+         {
+          "t": "text",
+          "v": " to all of them. In "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/package.xml"
+         },
+         {
+          "t": "text",
+          "v": ", add "
+         },
+         {
+          "t": "code",
+          "v": "<depend>example_interfaces</depend>"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "find_package(example_interfaces REQUIRED)\n\nforeach(node supervisor scenario_runner route_follower)   # odom_relay has left this list\n  target_include_directories(${node} PRIVATE include)\n  ament_target_dependencies(${node} rclcpp geometry_msgs nav_msgs)\nendforeach()\n\ntarget_include_directories(odom_relay PRIVATE include)\nament_target_dependencies(odom_relay rclcpp nav_msgs example_interfaces)\ntarget_link_libraries(odom_relay bench_core::bench_core)"
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Give the relay its parameters inside a scenario. In "
+         },
+         {
+          "t": "code",
+          "v": "scenario.launch.py"
+         },
+         {
+          "t": "text",
+          "v": " the relay is the one node that still starts bare, which was harmless while it read no clock and is not any more. One argument fixes it, and the "
+         },
+         {
+          "t": "code",
+          "v": "/**"
+         },
+         {
+          "t": "text",
+          "v": " block of each scenario's file then hands it "
+         },
+         {
+          "t": "code",
+          "v": "use_sim_time"
+         },
+         {
+          "t": "text",
+          "v": " along with everything else:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "    relay = Node(package='bench_nodes', executable='odom_relay', output='screen',\n                 parameters=[scenario_parameters], condition=IfCondition(LaunchConfiguration('relay')))"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A relay on the wall clock next to a world on "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " would measure its drop in your seconds rather than the robot's, and the two differ by whatever real-time factor the machine is running at. Nothing in the bench fires a cue yet, so today the change alters no run; the next topic's scenario is the one that would have gone wrong."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the test, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/test/test_odom_relay.cpp"
+         },
+         {
+          "t": "text",
+          "v": ", registered with "
+         },
+         {
+          "t": "code",
+          "v": "ament_add_ros_isolated_gtest"
+         },
+         {
+          "t": "text",
+          "v": " as the other topic tests are. The rule is tested in "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " to the nanosecond; this test checks the wiring, that the service is reachable under the name you expect, and that a call really stops the messages. The fake publishes "
+         },
+         {
+          "t": "code",
+          "v": "/odom_raw"
+         },
+         {
+          "t": "text",
+          "v": " twenty times a second and counts "
+         },
+         {
+          "t": "code",
+          "v": "/odom"
+         },
+         {
+          "t": "text",
+          "v": ", and the fixture is the one from the supervisor's test with a client added:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In the fixture: fire the cue and wait for the answer, without ever blocking on the future.\nbool cue() {\n  auto future = client->async_send_request(std::make_shared<Trigger::Request>());\n  if (!spin_until([&] { return future.wait_for(std::chrono::seconds(0)) == std::future_status::ready; })) {\n    return false;\n  }\n  return future.get()->success;\n}"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "TEST_F(OdomRelayTest, StopsForwardingForTheLengthOfTheDrop) {\n  ASSERT_TRUE(spin_until([&] { return relay->forwarded() >= 5; }));\n  ASSERT_TRUE(cue());\n  const std::int64_t before = fake->received();\n  ASSERT_TRUE(spin_until([&] { return relay->dropped() >= 5; }));\n  EXPECT_EQ(fake->received(), before);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build the rest as the supervisor's test does: ROS starts once for the suite, one executor holds the relay, the fake and the client's node, and "
+        },
+        {
+         "t": "code",
+         "v": "spin_until"
+        },
+        {
+         "t": "text",
+         "v": " waits for a condition against a five second deadline. Create the client with "
+        },
+        {
+         "t": "code",
+         "v": "create_client<Trigger>(\"/odom_relay/drop\")"
+        },
+        {
+         "t": "text",
+         "v": " and wait for it to be ready before the first case, because a call to a service nobody offers waits for ever. Set "
+        },
+        {
+         "t": "code",
+         "v": "drop_ms"
+        },
+        {
+         "t": "text",
+         "v": " to 1000 through "
+        },
+        {
+         "t": "code",
+         "v": "append_parameter_override"
+        },
+        {
+         "t": "text",
+         "v": ", and add a second case that waits out the drop and checks that "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " starts arriving again."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Never call "
+        },
+        {
+         "t": "code",
+         "v": "spin_until_future_complete"
+        },
+        {
+         "t": "text",
+         "v": " from inside a callback of the same executor: the executor would be waiting for a reply it is itself supposed to deliver. The helper above spins the executor and asks the future whether it is ready, which is the same pattern with no deadlock in it."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", then watch it in the world. Started by hand like this the relay needs the parameter itself, the way the launch file now gives it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim bench.launch.py headless:=False                                  # terminal 1\nros2 run bench_nodes odom_relay --ros-args -p use_sim_time:=true -p drop_ms:=2000      # terminal 2\nros2 topic pub --rate 10 /cmd_vel_nav geometry_msgs/msg/TwistStamped \"{twist: {linear: {x: 0.2}}}\"   # terminal 3\nros2 service list | grep drop                                                          # terminal 4\nros2 service call /odom_relay/drop example_interfaces/srv/Trigger \"{}\"                 # terminal 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The reply names the simulated time the drop ends. About 250 ms after the cue the supervisor logs that odometry is stale and starts publishing stops, and the robot comes to a halt. Two simulated seconds after the cue the relay forwards again, the supervisor logs that it is forwarding commands, and the robot drives on. Watch "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " in a fifth terminal to see the robot's own speed fall and rise, rather than the commands that were sent."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then call the service again with "
+        },
+        {
+         "t": "code",
+         "v": "drop_ms"
+        },
+        {
+         "t": "text",
+         "v": " set to 200 and watch nothing happen: a drop shorter than the supervisor's 250 ms odometry timeout is a gap the supervisor is built to ride out. That is the relationship the next topic's scenario turns into a number."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "ros2 service call"
+         },
+         {
+          "t": "text",
+          "v": " on "
+         },
+         {
+          "t": "code",
+          "v": "/odom_relay/drop"
+         },
+         {
+          "t": "text",
+          "v": " makes the supervisor stop the robot and, after the drop, start it again;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the two cases pass in "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " and in CI;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "scenario.launch.py"
+         },
+         {
+          "t": "text",
+          "v": " starts the relay with the scenario's parameter file, so it runs on simulated time;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a drop of 200 ms leaves the robot driving, and you can say why."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Extend the \"Supervisor\" section of "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": " with the relay's new behaviour. It is the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the relay's topics, its service name and interface, and its "
+        },
+        {
+         "t": "code",
+         "v": "drop_ms"
+        },
+        {
+         "t": "text",
+         "v": " parameter with the default. State the window rule in one line, that it runs from the cue up to but not including its end, and that the relay now runs on simulated time and why. Then the arithmetic that makes the drop useful: the supervisor's odometry timeout, how many timeouts a 2 s drop is, and what a drop shorter than one timeout does. End with the two counts the relay reports and what you saw in the world, including the time between the cue and the supervisor's first stop."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "writing a service and client in C++",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-Client-Libraries/Writing-A-Simple-Cpp-Service-And-Client.html"
+     },
+     {
+      "t": "text",
+      "v": " and on "
+     },
+     {
+      "t": "a",
+      "v": "understanding services",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Services/Understanding-ROS2-Services.html"
+     },
+     {
+      "t": "text",
+      "v": ", for "
+     },
+     {
+      "t": "code",
+      "v": "ros2 service list"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "ros2 service call"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "example_interfaces on the jazzy branch",
+      "href": "https://github.com/ros2/example_interfaces/tree/jazzy/srv"
+     },
+     {
+      "t": "text",
+      "v": ", which carries the three services the bench can use without an interface package of its own."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ros2/examples repository, jazzy branch: the "
+     },
+     {
+      "t": "a",
+      "v": "service server",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/services/minimal_service/main.cpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "client",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/services/minimal_client/main.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "asynchronous client",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/services/async_client/main.cpp"
+     },
+     {
+      "t": "text",
+      "v": " that never blocks a callback on its own reply."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 documentation on "
+     },
+     {
+      "t": "a",
+      "v": "node names and private names",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Basic/About-Topics.html"
+     },
+     {
+      "t": "text",
+      "v": ", for what "
+     },
+     {
+      "t": "code",
+      "v": "~/drop"
+     },
+     {
+      "t": "text",
+      "v": " resolves to."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article on "
+     },
+     {
+      "t": "a",
+      "v": "clock and time",
+      "href": "https://design.ros2.org/articles/clock_and_time.html"
+     },
+     {
+      "t": "text",
+      "v": ": a node that measures a length of time in a simulation reads "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": ", not the wall clock."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". The window rule is a plain class with the time passed in, and the callback is three lines."
+     }
+    ]
+   ]
+  }
+ ]
+}

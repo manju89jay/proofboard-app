@@ -1,0 +1,1947 @@
+{
+ "id": "dsa-sorting",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A test robot keeps a queue of jobs. Each job has a name, a priority, where higher runs first, and a deadline in milliseconds, where earlier runs first among jobs of equal priority. Write the comparison that orders them, and sort "
+     },
+     {
+      "t": "code",
+      "v": "{dock 1 900, estop-test 3 500, map 2 700, log 1 300, calib 2 700}"
+     },
+     {
+      "t": "text",
+      "v": ". Two jobs that tie on priority and deadline must stay in the order they were queued. Then explain in two or three sentences what a stable sort is, which standard algorithm you called, and why. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string>\n#include <vector>\n\nstruct Job {\n  std::string name;\n  int priority;              // higher runs first\n  std::int64_t deadline_ms;  // earlier runs first among equal priorities\n};\n\n// True when a must run strictly before b; false both ways for two jobs that tie.\n[[nodiscard]] bool runs_before(const Job& a, const Job& b) {\n  if (a.priority != b.priority) return a.priority > b.priority;\n  return a.deadline_ms < b.deadline_ms;\n}\n\nint main() {\n  std::vector<Job> jobs{\n      {\"dock\", 1, 900}, {\"estop-test\", 3, 500}, {\"map\", 2, 700}, {\"log\", 1, 300}, {\"calib\", 2, 700}};\n  std::ranges::stable_sort(jobs, runs_before);\n  for (const Job& job : jobs) std::cout << job.name << ' ';\n  std::cout << '\\n';\n}"
+   },
+   {
+    "t": "output",
+    "text": "estop-test map calib log dock "
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "runs_before"
+     },
+     {
+      "t": "text",
+      "v": " answers one question: must "
+     },
+     {
+      "t": "code",
+      "v": "a"
+     },
+     {
+      "t": "text",
+      "v": " run strictly before "
+     },
+     {
+      "t": "code",
+      "v": "b"
+     },
+     {
+      "t": "text",
+      "v": "? For "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "calib"
+     },
+     {
+      "t": "text",
+      "v": ", which tie on both fields, it returns "
+     },
+     {
+      "t": "code",
+      "v": "false"
+     },
+     {
+      "t": "text",
+      "v": " both ways, so the sort treats them as "
+     },
+     {
+      "t": "i",
+      "v": "equivalent"
+     },
+     {
+      "t": "text",
+      "v": ". A sort is "
+     },
+     {
+      "t": "i",
+      "v": "stable"
+     },
+     {
+      "t": "text",
+      "v": " when equivalent elements keep their input order. "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::stable_sort"
+     },
+     {
+      "t": "text",
+      "v": " promises that, so "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " stays ahead of "
+     },
+     {
+      "t": "code",
+      "v": "calib"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges::sort"
+     },
+     {
+      "t": "text",
+      "v": " doesn't. With GCC's libstdc++, which insertion-sorts 16 or fewer elements, it can swap tied jobs such as "
+     },
+     {
+      "t": "code",
+      "v": "map"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "calib"
+     },
+     {
+      "t": "text",
+      "v": " once the queue has more than 16; the standard allows it at any size. The comparison must return "
+     },
+     {
+      "t": "code",
+      "v": "false"
+     },
+     {
+      "t": "text",
+      "v": " for two equivalent jobs, which rules out "
+     },
+     {
+      "t": "code",
+      "v": ">="
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "<="
+     },
+     {
+      "t": "text",
+      "v": ": the last section shows a sort reading past the end of its vector because of one."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "When every field ascends, "
+     },
+     {
+      "t": "code",
+      "v": "std::tie(a.x, a.y) < std::tie(b.x, b.y)"
+     },
+     {
+      "t": "text",
+      "v": " compares the fields in order and can't get the tie-breaking wrong. Here the priority descends, so two explicit comparisons read better."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the comparison is strict, orders by priority and then by deadline, and you explain stability with the two tied jobs and choose "
+     },
+     {
+      "t": "code",
+      "v": "stable_sort"
+     },
+     {
+      "t": "text",
+      "v": " because of them. A correct comparison passed to "
+     },
+     {
+      "t": "code",
+      "v": "std::sort"
+     },
+     {
+      "t": "text",
+      "v": ", with a vague answer about stability, is a partial pass. A comparison that uses "
+     },
+     {
+      "t": "code",
+      "v": ">="
+     },
+     {
+      "t": "text",
+      "v": " or "
+     },
+     {
+      "t": "code",
+      "v": "<="
+     },
+     {
+      "t": "text",
+      "v": ", or orders the jobs wrongly, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The library gives you two general sorts. "
+    },
+    {
+     "t": "code",
+     "v": "std::sort"
+    },
+    {
+     "t": "text",
+     "v": " makes no promise about elements that compare equal; "
+    },
+    {
+     "t": "code",
+     "v": "std::stable_sort"
+    },
+    {
+     "t": "text",
+     "v": " promises that equivalent elements keep the order they arrived in. Both take a comparator, a function answering whether one element must come strictly before another, and that comparator has to be a "
+    },
+    {
+     "t": "i",
+     "v": "strict weak ordering"
+    },
+    {
+     "t": "text",
+     "v": ": irreflexive, an element is never less than itself; asymmetric, if a is less than b then b is never less than a; and transitive for both \"less than\" and \"equivalent\"."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is ordering elements by a rule the library cannot know in advance, while still getting a guaranteed cost and a defined answer for ties. A comparator lets you sort a job queue by priority and then by deadline, or detections by label and then confidence, without writing a sorting algorithm yourself; getting the tie-breaking wrong, not the sort, is where most of these solutions actually fail."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "code",
+     "v": "std::sort"
+    },
+    {
+     "t": "text",
+     "v": " in libstdc++ is "
+    },
+    {
+     "t": "i",
+     "v": "introsort"
+    },
+    {
+     "t": "text",
+     "v": ": quicksort, picking the median of three elements as its pivot, switching to heap sort if the recursion goes too deep, and finishing short ranges with one insertion sort, which bounds the worst case at O(n log n) without ever being stable, because partitioning swaps elements across long distances. "
+    },
+    {
+     "t": "code",
+     "v": "std::stable_sort"
+    },
+    {
+     "t": "text",
+     "v": " is a merge sort instead: it splits the range in half, sorts each half, and merges them by taking the left side first whenever two elements are equivalent, which is what makes it stable, at the cost of an O(n) buffer. "
+    },
+    {
+     "t": "code",
+     "v": "std::nth_element"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "partial_sort"
+    },
+    {
+     "t": "text",
+     "v": " do less work for a weaker promise, an unsorted split or a sorted prefix, when the question only needs a median or the k smallest elements."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What breaks under pressure is the comparator's promise rather than the algorithm. Writing "
+    },
+    {
+     "t": "code",
+     "v": "<="
+    },
+    {
+     "t": "text",
+     "v": " where "
+    },
+    {
+     "t": "code",
+     "v": "<"
+    },
+    {
+     "t": "text",
+     "v": " was meant returns true for an element compared with itself, and introsort's inner partition has no bounds check, so it reads past the end of the buffer once the input is large enough to be partitioned; sixteen equal elements or fewer never trigger it, because that range is sorted by insertion sort instead. "
+    },
+    {
+     "t": "code",
+     "v": "std::stable_sort"
+    },
+    {
+     "t": "text",
+     "v": " costs more, in data moved and in the buffer it needs, so reach for "
+    },
+    {
+     "t": "code",
+     "v": "std::sort"
+    },
+    {
+     "t": "text",
+     "v": " unless the order of ties is part of the answer."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: a job queue ordered by priority and then by deadline, where two jobs tying on both must stay in the order they were queued, which only "
+    },
+    {
+     "t": "code",
+     "v": "std::stable_sort"
+    },
+    {
+     "t": "text",
+     "v": " promises to keep."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Merge sort, quicksort, stability, std::sort and std::stable_sort",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A log arrives in time order, with the readings of three robots interleaved. Sort it by robot, and print robot 0's time stamps:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Reading {\n  int robot;\n  std::int64_t stamp_ms;\n};\n\n// The time stamps of one robot, in the order they appear in the log.\n[[nodiscard]] std::string stamps_of(std::span<const Reading> log, int robot) {\n  std::string out;\n  for (const Reading& r : log)\n    if (r.robot == robot) out += std::format(\" {}\", r.stamp_ms);\n  return out;\n}\n\nint main() {\n  std::vector<Reading> log;  // in time order, three robots interleaved\n  for (int i = 0; i < 24; ++i) log.push_back({.robot = i % 3, .stamp_ms = 10 * i});\n\n  std::vector<Reading> a = log;\n  std::ranges::sort(a, {}, &Reading::robot);\n  std::vector<Reading> b = log;\n  std::ranges::stable_sort(b, {}, &Reading::robot);\n\n  std::cout << \"robot 0 after sort:       \" << stamps_of(a, 0) << '\\n';\n  std::cout << \"robot 0 after stable_sort:\" << stamps_of(b, 0) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "robot 0 after sort:        0 30 210 60 180 90 150 120\nrobot 0 after stable_sort: 0 30 60 90 120 150 180 210"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both vectors are sorted by robot, and only "
+        },
+        {
+         "t": "code",
+         "v": "stable_sort"
+        },
+        {
+         "t": "text",
+         "v": " kept each robot's readings in the order they arrived. "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " makes no promise about equivalent elements. With 16 readings or fewer you would not have seen the difference: libstdc++ sorts a range that short by insertion sort, which happens to be stable, so a small test passes and the reordering waits for real data."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third argument, "
+        },
+        {
+         "t": "code",
+         "v": "&Reading::robot"
+        },
+        {
+         "t": "text",
+         "v": ", is a "
+        },
+        {
+         "t": "i",
+         "v": "projection"
+        },
+        {
+         "t": "text",
+         "v": ". The "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges"
+        },
+        {
+         "t": "text",
+         "v": " algorithms apply it to each element before they compare, so this sort compares robot ids. The "
+        },
+        {
+         "t": "code",
+         "v": "{}"
+        },
+        {
+         "t": "text",
+         "v": " before it keeps the default comparison, "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::less"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::sort(log, std::ranges::greater{}, &Reading::stamp_ms)"
+        },
+        {
+         "t": "text",
+         "v": " would sort newest first. A projection names the key in the call, where a lambda comparison hides it inside two member accesses."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two sorts are worth knowing from the inside."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Merge sort"
+        },
+        {
+         "t": "text",
+         "v": " splits the range in half, sorts each half, and merges the two sorted halves by taking the smaller front element each time. Halving gives log₂ n levels, and the merges on one level touch all n elements, so it makes O(n log n) comparisons on every input. The merge needs a buffer, O(n) extra space. It is stable if the merge takes from the left half when the two front elements are equivalent."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Quicksort"
+        },
+        {
+         "t": "text",
+         "v": " picks a pivot, partitions the range into the elements less than the pivot and the rest, and sorts both parts. It works in place and makes O(n log n) comparisons on average. A bad pivot on every step makes it O(n²), and the textbook version that takes the last element as its pivot does exactly that on input that is already sorted, recursing n levels deep. It isn't stable, because partitioning swaps elements across long distances."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Counting the comparisons shows the difference. The comparison lambdas count every call, and the shuffle is seeded, so the numbers are the same on every run with GCC 13:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <random>\n#include <span>\n#include <string_view>\n#include <utility>\n#include <vector>\n\n// Textbook quicksort: the last element is the pivot (Lomuto's partition).\nvoid quicksort(std::span<int> v, std::int64_t& comparisons) {\n  if (std::ssize(v) < 2) return;\n  const int pivot = v.back();\n  std::ptrdiff_t store = 0;  // v[0, store) holds the elements less than the pivot\n  for (std::ptrdiff_t i = 0; i + 1 < std::ssize(v); ++i) {\n    ++comparisons;\n    if (v[i] < pivot) std::swap(v[i], v[store++]);\n  }\n  std::swap(v[store], v.back());\n  quicksort(v.first(store), comparisons);\n  quicksort(v.subspan(store + 1), comparisons);\n}\n\n[[nodiscard]] std::vector<int> shuffled(int n, std::uint32_t seed) {\n  std::vector<int> v(n);\n  std::iota(v.begin(), v.end(), 0);\n  std::mt19937 gen{seed};\n  std::ranges::shuffle(v, gen);\n  return v;\n}\n\ntemplate <typename Sort>\nvoid row(std::string_view name, Sort sort) {\n  std::vector<int> random = shuffled(4096, 42);\n  std::vector<int> sorted = random;\n  std::ranges::sort(sorted);\n  std::int64_t on_random = 0;\n  std::int64_t on_sorted = 0;\n  sort(random, on_random);\n  sort(sorted, on_sorted);\n  std::cout << std::format(\"{:<26}{:>9}{:>10}\\n\", name, on_random, on_sorted);\n}\n\nint main() {\n  std::cout << std::format(\"{:<26}{:>9}{:>10}\\n\", \"comparisons, n = 4096\", \"random\", \"sorted\");\n  row(\"textbook quicksort\", [](std::vector<int>& v, std::int64_t& count) { quicksort(v, count); });\n  row(\"std::ranges::sort\", [](std::vector<int>& v, std::int64_t& count) {\n    std::ranges::sort(v, [&count](int a, int b) {\n      ++count;\n      return a < b;\n    });\n  });\n  row(\"std::ranges::stable_sort\", [](std::vector<int>& v, std::int64_t& count) {\n    std::ranges::stable_sort(v, [&count](int a, int b) {\n      ++count;\n      return a < b;\n    });\n  });\n}"
+      },
+      {
+       "t": "output",
+       "text": "comparisons, n = 4096        random    sorted\ntextbook quicksort            56008   8386560\nstd::ranges::sort             62117     55831\nstd::ranges::stable_sort      48429     28668"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "On sorted input the textbook quicksort makes n(n−1)/2 = 8,386,560 comparisons, 150 times as many as "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": ". No comparison sort can do better than log₂(n!) comparisons in the worst case, which is 43,250 for n = 4096. The library sorts stay within 44 % of that on these inputs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " in libstdc++ is "
+        },
+        {
+         "t": "i",
+         "v": "introsort"
+        },
+        {
+         "t": "text",
+         "v": ": quicksort with the median of three elements as its pivot, a switch to heap sort when the recursion gets deeper than 2·log₂ n, and no partitioning of pieces of 16 elements or fewer, which one insertion sort over the whole range finishes at the end. You can read it in "
+        },
+        {
+         "t": "code",
+         "v": "bits/stl_algo.h"
+        },
+        {
+         "t": "text",
+         "v": ", in the functions "
+        },
+        {
+         "t": "code",
+         "v": "__introsort_loop"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "__final_insertion_sort"
+        },
+        {
+         "t": "text",
+         "v": ". The switch keeps quicksort's speed and bounds the worst case at O(n log n), which the standard requires since C++11 ("
+        },
+        {
+         "t": "a",
+         "v": "LWG issue 713",
+         "href": "https://cplusplus.github.io/LWG/issue713"
+        },
+        {
+         "t": "text",
+         "v": "). Before that, only the average was bounded. "
+        },
+        {
+         "t": "code",
+         "v": "std::stable_sort"
+        },
+        {
+         "t": "text",
+         "v": " is a merge sort. libstdc++ asks for a buffer half the size of the range, and if it can't get one it merges in place with O(n log² n) comparisons ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/algorithm/stable_sort"
+        },
+        {
+         "t": "text",
+         "v": "). It made fewer comparisons than "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " above, but it moves more data: on a million random "
+        },
+        {
+         "t": "code",
+         "v": "std::int32_t"
+        },
+        {
+         "t": "text",
+         "v": " values, "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " took 62 ms and "
+        },
+        {
+         "t": "code",
+         "v": "std::stable_sort"
+        },
+        {
+         "t": "text",
+         "v": " 74 ms, the middle of three runs each (GCC 13.3, "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", WSL). Use "
+        },
+        {
+         "t": "code",
+         "v": "stable_sort"
+        },
+        {
+         "t": "text",
+         "v": " when equivalent elements must keep their order, and "
+        },
+        {
+         "t": "code",
+         "v": "sort"
+        },
+        {
+         "t": "text",
+         "v": " otherwise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When the keys are small integers, a sort doesn't need to compare at all. "
+        },
+        {
+         "t": "i",
+         "v": "Counting sort"
+        },
+        {
+         "t": "text",
+         "v": " counts the elements with each key, turns the counts into starting positions with a prefix sum, and then puts each element into the next free slot of its key:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <span>\n#include <vector>\n\nstruct Reading {\n  int robot;  // 0 <= robot < robots\n  std::int64_t stamp_ms;\n};\n\n[[nodiscard]] std::vector<Reading> by_robot(std::span<const Reading> log, int robots) {\n  std::vector<std::ptrdiff_t> slot(robots + 1, 0);\n  for (const Reading& r : log) ++slot[r.robot + 1];         // slot[k + 1] counts robot k\n  std::partial_sum(slot.begin(), slot.end(), slot.begin());  // slot[k] is where robot k starts\n  std::vector<Reading> sorted(log.size());\n  for (const Reading& r : log) sorted[slot[r.robot]++] = r;  // input order within a robot: stable\n  return sorted;\n}\n\nint main() {\n  std::vector<Reading> log;\n  for (int i = 0; i < 9; ++i) log.push_back({.robot = (2 * i) % 3, .stamp_ms = 10 * i});\n  for (const Reading& r : by_robot(log, 3)) std::cout << std::format(\"{}:{} \", r.robot, r.stamp_ms);\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "0:0 0:30 0:60 1:20 1:50 1:80 2:10 2:40 2:70 "
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It takes O(n + k) time and O(n + k) extra space for n elements with keys in [0, k), and it is stable, because it places the elements of each key in input order. Counting a million values below 256 and writing them back in order took 0.7 ms, where "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " took 31 ms on the same values (GCC 13.3, "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": "). It stops paying off when k is much larger than n, and it only works for keys that can be used as indices."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "merge",
+   "title": "Write merge sort once, with tests",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes, and start from an empty file. Write"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "template <typename T, typename Less = std::ranges::less>\nvoid merge_sort(std::span<T> v, Less less = {});"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "which sorts "
+        },
+        {
+         "t": "code",
+         "v": "v"
+        },
+        {
+         "t": "text",
+         "v": " in place, is stable, makes O(n log n) comparisons, and allocates one buffer for the whole sort, not one per merge. Write the tests before the function, and make each print one line: an empty span, one element, sorted input, reversed input, all equal, negative numbers with duplicates, 101 pseudo-random inputs full of ties checked against "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::sort"
+        },
+        {
+         "t": "text",
+         "v": ", and a stability test that sorts "
+        },
+        {
+         "t": "code",
+         "v": "(key, arrival)"
+        },
+        {
+         "t": "text",
+         "v": " pairs by key only and compares the result with "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::stable_sort"
+        },
+        {
+         "t": "text",
+         "v": ". Finish by counting the comparisons on the 4096 shuffled values from the table above. Then explain the complexity, and point to the line that makes your sort stable."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The recursion sorts both halves, then moves the left half into the buffer and merges it with the right half back into "
+        },
+        {
+         "t": "code",
+         "v": "v"
+        },
+        {
+         "t": "text",
+         "v": ". The right half never needs to move out: the write position "
+        },
+        {
+         "t": "code",
+         "v": "k"
+        },
+        {
+         "t": "text",
+         "v": " never passes the read position "
+        },
+        {
+         "t": "code",
+         "v": "j"
+        },
+        {
+         "t": "text",
+         "v": ", so the merge overwrites only elements it has already read. The buffer therefore needs only half the length, which is the same trick libstdc++'s "
+        },
+        {
+         "t": "code",
+         "v": "stable_sort"
+        },
+        {
+         "t": "text",
+         "v": " uses. It is reserved once and filled by moves through "
+        },
+        {
+         "t": "code",
+         "v": "std::back_inserter"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "clear()"
+        },
+        {
+         "t": "text",
+         "v": " empties it before each merge without giving the memory back. So "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " only has to be movable, and no "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " is ever default-constructed."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <numeric>\n#include <random>\n#include <span>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nnamespace detail {\n\n// Sorts v, using buffer, whose capacity holds at least the left half of v.\ntemplate <typename T, typename Less>\nvoid merge_sort(std::span<T> v, std::vector<T>& buffer, Less& less) {\n  const std::ptrdiff_t n = std::ssize(v);\n  if (n < 2) return;\n  const std::ptrdiff_t mid = n / 2;\n  merge_sort(v.first(mid), buffer, less);\n  merge_sort(v.subspan(mid), buffer, less);\n  buffer.clear();\n  std::ranges::move(v.first(mid), std::back_inserter(buffer));  // the left half moves out; the right stays\n  std::ptrdiff_t i = 0;    // next element of the left half, in buffer[0, mid)\n  std::ptrdiff_t j = mid;  // next element of the right half, in v[mid, n)\n  std::ptrdiff_t k = 0;    // next slot to fill; k <= j, so no unread element is overwritten\n  while (i < mid && j < n) {\n    if (less(v[j], buffer[i])) v[k++] = std::move(v[j++]);  // strictly smaller: take from the right\n    else v[k++] = std::move(buffer[i++]);                   // equivalent: take from the left, stable\n  }\n  while (i < mid) v[k++] = std::move(buffer[i++]);  // the rest of the right half is already in place\n}\n\n}  // namespace detail\n\ntemplate <typename T, typename Less = std::ranges::less>\nvoid merge_sort(std::span<T> v, Less less = {}) {\n  std::vector<T> buffer;\n  buffer.reserve(v.size() / 2);  // the one allocation of the whole sort\n  detail::merge_sort(v, buffer, less);\n}\n\n[[nodiscard]] std::vector<int> merge_sorted(std::vector<int> v) {\n  merge_sort(std::span{v});\n  return v;\n}\n\n[[nodiscard]] std::vector<int> shuffled(int n, std::uint32_t seed) {\n  std::vector<int> v(n);\n  std::iota(v.begin(), v.end(), 0);\n  std::mt19937 gen{seed};\n  std::ranges::shuffle(v, gen);\n  return v;\n}\n\nint main() {\n  int failed = 0;\n  const auto check = [&failed](std::string_view name, bool passed) {\n    std::cout << std::format(\"{:<5}{}\\n\", passed ? \"ok\" : \"FAIL\", name);\n    if (!passed) ++failed;\n  };\n  check(\"empty\", merge_sorted({}).empty());\n  check(\"one element\", merge_sorted({5}) == std::vector{5});\n  check(\"sorted\", merge_sorted({1, 2, 3, 4}) == std::vector{1, 2, 3, 4});\n  check(\"reversed\", merge_sorted({4, 3, 2, 1}) == std::vector{1, 2, 3, 4});\n  check(\"all equal\", merge_sorted({7, 7, 7}) == std::vector{7, 7, 7});\n  check(\"negatives and duplicates\", merge_sorted({3, -1, 3, 0, -1}) == std::vector{-1, -1, 0, 3, 3});\n\n  std::mt19937 gen{1};\n  bool all_match = true;\n  for (int n = 0; n <= 100; ++n) {\n    std::vector<int> v(n);\n    for (int& x : v) x = static_cast<int>(gen() % 10);  // values 0 to 9: many ties\n    std::vector<int> expected = v;\n    std::ranges::sort(expected);\n    all_match = all_match && merge_sorted(v) == expected;\n  }\n  check(\"101 random inputs match std::ranges::sort\", all_match);\n\n  std::vector<std::pair<int, int>> tagged;  // (key, arrival)\n  for (int i = 0; i < 40; ++i) tagged.emplace_back(i % 3, i);\n  std::vector<std::pair<int, int>> expected = tagged;\n  std::ranges::stable_sort(expected, {}, &std::pair<int, int>::first);\n  merge_sort(std::span{tagged}, [](const auto& a, const auto& b) { return a.first < b.first; });\n  check(\"stable: equal keys keep their arrival order\", tagged == expected);\n\n  std::vector<int> big = shuffled(4096, 42);\n  std::int64_t comparisons = 0;\n  merge_sort(std::span{big}, [&comparisons](int a, int b) {\n    ++comparisons;\n    return a < b;\n  });\n  check(\"4096 shuffled values\", std::ranges::is_sorted(big));\n  std::cout << std::format(\"{} comparisons for n = 4096\\n\", comparisons);\n  return failed == 0 ? 0 : 1;\n}"
+      },
+      {
+       "t": "output",
+       "text": "ok   empty\nok   one element\nok   sorted\nok   reversed\nok   all equal\nok   negatives and duplicates\nok   101 random inputs match std::ranges::sort\nok   stable: equal keys keep their arrival order\nok   4096 shuffled values\n44024 comparisons for n = 4096"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The time is O(n log n) on every input. There are ⌈log₂ n⌉ levels of halving, and merging two runs of total length m takes at most m − 1 comparisons, so for n = 4096 the worst case is n·log₂ n − n + 1 = 45,057 comparisons. The measured 44,024 sits between that and the lower bound of 43,250 from the theory, and below the 48,429 of "
+        },
+        {
+         "t": "code",
+         "v": "std::stable_sort"
+        },
+        {
+         "t": "text",
+         "v": ", which first insertion-sorts runs of 7 elements to save moves. The extra space is the buffer of n/2 elements plus O(log n) stack for the recursion."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Stability comes from one line: the merge takes from the right half only when "
+        },
+        {
+         "t": "code",
+         "v": "less(v[j], buffer[i])"
+        },
+        {
+         "t": "text",
+         "v": " holds, that is, when the right element is strictly smaller. Write the test as "
+        },
+        {
+         "t": "code",
+         "v": "less(buffer[i], v[j])"
+        },
+        {
+         "t": "text",
+         "v": " with the branches swapped, and equivalent elements come from the right first: the stability test catches it, and every other test still passes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three other mistakes are common. Allocating a new vector inside every merge is correct but makes O(n) allocations. Computing the middle as "
+        },
+        {
+         "t": "code",
+         "v": "(lo + hi) / 2"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " indices overflows for large ranges, which a later topic, binary search, shows with a sanitizer. And a version that splits at "
+        },
+        {
+         "t": "code",
+         "v": "mid = n / 2"
+        },
+        {
+         "t": "text",
+         "v": " but recurses on "
+        },
+        {
+         "t": "code",
+         "v": "v.first(mid + 1)"
+        },
+        {
+         "t": "text",
+         "v": " never shrinks a two-element range, so it recurses until the stack runs out. The standard library has the merge step on its own as "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::merge"
+        },
+        {
+         "t": "text",
+         "v": " into another range, and "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::inplace_merge"
+        },
+        {
+         "t": "text",
+         "v": " for two adjacent sorted runs, if you need one outside a sort."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "custom",
+   "title": "Sort by a custom key; partial_sort and nth_element",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. A perception node reports detections:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "struct Detection {\n  std::string label;\n  int confidence_pct;     // 0 to 100\n  std::int64_t range_mm;\n};"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write three functions, test them on six detections of your own, and state the time of each."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "sort_for_display(detections)"
+         },
+         {
+          "t": "text",
+          "v": " sorts a "
+         },
+         {
+          "t": "code",
+          "v": "std::span<Detection>"
+         },
+         {
+          "t": "text",
+          "v": " in place by label, and within a label by confidence, highest first."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "closest(detections, k)"
+         },
+         {
+          "t": "text",
+          "v": " returns the k detections with the smallest range, nearest first. It takes the input as "
+         },
+         {
+          "t": "code",
+          "v": "std::span<const Detection>"
+         },
+         {
+          "t": "text",
+          "v": ", doesn't change it, and doesn't sort all of it."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "median_range(detections)"
+         },
+         {
+          "t": "text",
+          "v": " returns the lower median of the ranges, the value at index (n − 1) / 2 in sorted order, in O(n) average time, or no value when there are no detections."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <compare>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Detection {\n  std::string label;\n  int confidence_pct;  // 0 to 100\n  std::int64_t range_mm;\n};\n\nvoid sort_for_display(std::span<Detection> detections) {\n  std::ranges::sort(detections, [](const Detection& a, const Detection& b) {\n    if (const auto order = a.label <=> b.label; order != 0) return order < 0;\n    return a.confidence_pct > b.confidence_pct;\n  });\n}\n\n[[nodiscard]] std::vector<Detection> closest(std::span<const Detection> detections, std::ptrdiff_t k) {\n  std::vector<Detection> out(std::clamp(k, std::ptrdiff_t{0}, std::ssize(detections)));\n  std::ranges::partial_sort_copy(detections, out, {}, &Detection::range_mm, &Detection::range_mm);\n  return out;\n}\n\n[[nodiscard]] std::optional<std::int64_t> median_range(std::span<const Detection> detections) {\n  if (detections.empty()) return std::nullopt;\n  std::vector<std::int64_t> ranges;\n  ranges.reserve(detections.size());\n  std::ranges::transform(detections, std::back_inserter(ranges), &Detection::range_mm);\n  const auto middle = ranges.begin() + (std::ssize(ranges) - 1) / 2;\n  std::ranges::nth_element(ranges, middle);\n  return *middle;\n}\n\nint main() {\n  std::vector<Detection> seen{{\"person\", 90, 4200}, {\"cone\", 75, 1500},  {\"person\", 97, 8000},\n                              {\"pallet\", 60, 2500}, {\"cone\", 88, 3100}, {\"person\", 70, 900}};\n\n  for (const Detection& d : closest(seen, 2)) std::cout << std::format(\"{} at {} mm\\n\", d.label, d.range_mm);\n  std::cout << std::format(\"closest 10 of 6: {}\\n\", closest(seen, 10).size());\n  std::cout << std::format(\"median range: {} mm\\n\", median_range(seen).value());\n  std::cout << std::format(\"median of none: {}\\n\", median_range({}).has_value());\n\n  sort_for_display(seen);\n  for (const Detection& d : seen) std::cout << std::format(\"{} {}% \", d.label, d.confidence_pct);\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "person at 900 mm\ncone at 1500 mm\nclosest 10 of 6: 6\nmedian range: 2500 mm\nmedian of none: false\ncone 88% cone 75% pallet 60% person 97% person 90% person 70% "
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "sort_for_display"
+        },
+        {
+         "t": "text",
+         "v": " makes O(n log n) comparisons, each costing up to the length of the labels. It compares the labels once with "
+        },
+        {
+         "t": "code",
+         "v": "<=>"
+        },
+        {
+         "t": "text",
+         "v": ", which for "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " returns a "
+        },
+        {
+         "t": "code",
+         "v": "std::strong_ordering"
+        },
+        {
+         "t": "text",
+         "v": ", and falls through to the confidence only when the labels are equal. A projection works too: "
+        },
+        {
+         "t": "code",
+         "v": "[](const Detection& d) { return std::tuple(std::string_view(d.label), -d.confidence_pct); }"
+        },
+        {
+         "t": "text",
+         "v": " sorts by the tuple, and the minus sign turns the confidence around, which is safe because it lies between 0 and 100."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "closest"
+        },
+        {
+         "t": "text",
+         "v": " is O(n log k). "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::partial_sort_copy"
+        },
+        {
+         "t": "text",
+         "v": " keeps the k best elements in a heap in "
+        },
+        {
+         "t": "code",
+         "v": "out"
+        },
+        {
+         "t": "text",
+         "v": " while it reads the input once, then sorts those k. It takes two projections, one for the input and one for the output range, and it copies min(n, k) elements, so asking for 10 of 6 returns all 6. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::partial_sort"
+        },
+        {
+         "t": "text",
+         "v": " does the same in place, leaving the other elements in an unspecified order."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "median_range"
+        },
+        {
+         "t": "text",
+         "v": " is O(n) on average and O(n) extra space for the copy. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::nth_element"
+        },
+        {
+         "t": "text",
+         "v": " puts the element that belongs at "
+        },
+        {
+         "t": "code",
+         "v": "middle"
+        },
+        {
+         "t": "text",
+         "v": " there, with no greater element before it and no smaller one after it, and leaves both sides unsorted. libstdc++ implements it as "
+        },
+        {
+         "t": "i",
+         "v": "introselect"
+        },
+        {
+         "t": "text",
+         "v": ": quicksort's partitioning, recursing into the one side that holds "
+        },
+        {
+         "t": "code",
+         "v": "middle"
+        },
+        {
+         "t": "text",
+         "v": ", with heap select as the fallback when that goes too deep. Sorting the whole copy to read one element would cost O(n log n)."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Comparators that break strict weak ordering",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This sort passes every test with 16 equal readings. With 17, it reads outside its vector:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-buffer-overflow",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <vector>\n\nint main() {\n  std::vector<int> readings(17, 7);  // 17 equal values\n  std::ranges::sort(readings, [](int a, int b) { return a <= b; });  // true for equal values\n  std::cout << std::format(\"sorted {} readings\\n\", readings.size());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports a heap-buffer-overflow: a 4-byte read directly after the 68-byte block that holds the 17 values, inside libstdc++'s "
+        },
+        {
+         "t": "code",
+         "v": "__unguarded_partition"
+        },
+        {
+         "t": "text",
+         "v": ". That loop moves right while the comparison says \"less than the pivot\", and it has no bounds check: it relies on the pivot, or an element equal to it, to stop the scan. "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "true"
+        },
+        {
+         "t": "text",
+         "v": " for the pivot itself, so nothing stops it. With 16 or fewer elements libstdc++ never partitions, which is why small tests pass. The standard requires the comparison to be a "
+        },
+        {
+         "t": "i",
+         "v": "strict weak ordering"
+        },
+        {
+         "t": "text",
+         "v": " for every sorting algorithm except the binary searches ("
+        },
+        {
+         "t": "a",
+         "v": "alg.sorting.general",
+         "href": "https://eel.is/c++draft/alg.sorting.general"
+        },
+        {
+         "t": "text",
+         "v": "), and breaking it is undefined behaviour: a crash, a wrong order, or a correct-looking result."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A strict weak ordering "
+        },
+        {
+         "t": "code",
+         "v": "less"
+        },
+        {
+         "t": "text",
+         "v": " follows these rules for all a, b and c ("
+        },
+        {
+         "t": "a",
+         "v": "Compare",
+         "href": "https://en.cppreference.com/cpp/named_req/Compare"
+        },
+        {
+         "t": "text",
+         "v": "):"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "irreflexivity: "
+         },
+         {
+          "t": "code",
+          "v": "less(a, a)"
+         },
+         {
+          "t": "text",
+          "v": " is false;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "asymmetry: if "
+         },
+         {
+          "t": "code",
+          "v": "less(a, b)"
+         },
+         {
+          "t": "text",
+          "v": ", then not "
+         },
+         {
+          "t": "code",
+          "v": "less(b, a)"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "transitivity: "
+         },
+         {
+          "t": "code",
+          "v": "less(a, b)"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "less(b, c)"
+         },
+         {
+          "t": "text",
+          "v": " imply "
+         },
+         {
+          "t": "code",
+          "v": "less(a, c)"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "transitivity of equivalence: with a and b "
+         },
+         {
+          "t": "i",
+          "v": "equivalent"
+         },
+         {
+          "t": "text",
+          "v": " when neither is less than the other, a equivalent to b and b equivalent to c imply a equivalent to c."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The compiler checks none of them. The "
+        },
+        {
+         "t": "code",
+         "v": "std::sortable"
+        },
+        {
+         "t": "text",
+         "v": " concept of the ranges algorithms checks only that the comparison can be called and returns something like "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": ". A small brute-force checker finds the rule each broken comparison violates:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <compare>\n#include <format>\n#include <iostream>\n#include <limits>\n#include <optional>\n#include <span>\n#include <string>\n#include <string_view>\n#include <tuple>\n#include <vector>\n\n// Tries every pair and triple of the sample, and names the first rule of a strict weak ordering that fails.\ntemplate <typename T, typename Less>\n[[nodiscard]] std::optional<std::string_view> broken_rule(std::span<const T> sample, Less less) {\n  const auto equivalent = [&](const T& a, const T& b) { return !less(a, b) && !less(b, a); };\n  for (const T& a : sample) {\n    if (less(a, a)) return \"irreflexivity\";\n    for (const T& b : sample) {\n      if (less(a, b) && less(b, a)) return \"asymmetry\";\n      for (const T& c : sample) {\n        if (less(a, b) && less(b, c) && !less(a, c)) return \"transitivity\";\n        if (equivalent(a, b) && equivalent(b, c) && !equivalent(a, c)) return \"transitivity of equivalence\";\n      }\n    }\n  }\n  return std::nullopt;\n}\n\nstruct Cell {\n  int x;\n  int y;\n};\n\nvoid report(std::string_view comparison, std::optional<std::string_view> rule) {\n  std::cout << std::format(\"{:<32}{}\\n\", comparison, rule ? \"breaks \" + std::string(*rule) : \"no rule broken\");\n}\n\nint main() {\n  const std::vector<int> ints{1, 2, 2, 3};\n  const std::vector<Cell> cells{{0, 1}, {1, 0}, {1, 1}};\n  const std::vector<double> doubles{1.0, std::numeric_limits<double>::quiet_NaN(), 2.0};\n\n  report(\"a <= b\", broken_rule<int>(ints, [](int a, int b) { return a <= b; }));\n  report(\"a.x < b.x || a.y < b.y\", broken_rule<Cell>(cells, [](const Cell& a, const Cell& b) {\n           return a.x < b.x || a.y < b.y;\n         }));\n  report(\"a < b, with a NaN\", broken_rule<double>(doubles, [](double a, double b) { return a < b; }));\n  report(\"a < b\", broken_rule<int>(ints, [](int a, int b) { return a < b; }));\n  report(\"std::tie(a.x, a.y) < ...\", broken_rule<Cell>(cells, [](const Cell& a, const Cell& b) {\n           return std::tie(a.x, a.y) < std::tie(b.x, b.y);\n         }));\n  report(\"std::strong_order(a, b) < 0\", broken_rule<double>(doubles, [](double a, double b) {\n           return std::strong_order(a, b) < 0;\n         }));\n}"
+      },
+      {
+       "t": "output",
+       "text": "a <= b                          breaks irreflexivity\na.x < b.x || a.y < b.y          breaks asymmetry\na < b, with a NaN               breaks transitivity of equivalence\na < b                           no rule broken\nstd::tie(a.x, a.y) < ...        no rule broken\nstd::strong_order(a, b) < 0     no rule broken"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second comparison is the one people write for \"sort by x, then by y\". It says (0, 1) is less than (1, 0) because 0 < 1, and also the reverse because 0 < 1 in y. The fix compares y only when the x values are equal, which "
+        },
+        {
+         "t": "code",
+         "v": "std::tie"
+        },
+        {
+         "t": "text",
+         "v": " does, and so does a defaulted "
+        },
+        {
+         "t": "code",
+         "v": "auto operator<=>(const Cell&) const = default;"
+        },
+        {
+         "t": "text",
+         "v": ", after which "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::sort(cells)"
+        },
+        {
+         "t": "text",
+         "v": " needs no comparison at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The NaN case hides in sensor data. Every comparison with NaN is false, so NaN is equivalent to 1.0 and to 2.0, while 1.0 and 2.0 are not equivalent to each other. Remove the NaNs before sorting, with "
+        },
+        {
+         "t": "code",
+         "v": "std::erase_if(v, [](double x) { return std::isnan(x); })"
+        },
+        {
+         "t": "text",
+         "v": ", or compare with "
+        },
+        {
+         "t": "code",
+         "v": "std::strong_order"
+        },
+        {
+         "t": "text",
+         "v": ", which orders all doubles, negative NaNs first and positive NaNs last ("
+        },
+        {
+         "t": "a",
+         "v": "strong_order",
+         "href": "https://en.cppreference.com/cpp/utility/compare/strong_order"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "To catch these in your own tests, build them once with "
+        },
+        {
+         "t": "code",
+         "v": "-D_GLIBCXX_DEBUG"
+        },
+        {
+         "t": "text",
+         "v": ". libstdc++'s "
+        },
+        {
+         "t": "a",
+         "v": "debug mode",
+         "href": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode.html"
+        },
+        {
+         "t": "text",
+         "v": " tests the comparison on the first element, and the 17-reading program stops with \"comparison doesn't meet irreflexive requirements, assert(!(a < a))\" before it sorts anything."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a stable sort is, with the robot log as the example, and which of "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::stable_sort"
+        },
+        {
+         "t": "text",
+         "v": " and counting sort are stable. Give the time and extra space of merge sort and quicksort, the input that makes textbook quicksort O(n²), and what introsort does about it. State the four rules of a strict weak ordering, which one "
+        },
+        {
+         "t": "code",
+         "v": "<="
+        },
+        {
+         "t": "text",
+         "v": " breaks, and what happened with 17 equal readings. Name the algorithm for the k smallest elements and for the median, with their costs."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does it mean for a sort to be stable? Which of "
+     },
+     {
+      "t": "code",
+      "v": "std::sort"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "std::stable_sort"
+     },
+     {
+      "t": "text",
+      "v": " and counting sort are stable?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a textbook quicksort make n(n−1)/2 comparisons on sorted input, and how does introsort bound the worst case?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the time and extra space of merge sort, and which comparison in the merge makes it stable?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "State the rules of a strict weak ordering. Which one does "
+     },
+     {
+      "t": "code",
+      "v": "a <= b"
+     },
+     {
+      "t": "text",
+      "v": " break, and what can happen when you sort with it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When do you call "
+     },
+     {
+      "t": "code",
+      "v": "partial_sort"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "partial_sort_copy"
+     },
+     {
+      "t": "text",
+      "v": " or "
+     },
+     {
+      "t": "code",
+      "v": "nth_element"
+     },
+     {
+      "t": "text",
+      "v": " instead of "
+     },
+     {
+      "t": "code",
+      "v": "sort"
+     },
+     {
+      "t": "text",
+      "v": ", and what does each cost?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 20 minutes: merge sort from an empty file, with the stability test."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Calling the algorithm that names the job, in its "
+     },
+     {
+      "t": "code",
+      "v": "std::ranges"
+     },
+     {
+      "t": "text",
+      "v": " form."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh and Adam Segoli Schubert, Back to Basics: Algorithmic Complexity, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Algorithmic_Complexity.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=AY2FqpDCBGs"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": ", prefer the standard library to handcrafted code, and "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": ", no performance claims without measurements."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The C++ standard on the rules a comparison must follow: "
+     },
+     {
+      "t": "a",
+      "v": "alg.sorting.general",
+      "href": "https://eel.is/c++draft/alg.sorting.general"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "sort",
+      "href": "https://en.cppreference.com/cpp/algorithm/sort"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "stable_sort",
+      "href": "https://en.cppreference.com/cpp/algorithm/stable_sort"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::sort",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/sort"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Compare",
+      "href": "https://en.cppreference.com/cpp/named_req/Compare"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "partial_sort",
+      "href": "https://en.cppreference.com/cpp/algorithm/partial_sort"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ranges::partial_sort_copy",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/partial_sort_copy"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "nth_element",
+      "href": "https://en.cppreference.com/cpp/algorithm/nth_element"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "strong_order",
+      "href": "https://en.cppreference.com/cpp/utility/compare/strong_order"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "LWG issue 713",
+      "href": "https://cplusplus.github.io/LWG/issue713"
+     },
+     {
+      "t": "text",
+      "v": ", which made O(n log n) the worst case for "
+     },
+     {
+      "t": "code",
+      "v": "std::sort"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "libstdc++ source of "
+     },
+     {
+      "t": "code",
+      "v": "std::sort"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::stable_sort"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "bits/stl_algo.h on the GCC 13 branch",
+      "href": "https://github.com/gcc-mirror/gcc/blob/releases/gcc-13/libstdc%2B%2B-v3/include/bits/stl_algo.h"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "debug mode",
+      "href": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

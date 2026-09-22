@@ -1,0 +1,2433 @@
+{
+ "id": "dsa-linked-lists",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "With the node type below, write "
+     },
+     {
+      "t": "code",
+      "v": "reverse(head)"
+     },
+     {
+      "t": "text",
+      "v": ", which reverses a singly linked list and returns the new head. It takes the list over by value, reuses its nodes without allocating, and uses O(1) extra space. Test it on "
+     },
+     {
+      "t": "code",
+      "v": "[1 2 3 4]"
+     },
+     {
+      "t": "text",
+      "v": ", a single node and the empty list. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "struct Node {\n  int value = 0;\n  std::unique_ptr<Node> next;\n};\n\n[[nodiscard]] std::unique_ptr<Node> reverse(std::unique_ptr<Node> head);"
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <ranges>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> next;\n};\n\n[[nodiscard]] std::unique_ptr<Node> reverse(std::unique_ptr<Node> head) {\n  std::unique_ptr<Node> reversed;  // the part already reversed\n  while (head) {\n    std::unique_ptr<Node> rest = std::move(head->next);  // detach the rest first\n    head->next = std::move(reversed);                    // turn the front node around\n    reversed = std::move(head);                          // it is now the front of the reversed part\n    head = std::move(rest);\n  }\n  return reversed;\n}\n\n[[nodiscard]] std::unique_ptr<Node> make_list(std::span<const int> values) {\n  std::unique_ptr<Node> head;\n  for (const int v : values | std::views::reverse) head = std::make_unique<Node>(v, std::move(head));\n  return head;\n}\n\n[[nodiscard]] std::string show(const Node* node) {\n  std::string out;\n  for (; node; node = node->next.get()) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", node->value);\n  return \"[\" + out + \"]\";\n}\n\nint main() {\n  const std::vector<int> four{1, 2, 3, 4};\n  const std::vector<int> one{7};\n  std::cout << show(reverse(make_list(four)).get()) << '\\n';\n  std::cout << show(reverse(make_list(one)).get()) << '\\n';\n  std::cout << show(reverse(nullptr).get()) << '\\n';\n}"
+   },
+   {
+    "t": "output",
+    "text": "[4 3 2 1]\n[7]\n[]"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Each turn of the loop moves one node from the front of "
+     },
+     {
+      "t": "code",
+      "v": "head"
+     },
+     {
+      "t": "text",
+      "v": " to the front of "
+     },
+     {
+      "t": "code",
+      "v": "reversed"
+     },
+     {
+      "t": "text",
+      "v": ", in four moves, and the order of the first two is the whole trick: "
+     },
+     {
+      "t": "code",
+      "v": "rest"
+     },
+     {
+      "t": "text",
+      "v": " has to take the remainder of the list before "
+     },
+     {
+      "t": "code",
+      "v": "head->next"
+     },
+     {
+      "t": "text",
+      "v": " is overwritten, or the remainder is destroyed. It is O(n) time and O(1) extra space, and no node is copied or allocated. The signature says who owns what. Taking "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr<Node>"
+     },
+     {
+      "t": "text",
+      "v": " by value means the function takes the list over, and returning it by value hands it back ("
+     },
+     {
+      "t": "a",
+      "v": "R.32",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-uniqueptrparam"
+     },
+     {
+      "t": "text",
+      "v": "); the caller writes "
+     },
+     {
+      "t": "code",
+      "v": "list = reverse(std::move(list));"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "show"
+     },
+     {
+      "t": "text",
+      "v": " only looks at the nodes, so it takes a "
+     },
+     {
+      "t": "code",
+      "v": "const Node*"
+     },
+     {
+      "t": "text",
+      "v": ", which owns nothing."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with an iterative reversal that handles the empty list and a single node and says O(n) time and O(1) space. The same algorithm on raw "
+     },
+     {
+      "t": "code",
+      "v": "Node*"
+     },
+     {
+      "t": "text",
+      "v": " pointers, with ownership explained in words, also passes. A recursive version is a partial pass: it is correct, but its O(n) stack depth fails on long lists, as the last section shows. A version that loses the rest of the list, or leaks nodes, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A linked list stores a sequence as separate nodes, each its own heap allocation holding a value and a pointer to the next node, rather than one contiguous block. In C++, ownership is the chain itself: each node owns the next through a "
+    },
+    {
+     "t": "code",
+     "v": "std::unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": ", and the variable holding the head owns the first node, so nobody ever writes "
+    },
+    {
+     "t": "code",
+     "v": "delete"
+    },
+    {
+     "t": "text",
+     "v": ". Code that only reads the list walks it with a raw, non-owning pointer, and a function that takes the list over says so by taking the "
+    },
+    {
+     "t": "code",
+     "v": "unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": " by value, handing it back the same way."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "It's rarely the right reach as a default container: each node's separate allocation defeats the processor's prefetcher, and a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": ", moving its elements through one contiguous block, wins even at sorted insertion, where the list's O(1) splice looks like the natural fit. The right reach for a real "
+    },
+    {
+     "t": "code",
+     "v": "std::list"
+    },
+    {
+     "t": "text",
+     "v": " is when something else holds iterators or references into it that must survive insertions and removals elsewhere, or when elements move between lists by splicing, as an LRU cache does. Outside that, linked lists mostly show up as an interview exercise in pointer surgery: reversing, merging, detecting a cycle, walking to the middle."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism worth naming is the order of moves. Rewiring a link has to take the rest of the list out of a node before that node's own link is overwritten, because a "
+    },
+    {
+     "t": "code",
+     "v": "unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": " assignment destroys whatever it already owned. A dummy node placed before the head gives the first node a predecessor, so removing it needs no separate case from removing any other node, and fast and slow pointers walk at two speeds to find a middle or a cycle in one pass with no extra memory."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake that shows up under pressure is in the teardown, not the surgery: destroying a "
+    },
+    {
+     "t": "code",
+     "v": "unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": " list is recursive, because each node's destructor destroys the next one from inside itself, so a long enough list runs out of stack at the closing brace, in code a reviewer would call correct. The same shape crashes a recursive reverse or merge. The fix is a destructor, or a "
+    },
+    {
+     "t": "code",
+     "v": "clear()"
+    },
+    {
+     "t": "text",
+     "v": ", that unlinks nodes one at a time in a loop instead of letting the chain destroy itself."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: reverse a singly linked list in place, reusing its nodes with no allocation and O(1) extra space, which is exactly the pointer surgery this page is about."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Node ownership in C++, dummy heads, fast and slow pointers",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the node a destructor that prints, and watch who destroys what:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <utility>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> next;\n  ~Node() { std::cout << std::format(\"~Node {}\\n\", value); }\n};\n\nint main() {\n  auto head = std::make_unique<Node>(1, std::make_unique<Node>(2, std::make_unique<Node>(3, nullptr)));\n  std::unique_ptr<Node> tail = std::move(head->next);  // tail now owns 2 and, through it, 3\n  std::cout << \"reset head:\\n\";\n  head.reset();\n  std::cout << \"end of main:\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "reset head:\n~Node 1\nend of main:\n~Node 2\n~Node 3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every node owns the next one through its "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", and the variable holding the head owns the first. Nobody writes "
+        },
+        {
+         "t": "code",
+         "v": "delete"
+        },
+        {
+         "t": "text",
+         "v": ": when an owner goes away, the node it owns goes too. Moving "
+        },
+        {
+         "t": "code",
+         "v": "head->next"
+        },
+        {
+         "t": "text",
+         "v": " into "
+        },
+        {
+         "t": "code",
+         "v": "tail"
+        },
+        {
+         "t": "text",
+         "v": " moved the ownership of nodes 2 and 3 in one step, which is why resetting "
+        },
+        {
+         "t": "code",
+         "v": "head"
+        },
+        {
+         "t": "text",
+         "v": " destroyed node 1 alone. Look at the order at the end: node 2's destructor body runs, and then its member "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": " is destroyed, which runs node 3's destructor "
+        },
+        {
+         "t": "i",
+         "v": "inside"
+        },
+        {
+         "t": "text",
+         "v": " node 2's. Destroying a list this way is recursive, one level of stack per node. For three nodes it doesn't matter, and the last section shows the length where it does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rest follows from that model. Code that only looks at the nodes walks them with "
+        },
+        {
+         "t": "code",
+         "v": "const Node*"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "Node*"
+        },
+        {
+         "t": "text",
+         "v": ", a pointer that owns nothing: a raw pointer is a non-owning pointer to a single object ("
+        },
+        {
+         "t": "a",
+         "v": "R.3",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+        },
+        {
+         "t": "text",
+         "v": "; David Olsen's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on smart pointers",
+         "href": "https://www.youtube.com/watch?v=YokY6HzLkXs"
+        },
+        {
+         "t": "text",
+         "v": ", CppCon 2022). Code that changes the structure moves "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s between links, and ownership moves with them, never with "
+        },
+        {
+         "t": "code",
+         "v": "release()"
+        },
+        {
+         "t": "text",
+         "v": ". A function that takes a list over takes "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Node>"
+        },
+        {
+         "t": "text",
+         "v": " by value, and a function that gives one back returns it. A doubly linked list keeps "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Node> next"
+        },
+        {
+         "t": "text",
+         "v": " and a plain "
+        },
+        {
+         "t": "code",
+         "v": "Node* prev"
+        },
+        {
+         "t": "text",
+         "v": ", because only one of the two links can own; Herb Sutter's "
+        },
+        {
+         "t": "a",
+         "v": "talk on leak freedom",
+         "href": "https://www.youtube.com/watch?v=JfmTagWcqoE"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2016) uses exactly that shape. Two "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s pointing at each other would keep both nodes alive forever."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The other way to own nodes is an "
+        },
+        {
+         "t": "i",
+         "v": "arena"
+        },
+        {
+         "t": "text",
+         "v": ": one "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Node>"
+        },
+        {
+         "t": "text",
+         "v": " owns all of them, and a link is an index into that vector, "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::ptrdiff_t> next"
+        },
+        {
+         "t": "text",
+         "v": ", with no value at the end of the list. It makes one allocation instead of one per node, the nodes sit next to each other in memory, the vector can be copied, destroying it frees one block with no recursion, and an index stays valid when the vector grows, where a pointer to an element would not. A link that points back, as in a cycle, is only a number, so it can't leak. Exercise 1 uses an arena for that reason."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::list"
+        },
+        {
+         "t": "text",
+         "v": " is the standard's doubly linked list, and it is rarely the right container. Each element is a separate allocation that also holds two pointers, and walking the list jumps between those allocations, which the processor's caches and prefetcher can't predict. Kevin Carpenter's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk, Almost Always Vector",
+         "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024), puts it this way: "
+        },
+        {
+         "t": "code",
+         "v": "std::list"
+        },
+        {
+         "t": "text",
+         "v": " inserts and erases in O(1) once you have an iterator, but has more memory overhead and slower iteration because of poor cache locality, so start with "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ". Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "SL.con.2",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+        },
+        {
+         "t": "text",
+         "v": " says the same, and adds that for containers up to a few kilobytes a vector usually still wins where a list looks like the better fit, such as insertion in the middle. The O(1) insert doesn't help when you first have to find the place. This program inserts values so the container stays sorted, finding each position with a linear scan, which is O(n²) for both containers:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <chrono>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <list>\n#include <random>\n#include <vector>\n\n// Inserts n pseudo-random values so the container stays sorted, and returns the time it took.\ntemplate <typename Container>\n[[nodiscard]] double sorted_inserts_ms(std::int64_t n) {\n  std::mt19937 gen{7};\n  Container c;\n  const auto start = std::chrono::steady_clock::now();\n  for (std::int64_t i = 0; i < n; ++i) {\n    const auto x = static_cast<std::int64_t>(gen());\n    c.insert(std::ranges::find_if(c, [x](std::int64_t e) { return e > x; }), x);\n  }\n  const std::chrono::duration<double, std::milli> took = std::chrono::steady_clock::now() - start;\n  return took.count();\n}\n\nint main() {\n  constexpr std::array<std::int64_t, 2> sizes{1'000, 10'000};\n  for (const std::int64_t n : sizes)\n    std::cout << std::format(\"n = {:>6}: vector {:8.1f} ms, list {:8.1f} ms\\n\", n,\n                             sorted_inserts_ms<std::vector<std::int64_t>>(n),\n                             sorted_inserts_ms<std::list<std::int64_t>>(n));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The times depend on the machine, so there is no output to compare with. Built with "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " (GCC 13.3, WSL) and with 50,000 added to "
+        },
+        {
+         "t": "code",
+         "v": "sizes"
+        },
+        {
+         "t": "text",
+         "v": ", the middle of three runs was:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "n"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::vector"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::list"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "1,000"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0.1 ms"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "0.3 ms"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "10,000"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "7.8 ms"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "86 ms"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "50,000"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "194 ms"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3,592 ms"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The vector moves on average half its elements for every insert and still wins 18 times over at 50,000, because it moves them through contiguous memory while the list chases a pointer per step. Built the way the snippet runner builds it, at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " with sanitizers, both took about 1.2 s at 10,000 and the difference disappeared, which is why performance is measured on optimised builds ("
+        },
+        {
+         "t": "a",
+         "v": "Per.6",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "code",
+         "v": "std::list"
+        },
+        {
+         "t": "text",
+         "v": " is right when something else holds iterators or references to elements that must stay valid while other elements come and go, or when you move elements between lists with "
+        },
+        {
+         "t": "code",
+         "v": "splice"
+        },
+        {
+         "t": "text",
+         "v": ", which relinks nodes in O(1) without copying or allocating. An LRU cache, a map from keys to list iterators with "
+        },
+        {
+         "t": "code",
+         "v": "splice"
+        },
+        {
+         "t": "text",
+         "v": " to move a used entry to the front, is the classic case."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two techniques remove most of the special cases from list code. A "
+        },
+        {
+         "t": "i",
+         "v": "dummy head"
+        },
+        {
+         "t": "text",
+         "v": " is a node placed before the first node, so that the first node has a predecessor like every other node. "
+        },
+        {
+         "t": "i",
+         "v": "Fast and slow pointers"
+        },
+        {
+         "t": "text",
+         "v": " walk the list at two speeds, the same-direction variant from the two pointers topic. This program uses one of each:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <ranges>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> next;\n};\n\n// Removes every node holding value, and returns how many it removed.\nstd::int64_t remove_all(std::unique_ptr<Node>& head, int value) {\n  Node dummy{.value = 0, .next = std::move(head)};  // gives the first node a predecessor\n  std::int64_t removed = 0;\n  Node* prev = &dummy;  // the node before the one being looked at\n  while (prev->next) {\n    if (prev->next->value == value) {\n      std::unique_ptr<Node> rest = std::move(prev->next->next);  // take the rest out of the node first\n      prev->next = std::move(rest);                              // then unlink the node, which destroys it\n      ++removed;\n    } else {\n      prev = prev->next.get();\n    }\n  }\n  head = std::move(dummy.next);\n  return removed;\n}\n\n// The middle node; the second of the two middle nodes for an even count; null for an empty list.\n[[nodiscard]] const Node* middle(const Node* head) {\n  const Node* slow = head;\n  const Node* fast = head;\n  while (fast && fast->next) {\n    slow = slow->next.get();\n    fast = fast->next->next.get();\n  }\n  return slow;\n}\n\n[[nodiscard]] std::unique_ptr<Node> make_list(std::span<const int> values) {\n  std::unique_ptr<Node> head;\n  for (const int v : values | std::views::reverse) head = std::make_unique<Node>(v, std::move(head));\n  return head;\n}\n\n[[nodiscard]] std::string show(const Node* node) {\n  std::string out;\n  for (; node; node = node->next.get()) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", node->value);\n  return \"[\" + out + \"]\";\n}\n\nint main() {\n  const std::vector<int> values{2, 1, 2, 3, 2};\n  std::unique_ptr<Node> list = make_list(values);\n  const std::int64_t removed = remove_all(list, 2);\n  std::cout << std::format(\"removed {}, left {}\\n\", removed, show(list.get()));\n\n  for (const std::vector<int>& v : {std::vector{1, 2, 3, 4, 5}, std::vector{1, 2, 3, 4, 5, 6}, std::vector<int>{}}) {\n    const std::unique_ptr<Node> l = make_list(v);\n    const Node* m = middle(l.get());\n    std::cout << std::format(\"middle of {}: {}\\n\", show(l.get()), m ? std::to_string(m->value) : \"none\");\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "removed 3, left [1 3]\nmiddle of [1 2 3 4 5]: 3\nmiddle of [1 2 3 4 5 6]: 4\nmiddle of []: none"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In "
+        },
+        {
+         "t": "code",
+         "v": "remove_all"
+        },
+        {
+         "t": "text",
+         "v": ", the first node of "
+        },
+        {
+         "t": "code",
+         "v": "[2 1 2 3 2]"
+        },
+        {
+         "t": "text",
+         "v": " has to go. Without the dummy, removing it means changing "
+        },
+        {
+         "t": "code",
+         "v": "head"
+        },
+        {
+         "t": "text",
+         "v": ", and removing any other node means changing the "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": " of its predecessor: two code paths. With "
+        },
+        {
+         "t": "code",
+         "v": "dummy"
+        },
+        {
+         "t": "text",
+         "v": " in front, every node has a predecessor, "
+        },
+        {
+         "t": "code",
+         "v": "prev"
+        },
+        {
+         "t": "text",
+         "v": " starts at the dummy, and one path handles both. The loop moves "
+        },
+        {
+         "t": "code",
+         "v": "prev"
+        },
+        {
+         "t": "text",
+         "v": " forward only when it keeps the next node, so after a removal it looks at the node that moved up, and two neighbours with the value both go. At the end the list is handed back from "
+        },
+        {
+         "t": "code",
+         "v": "dummy.next"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Removing a node takes two lines on purpose. The one-line "
+        },
+        {
+         "t": "code",
+         "v": "prev->next = std::move(prev->next->next)"
+        },
+        {
+         "t": "text",
+         "v": " runs cleanly here, but it names a member of an object it has already destroyed. A "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " move assignment calls "
+        },
+        {
+         "t": "code",
+         "v": "reset(r.release())"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "i",
+         "v": "then"
+        },
+        {
+         "t": "text",
+         "v": " assigns the deleter, "
+        },
+        {
+         "t": "code",
+         "v": "get_deleter() = std::forward<D>(r.get_deleter())"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "unique.ptr.single.asgn",
+         "href": "https://eel.is/c++draft/unique.ptr.single.asgn"
+        },
+        {
+         "t": "text",
+         "v": "). The "
+        },
+        {
+         "t": "code",
+         "v": "reset"
+        },
+        {
+         "t": "text",
+         "v": " destroys the removed node, and "
+        },
+        {
+         "t": "code",
+         "v": "r"
+        },
+        {
+         "t": "text",
+         "v": " is that node's "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "std::default_delete"
+        },
+        {
+         "t": "text",
+         "v": " holds no state, so nothing is read and AddressSanitizer stays quiet, but with a deleter that holds state it is a use-after-free. Moving the rest into the local "
+        },
+        {
+         "t": "code",
+         "v": "rest"
+        },
+        {
+         "t": "text",
+         "v": " first means the pointer moved from is still alive when the node dies, and the node dies with an empty "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": ", so its destructor stops there."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In C++ you can skip the dummy node and keep a pointer to the "
+        },
+        {
+         "t": "i",
+         "v": "link"
+        },
+        {
+         "t": "text",
+         "v": " instead, the "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Node>"
+        },
+        {
+         "t": "text",
+         "v": " that owns the current node. The head is a link like any other:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "for (std::unique_ptr<Node>* link = &head; *link;) {\n  if ((*link)->value == value) {\n    std::unique_ptr<Node> rest = std::move((*link)->next);\n    *link = std::move(rest);  // unlink and destroy\n  } else {\n    link = &(*link)->next;\n  }\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "middle"
+        },
+        {
+         "t": "text",
+         "v": " moves "
+        },
+        {
+         "t": "code",
+         "v": "fast"
+        },
+        {
+         "t": "text",
+         "v": " two nodes for each node "
+        },
+        {
+         "t": "code",
+         "v": "slow"
+        },
+        {
+         "t": "text",
+         "v": " moves, so when "
+        },
+        {
+         "t": "code",
+         "v": "fast"
+        },
+        {
+         "t": "text",
+         "v": " reaches the end, "
+        },
+        {
+         "t": "code",
+         "v": "slow"
+        },
+        {
+         "t": "text",
+         "v": " is halfway:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "list"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "slow visits"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "fast visits"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "stops because"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "middle"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "[1 2 3 4 5]"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1, 2, 3"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1, 3, 5"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "fast->next"
+          },
+          {
+           "t": "text",
+           "v": " is null"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "3"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "[1 2 3 4 5 6]"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1, 2, 3, 4"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "1, 3, 5, then past the end"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "fast"
+          },
+          {
+           "t": "text",
+           "v": " is null"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "4"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The loop condition "
+        },
+        {
+         "t": "code",
+         "v": "fast && fast->next"
+        },
+        {
+         "t": "text",
+         "v": " checks both ends, the empty list included, before "
+        },
+        {
+         "t": "code",
+         "v": "fast->next->next"
+        },
+        {
+         "t": "text",
+         "v": " is read. For the first of the two middle nodes, start "
+        },
+        {
+         "t": "code",
+         "v": "fast"
+        },
+        {
+         "t": "text",
+         "v": " one node ahead, at "
+        },
+        {
+         "t": "code",
+         "v": "head->next"
+        },
+        {
+         "t": "text",
+         "v": ". Both functions are O(n) time and O(1) extra space. Fast and slow pointers also find the n-th node from the end (Exercise 3) and detect a cycle (Exercise 1)."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Cycle detection; merge two sorted lists; remove the nth node from the end",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. The nodes of a list live in an arena, a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Node>"
+        },
+        {
+         "t": "text",
+         "v": " whose links are indices:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "struct Node {\n  int value = 0;\n  std::optional<std::ptrdiff_t> next;  // index of the next node in the same vector, or no value at the end\n};"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write "
+        },
+        {
+         "t": "code",
+         "v": "cycle_start(nodes, head)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the index of the node where the list starts to repeat, or no value if the list ends, in O(n) time and O(1) extra space. "
+        },
+        {
+         "t": "code",
+         "v": "head"
+        },
+        {
+         "t": "text",
+         "v": " is itself a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::ptrdiff_t>"
+        },
+        {
+         "t": "text",
+         "v": ", with no value for an empty list. Test a list of 5 nodes whose last node links back to index 2, a list without a cycle, a node that links to itself, a list whose last node links back to the head, and the empty list. Then explain why the list lives in an arena and not in "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " nodes."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Floyd's algorithm runs in two phases. In the first, "
+        },
+        {
+         "t": "code",
+         "v": "slow"
+        },
+        {
+         "t": "text",
+         "v": " moves one step and "
+        },
+        {
+         "t": "code",
+         "v": "fast"
+        },
+        {
+         "t": "text",
+         "v": " two steps at a time. If "
+        },
+        {
+         "t": "code",
+         "v": "fast"
+        },
+        {
+         "t": "text",
+         "v": " falls off the end, there is no cycle. Otherwise both end up in the cycle, and "
+        },
+        {
+         "t": "code",
+         "v": "fast"
+        },
+        {
+         "t": "text",
+         "v": " gains one node per step on "
+        },
+        {
+         "t": "code",
+         "v": "slow"
+        },
+        {
+         "t": "text",
+         "v": ", so it catches up with it. In the second, one pointer starts again from the head, and both move one step at a time. They meet at the start of the cycle."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::optional<std::ptrdiff_t> next;  // index of the next node in the same vector, or no value at the end\n};\n\nusing Link = std::optional<std::ptrdiff_t>;\n\n[[nodiscard]] Link step(std::span<const Node> nodes, Link at) { return at ? nodes[*at].next : std::nullopt; }\n\n[[nodiscard]] Link cycle_start(std::span<const Node> nodes, Link head) {\n  Link slow = head;\n  Link fast = head;\n  while (true) {\n    slow = step(nodes, slow);\n    fast = step(nodes, step(nodes, fast));\n    if (!fast) return std::nullopt;  // fast fell off the end: the list ends\n    if (slow == fast) break;         // both are in the cycle, at the same node\n  }\n  slow = head;\n  while (slow != fast) {\n    slow = step(nodes, slow);\n    fast = step(nodes, fast);\n  }\n  return slow;\n}\n\n// Nodes 0 to n-1 linked in order; the last one links to loop_to.\n[[nodiscard]] std::vector<Node> chain(std::span<const int> values, Link loop_to) {\n  std::vector<Node> nodes;\n  for (std::ptrdiff_t i = 0; i < std::ssize(values); ++i) nodes.push_back({.value = values[i], .next = i + 1});\n  if (!nodes.empty()) nodes.back().next = loop_to;\n  return nodes;\n}\n\n[[nodiscard]] std::string show(Link at) { return at ? std::format(\"index {}\", *at) : \"no cycle\"; }\n\nint main() {\n  const std::vector<int> five{3, 1, 4, 1, 5};\n  const std::vector<int> one{9};\n  std::cout << \"back to 2:  \" << show(cycle_start(chain(five, 2), 0)) << '\\n';\n  std::cout << \"no cycle:   \" << show(cycle_start(chain(five, std::nullopt), 0)) << '\\n';\n  std::cout << \"self loop:  \" << show(cycle_start(chain(one, 0), 0)) << '\\n';\n  std::cout << \"back to 0:  \" << show(cycle_start(chain(five, 0), 0)) << '\\n';\n  std::cout << \"empty list: \" << show(cycle_start({}, std::nullopt)) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "back to 2:  index 2\nno cycle:   no cycle\nself loop:  index 0\nback to 0:  index 0\nempty list: no cycle"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time and O(1) extra space. The first phase ends within one lap after "
+        },
+        {
+         "t": "code",
+         "v": "slow"
+        },
+        {
+         "t": "text",
+         "v": " enters the cycle, and the second within the distance from the head to the cycle."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Why the second phase works: say the cycle starts "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " steps from the head and is "
+        },
+        {
+         "t": "code",
+         "v": "c"
+        },
+        {
+         "t": "text",
+         "v": " nodes long, and the pointers meet after "
+        },
+        {
+         "t": "code",
+         "v": "k"
+        },
+        {
+         "t": "text",
+         "v": " steps. "
+        },
+        {
+         "t": "code",
+         "v": "fast"
+        },
+        {
+         "t": "text",
+         "v": " has walked 2k steps and "
+        },
+        {
+         "t": "code",
+         "v": "slow"
+        },
+        {
+         "t": "text",
+         "v": " k, and they stand on the same node, so the extra k steps of "
+        },
+        {
+         "t": "code",
+         "v": "fast"
+        },
+        {
+         "t": "text",
+         "v": " are whole laps: k is a multiple of c. "
+        },
+        {
+         "t": "code",
+         "v": "slow"
+        },
+        {
+         "t": "text",
+         "v": " stands k steps from the head. Walking "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " more steps takes it to position k + a, which is the start of the cycle plus k steps, a whole number of laps, so it is the start of the cycle. A pointer from the head reaches the same node in the same "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " steps."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Why an arena: a cycle means one node is the "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": " of two nodes, the one before it in the tail and the last one. With "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " links, two owners of one node is impossible, and a last node that owns the start of the cycle makes a ring that owns itself, which nothing outside can reach or destroy. The failure section shows that leak. In the arena the vector owns every node, a link is a number, and a cycle is harmless. Interview platforms hand you raw "
+        },
+        {
+         "t": "code",
+         "v": "ListNode*"
+        },
+        {
+         "t": "text",
+         "v": " pointers that nobody frees; say which of the two ownership models you would use in real code. A hash set of visited indices also finds the cycle, in O(n) time but O(n) space."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "merge(a, b)"
+        },
+        {
+         "t": "text",
+         "v": ", which merges two sorted lists of "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " nodes, as in the cold check, into one sorted list. It takes both lists over, reuses their nodes without allocating, uses O(1) extra space, and on equal values puts the node from "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " first. Test "
+        },
+        {
+         "t": "code",
+         "v": "[1 3 5]"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "[2 4 6]"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "[1 2 4]"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "[1 3 4]"
+        },
+        {
+         "t": "text",
+         "v": ", an empty list with "
+        },
+        {
+         "t": "code",
+         "v": "[1 2]"
+        },
+        {
+         "t": "text",
+         "v": ", two empty lists, and "
+        },
+        {
+         "t": "code",
+         "v": "[5]"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "[1 2 3]"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Keep a pointer to the link where the next node goes, "
+        },
+        {
+         "t": "code",
+         "v": "tail"
+        },
+        {
+         "t": "text",
+         "v": ", and move the smaller front node into it each time. When one list runs out, the rest of the other is appended in one move:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <ranges>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> next;\n};\n\n[[nodiscard]] std::unique_ptr<Node> merge(std::unique_ptr<Node> a, std::unique_ptr<Node> b) {\n  std::unique_ptr<Node> head;\n  std::unique_ptr<Node>* tail = &head;  // the link that receives the next node\n  while (a && b) {\n    std::unique_ptr<Node>& smaller = b->value < a->value ? b : a;  // equal values take from a\n    *tail = std::move(smaller);          // the front node moves to the end of the result\n    smaller = std::move((*tail)->next);  // its old list continues from the node after it\n    tail = &(*tail)->next;\n  }\n  *tail = a ? std::move(a) : std::move(b);  // one list is empty; the other is appended whole\n  return head;\n}\n\n[[nodiscard]] std::unique_ptr<Node> make_list(std::span<const int> values) {\n  std::unique_ptr<Node> head;\n  for (const int v : values | std::views::reverse) head = std::make_unique<Node>(v, std::move(head));\n  return head;\n}\n\n[[nodiscard]] std::string show(const Node* node) {\n  std::string out;\n  for (; node; node = node->next.get()) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", node->value);\n  return \"[\" + out + \"]\";\n}\n\nint main() {\n  const std::vector<std::pair<std::vector<int>, std::vector<int>>> cases{\n      {{1, 3, 5}, {2, 4, 6}}, {{1, 2, 4}, {1, 3, 4}}, {{}, {1, 2}}, {{}, {}}, {{5}, {1, 2, 3}}};\n  for (const auto& [a, b] : cases) std::cout << show(merge(make_list(a), make_list(b)).get()) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "[1 2 3 4 5 6]\n[1 1 2 3 4 4]\n[1 2]\n[]\n[1 2 3 5]"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n + m) time and O(1) extra space. The two moves in the loop are the same as in the cold check's reversal: take the front node, then give its list the node after it. "
+        },
+        {
+         "t": "code",
+         "v": "tail"
+        },
+        {
+         "t": "text",
+         "v": " plays the part of a dummy head without a node: it starts at "
+        },
+        {
+         "t": "code",
+         "v": "head"
+        },
+        {
+         "t": "text",
+         "v": " itself, so the first node needs no special case. Ties take from "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " because the test is "
+        },
+        {
+         "t": "code",
+         "v": "b->value < a->value"
+        },
+        {
+         "t": "text",
+         "v": ", strictly less, the same rule that made merge sort stable."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The recursive version, "
+        },
+        {
+         "t": "code",
+         "v": "a->next = merge(std::move(a->next), std::move(b))"
+        },
+        {
+         "t": "text",
+         "v": ", is shorter and a common answer. It uses one stack frame per node of the result, so merging two lists of half a million nodes each can overflow the stack, for the reason the last section measures."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "remove_nth_from_end(head, n)"
+        },
+        {
+         "t": "text",
+         "v": ", which removes the n-th node from the end of a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " list, where n = 1 is the last node, and returns its value, or no value when n is less than 1 or greater than the length. It takes the list by reference, "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Node>&"
+        },
+        {
+         "t": "text",
+         "v": ", because it changes it, and makes one pass. Test on "
+        },
+        {
+         "t": "code",
+         "v": "[1 2 3 4 5]"
+        },
+        {
+         "t": "text",
+         "v": " with n = 2, 5, 1, 6 and 0, and on "
+        },
+        {
+         "t": "code",
+         "v": "[7]"
+        },
+        {
+         "t": "text",
+         "v": " with n = 1."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Send a "
+        },
+        {
+         "t": "code",
+         "v": "lead"
+        },
+        {
+         "t": "text",
+         "v": " pointer n nodes ahead, then move it and a trailing link pointer together until "
+        },
+        {
+         "t": "code",
+         "v": "lead"
+        },
+        {
+         "t": "text",
+         "v": " falls off the end. The trailing pointer then holds the link that owns the node to remove. Holding the link rather than the node is what lets it remove the first node too:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> next;\n};\n\nstd::optional<int> remove_nth_from_end(std::unique_ptr<Node>& head, std::ptrdiff_t n) {\n  if (n < 1) return std::nullopt;\n  const Node* lead = head.get();\n  for (std::ptrdiff_t i = 0; i < n; ++i) {\n    if (!lead) return std::nullopt;  // fewer than n nodes\n    lead = lead->next.get();\n  }\n  std::unique_ptr<Node>* link = &head;  // stays n nodes behind lead\n  while (lead) {\n    lead = lead->next.get();\n    link = &(*link)->next;\n  }\n  const int value = (*link)->value;\n  std::unique_ptr<Node> rest = std::move((*link)->next);\n  *link = std::move(rest);  // unlink and destroy the node\n  return value;\n}\n\n[[nodiscard]] std::unique_ptr<Node> make_list(std::span<const int> values) {\n  std::unique_ptr<Node> head;\n  for (const int v : values | std::views::reverse) head = std::make_unique<Node>(v, std::move(head));\n  return head;\n}\n\n[[nodiscard]] std::string show(const Node* node) {\n  std::string out;\n  for (; node; node = node->next.get()) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", node->value);\n  return \"[\" + out + \"]\";\n}\n\nint main() {\n  const std::vector<int> five{1, 2, 3, 4, 5};\n  for (const std::ptrdiff_t n : {2, 5, 1, 6, 0}) {\n    std::unique_ptr<Node> list = make_list(five);\n    const std::optional<int> removed = remove_nth_from_end(list, n);\n    std::cout << std::format(\"n = {}: removed {}, left {}\\n\", n, removed ? std::to_string(*removed) : \"nothing\",\n                             show(list.get()));\n  }\n  const std::vector<int> one{7};\n  std::unique_ptr<Node> single = make_list(one);\n  const std::optional<int> removed = remove_nth_from_end(single, 1);\n  std::cout << std::format(\"[7], n = 1: removed {}, left {}\\n\", removed.value(), show(single.get()));\n}"
+      },
+      {
+       "t": "output",
+       "text": "n = 2: removed 4, left [1 2 3 5]\nn = 5: removed 1, left [2 3 4 5]\nn = 1: removed 5, left [1 2 3 4]\nn = 6: removed nothing, left [1 2 3 4 5]\nn = 0: removed nothing, left [1 2 3 4 5]\n[7], n = 1: removed 7, left []"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is one pass, O(L) time for a list of length L, and O(1) extra space. The gap between "
+        },
+        {
+         "t": "code",
+         "v": "lead"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "link"
+        },
+        {
+         "t": "text",
+         "v": " is the invariant: after the first loop, "
+        },
+        {
+         "t": "code",
+         "v": "lead"
+        },
+        {
+         "t": "text",
+         "v": " is n nodes ahead of the node "
+        },
+        {
+         "t": "code",
+         "v": "*link"
+        },
+        {
+         "t": "text",
+         "v": " owns, and the second loop keeps that gap, so when "
+        },
+        {
+         "t": "code",
+         "v": "lead"
+        },
+        {
+         "t": "text",
+         "v": " is past the end, "
+        },
+        {
+         "t": "code",
+         "v": "*link"
+        },
+        {
+         "t": "text",
+         "v": " owns the n-th node from the end. The first loop also checks the length, which is why n = 6 leaves the list untouched and returns no value instead of reading through a null pointer. The version with a dummy node is equally good: start both pointers at the dummy and remove "
+        },
+        {
+         "t": "code",
+         "v": "slow->next"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Leaks and recursion depth with unique_ptr lists",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program builds a list of a million nodes and does nothing wrong that a reviewer would see:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-overflow",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <utility>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> next;\n};\n\nint main() {\n  std::unique_ptr<Node> head;\n  for (int i = 0; i < 1'000'000; ++i) head = std::make_unique<Node>(i, std::move(head));\n  std::cout << std::format(\"built, the head holds {}\\n\", head->value);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It gets as far as the closing brace of "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", where "
+        },
+        {
+         "t": "code",
+         "v": "head"
+        },
+        {
+         "t": "text",
+         "v": " is destroyed, and crashes there: AddressSanitizer reports a stack-overflow. As the theory showed, each node's destructor destroys the next node from inside itself, so destroying a list of n nodes nests n destructor calls. The stack is finite, 8 MB on the WSL machine these numbers come from ("
+        },
+        {
+         "t": "code",
+         "v": "ulimit -s"
+        },
+        {
+         "t": "text",
+         "v": " prints 8192). There, with GCC 13.3 and no sanitizers, a list of 50,000 nodes was destroyed and one of 60,000 crashed at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": ", and at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " the limit lay between 500,000 and 550,000 nodes. A robot that logs a long path in such a list crashes when it clears the log, far from any line that looks wrong. Herb Sutter's talk on leak freedom (CppCon 2016) makes the same point: destruction through owning pointers is recursive by default, and a long chain can exceed the stack."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fix is a destructor that unlinks the nodes one at a time. It belongs in the class that owns the list:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <utility>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> next;\n};\n\n// Owns a chain of nodes and destroys it one node at a time.\nclass List {\n public:\n  List() = default;\n  List(const List&) = delete;\n  List& operator=(const List&) = delete;\n  List(List&&) noexcept = default;\n  List& operator=(List&& other) noexcept {\n    clear();  // the defaulted version would destroy the old nodes recursively\n    head_ = std::move(other.head_);\n    return *this;\n  }\n  ~List() { clear(); }\n\n  void push_front(int value) { head_ = std::make_unique<Node>(value, std::move(head_)); }\n\n  void clear() noexcept {\n    while (head_) {\n      std::unique_ptr<Node> rest = std::move(head_->next);  // the first node's next is now empty,\n      head_ = std::move(rest);                              // so destroying it goes no deeper\n    }\n  }\n\n  [[nodiscard]] const Node* head() const { return head_.get(); }\n\n private:\n  std::unique_ptr<Node> head_;\n};\n\nint main() {\n  List list;\n  for (int i = 0; i < 1'000'000; ++i) list.push_front(i);\n  std::int64_t sum = 0;\n  for (const Node* node = list.head(); node; node = node->next.get()) sum += node->value;\n  std::cout << std::format(\"1000000 nodes, sum {}\\n\", sum);\n  List moved = std::move(list);\n  list = std::move(moved);\n  std::cout << std::format(\"moved there and back, the head holds {}\\n\", list.head()->value);\n}"
+      },
+      {
+       "t": "output",
+       "text": "1000000 nodes, sum 499999500000\nmoved there and back, the head holds 999999"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "clear()"
+        },
+        {
+         "t": "text",
+         "v": " takes the rest of the list out of the first node before it replaces "
+        },
+        {
+         "t": "code",
+         "v": "head_"
+        },
+        {
+         "t": "text",
+         "v": ", so the first node is destroyed with an empty "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": " and its destructor returns at once. The rest goes through the local "
+        },
+        {
+         "t": "code",
+         "v": "rest"
+        },
+        {
+         "t": "text",
+         "v": " for the reason in the worked example: the one-line "
+        },
+        {
+         "t": "code",
+         "v": "head_ = std::move(head_->next)"
+        },
+        {
+         "t": "text",
+         "v": " destroys the first node and then uses the deleter of its "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": ", a member of an object it has already destroyed. The loop is O(n) time and O(1) stack. Declaring the destructor turns off the implicit move operations, so the class declares all five special members ("
+        },
+        {
+         "t": "a",
+         "v": "C.21",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+        },
+        {
+         "t": "text",
+         "v": "), and the move assignment clears first, because the defaulted one would destroy the old list recursively in "
+        },
+        {
+         "t": "code",
+         "v": "head_ = std::move(other.head_)"
+        },
+        {
+         "t": "text",
+         "v": ". The sum is a "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": ", because 0 + 1 + … + 999,999 is about 5 × 10¹¹, far past the "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " limit. Recursive algorithms on lists have the same problem: a recursive reverse or merge uses a stack frame per node, so on a long list the iterative versions from the exercises are the only safe ones."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Unique ownership can still leak, in two ways. The first is "
+        },
+        {
+         "t": "code",
+         "v": "release()"
+        },
+        {
+         "t": "text",
+         "v": ": it gives up ownership and returns a raw pointer, and if nobody takes that pointer over, the node is lost. Transfer ownership with a move instead, which is the advice in Olsen's talk, and treat any "
+        },
+        {
+         "t": "code",
+         "v": "release()"
+        },
+        {
+         "t": "text",
+         "v": " outside a line that hands the pointer to a new owner as a bug. The second is a cycle. Link the last node of a list back to its head, as the cycle problems do, and the ring owns itself:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:48 byte(s) leaked in 3 allocation(s)",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <utility>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> next;\n};\n\nint main() {\n  auto head = std::make_unique<Node>(1, std::make_unique<Node>(2, std::make_unique<Node>(3, nullptr)));\n  Node* last = head.get();\n  while (last->next) last = last->next.get();\n  last->next = std::move(head);  // 3 -> 1: the list now owns itself\n  std::cout << std::format(\"head is empty: {}\\n\", head == nullptr);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "LeakSanitizer, which runs with AddressSanitizer on Linux, reports at exit that 48 bytes in 3 allocations, the three 16-byte nodes, are no longer reachable. Node 3 owns node 1, node 1 owns node 2, and node 2 owns node 3, so none of their destructors can ever run. That is why a list with a cycle lives in an arena, where the vector owns the nodes and a cycle is a set of numbers."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say who owns each node in a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " list, what walks the list without owning it, and how a function signature shows that it takes a list over. Describe the arena alternative and when you need it, and give two reasons "
+        },
+        {
+         "t": "code",
+         "v": "std::list"
+        },
+        {
+         "t": "text",
+         "v": " is rarely the right container, with the measured numbers. Explain the dummy head and the link pointer, and the two uses of fast and slow pointers. Say why destroying a long "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " list overflows the stack, the length where it did, and the one-line loop that fixes it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "In the reversal, why must "
+     },
+     {
+      "t": "code",
+      "v": "rest"
+     },
+     {
+      "t": "text",
+      "v": " take "
+     },
+     {
+      "t": "code",
+      "v": "head->next"
+     },
+     {
+      "t": "text",
+      "v": " before anything else changes?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why can't a list with a cycle be built from "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " links, and what do you use instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does removing a node move "
+     },
+     {
+      "t": "code",
+      "v": "prev->next->next"
+     },
+     {
+      "t": "text",
+      "v": " into a local before assigning it to "
+     },
+     {
+      "t": "code",
+      "v": "prev->next"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a dummy head save you from, and how does a pointer to the link do the same without a node?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does destroying a long "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " list crash, and what does the fixed destructor do differently?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When is "
+     },
+     {
+      "t": "code",
+      "v": "std::list"
+     },
+     {
+      "t": "text",
+      "v": " the right container, and why is "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " faster at sorted insertion even though it moves elements?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: remove the n-th node from the end in one pass, including n equal to the length."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Herb Sutter, Leak-Freedom in C++... By Default, CppCon 2016: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2016/blob/master/Presentations/Lifetime%20Safety%20By%20Default%20-%20Making%20Code%20Leak-Free%20by%20Construction/Lifetime%20Safety%20By%20Default%20-%20Making%20Code%20Leak-Free%20by%20Construction%20-%20Herb%20Sutter%20-%20CppCon%202016.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=JfmTagWcqoE"
+     },
+     {
+      "t": "text",
+      "v": ". Lists owned by "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", the raw "
+     },
+     {
+      "t": "code",
+      "v": "prev"
+     },
+     {
+      "t": "text",
+      "v": " pointer, and destructor recursion."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " against "
+     },
+     {
+      "t": "code",
+      "v": "std::list"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::deque"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: C++ Smart Pointers, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/Olsen-Smart-Pointers-CppCon22.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=YokY6HzLkXs"
+     },
+     {
+      "t": "text",
+      "v": ". Raw pointers as non-owning, and transferring ownership by value and with moves."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bjarne Stroustrup, "
+     },
+     {
+      "t": "a",
+      "v": "why you should avoid linked lists",
+      "href": "https://www.youtube.com/watch?v=YQs6IC-vgmo"
+     },
+     {
+      "t": "text",
+      "v": ", an excerpt from his GoingNative 2012 keynote: vector against list, and the cost of following pointers through memory."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-owner"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.32",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-uniqueptrparam"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-vector"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Per.19",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-access"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The C++ standard on "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " move assignment, "
+     },
+     {
+      "t": "a",
+      "v": "unique.ptr.single.asgn",
+      "href": "https://eel.is/c++draft/unique.ptr.single.asgn"
+     },
+     {
+      "t": "text",
+      "v": ", and cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "unique_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", its "
+     },
+     {
+      "t": "a",
+      "v": "move assignment",
+      "href": "https://en.cppreference.com/cpp/memory/unique_ptr/operator="
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "reset",
+      "href": "https://en.cppreference.com/cpp/memory/unique_ptr/reset"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::list",
+      "href": "https://en.cppreference.com/cpp/container/list"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

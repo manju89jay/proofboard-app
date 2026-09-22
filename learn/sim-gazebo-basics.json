@@ -1,0 +1,972 @@
+{
+ "id": "sim-gazebo-basics",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "In five or six sentences, or a sketch with labels, explain how a velocity command published by a ROS 2 node reaches a simulated wheeled robot in Gazebo and makes it move. Name the processes, the topics and the message types involved. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The ROS node publishes a "
+     },
+     {
+      "t": "code",
+      "v": "geometry_msgs/msg/Twist"
+     },
+     {
+      "t": "text",
+      "v": " on a ROS topic, which travels over DDS. Gazebo doesn't use DDS. It has its own transport, Gazebo Transport, and its own message types, such as "
+     },
+     {
+      "t": "code",
+      "v": "gz.msgs.Twist"
+     },
+     {
+      "t": "text",
+      "v": ". A separate bridge process, "
+     },
+     {
+      "t": "code",
+      "v": "parameter_bridge"
+     },
+     {
+      "t": "text",
+      "v": " from the "
+     },
+     {
+      "t": "code",
+      "v": "ros_gz_bridge"
+     },
+     {
+      "t": "text",
+      "v": " package, subscribes to the ROS topic and republishes each message on a Gazebo topic, converting the type. Inside the Gazebo server, the DiffDrive system subscribes to that Gazebo topic. On every simulation step it turns the commanded velocity into wheel velocities, and the Physics system moves the robot. Odometry goes the other way, from the DiffDrive system through the bridge to a ROS topic."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you had the two transports, the bridge in the middle, and a system inside Gazebo that acts on the command. Missing the bridge is a partial pass, and more than that is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Gazebo describes a scene in a world file: physics settings, ground and lights, and a list of models. A model is built from links, rigid bodies with mass, inertia and both a collision and a visual shape, connected by joints. Everything a model does comes from systems, plugins the world or the model loads by name, such as one that moves every body according to physics and one that turns a wheeled robot's commanded velocity into wheel motion."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that Gazebo and ROS speak different languages entirely: ROS messages travel over DDS, and Gazebo has its own transport and its own message types, so a ROS node's publisher has nobody inside the simulator to talk to directly. A simulator also has to give every loaded system a fixed, repeatable place in each step, or a command applied after the physics has already run that step would arrive one step late, silently."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A separate bridge process subscribes to a ROS topic and republishes each message on a matching Gazebo topic, converting the type as it goes; inside the simulator, the system responsible for that behaviour is the one that actually subscribes to it. Every step runs the same sequence for every loaded system: a setup call once when the system is loaded, then, on each step, one phase that applies incoming commands, one that advances the physics, and one that publishes results such as odometry, in that fixed order every time."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake under pressure is a silent one: everything starts, and nothing moves, because the bridge was given a topic name, a ROS type or a Gazebo type that doesn't match what either side actually uses, and nothing on either side reports an error, since as far as each is concerned it is talking correctly to whatever it was told to talk to. The same silence follows a model resource Gazebo can't find: the log says so, but the simulation keeps running as if the model were missing rather than broken."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: naming the two transports, the bridge process that sits between them, and the system inside Gazebo that turns a velocity command into a moving robot."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "gazebo",
+   "title": "Worlds, models, systems and plugins; the ROS bridge",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Gazebo ships example worlds. This one has two small wheeled vehicles, and it runs without a window:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "gz sim -s -r diff_drive.sdf       # terminal 1: -s is server only (no GUI), -r starts it running\ngz topic -l                       # terminal 2: lists /model/vehicle_blue/cmd_vel, /model/vehicle_blue/odometry, /clock and more\ngz topic -t /model/vehicle_blue/cmd_vel -m gz.msgs.Twist -p \"linear: {x: 0.5}, angular: {z: 0.05}\"\ngz topic -e -t /model/vehicle_blue/odometry     # the pose changes as the vehicle drives"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "diff_drive.sdf"
+        },
+        {
+         "t": "text",
+         "v": " is a "
+        },
+        {
+         "t": "i",
+         "v": "world"
+        },
+        {
+         "t": "text",
+         "v": " file in SDF, the Simulation Description Format. It sets the physics step, here 1 ms at a real-time factor of 1. It also adds the lights and the ground, and lists the "
+        },
+        {
+         "t": "i",
+         "v": "models"
+        },
+        {
+         "t": "text",
+         "v": ". A model is made of "
+        },
+        {
+         "t": "i",
+         "v": "links"
+        },
+        {
+         "t": "text",
+         "v": ", rigid bodies with mass, inertia, collision shapes and visual shapes, and of "
+        },
+        {
+         "t": "i",
+         "v": "joints"
+        },
+        {
+         "t": "text",
+         "v": " that connect links, such as the two wheel joints."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Behaviour comes from "
+        },
+        {
+         "t": "i",
+         "v": "systems"
+        },
+        {
+         "t": "text",
+         "v": ", which are plugins the SDF names with a "
+        },
+        {
+         "t": "code",
+         "v": "<plugin>"
+        },
+        {
+         "t": "text",
+         "v": " element. The world loads "
+        },
+        {
+         "t": "code",
+         "v": "gz-sim-physics-system"
+        },
+        {
+         "t": "text",
+         "v": ", which moves the bodies. It also loads "
+        },
+        {
+         "t": "code",
+         "v": "gz-sim-user-commands-system"
+        },
+        {
+         "t": "text",
+         "v": ", which accepts commands such as spawning a model, and "
+        },
+        {
+         "t": "code",
+         "v": "gz-sim-scene-broadcaster-system"
+        },
+        {
+         "t": "text",
+         "v": ", which sends the scene to a GUI. Each vehicle loads "
+        },
+        {
+         "t": "code",
+         "v": "gz-sim-diff-drive-system"
+        },
+        {
+         "t": "text",
+         "v": ", configured with its wheel joints, its wheel separation and radius, and its speed limits. That system is what subscribes to "
+        },
+        {
+         "t": "code",
+         "v": "/model/vehicle_blue/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " and publishes "
+        },
+        {
+         "t": "code",
+         "v": "/model/vehicle_blue/odometry"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Inside, Gazebo is an entity-component-system design. Worlds, models, links and joints are "
+        },
+        {
+         "t": "i",
+         "v": "entities"
+        },
+        {
+         "t": "text",
+         "v": ", their data (pose, velocity, inertia) are "
+        },
+        {
+         "t": "i",
+         "v": "components"
+        },
+        {
+         "t": "text",
+         "v": ", and systems read and write components. The lifecycle of a system, in outline: "
+        },
+        {
+         "t": "code",
+         "v": "Configure"
+        },
+        {
+         "t": "text",
+         "v": " runs once when it is loaded and reads its SDF parameters. On every simulation step, "
+        },
+        {
+         "t": "code",
+         "v": "PreUpdate"
+        },
+        {
+         "t": "text",
+         "v": " applies commands, "
+        },
+        {
+         "t": "code",
+         "v": "Update"
+        },
+        {
+         "t": "text",
+         "v": " advances the state, which is where the physics runs, and "
+        },
+        {
+         "t": "code",
+         "v": "PostUpdate"
+        },
+        {
+         "t": "text",
+         "v": " reads the results, for example to publish odometry. "
+        },
+        {
+         "t": "code",
+         "v": "Reset"
+        },
+        {
+         "t": "text",
+         "v": " runs when the world is reset. A custom plugin implements the subset of these that it needs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Gazebo Transport and ROS 2 don't talk to each other directly, so "
+        },
+        {
+         "t": "code",
+         "v": "ros_gz_bridge"
+        },
+        {
+         "t": "text",
+         "v": " connects them topic by topic. Its command-line form is "
+        },
+        {
+         "t": "code",
+         "v": "topic@ros_type<sep>gz_type"
+        },
+        {
+         "t": "text",
+         "v": ", where the separator gives the direction: "
+        },
+        {
+         "t": "code",
+         "v": "@"
+        },
+        {
+         "t": "text",
+         "v": " bridges both ways, "
+        },
+        {
+         "t": "code",
+         "v": "["
+        },
+        {
+         "t": "text",
+         "v": " from Gazebo to ROS, and "
+        },
+        {
+         "t": "code",
+         "v": "]"
+        },
+        {
+         "t": "text",
+         "v": " from ROS to Gazebo. The topic has the same name on both sides."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Drive the blue vehicle from ROS 2 and read its odometry back in ROS 2. Each command runs in its own terminal:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "gz sim -s -r diff_drive.sdf\nros2 run ros_gz_bridge parameter_bridge \\\n  /model/vehicle_blue/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist \\\n  /model/vehicle_blue/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry\nros2 topic pub --rate 5 /model/vehicle_blue/cmd_vel geometry_msgs/msg/Twist \"{linear: {x: 0.5}, angular: {z: 0.1}}\"\nros2 topic echo /model/vehicle_blue/odometry --field pose.pose.position"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Notice the direction characters. The command topic uses "
+        },
+        {
+         "t": "code",
+         "v": "]"
+        },
+        {
+         "t": "text",
+         "v": ", because commands only flow from ROS into Gazebo. The odometry uses "
+        },
+        {
+         "t": "code",
+         "v": "["
+        },
+        {
+         "t": "text",
+         "v": ", because it only flows out. "
+        },
+        {
+         "t": "code",
+         "v": "@"
+        },
+        {
+         "t": "text",
+         "v": " would bridge each topic both ways, which neither of them needs. Give every bridged topic the direction its data flows in."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Notice the timing, too. The position appears about once a second, because this world sets "
+        },
+        {
+         "t": "code",
+         "v": "odom_publish_frequency"
+        },
+        {
+         "t": "text",
+         "v": " to 1 for the blue vehicle. The simulation runs at 1000 steps per second, but the DiffDrive system publishes odometry only at the rate it was told. When a ROS topic seems slow, check the rate set on the Gazebo side before you blame the bridge."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ros2 topic pub --rate 5"
+        },
+        {
+         "t": "text",
+         "v": " keeps publishing. The DiffDrive system keeps using the last command it received, so if you stop the publisher, the vehicle carries on at the last speed until you send a zero command."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "run",
+   "title": "Run an existing robot, bridge a topic, run headless",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "diff_drive.sdf"
+         },
+         {
+          "t": "text",
+          "v": " headless for 5000 steps with "
+         },
+         {
+          "t": "code",
+          "v": "time gz sim -s -r --iterations 5000 diff_drive.sdf"
+         },
+         {
+          "t": "text",
+          "v": ". Before you run it, predict the wall-clock time, then compare."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Bridge "
+         },
+         {
+          "t": "code",
+          "v": "/clock"
+         },
+         {
+          "t": "text",
+          "v": " from Gazebo to ROS, and check with "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic echo /clock --once"
+         },
+         {
+          "t": "text",
+          "v": " that simulation time is arriving."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Drive the green vehicle in a circle from ROS 2. Write the bridge argument and the "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic pub"
+         },
+         {
+          "t": "text",
+          "v": " command yourself."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write the same bridge as a YAML file and start the bridge with "
+         },
+         {
+          "t": "code",
+          "v": "ros2 run ros_gz_bridge parameter_bridge --ros-args -p config_file:=bridge.yaml"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "It takes about 5 seconds of stepping, plus a second or two to load the world and its plugins. The world asks for a real-time factor of 1 with 1 ms steps, and running without a GUI doesn't change that: 5000 steps of 1 ms are 5 s of simulated time, which Gazebo spreads over 5 s of wall-clock time. Headless saves the rendering cost, and the topic on simulation time shows how to run faster than real time."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "/clock"
+         },
+         {
+          "t": "text",
+          "v": " flows from Gazebo to ROS, so it uses "
+         },
+         {
+          "t": "code",
+          "v": "["
+         },
+         {
+          "t": "text",
+          "v": ": "
+         },
+         {
+          "t": "code",
+          "v": "ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"
+         },
+         {
+          "t": "text",
+          "v": ". Nodes started with "
+         },
+         {
+          "t": "code",
+          "v": "use_sim_time:=true"
+         },
+         {
+          "t": "text",
+          "v": " read their time from this topic."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Only the model name changes: "
+         },
+         {
+          "t": "code",
+          "v": "/model/vehicle_green/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist"
+         },
+         {
+          "t": "text",
+          "v": ", then "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic pub --rate 5 /model/vehicle_green/cmd_vel geometry_msgs/msg/Twist \"{linear: {x: 0.3}, angular: {z: 0.3}}\""
+         },
+         {
+          "t": "text",
+          "v": ". A constant forward speed with a constant turn rate drives a circle, here of radius 0.3 / 0.3 = 1 m."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The YAML form names each side explicitly and spells out the direction:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "- ros_topic_name: \"/model/vehicle_green/cmd_vel\"\n  gz_topic_name: \"/model/vehicle_green/cmd_vel\"\n  ros_type_name: \"geometry_msgs/msg/Twist\"\n  gz_type_name: \"gz.msgs.Twist\"\n  direction: ROS_TO_GZ\n- ros_topic_name: \"/clock\"\n  gz_topic_name: \"/clock\"\n  ros_type_name: \"rosgraph_msgs/msg/Clock\"\n  gz_type_name: \"gz.msgs.Clock\"\n  direction: GZ_TO_ROS"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A file is easier to review than a long command line, and it can give the two sides different topic names. The "
+        },
+        {
+         "t": "a",
+         "v": "ros_gz_bridge README",
+         "href": "https://github.com/gazebosim/ros_gz/tree/jazzy/ros_gz_bridge"
+        },
+        {
+         "t": "text",
+         "v": " lists the supported type pairs."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Bridge type mismatches; missing resources",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The most common failure is silent: everything starts, and nothing moves. Usually one of the three names doesn't match: the topic, the ROS type, or the Gazebo type. If the bridge is told the topic carries "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/TwistStamped"
+        },
+        {
+         "t": "text",
+         "v": " while your node publishes "
+        },
+        {
+         "t": "code",
+         "v": "Twist"
+        },
+        {
+         "t": "text",
+         "v": ", ROS doesn't connect the two, and the bridge receives nothing. Compare both sides of every link. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info -v <topic>"
+        },
+        {
+         "t": "text",
+         "v": " shows the ROS types and endpoints, and "
+        },
+        {
+         "t": "code",
+         "v": "gz topic -i -t <topic>"
+        },
+        {
+         "t": "text",
+         "v": " shows the Gazebo publishers and their message type."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A node started with "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time:=true"
+        },
+        {
+         "t": "text",
+         "v": ", when nothing bridges "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": ", sees its time stay at zero. Timers made with "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": " run on that time and never fire, so the node seems to hang. Timers made with "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": " run on the computer's clock and keep firing, which makes the fault harder to spot. Bridge "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " whenever you use simulation time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Models are often referenced by URI, such as "
+        },
+        {
+         "t": "code",
+         "v": "model://my_robot"
+        },
+        {
+         "t": "text",
+         "v": " or a Gazebo Fuel URL. If Gazebo can't find a "
+        },
+        {
+         "t": "code",
+         "v": "model://"
+        },
+        {
+         "t": "text",
+         "v": " resource, the log says it is unable to find the URI and the model doesn't appear. Add the folder that contains your models to "
+        },
+        {
+         "t": "code",
+         "v": "GZ_SIM_RESOURCE_PATH"
+        },
+        {
+         "t": "text",
+         "v": ". Fuel models are downloaded on first use, so a machine without network access, such as a CI runner, has to have them cached or vendored."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Describe what a world file, a model, a link, a joint and a system are, and what "
+        },
+        {
+         "t": "code",
+         "v": "Configure"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "PreUpdate"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Update"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "PostUpdate"
+        },
+        {
+         "t": "text",
+         "v": " are for. Explain how a ROS 2 command reaches a Gazebo system, and what "
+        },
+        {
+         "t": "code",
+         "v": "@"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "["
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "]"
+        },
+        {
+         "t": "text",
+         "v": " mean in a bridge argument. Name two reasons why nothing moves even though everything started."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does each of "
+     },
+     {
+      "t": "code",
+      "v": "@"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "["
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "]"
+     },
+     {
+      "t": "text",
+      "v": " mean in a "
+     },
+     {
+      "t": "code",
+      "v": "parameter_bridge"
+     },
+     {
+      "t": "text",
+      "v": " argument, and which one do you use for commands, odometry and the clock?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In which system lifecycle step are commands applied, and in which are results published?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a headless run of a world with a real-time factor of 1 still take real time?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A node with "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time:=true"
+     },
+     {
+      "t": "text",
+      "v": " never runs the timers it made with "
+     },
+     {
+      "t": "code",
+      "v": "create_timer"
+     },
+     {
+      "t": "text",
+      "v": ". What is missing, and why do its wall timers still run?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: the commands to run "
+     },
+     {
+      "t": "code",
+      "v": "diff_drive.sdf"
+     },
+     {
+      "t": "text",
+      "v": " headless, bridge its command topic and drive it from ROS 2."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": null
+}

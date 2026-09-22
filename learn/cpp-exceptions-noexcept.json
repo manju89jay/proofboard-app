@@ -1,0 +1,3454 @@
+{
+ "id": "cpp-exceptions-noexcept",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Name the three exception safety guarantees a function can give, and say in one sentence what each promises about the state of the program after an exception. Then say which one "
+     },
+     {
+      "t": "code",
+      "v": "std::vector::push_back"
+     },
+     {
+      "t": "text",
+      "v": " gives, and the one situation in which it gives less. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "ul",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "The "
+      },
+      {
+       "t": "i",
+       "v": "basic guarantee"
+      },
+      {
+       "t": "text",
+       "v": ": if the function throws, no resource leaks and every object is still valid, with its invariants intact, but its value may have changed."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The "
+      },
+      {
+       "t": "i",
+       "v": "strong guarantee"
+      },
+      {
+       "t": "text",
+       "v": ": if the function throws, the program's state is as it was before the call. The operation either happens completely or not at all, which is also called commit or roll back."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The "
+      },
+      {
+       "t": "i",
+       "v": "nothrow guarantee"
+      },
+      {
+       "t": "text",
+       "v": ": the function never throws. In code, it is declared "
+      },
+      {
+       "t": "code",
+       "v": "noexcept"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " gives the strong guarantee ("
+     },
+     {
+      "t": "a",
+      "v": "cppreference",
+      "href": "https://en.cppreference.com/cpp/container/vector/push_back"
+     },
+     {
+      "t": "text",
+      "v": "). If adding the element throws, whether in allocating new storage or in copying or moving an element, the vector is unchanged. Here the vector is full, so "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " must move its two elements to new storage, and copying one of them throws:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <format>\n#include <iostream>\n#include <stdexcept>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Part {\n  explicit Part(std::string part_name) : name(std::move(part_name)) {}\n  Part(const Part& other) : name(other.name) {\n    if (name == \"cracked housing\") throw std::runtime_error(\"cannot copy the cracked housing\");\n  }\n  Part(Part&& other) : name(std::move(other.name)) {}  // not noexcept, so the vector copies instead\n  Part& operator=(const Part&) = default;\n  Part& operator=(Part&&) = default;\n  ~Part() = default;\n\n  std::string name;\n};\n\nint main() {\n  std::vector<Part> parts;\n  parts.reserve(2);\n  parts.emplace_back(\"wheel\");\n  parts.emplace_back(\"cracked housing\");\n  try {\n    parts.push_back(Part(\"motor\"));  // full: needs new storage for all three parts\n  } catch (const std::runtime_error& e) {\n    std::cout << std::format(\"push_back failed: {}\\n\", e.what());\n  }\n  std::cout << std::format(\"size {}, capacity {}:\", parts.size(), parts.capacity());\n  for (const Part& part : parts) std::cout << std::format(\" [{}]\", part.name);\n  std::cout << '\\n';\n}"
+   },
+   {
+    "t": "output",
+    "text": "push_back failed: cannot copy the cracked housing\nsize 2, capacity 2: [wheel] [cracked housing]"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The vector keeps the promise by copying its elements into the new storage and releasing the old storage only when every copy has succeeded. It would rather move them, and it does when the move constructor is "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "Part"
+     },
+     {
+      "t": "text",
+      "v": "'s move constructor isn't, and a move that throws halfway would leave some elements moved out of the old storage, with no way back. The exception is a type whose move may throw and that can't be copied at all: then the vector has no choice, it moves, and if a move throws, the guarantee is waived and the contents are unspecified."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with the three guarantees and the strong guarantee for "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": ". The caveat about a throwing move of a type that can't be copied is the difference between a pass and a full answer. Calling "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " basic, or not knowing the names, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Once the compiler picks which overload a call runs, ranked from an exact match down to one that compiles only through a template, that function's exception guarantee is its promise about the program's state if it throws instead of returning. The "
+    },
+    {
+     "t": "i",
+     "v": "basic guarantee"
+    },
+    {
+     "t": "text",
+     "v": " promises nothing leaks and every object stays valid, without saying what value it holds. The "
+    },
+    {
+     "t": "i",
+     "v": "strong guarantee"
+    },
+    {
+     "t": "text",
+     "v": " promises the state is exactly what it was before the call, as if the call had never run. "
+    },
+    {
+     "t": "code",
+     "v": "noexcept"
+    },
+    {
+     "t": "text",
+     "v": " on a function is a stronger promise still: that no exception leaves it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem a guarantee solves is the caller who can't tell what a failed call left behind. A route that refuses a blank waypoint partway through a batch may still hold the waypoints added before the failure, a valid route, but not the one the caller asked for, and the caller can't even tell how much of the batch went in. Knowing which guarantee a function gives is as much a part of calling it correctly as knowing its parameters, because the guarantee decides what the caller must check afterwards."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism behind the strong guarantee is doing the risky work before touching anything: build the replacement in full, where the only step that can throw runs on data nobody else can see yet, then commit it with operations that cannot fail. "
+    },
+    {
+     "t": "code",
+     "v": "std::vector::push_back"
+    },
+    {
+     "t": "text",
+     "v": " uses this when it must grow, copying old elements into new storage and freeing the old storage only once every copy succeeds, slower than moving them but untouched if a copy throws. It moves instead only when the move can't strand elements between the two storages: "
+    },
+    {
+     "t": "code",
+     "v": "std::move_if_noexcept"
+    },
+    {
+     "t": "text",
+     "v": " returns an rvalue reference, so the object moves, when the move constructor is "
+    },
+    {
+     "t": "code",
+     "v": "noexcept"
+    },
+    {
+     "t": "text",
+     "v": " or the type can't be copied, and otherwise a "
+    },
+    {
+     "t": "code",
+     "v": "const"
+    },
+    {
+     "t": "text",
+     "v": " lvalue reference, so it copies."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What "
+    },
+    {
+     "t": "code",
+     "v": "noexcept"
+    },
+    {
+     "t": "text",
+     "v": " costs is that the compiler never checks the promise. If an exception reaches the edge of a "
+    },
+    {
+     "t": "code",
+     "v": "noexcept"
+    },
+    {
+     "t": "text",
+     "v": " function anyway, "
+    },
+    {
+     "t": "code",
+     "v": "std::terminate"
+    },
+    {
+     "t": "text",
+     "v": " ends the program, so marking a function "
+    },
+    {
+     "t": "code",
+     "v": "noexcept"
+    },
+    {
+     "t": "text",
+     "v": " that might still throw is worse than not marking it. One member whose move constructor isn't "
+    },
+    {
+     "t": "code",
+     "v": "noexcept"
+    },
+    {
+     "t": "text",
+     "v": " is enough to make "
+    },
+    {
+     "t": "code",
+     "v": "move_if_noexcept"
+    },
+    {
+     "t": "text",
+     "v": " copy the whole object where the caller expected a move."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet these guarantees on every container and route operation the robot performs on a full queue or a bad reading, and the interview question is naming them, saying which one "
+    },
+    {
+     "t": "code",
+     "v": "push_back"
+    },
+    {
+     "t": "text",
+     "v": " gives, and the case where it gives less: a move-only type whose move can throw."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "overloads",
+   "title": "Overload resolution basics: exact match, promotion, conversion, templates",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four overloads of "
+        },
+        {
+         "t": "code",
+         "v": "describe"
+        },
+        {
+         "t": "text",
+         "v": ", two of "
+        },
+        {
+         "t": "code",
+         "v": "scale"
+        },
+        {
+         "t": "text",
+         "v": ", and six calls. Say which runs for each before reading the output:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <string>\n\nvoid describe(int) { std::cout << \"describe(int)\\n\"; }\nvoid describe(double) { std::cout << \"describe(double)\\n\"; }\nvoid describe(bool) { std::cout << \"describe(bool)\\n\"; }\nvoid describe(const std::string&) { std::cout << \"describe(const std::string&)\\n\"; }\n\nvoid scale(double) { std::cout << \"scale(double)\\n\"; }\ntemplate <typename T>\nvoid scale(T) {\n  std::cout << \"scale<T>(T)\\n\";\n}\n\nint main() {\n  const short sensor_id = 7;\n  describe(sensor_id);\n  describe(2.5F);\n  describe(\"front_lidar\");\n  describe(std::string(\"front_lidar\"));\n  scale(2.0);\n  scale(2);\n}"
+      },
+      {
+       "t": "output",
+       "text": "describe(int)\ndescribe(double)\ndescribe(bool)\ndescribe(const std::string&)\nscale(double)\nscale<T>(T)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The string literal going to "
+        },
+        {
+         "t": "code",
+         "v": "describe(bool)"
+        },
+        {
+         "t": "text",
+         "v": " is the classic surprise, and the rules explain it. The compiler resolves a call in three steps, which Ben and Dan Saks's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on function call resolution",
+         "href": "https://www.youtube.com/watch?v=ab_RzvGAS1Q"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2024) takes one at a time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "First, "
+        },
+        {
+         "t": "i",
+         "v": "name lookup"
+        },
+        {
+         "t": "text",
+         "v": " collects the candidates: every function called "
+        },
+        {
+         "t": "code",
+         "v": "describe"
+        },
+        {
+         "t": "text",
+         "v": " in the first enclosing scope that declares one, plus those found in the namespaces of the arguments' types, which is argument-dependent lookup. Lookup stops at the first scope that has the name, so a "
+        },
+        {
+         "t": "code",
+         "v": "describe"
+        },
+        {
+         "t": "text",
+         "v": " declared in a derived class hides every "
+        },
+        {
+         "t": "code",
+         "v": "describe"
+        },
+        {
+         "t": "text",
+         "v": " of its base, even ones that would fit better. For templates, each candidate's template arguments are deduced from the call, and a template whose deduction fails drops out."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Second, the compiler removes the candidates that aren't "
+        },
+        {
+         "t": "i",
+         "v": "viable"
+        },
+        {
+         "t": "text",
+         "v": ": the wrong number of arguments, or an argument with no implicit conversion to its parameter."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Third, it ranks the conversion each viable candidate needs for each argument, best first ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/language/overload_resolution"
+        },
+        {
+         "t": "text",
+         "v": "):"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Rank"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What it includes"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "From the program"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Exact match"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no conversion; binding a reference; array to pointer; adding "
+          },
+          {
+           "t": "code",
+           "v": "const"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::string"
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "const std::string&"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "2.0"
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "double"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Promotion"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "bool"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "char"
+          },
+          {
+           "t": "text",
+           "v": " and "
+          },
+          {
+           "t": "code",
+           "v": "short"
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "int"
+          },
+          {
+           "t": "text",
+           "v": "; "
+          },
+          {
+           "t": "code",
+           "v": "float"
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "double"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "short"
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "int"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "2.5F"
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "double"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Conversion"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "every other built-in conversion: "
+          },
+          {
+           "t": "code",
+           "v": "int"
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "double"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "double"
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "int"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "int"
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "std::int64_t"
+          },
+          {
+           "t": "text",
+           "v": ", any pointer to "
+          },
+          {
+           "t": "code",
+           "v": "bool"
+          },
+          {
+           "t": "text",
+           "v": ", a derived-class pointer to a base-class pointer"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "\"front_lidar\""
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "bool"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "User-defined conversion"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a converting constructor or a conversion operator"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "\"front_lidar\""
+          },
+          {
+           "t": "text",
+           "v": " to "
+          },
+          {
+           "t": "code",
+           "v": "std::string"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The best viable function is the one that is at least as good as every other for every argument and better for at least one. If there isn't exactly one such function, the call is ambiguous and doesn't compile. "
+        },
+        {
+         "t": "code",
+         "v": "\"front_lidar\""
+        },
+        {
+         "t": "text",
+         "v": " is a "
+        },
+        {
+         "t": "code",
+         "v": "const char[12]"
+        },
+        {
+         "t": "text",
+         "v": ". It decays to "
+        },
+        {
+         "t": "code",
+         "v": "const char*"
+        },
+        {
+         "t": "text",
+         "v": ", which counts as an exact match, and then needs either a pointer-to-"
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " conversion or "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": "'s converting constructor. A built-in conversion outranks any user-defined one, so "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " wins. A "
+        },
+        {
+         "t": "code",
+         "v": "describe(std::string_view)"
+        },
+        {
+         "t": "text",
+         "v": " overload would lose the same way. Add a "
+        },
+        {
+         "t": "code",
+         "v": "describe(const char*)"
+        },
+        {
+         "t": "text",
+         "v": " if literals should be text."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Within one rank, all conversions are equal, which is where ambiguity comes from. "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " is a different type from "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " on Linux, and converting it to "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", to "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " or to "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " is a conversion every time:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "is ambiguous",
+       "text": "#include <cstdint>\n#include <iostream>\n#include <string>\n\nvoid describe(int) { std::cout << \"describe(int)\\n\"; }\nvoid describe(double) { std::cout << \"describe(double)\\n\"; }\nvoid describe(bool) { std::cout << \"describe(bool)\\n\"; }\nvoid describe(const std::string&) { std::cout << \"describe(const std::string&)\\n\"; }\n\nint main() {\n  const std::int64_t ticks = 42;\n  describe(ticks);  // three candidates, each one conversion away\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Templates add two rules. Deduction produces the argument's own type, so a template is usually an exact match: "
+        },
+        {
+         "t": "code",
+         "v": "scale(2)"
+        },
+        {
+         "t": "text",
+         "v": " deduces "
+        },
+        {
+         "t": "code",
+         "v": "T = int"
+        },
+        {
+         "t": "text",
+         "v": ", an exact match, and beats "
+        },
+        {
+         "t": "code",
+         "v": "scale(double)"
+        },
+        {
+         "t": "text",
+         "v": ", which needs a conversion. When a template and a non-template are equally good, as for "
+        },
+        {
+         "t": "code",
+         "v": "scale(2.0)"
+        },
+        {
+         "t": "text",
+         "v": ", the non-template wins. Between two templates that match equally, the more specialised one wins, and C++20 adds a last tie-breaker: the more constrained one. Deduction also performs no conversions: with "
+        },
+        {
+         "t": "code",
+         "v": "template <typename T> T larger(T a, T b)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "larger(1, 2.5)"
+        },
+        {
+         "t": "text",
+         "v": " doesn't compile, because "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " can't be "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " at once."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The forwarding topic's hijacked copy constructor was this machinery at work. A template taking "
+        },
+        {
+         "t": "code",
+         "v": "U&&"
+        },
+        {
+         "t": "text",
+         "v": " deduces an exact match for almost anything, so it beats every overload that needs a conversion, and it beats even the copy constructor when the copy constructor has to add "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ". Ansel Sermersheim and Barbara Geller's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on overload resolution",
+         "href": "https://www.youtube.com/watch?v=b5Kbzgx1w9A"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2021) gives the fixes for a call that resolves the wrong way: add or remove an overload, make a converting constructor "
+        },
+        {
+         "t": "code",
+         "v": "explicit"
+        },
+        {
+         "t": "text",
+         "v": ", constrain a template, or convert the argument yourself with a named cast."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes. Given these overloads, say which one each call below runs, and why, before you compile anything. "
+        },
+        {
+         "t": "code",
+         "v": "make_pose()"
+        },
+        {
+         "t": "text",
+         "v": " returns a "
+        },
+        {
+         "t": "code",
+         "v": "Pose"
+        },
+        {
+         "t": "text",
+         "v": " by value."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "struct Pose {};\n\nvoid inspect(Pose&);          // A\nvoid inspect(const Pose&);    // B\nvoid inspect(Pose&&);         // C\nvoid inspect(const Pose*);    // D\nvoid inspect(double);         // E\ntemplate <typename T>\nvoid inspect(T);              // F\n\nPose pose;\nconst Pose fixed;"
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "inspect(pose)"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "inspect(fixed)"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "inspect(make_pose())"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "inspect(std::move(fixed))"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "inspect(&pose)"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "inspect(&fixed)"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "inspect(1.5)"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "inspect(1.5F)"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "inspect(90)"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n#include <utility>\n\nstruct Pose {};\n\nvoid inspect(Pose&) { std::cout << \"A: Pose&\\n\"; }\nvoid inspect(const Pose&) { std::cout << \"B: const Pose&\\n\"; }\nvoid inspect(Pose&&) { std::cout << \"C: Pose&&\\n\"; }\nvoid inspect(const Pose*) { std::cout << \"D: const Pose*\\n\"; }\nvoid inspect(double) { std::cout << \"E: double\\n\"; }\ntemplate <typename T>\nvoid inspect(T) {\n  std::cout << \"F: template\\n\";\n}\n\n[[nodiscard]] Pose make_pose() { return {}; }\n\nint main() {\n  Pose pose;\n  const Pose fixed;\n  inspect(pose);\n  inspect(fixed);\n  inspect(make_pose());\n  inspect(std::move(fixed));\n  inspect(&pose);\n  inspect(&fixed);\n  inspect(1.5);\n  inspect(1.5F);\n  inspect(90);\n}"
+      },
+      {
+       "t": "output",
+       "text": "A: Pose&\nB: const Pose&\nC: Pose&&\nB: const Pose&\nF: template\nD: const Pose*\nE: double\nF: template\nF: template"
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A. "
+         },
+         {
+          "t": "code",
+          "v": "pose"
+         },
+         {
+          "t": "text",
+          "v": " binds to "
+         },
+         {
+          "t": "code",
+          "v": "Pose&"
+         },
+         {
+          "t": "text",
+          "v": " and to "
+         },
+         {
+          "t": "code",
+          "v": "const Pose&"
+         },
+         {
+          "t": "text",
+          "v": ", and F deduces "
+         },
+         {
+          "t": "code",
+          "v": "T = Pose"
+         },
+         {
+          "t": "text",
+          "v": ", all exact matches. Of two reference bindings that differ only in "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": ", the one that adds less wins, so A beats B, and A beats F because it isn't a template."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "B. A can't bind a "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": " object. B and F are exact, and the non-template wins."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "C. A temporary can't bind to "
+         },
+         {
+          "t": "code",
+          "v": "Pose&"
+         },
+         {
+          "t": "text",
+          "v": ". B and C both bind it, and an rvalue binding to "
+         },
+         {
+          "t": "code",
+          "v": "Pose&&"
+         },
+         {
+          "t": "text",
+          "v": " beats one binding to "
+         },
+         {
+          "t": "code",
+          "v": "const Pose&"
+         },
+         {
+          "t": "text",
+          "v": ". C beats F as a non-template."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "B. "
+         },
+         {
+          "t": "code",
+          "v": "std::move(fixed)"
+         },
+         {
+          "t": "text",
+          "v": " is a "
+         },
+         {
+          "t": "code",
+          "v": "const Pose"
+         },
+         {
+          "t": "text",
+          "v": " rvalue. C can't take it, because binding "
+         },
+         {
+          "t": "code",
+          "v": "Pose&&"
+         },
+         {
+          "t": "text",
+          "v": " would drop the "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": ", so B is the only reference left. B and F are both exact, and the non-template wins. A "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": " object can't be moved from, which is why "
+         },
+         {
+          "t": "code",
+          "v": "std::move"
+         },
+         {
+          "t": "text",
+          "v": " on one does nothing useful: here it lands in the same overload as "
+         },
+         {
+          "t": "code",
+          "v": "fixed"
+         },
+         {
+          "t": "text",
+          "v": " itself."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "F. "
+         },
+         {
+          "t": "code",
+          "v": "&pose"
+         },
+         {
+          "t": "text",
+          "v": " is a "
+         },
+         {
+          "t": "code",
+          "v": "Pose*"
+         },
+         {
+          "t": "text",
+          "v": ". D needs a conversion that adds "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": ", which ranks as an exact match, but F with "
+         },
+         {
+          "t": "code",
+          "v": "T = Pose*"
+         },
+         {
+          "t": "text",
+          "v": " needs no conversion at all, and doing nothing beats adding "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": ". That decides it before the non-template rule is reached, because the rule applies only between equally good candidates."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "D. "
+         },
+         {
+          "t": "code",
+          "v": "&fixed"
+         },
+         {
+          "t": "text",
+          "v": " is already a "
+         },
+         {
+          "t": "code",
+          "v": "const Pose*"
+         },
+         {
+          "t": "text",
+          "v": ". D and F are both identity, and the non-template wins."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "E. "
+         },
+         {
+          "t": "code",
+          "v": "1.5"
+         },
+         {
+          "t": "text",
+          "v": " is a "
+         },
+         {
+          "t": "code",
+          "v": "double"
+         },
+         {
+          "t": "text",
+          "v": ", exact for E and for F, and the non-template wins."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "F. "
+         },
+         {
+          "t": "code",
+          "v": "1.5F"
+         },
+         {
+          "t": "text",
+          "v": " is a "
+         },
+         {
+          "t": "code",
+          "v": "float"
+         },
+         {
+          "t": "text",
+          "v": ". E needs a promotion, F with "
+         },
+         {
+          "t": "code",
+          "v": "T = float"
+         },
+         {
+          "t": "text",
+          "v": " needs nothing."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "F. "
+         },
+         {
+          "t": "code",
+          "v": "90"
+         },
+         {
+          "t": "text",
+          "v": " is an "
+         },
+         {
+          "t": "code",
+          "v": "int"
+         },
+         {
+          "t": "text",
+          "v": ". E needs a conversion, F with "
+         },
+         {
+          "t": "code",
+          "v": "T = int"
+         },
+         {
+          "t": "text",
+          "v": " needs nothing."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Calls 5, 8 and 9 are the lesson: a catch-all template beats every overload that needs any conversion at all, even a promotion. "
+        },
+        {
+         "t": "code",
+         "v": "inspect(nullptr)"
+        },
+        {
+         "t": "text",
+         "v": " goes to F too, with "
+        },
+        {
+         "t": "code",
+         "v": "T = std::nullptr_t"
+        },
+        {
+         "t": "text",
+         "v": ", rather than to D. If a template like F is only meant for types no other overload covers, constrain it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "guarantees",
+   "title": "Exception guarantees; strong guarantee with copy-and-swap; cleanup on failure",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "append"
+        },
+        {
+         "t": "text",
+         "v": " adds waypoints one at a time and refuses a blank name. What does the route hold after a batch with a blank name in the middle?"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <format>\n#include <iostream>\n#include <span>\n#include <stdexcept>\n#include <string>\n#include <string_view>\n#include <vector>\n\nclass Route {\n public:\n  // Appends each name in turn, and throws at a blank one.\n  void append(std::span<const std::string_view> names) {\n    for (const std::string_view name : names) {\n      if (name.empty()) throw std::invalid_argument(\"blank waypoint name\");\n      waypoints_.emplace_back(name);\n    }\n  }\n  [[nodiscard]] std::string describe() const {\n    std::string text;\n    for (const std::string& waypoint : waypoints_) text += (text.empty() ? \"\" : \", \") + waypoint;\n    return text;\n  }\n\n private:\n  std::vector<std::string> waypoints_;\n};\n\nint main() {\n  Route route;\n  constexpr std::array<std::string_view, 1> start{\"dock\"};\n  route.append(start);\n  constexpr std::array<std::string_view, 3> batch{\"shelf\", \"\", \"gate\"};\n  try {\n    route.append(batch);\n  } catch (const std::invalid_argument& e) {\n    std::cout << std::format(\"append failed: {}\\n\", e.what());\n  }\n  std::cout << std::format(\"route: {}\\n\", route.describe());\n}"
+      },
+      {
+       "t": "output",
+       "text": "append failed: blank waypoint name\nroute: dock, shelf"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The failed call still added "
+        },
+        {
+         "t": "code",
+         "v": "shelf"
+        },
+        {
+         "t": "text",
+         "v": ". Nothing leaked, and the route is a valid route, so "
+        },
+        {
+         "t": "code",
+         "v": "append"
+        },
+        {
+         "t": "text",
+         "v": " gives the "
+        },
+        {
+         "t": "i",
+         "v": "basic guarantee"
+        },
+        {
+         "t": "text",
+         "v": ". It doesn't give the "
+        },
+        {
+         "t": "i",
+         "v": "strong guarantee"
+        },
+        {
+         "t": "text",
+         "v": ", under which the route would still be "
+        },
+        {
+         "t": "code",
+         "v": "dock"
+        },
+        {
+         "t": "text",
+         "v": " alone. Which one a function gives is part of its contract, as much as its parameters are, and the caller can't write correct error handling without knowing it. After this "
+        },
+        {
+         "t": "code",
+         "v": "append"
+        },
+        {
+         "t": "text",
+         "v": " fails, the caller has to decide whether a half-appended route is acceptable, and it can't even tell how much was appended."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Below the basic guarantee is no guarantee at all: after an exception, an invariant may be broken or a resource leaked, and the object can't safely be used again. Above the strong guarantee is the "
+        },
+        {
+         "t": "i",
+         "v": "nothrow guarantee"
+        },
+        {
+         "t": "text",
+         "v": ": the function can't fail. Destructors, deallocation and "
+        },
+        {
+         "t": "code",
+         "v": "swap"
+        },
+        {
+         "t": "text",
+         "v": " must never fail, and neither may copying or moving an exception object ("
+        },
+        {
+         "t": "a",
+         "v": "E.16",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-never-fail"
+        },
+        {
+         "t": "text",
+         "v": "). Move operations should be "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " too ("
+        },
+        {
+         "t": "a",
+         "v": "C.66",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-noexcept"
+        },
+        {
+         "t": "text",
+         "v": "). The other two guarantees are built from these operations. Klaus Iglberger's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on exceptions",
+         "href": "https://www.youtube.com/watch?v=0ojB8c0xUd8"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2020) sets the default: every function gives at least the basic guarantee, the strong guarantee where that is possible and reasonable, and the nothrow guarantee only where you can keep that promise through every future change."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "RAII gives the basic guarantee almost for free. When every resource has an owner, unwinding releases it, as the RAII topic showed, so the only work left is keeping invariants: never leave an object between two related updates when something that can throw runs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The strong guarantee needs a recipe, and it has one. Do all the work that can throw on the side, on a copy or on new objects the caller can't see yet, and then commit with operations that can't throw. If anything throws before the commit, the side copies are destroyed during unwinding and the original is untouched. The commit is usually a "
+        },
+        {
+         "t": "code",
+         "v": "swap"
+        },
+        {
+         "t": "text",
+         "v": ", which the standard containers declare "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " when they use the default allocator ("
+        },
+        {
+         "t": "a",
+         "v": "C.85",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-swap-noexcept"
+        },
+        {
+         "t": "text",
+         "v": "), or a "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " move assignment. The rule of five topic used this recipe for copy assignment, as copy-and-swap. The same recipe works for any function that changes state, and the worked example applies it to two containers that must agree."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It has a price. The copy costs time and memory in proportion to the whole object, on every call, even though most calls succeed. For a route of ten waypoints that is nothing; for a map of a million cells updated at 100 Hz it is a design decision. The cheaper alternative is to validate everything first and change the object only once nothing can fail except allocation. That gives the strong guarantee against bad input, the failure you expect, and the basic guarantee against running out of memory. "
+        },
+        {
+         "t": "code",
+         "v": "Route::append"
+        },
+        {
+         "t": "text",
+         "v": " becomes strong against blank names by checking them all before appending any."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Exceptions are for a function that can't do what its name promises ("
+        },
+        {
+         "t": "a",
+         "v": "E.2",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-throw"
+        },
+        {
+         "t": "text",
+         "v": "): a constructor that can't establish its invariant, a file that should exist and doesn't. They are the wrong tool for a failure the caller expects often and handles on the spot, such as a lookup that finds nothing, where "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " says it better. C++23 adds "
+        },
+        {
+         "t": "code",
+         "v": "std::expected<T, E>"
+        },
+        {
+         "t": "text",
+         "v": ", which holds either a result or an error value, for failures such as parsing input, where the caller needs to know why ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/utility/expected"
+        },
+        {
+         "t": "text",
+         "v": "). GCC 13 in C++20 mode doesn't have it, so this course doesn't use it. Throw by value and catch by "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " reference, so that nothing is copied or sliced ("
+        },
+        {
+         "t": "a",
+         "v": "E.15",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-exception-ref"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "Mission"
+        },
+        {
+         "t": "text",
+         "v": " keeps its waypoints in order in a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " and in an index from name to position, and the two must always agree. "
+        },
+        {
+         "t": "code",
+         "v": "add_all_unsafe"
+        },
+        {
+         "t": "text",
+         "v": " updates both for each name; "
+        },
+        {
+         "t": "code",
+         "v": "add_all"
+        },
+        {
+         "t": "text",
+         "v": " applies the recipe:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <format>\n#include <iostream>\n#include <span>\n#include <stdexcept>\n#include <string>\n#include <string_view>\n#include <unordered_map>\n#include <vector>\n\nusing Index = std::unordered_map<std::string, std::ptrdiff_t>;\n\n// Adds one name to an index, and refuses a name that is already there.\nvoid index_name(Index& index, std::string_view name, std::ptrdiff_t position) {\n  if (!index.try_emplace(std::string(name), position).second) {\n    throw std::invalid_argument(std::format(\"duplicate waypoint {}\", name));\n  }\n}\n\n// Invariant: index_ maps every name in order_ to its position there, and holds nothing else.\nclass Mission {\n public:\n  // No guarantee: a duplicate throws between the two updates, and the invariant breaks.\n  void add_all_unsafe(std::span<const std::string_view> names) {\n    for (const std::string_view name : names) {\n      order_.emplace_back(name);\n      index_name(index_, name, std::ssize(order_) - 1);\n    }\n  }\n\n  // Strong guarantee: everything that can throw works on copies, and the commit can't throw.\n  void add_all(std::span<const std::string_view> names) {\n    std::vector<std::string> order = order_;\n    Index index = index_;\n    for (const std::string_view name : names) {\n      order.emplace_back(name);\n      index_name(index, name, std::ssize(order) - 1);\n    }\n    order_.swap(order);  // noexcept\n    index_.swap(index);  // noexcept\n  }\n\n  [[nodiscard]] std::string summary() const {\n    return std::format(\"{} in order, {} in the index\", order_.size(), index_.size());\n  }\n\n private:\n  std::vector<std::string> order_;\n  Index index_;\n};\n\nint main() {\n  constexpr std::array<std::string_view, 2> start{\"dock\", \"shelf\"};\n  constexpr std::array<std::string_view, 3> batch{\"gate\", \"dock\", \"charger\"};\n\n  Mission unsafe;\n  unsafe.add_all_unsafe(start);\n  try {\n    unsafe.add_all_unsafe(batch);\n  } catch (const std::invalid_argument& e) {\n    std::cout << std::format(\"unsafe: {}; now {}\\n\", e.what(), unsafe.summary());\n  }\n\n  Mission strong;\n  strong.add_all(start);\n  try {\n    strong.add_all(batch);\n  } catch (const std::invalid_argument& e) {\n    std::cout << std::format(\"strong: {}; still {}\\n\", e.what(), strong.summary());\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "unsafe: duplicate waypoint dock; now 4 in order, 3 in the index\nstrong: duplicate waypoint dock; still 2 in order, 2 in the index"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The unsafe version gives no guarantee. It appended "
+         },
+         {
+          "t": "code",
+          "v": "gate"
+         },
+         {
+          "t": "text",
+          "v": " to both containers, then appended the second "
+         },
+         {
+          "t": "code",
+          "v": "dock"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": "order_"
+         },
+         {
+          "t": "text",
+          "v": " and threw before indexing it. Four names in order and three in the index is a broken invariant, and every later lookup by position can be wrong. The fault isn't the exception but the order of the updates: the throw happens after one container changed and before the other did."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The strong version throws at the same point, but inside its copies. The unwinding destroys "
+         },
+         {
+          "t": "code",
+          "v": "order"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "index"
+         },
+         {
+          "t": "text",
+          "v": ", and that is the whole cleanup on failure: nothing needs undoing, because nothing visible changed. No "
+         },
+         {
+          "t": "code",
+          "v": "catch"
+         },
+         {
+          "t": "text",
+          "v": " block and no scope guard appear in "
+         },
+         {
+          "t": "code",
+          "v": "add_all"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The two "
+         },
+         {
+          "t": "code",
+          "v": "swap"
+         },
+         {
+          "t": "text",
+          "v": "s are the commit, and the guarantee rests on them being "
+         },
+         {
+          "t": "code",
+          "v": "noexcept"
+         },
+         {
+          "t": "text",
+          "v": ". If the commit could throw between the first and the second swap, the strong version would have the unsafe version's bug."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The price is a copy of both containers per call, successful or not. When that is too much, validate the whole batch against the index first, then apply it; the scope guard from the RAII topic covers the steps that can't be validated in advance."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. A robot reads parameter updates as lines of the form "
+        },
+        {
+         "t": "code",
+         "v": "name=value"
+        },
+        {
+         "t": "text",
+         "v": ", such as "
+        },
+        {
+         "t": "code",
+         "v": "max_speed=1.5"
+        },
+        {
+         "t": "text",
+         "v": ". Write a "
+        },
+        {
+         "t": "code",
+         "v": "ParameterStore"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "apply(std::span<const std::string_view> lines)"
+        },
+        {
+         "t": "text",
+         "v": ", which applies every line or none of them, and "
+        },
+        {
+         "t": "code",
+         "v": "get(std::string_view name)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<double>"
+        },
+        {
+         "t": "text",
+         "v": ". A line without "
+        },
+        {
+         "t": "code",
+         "v": "="
+        },
+        {
+         "t": "text",
+         "v": ", with an empty name or with a value that isn't a number makes "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": " throw "
+        },
+        {
+         "t": "code",
+         "v": "std::invalid_argument"
+        },
+        {
+         "t": "text",
+         "v": ", with a message that names the line number. Several threads use the store, so both functions lock a "
+        },
+        {
+         "t": "code",
+         "v": "std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " member. Then test in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A good batch is applied."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A batch whose second line has no "
+         },
+         {
+          "t": "code",
+          "v": "="
+         },
+         {
+          "t": "text",
+          "v": " is refused, and a value set by its first line isn't there afterwards."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A batch with a value that isn't a number is refused."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The store still works after the failures, which shows that the mutex was released while the exception left "
+         },
+         {
+          "t": "code",
+          "v": "apply"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Say which guarantee each of your functions gives, and what "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": "'s guarantee costs."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <charconv>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <map>\n#include <mutex>\n#include <optional>\n#include <span>\n#include <stdexcept>\n#include <string>\n#include <string_view>\n#include <system_error>\n\nstruct Entry {\n  std::string_view name;\n  double value = 0;\n};\n\n// Parses \"name=value\", or throws std::invalid_argument naming the line.\n[[nodiscard]] Entry parse_line(std::string_view line, std::ptrdiff_t number) {\n  const auto equals = line.find('=');\n  if (equals == std::string_view::npos || equals == 0) {\n    throw std::invalid_argument(std::format(\"line {}: expected name=value\", number));\n  }\n  const std::string_view text = line.substr(equals + 1);\n  double value = 0;\n  const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);\n  if (error != std::errc{} || end != text.data() + text.size()) {\n    throw std::invalid_argument(std::format(\"line {}: {} is not a number\", number, text));\n  }\n  return {.name = line.substr(0, equals), .value = value};\n}\n\nclass ParameterStore {\n public:\n  // Strong guarantee: applies every line, or throws and changes nothing.\n  void apply(std::span<const std::string_view> lines) {\n    const std::scoped_lock lock(mutex_);\n    std::map<std::string, double, std::less<>> staged = values_;\n    for (std::ptrdiff_t i = 0; i < std::ssize(lines); ++i) {\n      const Entry entry = parse_line(lines[i], i + 1);\n      staged.insert_or_assign(std::string(entry.name), entry.value);\n    }\n    values_.swap(staged);  // the commit: noexcept\n  }\n\n  [[nodiscard]] std::optional<double> get(std::string_view name) const {\n    const std::scoped_lock lock(mutex_);\n    const auto found = values_.find(name);\n    if (found == values_.end()) return std::nullopt;\n    return found->second;\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::map<std::string, double, std::less<>> values_;\n};\n\nint main() {\n  ParameterStore store;\n  const auto try_apply = [&store](std::span<const std::string_view> lines) {\n    try {\n      store.apply(lines);\n      std::cout << \"applied\\n\";\n    } catch (const std::invalid_argument& e) {\n      std::cout << std::format(\"refused, {}\\n\", e.what());\n    }\n  };\n  const auto show = [&store] {\n    std::cout << std::format(\"max_speed {}, wheel_base {}, accel {}\\n\", store.get(\"max_speed\").value(),\n                             store.get(\"wheel_base\").value(), store.get(\"accel\") ? \"set\" : \"not set\");\n  };\n\n  constexpr std::array<std::string_view, 2> initial{\"max_speed=1.5\", \"wheel_base=0.35\"};\n  constexpr std::array<std::string_view, 3> missing_equals{\"accel=0.8\", \"max_speed\", \"wheel_base=0.4\"};\n  constexpr std::array<std::string_view, 1> not_a_number{\"max_speed=fast\"};\n  constexpr std::array<std::string_view, 1> update{\"max_speed=2.0\"};\n\n  try_apply(initial);\n  try_apply(missing_equals);\n  try_apply(not_a_number);\n  show();\n  try_apply(update);\n  show();\n}"
+      },
+      {
+       "t": "output",
+       "text": "applied\nrefused, line 2: expected name=value\nrefused, line 1: fast is not a number\nmax_speed 1.5, wheel_base 0.35, accel not set\napplied\nmax_speed 2, wheel_base 0.35, accel not set"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": " gives the strong guarantee. It parses and inserts into "
+        },
+        {
+         "t": "code",
+         "v": "staged"
+        },
+        {
+         "t": "text",
+         "v": ", a copy, and only the "
+        },
+        {
+         "t": "code",
+         "v": "swap"
+        },
+        {
+         "t": "text",
+         "v": " touches "
+        },
+        {
+         "t": "code",
+         "v": "values_"
+        },
+        {
+         "t": "text",
+         "v": ". The second batch set "
+        },
+        {
+         "t": "code",
+         "v": "accel"
+        },
+        {
+         "t": "text",
+         "v": " in the copy before line 2 threw, and the output shows it never reached the store. The cleanup on failure takes no code: while the exception leaves "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": ", the destructors of "
+        },
+        {
+         "t": "code",
+         "v": "staged"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "lock"
+        },
+        {
+         "t": "text",
+         "v": " run, which frees the copy and unlocks the mutex. The last two lines prove that the mutex was released. "
+        },
+        {
+         "t": "code",
+         "v": "get"
+        },
+        {
+         "t": "text",
+         "v": " locks the same mutex, and locking a "
+        },
+        {
+         "t": "code",
+         "v": "std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " that the same thread still holds is undefined behaviour, which with glibc hangs forever. "
+        },
+        {
+         "t": "code",
+         "v": "get"
+        },
+        {
+         "t": "text",
+         "v": " gives the strong guarantee too, trivially, because it changes nothing. It can't be "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", though: "
+        },
+        {
+         "t": "code",
+         "v": "std::mutex::lock"
+        },
+        {
+         "t": "text",
+         "v": " may throw "
+        },
+        {
+         "t": "code",
+         "v": "std::system_error"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The price is a copy of the whole map on every "
+        },
+        {
+         "t": "code",
+         "v": "apply"
+        },
+        {
+         "t": "text",
+         "v": ", including the ones that fail. For a few dozen parameters that is nothing. For a large store, parse every line into a small "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Entry>"
+        },
+        {
+         "t": "text",
+         "v": " first, which is where every expected failure happens, and then insert. That keeps the strong guarantee against bad input and gives the basic guarantee if an insertion runs out of memory. The parameter names in "
+        },
+        {
+         "t": "code",
+         "v": "Entry"
+        },
+        {
+         "t": "text",
+         "v": " are "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": "s into the caller's lines, which is safe because they don't outlive the call."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "noexcept",
+   "title": "noexcept, move_if_noexcept and throwing destructors",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " on a function is a promise that no exception leaves it. The compiler doesn't check the promise. If an exception reaches the edge of a "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " function anyway, "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": " ends the program, and whether the stack is unwound first is up to the implementation ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/language/noexcept_spec"
+        },
+        {
+         "t": "text",
+         "v": "). So the promise changes behaviour in two ways: what happens when it is broken, and what other code decides because it was made."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second matters more, and "
+        },
+        {
+         "t": "code",
+         "v": "std::move_if_noexcept"
+        },
+        {
+         "t": "text",
+         "v": " is where the standard library decides. It returns an rvalue reference, so that the object is moved, if the type's move constructor is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " or the type can't be copied; otherwise it returns a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " lvalue reference, so that the object is copied. The "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " operator asks the same question at compile time: "
+        },
+        {
+         "t": "code",
+         "v": "noexcept(expr)"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "true"
+        },
+        {
+         "t": "text",
+         "v": " if "
+        },
+        {
+         "t": "code",
+         "v": "expr"
+        },
+        {
+         "t": "text",
+         "v": " is declared not to throw, without evaluating it. Three types, each relocated the way "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " relocates its elements when it grows:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string_view>\n#include <type_traits>\n#include <utility>\n\nstruct NothrowMove {\n  NothrowMove() = default;\n  NothrowMove(const NothrowMove&) { std::cout << \"copy\\n\"; }\n  NothrowMove(NothrowMove&&) noexcept { std::cout << \"move\\n\"; }\n  NothrowMove& operator=(const NothrowMove&) = default;\n  NothrowMove& operator=(NothrowMove&&) = default;\n  ~NothrowMove() = default;\n};\n\nstruct ThrowingMove {\n  ThrowingMove() = default;\n  ThrowingMove(const ThrowingMove&) { std::cout << \"copy\\n\"; }\n  ThrowingMove(ThrowingMove&&) { std::cout << \"move\\n\"; }\n  ThrowingMove& operator=(const ThrowingMove&) = default;\n  ThrowingMove& operator=(ThrowingMove&&) = default;\n  ~ThrowingMove() = default;\n};\n\nstruct MoveOnly {\n  MoveOnly() = default;\n  MoveOnly(const MoveOnly&) = delete;\n  MoveOnly(MoveOnly&&) { std::cout << \"move\\n\"; }\n  MoveOnly& operator=(const MoveOnly&) = delete;\n  MoveOnly& operator=(MoveOnly&&) = default;\n  ~MoveOnly() = default;\n};\n\ntemplate <typename T>\nvoid relocate(std::string_view label) {\n  T original;\n  std::cout << std::format(\"{:<14} nothrow move {:<5} relocated by \", label,\n                           std::is_nothrow_move_constructible_v<T>);\n  const T relocated(std::move_if_noexcept(original));\n}\n\nint main() {\n  relocate<NothrowMove>(\"NothrowMove\");\n  relocate<ThrowingMove>(\"ThrowingMove\");\n  relocate<MoveOnly>(\"MoveOnly\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "NothrowMove    nothrow move true  relocated by move\nThrowingMove   nothrow move false relocated by copy\nMoveOnly       nothrow move false relocated by move"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ThrowingMove"
+        },
+        {
+         "t": "text",
+         "v": " pays a copy wherever a move would do, in every growth of every vector that holds it. That is the reason for "
+        },
+        {
+         "t": "a",
+         "v": "C.66",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-noexcept"
+        },
+        {
+         "t": "text",
+         "v": ": make move operations "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ". The rule of five topic showed what that costs a growing vector. "
+        },
+        {
+         "t": "code",
+         "v": "MoveOnly"
+        },
+        {
+         "t": "text",
+         "v": " is the exception from the cold check: it can't be copied, so it is moved even though the move may throw, and the strong guarantee is waived."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Some functions are "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " without saying so. Destructors are, unless a member's or base's destructor isn't. A defaulted special member is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " exactly when the same operation is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " for every member and base, which is why a class that follows the rule of zero with well-behaved members gets "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " moves for free, and loses them when one member's move can throw. A conditional "
+        },
+        {
+         "t": "code",
+         "v": "noexcept(noexcept(a.swap(b)))"
+        },
+        {
+         "t": "text",
+         "v": " passes the question on to the operations a template uses."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Where to write it: on move operations and "
+        },
+        {
+         "t": "code",
+         "v": "swap"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "C.85",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-swap-noexcept"
+        },
+        {
+         "t": "text",
+         "v": "), which the library checks, and on low-level functions that can't fail ("
+        },
+        {
+         "t": "a",
+         "v": "F.6",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "a",
+         "v": "E.12",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-noexcept"
+        },
+        {
+         "t": "text",
+         "v": "). F.6 also accepts "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " on a function that allocates, in a program that can't recover from running out of memory anyway: "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": " is then the intended response. Don't put it on an interface function that might need to throw one day. Callers may come to depend on it, and removing it later breaks them, which is why Iglberger calls it a promise that can't be taken back."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " function that throws directly doesn't compile with "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " in GCC 13, because "
+        },
+        {
+         "t": "code",
+         "v": "-Wterminate"
+        },
+        {
+         "t": "text",
+         "v": ", on by default, sees the "
+        },
+        {
+         "t": "code",
+         "v": "throw"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "will always call",
+       "text": "#include <stdexcept>\n\n[[nodiscard]] double checked_speed(double metres_per_second) noexcept {\n  if (metres_per_second > 2.0) throw std::out_of_range(\"speed above the limit\");\n  return metres_per_second;\n}\n\nint main() { return checked_speed(1.0) > 0.0 ? 0 : 1; }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The warning sees only a "
+        },
+        {
+         "t": "code",
+         "v": "throw"
+        },
+        {
+         "t": "text",
+         "v": " written in the function itself. Here "
+        },
+        {
+         "t": "code",
+         "v": "speed_or_zero"
+        },
+        {
+         "t": "text",
+         "v": " promises not to throw and calls a parser that does. It compiles without a warning under "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra -Werror"
+        },
+        {
+         "t": "text",
+         "v": ", and the "
+        },
+        {
+         "t": "code",
+         "v": "catch"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " never runs:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "[[nodiscard]] double parse_speed(std::string_view text);  // throws std::invalid_argument(\"not a speed\")\n\n[[nodiscard]] double speed_or_zero(std::string_view text) noexcept { return parse_speed(text); }\n\nint main() {\n  try {\n    std::cout << speed_or_zero(\"1.5\") << '\\n';\n    std::cout << speed_or_zero(\"fast\") << '\\n';\n  } catch (const std::invalid_argument& e) {\n    std::cout << \"caught: \" << e.what() << '\\n';  // never reached\n  }\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Built with GCC 13.3 and run in a terminal, it prints this, and the shell reports exit status 134, which is 128 plus 6, the number of "
+        },
+        {
+         "t": "code",
+         "v": "SIGABRT"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "1.5\nterminate called after throwing an instance of 'std::invalid_argument'\n  what():  not a speed"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With stdout piped to a file, the "
+        },
+        {
+         "t": "code",
+         "v": "1.5"
+        },
+        {
+         "t": "text",
+         "v": " disappears too: "
+        },
+        {
+         "t": "code",
+         "v": "std::cout"
+        },
+        {
+         "t": "text",
+         "v": " then buffers its output, and "
+        },
+        {
+         "t": "code",
+         "v": "abort"
+        },
+        {
+         "t": "text",
+         "v": " doesn't flush it. The name promised a fallback that was never written. Either catch inside the function and return the fallback, or drop "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " and let the caller handle the exception. "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": " is the right outcome only where no caller could do anything better."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A destructor may opt out with "
+        },
+        {
+         "t": "code",
+         "v": "noexcept(false)"
+        },
+        {
+         "t": "text",
+         "v": ", and then its exception can be caught, until the day the destructor runs because another exception is already unwinding the stack. C++ can't have two exceptions in flight from the same unwinding, so that ends in "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": " too. This "
+        },
+        {
+         "t": "code",
+         "v": "Transaction"
+        },
+        {
+         "t": "text",
+         "v": " throws from its destructor when nobody committed it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "class Transaction {\n public:\n  ~Transaction() noexcept(false) {\n    if (!committed_) throw std::runtime_error(\"rollback failed\");\n  }\n  void commit() { committed_ = true; }\n\n private:\n  bool committed_ = false;\n};\n\nvoid save() {\n  const Transaction transaction;\n  throw std::runtime_error(\"disk full\");  // unwinding destroys transaction, which throws again\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that first destroys an uncommitted "
+        },
+        {
+         "t": "code",
+         "v": "Transaction"
+        },
+        {
+         "t": "text",
+         "v": " inside a "
+        },
+        {
+         "t": "code",
+         "v": "try"
+        },
+        {
+         "t": "text",
+         "v": " block, and then calls "
+        },
+        {
+         "t": "code",
+         "v": "save()"
+        },
+        {
+         "t": "text",
+         "v": " inside another, each followed by a "
+        },
+        {
+         "t": "code",
+         "v": "catch"
+        },
+        {
+         "t": "text",
+         "v": " that prints the message, GCC 13.3's build prints this and exits with status 134:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "caught: rollback failed\nterminate called after throwing an instance of 'std::runtime_error'\n  what():  rollback failed"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first failure was caught normally. The second exception, the one from the destructor, arrived while "
+        },
+        {
+         "t": "code",
+         "v": "disk full"
+        },
+        {
+         "t": "text",
+         "v": " was unwinding the stack, so the "
+        },
+        {
+         "t": "code",
+         "v": "catch"
+        },
+        {
+         "t": "text",
+         "v": " around "
+        },
+        {
+         "t": "code",
+         "v": "save()"
+        },
+        {
+         "t": "text",
+         "v": " never ran, for either exception. The RAII topic gave the fix: a destructor that must not fail stays "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", and a cleanup whose failure matters gets an explicit function, such as "
+        },
+        {
+         "t": "code",
+         "v": "rollback()"
+        },
+        {
+         "t": "text",
+         "v": ", that the caller calls and checks ("
+        },
+        {
+         "t": "a",
+         "v": "E.16",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-never-fail"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The quiet failure is a move that isn't "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " because of a member. "
+        },
+        {
+         "t": "code",
+         "v": "Track"
+        },
+        {
+         "t": "text",
+         "v": " below follows the rule of zero, and its moves are defaulted, so they are "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " exactly when its members' are. "
+        },
+        {
+         "t": "code",
+         "v": "Probe"
+        },
+        {
+         "t": "text",
+         "v": " counts how its "
+        },
+        {
+         "t": "code",
+         "v": "Track"
+        },
+        {
+         "t": "text",
+         "v": " was relocated:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <deque>\n#include <format>\n#include <iostream>\n#include <string_view>\n#include <type_traits>\n#include <vector>\n\nstruct Counts {\n  int copies = 0;\n  int moves = 0;\n};\n\n// Counts how the object that holds it is relocated.\nclass Probe {\n public:\n  explicit Probe(Counts& counts) : counts_(&counts) {}\n  Probe(const Probe& other) : counts_(other.counts_) { ++counts_->copies; }\n  Probe(Probe&& other) noexcept : counts_(other.counts_) { ++counts_->moves; }\n  Probe& operator=(const Probe&) = default;\n  Probe& operator=(Probe&&) = default;\n  ~Probe() = default;\n\n private:\n  Counts* counts_;\n};\n\nstruct Pose {\n  double x = 0;\n  double y = 0;\n};\n\ntemplate <typename History>\nstruct Track {\n  History history;\n  Probe probe;\n};\n\ntemplate <typename History>\nvoid grow(std::string_view label) {\n  Counts counts;\n  std::vector<Track<History>> tracks;\n  tracks.reserve(4);\n  for (int i = 0; i < 4; ++i) tracks.push_back(Track<History>{.history = History(100), .probe = Probe(counts)});\n  counts = Counts{};\n  tracks.reserve(8);  // relocates the four tracks\n  std::cout << std::format(\"{:<12} nothrow move {:<5} relocation: {} copies, {} moves\\n\", label,\n                           std::is_nothrow_move_constructible_v<Track<History>>, counts.copies, counts.moves);\n}\n\nint main() {\n  grow<std::vector<Pose>>(\"std::vector\");\n  grow<std::deque<Pose>>(\"std::deque\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "std::vector  nothrow move true  relocation: 0 copies, 4 moves\nstd::deque   nothrow move false relocation: 4 copies, 0 moves"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nothing in "
+        },
+        {
+         "t": "code",
+         "v": "Track"
+        },
+        {
+         "t": "text",
+         "v": " changed but the container of its history, and every relocation now copies 100 poses per track. GCC's "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": " move constructor isn't "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", because it allocates: it gives the moved-from deque a new, empty block map, so that the source stays usable. That makes "
+        },
+        {
+         "t": "code",
+         "v": "Track"
+        },
+        {
+         "t": "text",
+         "v": "'s defaulted move "
+        },
+        {
+         "t": "code",
+         "v": "noexcept(false)"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " falls back to copies. Nothing warns. A "
+        },
+        {
+         "t": "code",
+         "v": "static_assert(std::is_nothrow_move_constructible_v<Track>)"
+        },
+        {
+         "t": "text",
+         "v": " next to a type that lives in vectors turns the silent copy into a compile error. The fixes are to choose a member with a "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " move, to "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": " so that growth doesn't happen, or to declare "
+        },
+        {
+         "t": "code",
+         "v": "Track(Track&&) noexcept = default;"
+        },
+        {
+         "t": "text",
+         "v": " together with the other four special members. C++20 accepts the "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " on a defaulted move even though the deque's move may throw, and an allocation failure during the move then calls "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": ": the F.6 trade again."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. List the ranks of overload resolution, and say when a template beats a non-template and when it loses. Define the basic, strong and nothrow guarantees, say which one "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " gives and when it gives less, and give the recipe for the strong guarantee and its cost. Say what happens when an exception leaves a "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " function or a destructor during unwinding, what "
+        },
+        {
+         "t": "code",
+         "v": "std::move_if_noexcept"
+        },
+        {
+         "t": "text",
+         "v": " decides, and how one member can make a class copy where it should move."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "In what order does the compiler look up names, remove candidates and rank conversions, and what are the ranks?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "describe(\"text\")"
+     },
+     {
+      "t": "text",
+      "v": " call "
+     },
+     {
+      "t": "code",
+      "v": "describe(bool)"
+     },
+     {
+      "t": "text",
+      "v": " rather than "
+     },
+     {
+      "t": "code",
+      "v": "describe(const std::string&)"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When does a function template beat a non-template overload, and what breaks a tie between them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "inspect(&pose)"
+     },
+     {
+      "t": "text",
+      "v": " pick "
+     },
+     {
+      "t": "code",
+      "v": "template <typename T> void inspect(T)"
+     },
+     {
+      "t": "text",
+      "v": " over "
+     },
+     {
+      "t": "code",
+      "v": "inspect(const Pose*)"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Define the basic, strong and nothrow guarantees. Which does "
+     },
+     {
+      "t": "code",
+      "v": "std::vector::push_back"
+     },
+     {
+      "t": "text",
+      "v": " give, and when is it waived?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the recipe for the strong guarantee, and why must the commit be "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What happens when an exception leaves a "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": " function, and why doesn't GCC always warn?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::move_if_noexcept"
+     },
+     {
+      "t": "text",
+      "v": " return for a type with a throwing move, and for a move-only type?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a class holding a "
+     },
+     {
+      "t": "code",
+      "v": "std::deque"
+     },
+     {
+      "t": "text",
+      "v": " get copied, not moved, when a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " of it grows in GCC 13?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a function that updates two containers with the strong guarantee."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: Exceptions, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_exceptions/back_to_basics_exceptions__klaus_iglberger__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=0ojB8c0xUd8"
+     },
+     {
+      "t": "text",
+      "v": ". The three guarantees, which one to aim for by default, "
+     },
+     {
+      "t": "code",
+      "v": "noexcept"
+     },
+     {
+      "t": "text",
+      "v": " as a promise that can't be taken back, and failing cleanup in destructors."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Ben Saks and Dan Saks, Back to Basics: Function Call Resolution, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Function_Call_Resolution.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ab_RzvGAS1Q"
+     },
+     {
+      "t": "text",
+      "v": ". Name lookup before overload resolution, the conversion ranks, and templates against non-templates."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Ansel Sermersheim and Barbara Geller, Back to Basics: Overload Resolution, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Overload_Resolution_CppCon_2021.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=b5Kbzgx1w9A"
+     },
+     {
+      "t": "text",
+      "v": ". Viable candidates, tie-breakers, and what to do when the wrong overload wins."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "E.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-throw"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "E.12",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-noexcept"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "E.15",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-exception-ref"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "E.16",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#re-never-fail"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-noexcept"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.66",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-move-noexcept"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "C.85",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-swap-noexcept"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "overload resolution",
+      "href": "https://en.cppreference.com/cpp/language/overload_resolution"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "exceptions and exception safety",
+      "href": "https://en.cppreference.com/cpp/language/exceptions"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "the noexcept specifier",
+      "href": "https://en.cppreference.com/cpp/language/noexcept_spec"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::move_if_noexcept",
+      "href": "https://en.cppreference.com/cpp/utility/move_if_noexcept"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "vector::push_back",
+      "href": "https://en.cppreference.com/cpp/container/vector/push_back"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::expected",
+      "href": "https://en.cppreference.com/cpp/utility/expected"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

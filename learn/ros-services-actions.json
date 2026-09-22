@@ -1,0 +1,2313 @@
+{
+ "id": "ros-services-actions",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "For each of these six needs of the Test Bench robot, choose a topic, a service or an action, and give the reason in one line. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Wheel odometry, 50 times a second."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Zero the trip counter before a test run."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Drive to a waypoint 5 m away, which takes about 20 s, reporting the remaining distance, with the option to stop halfway."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The lidar scan, 10 times a second."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Switch the recorder on or off."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The velocity command from the controller to the base, 20 times a second."
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "table",
+    "head": [
+     [
+      {
+       "t": "text",
+       "v": "Need"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Choice"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Reason"
+      }
+     ]
+    ],
+    "rows": [
+     [
+      [
+       {
+        "t": "text",
+        "v": "Odometry at 50 Hz"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Topic"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "A stream: every subscriber wants the newest value, and nobody answers"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Zero the trip counter"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Service"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "One request and one short answer, and the caller must know it happened before the run starts"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Drive to a waypoint"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Action"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "It takes seconds, the caller wants progress, and the caller must be able to stop it"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Lidar scan at 10 Hz"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Topic"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "A stream, like odometry"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Recorder on or off"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Service"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "A small change of state with a yes or no answer; "
+       },
+       {
+        "t": "code",
+        "v": "example_interfaces/srv/SetBool"
+       },
+       {
+        "t": "text",
+        "v": " fits"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Velocity command at 20 Hz"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Topic"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "A stream where each command replaces the one before. Waiting for an answer would add a round trip to every command"
+       }
+      ]
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Three questions decide it: how long the work takes, whether the caller needs an answer, and whether the caller must be able to stop the work. The Jazzy documentation draws the line between services and actions at duration: a service is expected to return fast, and long work, especially work that may have to be stopped, belongs in an action ("
+     },
+     {
+      "t": "a",
+      "v": "About services",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Basic/About-Services.html"
+     },
+     {
+      "t": "text",
+      "v": ")."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if all six are right and each reason names a stream, an answer, a duration or cancellation. One other mistake is a partial pass. A service for the waypoint drive is a fail on its own: the caller would wait 20 s with no progress and no way to stop the robot."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A service is one request and one response: a client asks, and the server answers. An action is built for longer work: a goal starts it, feedback arrives while it runs, and a result comes only when the goal reaches a terminal outcome, succeeded, aborted, or canceled. Underneath, an action is three services, to send the goal, cancel it and fetch the result, and two topics, for feedback and status, under one name."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is picking the right shape for what a caller needs. A stream of data where every subscriber wants the newest value and nobody answers is a topic's job already. What is left is a fast answer or a long one: a service fits a question or a small state change that returns in milliseconds, and an action fits work that takes long enough that the caller wants progress and a way to stop it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A server's callback runs on the executor like a subscription's, so it must finish within milliseconds: while it runs, every other callback of that node waits. Sending a request also returns at once, and the answer arrives later through the executor. An action layers a life cycle on top: the server accepts or rejects a goal up front, publishes feedback while it executes, and cancellation is a request rather than a kill, so the server's own code must notice it, stop, and report the goal canceled with whatever it has."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The costly mistake is waiting for a service's answer inside a callback of the node that owns the client: the response arrives only when the executor hands it over, the same thread stuck waiting, so the call hangs even after the server has replied. The fix is not to wait: hand the client a callback for the answer to arrive on a later turn, or, if the code must block, put the client in its own callback group so a second thread can deliver the response. If the work is long, an action, whose server reports progress and takes a cancellation, fits better from the start."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This is the interview question itself: for each need of a robot, odometry to a twenty-second drive to a waypoint, saying whether it wants a topic, a service or an action, where a service for that drive is wrong, since the caller would wait with no progress and no way to stop the robot."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Services, actions, goals, feedback, results, cancel",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start the demo service server and call it from the command line:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run demo_nodes_cpp add_two_ints_server    # terminal 1\nros2 service list -t                           # terminal 2: /add_two_ints [example_interfaces/srv/AddTwoInts], plus parameter services\nros2 service call /add_two_ints example_interfaces/srv/AddTwoInts \"{a: 2, b: 3}\"\n                                               # prints the request it sent, then the response with sum=5"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "service"
+        },
+        {
+         "t": "text",
+         "v": " is a request and a response. Its definition shows both halves, separated by "
+        },
+        {
+         "t": "code",
+         "v": "---"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "int64 a\nint64 b\n---\nint64 sum"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "As with messages, the build turns "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces/srv/AddTwoInts"
+        },
+        {
+         "t": "text",
+         "v": " into a C++ class, "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces::srv::AddTwoInts"
+        },
+        {
+         "t": "text",
+         "v": ", declared in "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces/srv/add_two_ints.hpp"
+        },
+        {
+         "t": "text",
+         "v": ", with the member types "
+        },
+        {
+         "t": "code",
+         "v": "Request"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Response"
+        },
+        {
+         "t": "text",
+         "v": ", which name the generated structs "
+        },
+        {
+         "t": "code",
+         "v": "AddTwoInts_Request"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "AddTwoInts_Response"
+        },
+        {
+         "t": "text",
+         "v": ". One node offers the service, the "
+        },
+        {
+         "t": "i",
+         "v": "server"
+        },
+        {
+         "t": "text",
+         "v": ", and any number of nodes call it, the "
+        },
+        {
+         "t": "i",
+         "v": "clients"
+        },
+        {
+         "t": "text",
+         "v": ". Only one server may use a name: with two, it is undefined which of them receives a request."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The server's callback runs on the executor, like a subscription callback. It receives the request, fills in the response and returns, and rclcpp sends the response back. While it runs, the other callbacks of the node wait, when the node is spun by a single-threaded executor as "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin"
+        },
+        {
+         "t": "text",
+         "v": " does. That is one reason a service has to answer within milliseconds. The other reason is on the client side: the caller has a request in flight and nothing to show until the answer arrives. It gets no progress, and it can't stop the work."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In Jazzy, the rclcpp client has no blocking call. "
+        },
+        {
+         "t": "code",
+         "v": "async_send_request"
+        },
+        {
+         "t": "text",
+         "v": " sends the request and returns at once, and the response comes back through the client's executor, which completes a future or calls a callback you passed. From "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", before the node spins, you can wait for the future with "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin_until_future_complete"
+        },
+        {
+         "t": "text",
+         "v": ", as the "
+        },
+        {
+         "t": "a",
+         "v": "minimal client in ros2/examples",
+         "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/services/minimal_client/main.cpp"
+        },
+        {
+         "t": "text",
+         "v": " does. Inside a node you pass a callback, which the worked example shows. The traps section shows what happens if you wait instead."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now an action. The desktop install of Jazzy includes the Fibonacci server from ros2/examples:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 run examples_rclcpp_minimal_action_server action_server_member_functions   # terminal 1\nros2 action list -t        # terminal 2: /fibonacci [example_interfaces/action/Fibonacci]\nros2 action send_goal /fibonacci example_interfaces/action/Fibonacci \"{order: 5}\" --feedback\n                           # \"Goal accepted with ID: ...\", one Feedback a second, then Result and SUCCEEDED\n                           # Ctrl+C before the end sends a cancel request: \"Goal canceled.\", then CANCELED"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An "
+        },
+        {
+         "t": "i",
+         "v": "action"
+        },
+        {
+         "t": "text",
+         "v": " is a long job with three messages in its definition: the "
+        },
+        {
+         "t": "i",
+         "v": "goal"
+        },
+        {
+         "t": "text",
+         "v": " that starts it, the "
+        },
+        {
+         "t": "i",
+         "v": "result"
+        },
+        {
+         "t": "text",
+         "v": " at the end, and "
+        },
+        {
+         "t": "i",
+         "v": "feedback"
+        },
+        {
+         "t": "text",
+         "v": " on the way. The "
+        },
+        {
+         "t": "code",
+         "v": ".action"
+        },
+        {
+         "t": "text",
+         "v": " file has three parts:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "int32 order\n---\nint32[] sequence\n---\nint32[] sequence"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The goal is the order, the result is the sequence, and each feedback message carries the terms computed so far. The C++ class is "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces::action::Fibonacci"
+        },
+        {
+         "t": "text",
+         "v": ", in "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces/action/fibonacci.hpp"
+        },
+        {
+         "t": "text",
+         "v": ", with the member types "
+        },
+        {
+         "t": "code",
+         "v": "Goal"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Result"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Feedback"
+        },
+        {
+         "t": "text",
+         "v": " for the three generated structs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An action isn't a new transport. It is three services and two topics under the action's name ("
+        },
+        {
+         "t": "a",
+         "v": "design article",
+         "href": "https://design.ros2.org/articles/actions.html"
+        },
+        {
+         "t": "text",
+         "v": "): the services "
+        },
+        {
+         "t": "code",
+         "v": "_action/send_goal"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "_action/cancel_goal"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "_action/get_result"
+        },
+        {
+         "t": "text",
+         "v": ", and the topics "
+        },
+        {
+         "t": "code",
+         "v": "_action/feedback"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "_action/status"
+        },
+        {
+         "t": "text",
+         "v": ". The plain listings hide them, and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 service list --include-hidden-services"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic list --include-hidden-topics"
+        },
+        {
+         "t": "text",
+         "v": " show them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A goal goes through a fixed life. The client sends it with a unique goal ID. The server's goal callback accepts or rejects it at once, and doesn't do the work there. An accepted goal is "
+        },
+        {
+         "t": "i",
+         "v": "executing"
+        },
+        {
+         "t": "text",
+         "v": ". The server publishes feedback as it goes, and ends the goal in exactly one terminal state: "
+        },
+        {
+         "t": "i",
+         "v": "succeeded"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "i",
+         "v": "aborted"
+        },
+        {
+         "t": "text",
+         "v": " when it failed, or "
+        },
+        {
+         "t": "i",
+         "v": "canceled"
+        },
+        {
+         "t": "text",
+         "v": ". The client asks for the result through "
+        },
+        {
+         "t": "code",
+         "v": "get_result"
+        },
+        {
+         "t": "text",
+         "v": ", and the result carries that state."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Cancellation is a request, not a kill. The client sends a cancel request, the server's cancel callback accepts or rejects it, and an accepted request moves the goal to "
+        },
+        {
+         "t": "i",
+         "v": "canceling"
+        },
+        {
+         "t": "text",
+         "v": ". The work goes on until the server's code checks "
+        },
+        {
+         "t": "code",
+         "v": "is_canceling()"
+        },
+        {
+         "t": "text",
+         "v": ", stops, and reports the goal as canceled with whatever result it has. A server that never checks never cancels. So an action server has a duty in its contract: check often enough that a stop takes effect within the time the caller can accept, such as one control period for a drive."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [],
+        [
+         {
+          "t": "text",
+          "v": "Topic"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Service"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Action"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Shape"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "One way, many to many"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Request and response"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Goal, feedback, result"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Typical duration"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Continuous"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Milliseconds"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Seconds to minutes"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "The caller waits for"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Nothing"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The response"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The result, with feedback on the way"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Can be stopped"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Not applicable"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Yes, by a cancel request"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Servers per name"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Any number of publishers"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "One"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "One"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Test Bench example"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "/odom"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "/scan"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "/cmd_vel"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Zero the trip counter"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Drive to a waypoint"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The choice follows from the table. A topic fits data that keeps coming, where the newest value matters and nobody answers. A service fits a question or a small change of state with one fast answer. An action fits work that takes long enough that the caller wants progress and a way to stop it. The costs point the same way. An action needs five endpoints and a goal ID, which is overhead for a job that finishes in a millisecond, and a service used for a 20-second drive leaves the caller blind and the server's node busy."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is a service in the style of the bench: a node that counts heartbeats and hands out the count on request, and a client that asks every 2 seconds. The service type is "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces/srv/Trigger"
+        },
+        {
+         "t": "text",
+         "v": ", whose request is empty and whose response has a "
+        },
+        {
+         "t": "code",
+         "v": "bool success"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "string message"
+        },
+        {
+         "t": "text",
+         "v": ". Both files build in a package of your own that depends on "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces"
+        },
+        {
+         "t": "text",
+         "v": ". The heartbeats come from the bench's "
+        },
+        {
+         "t": "code",
+         "v": "heartbeat"
+        },
+        {
+         "t": "text",
+         "v": " node, which publishes "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs/msg/Int64"
+        },
+        {
+         "t": "text",
+         "v": " on the topic "
+        },
+        {
+         "t": "code",
+         "v": "heartbeat"
+        },
+        {
+         "t": "text",
+         "v": " ten times a second."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The server:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <memory>\n#include <utility>\n\n#include <example_interfaces/srv/trigger.hpp>\n#include <rclcpp/rclcpp.hpp>\n#include <std_msgs/msg/int64.hpp>\n\n// Counts heartbeats between two calls. No ROS in here, so a unit test can drive it.\nclass HeartbeatTally {\n public:\n  void add() { ++count_; }\n\n  // Returns the count since the last call and starts again from zero.\n  [[nodiscard]] std::int64_t take() { return std::exchange(count_, 0); }\n\n private:\n  std::int64_t count_ = 0;\n};\n\nclass TallyServer : public rclcpp::Node {\n public:\n  using Trigger = example_interfaces::srv::Trigger;\n\n  explicit TallyServer(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"tally\", options) {\n    subscription_ = create_subscription<std_msgs::msg::Int64>(\n        \"heartbeat\", rclcpp::QoS(rclcpp::KeepLast(10)), [this](const std_msgs::msg::Int64&) { tally_.add(); });\n    service_ = create_service<Trigger>(\n        \"~/take\",\n        [this](const std::shared_ptr<Trigger::Request>, std::shared_ptr<Trigger::Response> response) {\n          response->success = true;\n          response->message = std::format(\"{} heartbeats since the last call\", tally_.take());\n        });\n  }\n\n private:\n  HeartbeatTally tally_;\n  rclcpp::Subscription<std_msgs::msg::Int64>::SharedPtr subscription_;\n  rclcpp::Service<Trigger>::SharedPtr service_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<TallyServer>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The service name "
+        },
+        {
+         "t": "code",
+         "v": "~/take"
+        },
+        {
+         "t": "text",
+         "v": " is private to the node: the tilde expands to the node's name, so the full name is "
+        },
+        {
+         "t": "code",
+         "v": "/tally/take"
+        },
+        {
+         "t": "text",
+         "v": ". The callback receives the request and the response as shared pointers, fills in the response and returns, and rclcpp sends it. "
+        },
+        {
+         "t": "code",
+         "v": "tally_"
+        },
+        {
+         "t": "text",
+         "v": " is declared before the subscription and the service, so it is destroyed after them, and no callback can reach it once it is gone."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The client:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <memory>\n#include <optional>\n\n#include <example_interfaces/srv/trigger.hpp>\n#include <rclcpp/rclcpp.hpp>\n\n// Keeps one request in flight and says when to give up on it. Time comes in as an argument.\nclass OneRequest {\n public:\n  explicit OneRequest(std::chrono::nanoseconds limit) : limit_(limit) {}\n\n  [[nodiscard]] bool may_send() const { return !in_flight_; }\n\n  // The id of the request in flight if it has waited longer than the limit.\n  [[nodiscard]] std::optional<std::int64_t> overdue(std::chrono::nanoseconds now) const {\n    if (in_flight_ && now - in_flight_->sent_at > limit_) return in_flight_->id;\n    return std::nullopt;\n  }\n\n  void sent(std::int64_t id, std::chrono::nanoseconds now) { in_flight_ = InFlight{.id = id, .sent_at = now}; }\n  void finished() { in_flight_.reset(); }\n\n private:\n  struct InFlight {\n    std::int64_t id;\n    std::chrono::nanoseconds sent_at;\n  };\n\n  std::chrono::nanoseconds limit_;\n  std::optional<InFlight> in_flight_;\n};\n\nclass TallyClient : public rclcpp::Node {\n public:\n  using Trigger = example_interfaces::srv::Trigger;\n\n  explicit TallyClient(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"tally_client\", options), request_(std::chrono::seconds(5)) {\n    client_ = create_client<Trigger>(\"/tally/take\");\n    timer_ = create_timer(std::chrono::seconds(2), [this] { ask(); });\n  }\n\n private:\n  void ask() {\n    const std::chrono::nanoseconds stamp{now().nanoseconds()};\n    if (const auto stale = request_.overdue(stamp)) {\n      client_->remove_pending_request(*stale);\n      request_.finished();\n      RCLCPP_WARN(get_logger(), \"no response within 5 s, request abandoned\");\n    }\n    if (!request_.may_send() || !client_->service_is_ready()) return;\n\n    const auto sent = client_->async_send_request(\n        std::make_shared<Trigger::Request>(), [this](rclcpp::Client<Trigger>::SharedFuture future) {\n          request_.finished();\n          RCLCPP_INFO(get_logger(), \"%s\", future.get()->message.c_str());\n        });\n    request_.sent(sent.request_id, stamp);\n  }\n\n  OneRequest request_;\n  rclcpp::Client<Trigger>::SharedPtr client_;\n  rclcpp::TimerBase::SharedPtr timer_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<TallyClient>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "async_send_request"
+         },
+         {
+          "t": "text",
+          "v": " returns before the response exists, so "
+         },
+         {
+          "t": "code",
+          "v": "ask"
+         },
+         {
+          "t": "text",
+          "v": " ends at once and the executor stays free. The response arrives on a later turn of the executor, which calls the lambda. By then the future is ready, and "
+         },
+         {
+          "t": "code",
+          "v": "future.get()"
+         },
+         {
+          "t": "text",
+          "v": " returns without waiting."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The client checks "
+         },
+         {
+          "t": "code",
+          "v": "service_is_ready()"
+         },
+         {
+          "t": "text",
+          "v": " on each tick instead of calling "
+         },
+         {
+          "t": "code",
+          "v": "wait_for_service"
+         },
+         {
+          "t": "text",
+          "v": ", which blocks the executor for up to its timeout."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A request that never gets an answer stays in the client until you remove it. The comment on "
+         },
+         {
+          "t": "code",
+          "v": "async_send_request"
+         },
+         {
+          "t": "text",
+          "v": " in rclcpp's "
+         },
+         {
+          "t": "a",
+          "v": "client.hpp",
+          "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/client.hpp"
+         },
+         {
+          "t": "text",
+          "v": " asks for "
+         },
+         {
+          "t": "code",
+          "v": "remove_pending_request"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "prune_pending_requests"
+         },
+         {
+          "t": "text",
+          "v": " in that case, or the client uses more memory with every lost request. "
+         },
+         {
+          "t": "code",
+          "v": "OneRequest"
+         },
+         {
+          "t": "text",
+          "v": " keeps one request in flight and gives up on it after 5 s. The "
+         },
+         {
+          "t": "a",
+          "v": "async client in ros2/examples",
+          "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/services/async_client/main.cpp"
+         },
+         {
+          "t": "text",
+          "v": " prunes with a timer instead."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "take"
+         },
+         {
+          "t": "text",
+          "v": " changes state on the server. When the client gives up on a request, the server may already have handed out that count and reset it, and the count is lost. The topic on errors and recovery comes back to requests that are safe to repeat."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "To try it, run both nodes, publish heartbeats with "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic pub -r 10 /heartbeat std_msgs/msg/Int64 \"{data: 1}\""
+        },
+        {
+         "t": "text",
+         "v": ", or run the bench's "
+        },
+        {
+         "t": "code",
+         "v": "heartbeat"
+        },
+        {
+         "t": "text",
+         "v": " node, and watch the client log about 20 heartbeats per call. You can call the service by hand as well: "
+        },
+        {
+         "t": "code",
+         "v": "ros2 service call /tally/take example_interfaces/srv/Trigger"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "action",
+   "title": "Cancellable action server and client",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. Write two nodes for "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces/action/Fibonacci"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The server, "
+        },
+        {
+         "t": "code",
+         "v": "fibonacci_server"
+        },
+        {
+         "t": "text",
+         "v": ", offers the action "
+        },
+        {
+         "t": "code",
+         "v": "fibonacci"
+        },
+        {
+         "t": "text",
+         "v": ". It:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "accepts a goal only when its order is between 1 and 46 and no other goal is running, and rejects it otherwise. At order 47 the last term, 2,971,215,073, no longer fits in the message's "
+         },
+         {
+          "t": "code",
+          "v": "int32"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "computes one term every 200 ms on a timer of the node, with no thread and no sleep, and publishes the terms so far as feedback after each one;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "accepts every cancel request, and stops at its next tick with the terms so far as the result;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "keeps the sequence in a plain class whose factory returns "
+         },
+         {
+          "t": "code",
+          "v": "std::optional"
+         },
+         {
+          "t": "text",
+          "v": ", empty for an order it can't compute."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The client, "
+        },
+        {
+         "t": "code",
+         "v": "fibonacci_client"
+        },
+        {
+         "t": "text",
+         "v": ", sends order 20 once the server is up, logs the newest term of each feedback, requests a cancel on the fifth feedback, logs the final status and the number of terms, and shuts down."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test the server from the command line too: order 50 must be rejected, order 10 must succeed with 11 terms, and Ctrl+C during order 30 must end it as canceled."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The server:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <memory>\n#include <optional>\n#include <utility>\n#include <vector>\n\n#include <example_interfaces/action/fibonacci.hpp>\n#include <rclcpp/rclcpp.hpp>\n#include <rclcpp_action/rclcpp_action.hpp>\n\n// F(0) to F(order), one term per step. No ROS in here, so a unit test can drive it.\nclass FibonacciJob {\n public:\n  static constexpr std::int32_t max_order = 46;  // F(47) = 2971215073 doesn't fit in std::int32_t\n\n  [[nodiscard]] static std::optional<FibonacciJob> start(std::int32_t order) {\n    if (order < 1 || order > max_order) return std::nullopt;\n    return FibonacciJob(order);\n  }\n\n  [[nodiscard]] bool done() const { return std::ssize(terms_) > order_; }\n  void step() { terms_.push_back(terms_.back() + terms_[std::ssize(terms_) - 2]); }\n  [[nodiscard]] const std::vector<std::int32_t>& terms() const { return terms_; }\n\n private:\n  explicit FibonacciJob(std::int32_t order) : order_(order) {}\n\n  std::int32_t order_;\n  std::vector<std::int32_t> terms_{0, 1};\n};\n\nclass FibonacciServer : public rclcpp::Node {\n public:\n  using Fibonacci = example_interfaces::action::Fibonacci;\n  using GoalHandle = rclcpp_action::ServerGoalHandle<Fibonacci>;\n\n  explicit FibonacciServer(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"fibonacci_server\", options) {\n    server_ = rclcpp_action::create_server<Fibonacci>(\n        this, \"fibonacci\",\n        [this](const rclcpp_action::GoalUUID&, std::shared_ptr<const Fibonacci::Goal> goal) {\n          return on_goal(goal->order);\n        },\n        [this](std::shared_ptr<GoalHandle>) {\n          RCLCPP_INFO(get_logger(), \"cancel requested\");\n          return rclcpp_action::CancelResponse::ACCEPT;\n        },\n        [this](std::shared_ptr<GoalHandle> handle) { on_accepted(std::move(handle)); });\n  }\n\n private:\n  struct Running {\n    std::shared_ptr<GoalHandle> handle;  // the action server keeps only a weak pointer\n    FibonacciJob job;\n  };\n\n  rclcpp_action::GoalResponse on_goal(std::int32_t order) {\n    if (running_) {\n      RCLCPP_WARN(get_logger(), \"busy, rejecting order %d\", order);\n      return rclcpp_action::GoalResponse::REJECT;\n    }\n    if (!FibonacciJob::start(order)) {\n      RCLCPP_WARN(get_logger(), \"order %d is outside 1 to %d\", order, FibonacciJob::max_order);\n      return rclcpp_action::GoalResponse::REJECT;\n    }\n    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;\n  }\n\n  void on_accepted(std::shared_ptr<GoalHandle> handle) {\n    auto job = FibonacciJob::start(handle->get_goal()->order);\n    if (!job) return;  // on_goal already rejected such orders\n    running_ = Running{.handle = std::move(handle), .job = *std::move(job)};\n    timer_ = create_timer(std::chrono::milliseconds(200), [this] { on_tick(); });\n  }\n\n  // One term per tick. Each tick returns at once, so cancel requests get through in between.\n  void on_tick() {\n    if (!running_) return;\n    auto& [handle, job] = *running_;\n    auto result = std::make_shared<Fibonacci::Result>();\n    if (handle->is_canceling()) {\n      result->sequence = job.terms();\n      handle->canceled(result);\n      RCLCPP_INFO(get_logger(), \"canceled with %zu terms\", job.terms().size());\n      finish();\n      return;\n    }\n    if (!job.done()) {\n      job.step();\n      auto feedback = std::make_shared<Fibonacci::Feedback>();\n      feedback->sequence = job.terms();\n      handle->publish_feedback(feedback);\n    }\n    if (job.done()) {\n      result->sequence = job.terms();\n      handle->succeed(result);\n      RCLCPP_INFO(get_logger(), \"succeeded with %zu terms\", job.terms().size());\n      finish();\n    }\n  }\n\n  void finish() {\n    timer_->cancel();\n    running_.reset();\n  }\n\n  rclcpp_action::Server<Fibonacci>::SharedPtr server_;\n  rclcpp::TimerBase::SharedPtr timer_;\n  std::optional<Running> running_;\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<FibonacciServer>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The client:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <memory>\n\n#include <example_interfaces/action/fibonacci.hpp>\n#include <rclcpp/rclcpp.hpp>\n#include <rclcpp_action/rclcpp_action.hpp>\n\n// Says when to cancel: on a fixed feedback message. No ROS in here, so a unit test can drive it.\nclass CancelAfter {\n public:\n  explicit CancelAfter(std::int32_t feedback_count) : left_(feedback_count) {}\n\n  // True on the feedback message that reaches the count, false before and after it.\n  [[nodiscard]] bool on_feedback() { return --left_ == 0; }\n\n private:\n  std::int32_t left_;\n};\n\n[[nodiscard]] const char* name_of(rclcpp_action::ResultCode code) {\n  switch (code) {\n    case rclcpp_action::ResultCode::SUCCEEDED: return \"SUCCEEDED\";\n    case rclcpp_action::ResultCode::CANCELED: return \"CANCELED\";\n    case rclcpp_action::ResultCode::ABORTED: return \"ABORTED\";\n    case rclcpp_action::ResultCode::UNKNOWN: return \"UNKNOWN\";\n  }\n  return \"not a result code\";\n}\n\nclass FibonacciClient : public rclcpp::Node {\n public:\n  using Fibonacci = example_interfaces::action::Fibonacci;\n  using GoalHandle = rclcpp_action::ClientGoalHandle<Fibonacci>;\n\n  explicit FibonacciClient(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"fibonacci_client\", options) {\n    client_ = rclcpp_action::create_client<Fibonacci>(this, \"fibonacci\");\n    timer_ = create_timer(std::chrono::milliseconds(500), [this] { send_when_ready(); });\n  }\n\n private:\n  void send_when_ready() {\n    if (!client_->action_server_is_ready()) {\n      RCLCPP_INFO(get_logger(), \"waiting for the action server\");\n      return;\n    }\n    timer_->cancel();  // one goal only\n\n    rclcpp_action::Client<Fibonacci>::SendGoalOptions options;\n    options.goal_response_callback = [this](const GoalHandle::SharedPtr& handle) {\n      if (!handle) {\n        RCLCPP_ERROR(get_logger(), \"goal rejected\");\n        rclcpp::shutdown();\n        return;\n      }\n      goal_handle_ = handle;  // the action client keeps only a weak pointer\n    };\n    options.feedback_callback = [this](GoalHandle::SharedPtr,\n                                       const std::shared_ptr<const Fibonacci::Feedback> feedback) {\n      RCLCPP_INFO(get_logger(), \"feedback: %d\", feedback->sequence.back());\n      if (cancel_after_.on_feedback()) {\n        RCLCPP_INFO(get_logger(), \"requesting cancel\");\n        client_->async_cancel_goal(goal_handle_);\n      }\n    };\n    options.result_callback = [this](const GoalHandle::WrappedResult& result) {\n      RCLCPP_INFO(get_logger(), \"finished as %s with %zu terms\", name_of(result.code),\n                  result.result->sequence.size());\n      goal_handle_.reset();\n      rclcpp::shutdown();\n    };\n\n    Fibonacci::Goal goal;\n    goal.order = 20;\n    client_->async_send_goal(goal, options);\n  }\n\n  rclcpp_action::Client<Fibonacci>::SharedPtr client_;\n  rclcpp::TimerBase::SharedPtr timer_;\n  GoalHandle::SharedPtr goal_handle_;\n  CancelAfter cancel_after_{5};\n};\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<FibonacciClient>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The client logs the feedback terms 1, 2, 3, 5 and 8, then "
+        },
+        {
+         "t": "code",
+         "v": "requesting cancel"
+        },
+        {
+         "t": "text",
+         "v": ", then usually "
+        },
+        {
+         "t": "code",
+         "v": "finished as CANCELED with 7 terms"
+        },
+        {
+         "t": "text",
+         "v": ". The cancel request reaches the server within the 200 ms before its next tick, and that tick reports the 7 terms F(0) to F(6). On a loaded machine the request can arrive one tick later, and the result has 8 terms."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The client keeps the goal handle in a member for the same reason the server does. "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp_action::Client"
+        },
+        {
+         "t": "text",
+         "v": " stores only weak pointers to the goals it sent, in a "
+        },
+        {
+         "t": "code",
+         "v": "std::map<GoalUUID, GoalHandle::WeakPtr>"
+        },
+        {
+         "t": "text",
+         "v": ", and the comment on "
+        },
+        {
+         "t": "code",
+         "v": "async_send_goal"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "a",
+         "v": "client.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_action/include/rclcpp_action/client.hpp"
+        },
+        {
+         "t": "text",
+         "v": " says the callbacks arrive as long as you hold the shared pointer that the returned future carries. The same comment warns about the exception: a client that sets a result callback gets a handle which holds a reference to itself, so the callbacks keep coming even when the caller keeps nothing. The comment calls that inconsistent behaviour a bug."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The self-reference goes away when the result arrives, so a goal whose result never comes leaks the handle. That is what "
+        },
+        {
+         "t": "code",
+         "v": "stop_callbacks"
+        },
+        {
+         "t": "text",
+         "v": " is for: it drops the self-reference of a goal that will not resolve. A client that keeps nothing of its own works only while it has a result callback, and goes silent as soon as someone removes it or copies the code for a feedback-only client, because then nothing holds the handle at all. The "
+        },
+        {
+         "t": "a",
+         "v": "action client in ros2/examples",
+         "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/actions/minimal_action_client/not_composable_with_cancel.cpp"
+        },
+        {
+         "t": "text",
+         "v": " holds the handle for as long as it uses it, and "
+        },
+        {
+         "t": "code",
+         "v": "async_cancel_goal"
+        },
+        {
+         "t": "text",
+         "v": " needs it anyway."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four decisions in the server matter."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The work runs on a timer. The "
+        },
+        {
+         "t": "a",
+         "v": "server in ros2/examples",
+         "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/actions/minimal_action_server/member_functions.cpp"
+        },
+        {
+         "t": "text",
+         "v": " and the "
+        },
+        {
+         "t": "a",
+         "v": "Jazzy tutorial",
+         "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Writing-an-Action-Server-Client/Cpp.html"
+        },
+        {
+         "t": "text",
+         "v": " start a detached "
+        },
+        {
+         "t": "code",
+         "v": "std::thread"
+        },
+        {
+         "t": "text",
+         "v": " in the accepted callback and sleep in a loop, because a loop inside the callback would block the executor. The timer gets the same effect without a second thread. Each tick does one step and returns, and cancel requests, new goals and result requests are handled between ticks. Every call on the goal handle happens on the executor's thread, so the node needs no mutex. A detached thread also captures "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": " and nothing stops it at shutdown, so it can outlive the node it uses, which is why Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "CP.26",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detached_thread"
+        },
+        {
+         "t": "text",
+         "v": " advises against "
+        },
+        {
+         "t": "code",
+         "v": "detach"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The goal handle is kept in "
+        },
+        {
+         "t": "code",
+         "v": "running_"
+        },
+        {
+         "t": "text",
+         "v": ". The action server holds only a weak pointer to each goal handle (see "
+        },
+        {
+         "t": "code",
+         "v": "call_handle_cancel_callback"
+        },
+        {
+         "t": "text",
+         "v": " in rclcpp_action's "
+        },
+        {
+         "t": "a",
+         "v": "server.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_action/include/rclcpp_action/server.hpp"
+        },
+        {
+         "t": "text",
+         "v": "), and a "
+        },
+        {
+         "t": "code",
+         "v": "ServerGoalHandle"
+        },
+        {
+         "t": "text",
+         "v": " destroyed before its goal reaches a terminal state marks the goal canceled in its destructor ("
+        },
+        {
+         "t": "a",
+         "v": "server_goal_handle.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_action/include/rclcpp_action/server_goal_handle.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). An accepted callback that drops the handle ends every goal as canceled at once. It is the same rule as for subscriptions: keep what you want to stay alive in a member."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The order is checked in the goal callback. The client learns at once that order 50 is refused, rather than having the goal accepted and then aborted. The ros2/examples server rejects orders above 9000, but its terms are "
+        },
+        {
+         "t": "code",
+         "v": "int32_t"
+        },
+        {
+         "t": "text",
+         "v": ", so every order from 47 to 9000 overflows a signed "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", which is undefined behaviour. The limit of 46 is the contract of this server, and "
+        },
+        {
+         "t": "code",
+         "v": "FibonacciJob::start"
+        },
+        {
+         "t": "text",
+         "v": " enforces it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "canceled"
+        },
+        {
+         "t": "text",
+         "v": " is called only after "
+        },
+        {
+         "t": "code",
+         "v": "is_canceling()"
+        },
+        {
+         "t": "text",
+         "v": " returned true. It throws "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::exceptions::RCLError"
+        },
+        {
+         "t": "text",
+         "v": " unless a cancel request for the goal was accepted first."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Blocking inside a service callback",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This timer callback looks like an ordinary service call, and it never returns:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "void ask() {\n  auto sent = client_->async_send_request(std::make_shared<Trigger::Request>());\n  // Waits for a response that only this thread can take in.\n  const auto response = sent.future.get();\n  RCLCPP_INFO(get_logger(), \"%s\", response->message.c_str());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The future becomes ready only when the executor takes the response from the middleware and hands it to the client. The client belongs to this node, and the thread that spins this node is inside "
+        },
+        {
+         "t": "code",
+         "v": "ask"
+        },
+        {
+         "t": "text",
+         "v": ", waiting. The server may answer within a millisecond, and the answer still never gets in. With "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::spin"
+        },
+        {
+         "t": "text",
+         "v": ", nothing else of the node runs either: no timer, no subscription, no service. A "
+        },
+        {
+         "t": "code",
+         "v": "wait_for"
+        },
+        {
+         "t": "text",
+         "v": " with a timeout only turns the hang into a failure on every call."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same mechanism, with a one-thread event loop in plain C++ standing in for the executor:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <deque>\n#include <functional>\n#include <future>\n#include <iostream>\n#include <utility>\n\n// Runs queued callbacks one at a time on the calling thread, as a single-threaded executor does.\nclass Loop {\n public:\n  void post(std::function<void()> callback) { ready_.push_back(std::move(callback)); }\n\n  void run() {\n    while (!ready_.empty()) {\n      const auto callback = std::move(ready_.front());\n      ready_.pop_front();\n      callback();\n    }\n  }\n\n private:\n  std::deque<std::function<void()>> ready_;\n};\n\nint main() {\n  Loop loop;\n  std::promise<int> response;\n  std::future<int> future = response.get_future();\n\n  loop.post([&] {  // the timer callback\n    std::cout << \"timer: request sent, waiting for the response\\n\";\n    // The server has answered. The loop still has to run the step that takes the answer in.\n    loop.post([&] {\n      response.set_value(5);\n      std::cout << \"loop: response taken in\\n\";\n    });\n    if (future.wait_for(std::chrono::milliseconds(200)) == std::future_status::timeout) {\n      std::cout << \"timer: gave up after 200 ms\\n\";\n    }\n  });\n  loop.run();\n  std::cout << \"main: the response is \" << future.get() << \"\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "timer: request sent, waiting for the response\ntimer: gave up after 200 ms\nloop: response taken in\nmain: the response is 5"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The answer was queued before the wait began, and it was taken in only after the waiting callback gave up. In rclcpp the step that takes the response in is the executor running the client, and it waits behind the callback in the same way."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two more forms of the same mistake are common:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "rclcpp::spin_until_future_complete(shared_from_this(), sent.future)"
+         },
+         {
+          "t": "text",
+          "v": " inside a callback doesn't hang. It throws "
+         },
+         {
+          "t": "code",
+          "v": "std::runtime_error"
+         },
+         {
+          "t": "text",
+          "v": " with the message "
+         },
+         {
+          "t": "code",
+          "v": "Node '/tally_client' has already been added to an executor."
+         },
+         {
+          "t": "text",
+          "v": ", because it tries to add the node to a second executor ("
+         },
+         {
+          "t": "a",
+          "v": "executor_entities_collector.cpp",
+          "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executors/executor_entities_collector.cpp"
+         },
+         {
+          "t": "text",
+          "v": ")."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A service callback that does long work, such as driving the robot for 3 s, holds every other callback of its node for those 3 s. Odometry at 50 Hz brings 150 messages in that time, and a subscription queue of depth 10 keeps the newest 10 and drops the other 140."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "There are three fixes, in order of preference:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Don't wait. Pass a callback to "
+         },
+         {
+          "t": "code",
+          "v": "async_send_request"
+         },
+         {
+          "t": "text",
+          "v": " and continue the work there, as the worked example does. A service callback that needs another service's answer can reply later: rclcpp also accepts a service callback that takes the request header and the request but no response, and the node answers afterwards by calling "
+         },
+         {
+          "t": "code",
+          "v": "send_response"
+         },
+         {
+          "t": "text",
+          "v": " on the service with the saved header, from the callback of its own request ("
+         },
+         {
+          "t": "a",
+          "v": "any_service_callback.hpp",
+          "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/any_service_callback.hpp"
+         },
+         {
+          "t": "text",
+          "v": ")."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "If the code has to wait, put the client in a callback group of its own and spin the node with a multi-threaded executor, so that another thread can take the response in. The Jazzy guide "
+         },
+         {
+          "t": "a",
+          "v": "Using callback groups",
+          "href": "https://docs.ros.org/en/jazzy/How-To-Guides/Using-callback-groups.html"
+         },
+         {
+          "t": "text",
+          "v": " shows the deadlock and this fix step by step, and the executors topic reproduces it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Move long work out of the service into an action, whose server can report progress and accept a cancel."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the three questions that choose between a topic, a service and an action, and a bench example of each. Name the services and topics an action is made of, the terminal states of a goal, and what the server has to do for a cancel to take effect. Explain why waiting for a service response inside a callback deadlocks a single-threaded executor, and give two fixes. Say why an action server keeps the goal handle."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Which three questions decide between a topic, a service and an action?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the five endpoints of an action, and which one carries the feedback?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the terminal states of a goal. What must the server's code do for a goal to end as canceled?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "future.get()"
+     },
+     {
+      "t": "text",
+      "v": " on a service response hang inside a timer callback of a node spun with "
+     },
+     {
+      "t": "code",
+      "v": "rclcpp::spin"
+     },
+     {
+      "t": "text",
+      "v": "? Give two fixes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What happens to a goal when the server drops its last "
+     },
+     {
+      "t": "code",
+      "v": "shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": " to the goal handle before the goal finishes?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why should a client remove a request that never got a response?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a "
+     },
+     {
+      "t": "code",
+      "v": "Trigger"
+     },
+     {
+      "t": "text",
+      "v": " service server, and a client that calls it from a timer without blocking."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation: "
+     },
+     {
+      "t": "a",
+      "v": "About services",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Basic/About-Services.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "About actions",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Basic/About-Actions.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Understanding services",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Services/Understanding-ROS2-Services.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Understanding actions",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Actions/Understanding-ROS2-Actions.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "a service and client in C++",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-Client-Libraries/Writing-A-Simple-Cpp-Service-And-Client.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "an action server and client in C++",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Writing-an-Action-Server-Client/Cpp.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Using callback groups",
+      "href": "https://docs.ros.org/en/jazzy/How-To-Guides/Using-callback-groups.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ros2/examples on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "minimal service",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/services/minimal_service/main.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "minimal client",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/services/minimal_client/main.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "async client",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/services/async_client/main.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "action server",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/actions/minimal_action_server/member_functions.cpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "action client with cancel",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/actions/minimal_action_client/not_composable_with_cancel.cpp"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "example_interfaces on the jazzy branch",
+      "href": "https://github.com/ros2/example_interfaces/tree/jazzy"
+     },
+     {
+      "t": "text",
+      "v": ": the services "
+     },
+     {
+      "t": "code",
+      "v": "AddTwoInts"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "SetBool"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "Trigger"
+     },
+     {
+      "t": "text",
+      "v": ", and one action, "
+     },
+     {
+      "t": "code",
+      "v": "Fibonacci"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article on "
+     },
+     {
+      "t": "a",
+      "v": "actions",
+      "href": "https://design.ros2.org/articles/actions.html"
+     },
+     {
+      "t": "text",
+      "v": ": the goal states, the three services and two topics, and the cancel policy."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp sources on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "client.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/client.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "any_service_callback.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/any_service_callback.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "server.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_action/include/rclcpp_action/server.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "server_goal_handle.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_action/include/rclcpp_action/server_goal_handle.hpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "executor_entities_collector.cpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/src/rclcpp/executors/executor_entities_collector.cpp"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". Thin callbacks, with the logic in plain classes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "CP.26",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detached_thread"
+     },
+     {
+      "t": "text",
+      "v": ", don't detach a thread."
+     }
+    ]
+   ]
+  }
+ ]
+}

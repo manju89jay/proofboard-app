@@ -1,0 +1,1450 @@
+{
+ "id": "prj-first-nodes",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage gives the bench its first two live nodes: "
+    },
+    {
+     "t": "code",
+     "v": "heartbeat"
+    },
+    {
+     "t": "text",
+     "v": ", which publishes a counter ten times a second, and "
+    },
+    {
+     "t": "code",
+     "v": "monitor"
+    },
+    {
+     "t": "text",
+     "v": ", which watches that stream and tells a gap in the counter from a restart of it, something a single number can't say on its own. The monitor logs a warning with the exact count lost on a gap, and an info line on a restart, never the two confused for each other."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is where the rules live. "
+    },
+    {
+     "t": "code",
+     "v": "HeartbeatCheck"
+    },
+    {
+     "t": "text",
+     "v": " is a plain class the node only feeds and logs; it knows nothing about ROS, so a test checks it in milliseconds with no node started. It answers with a "
+    },
+    {
+     "t": "code",
+     "v": "std::variant"
+    },
+    {
+     "t": "text",
+     "v": " of in order, gap or restart, rather than a sentinel a caller could misread, and the restart check runs before the gap check, because a counter restarting after 500 would otherwise look like a gap of minus 501."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: "
+    },
+    {
+     "t": "code",
+     "v": "ros2 topic hz"
+    },
+    {
+     "t": "text",
+     "v": " reports about 10 Hz, a restarted heartbeat produces the restart message with no false loss, and a second test starts both nodes for real and waits, with a deadline, for a count of heartbeats received rather than particular values, because the first ones can be lost while the nodes discover each other."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "nodes",
+   "title": "Publisher and subscriber nodes with a test",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the bench has a ROS 2 package, "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes"
+        },
+        {
+         "t": "text",
+         "v": ", with two nodes: "
+        },
+        {
+         "t": "code",
+         "v": "heartbeat"
+        },
+        {
+         "t": "text",
+         "v": " publishes a counter ten times a second, and "
+        },
+        {
+         "t": "code",
+         "v": "monitor"
+        },
+        {
+         "t": "text",
+         "v": " counts what arrives and warns when heartbeats go missing. "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " builds them, and you have watched them talk."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pair is small on purpose. The supervisor you build later works the same way: it watches a stream of messages and acts when they stop or skip. Here you get the package, the build and the test right while the node code is still short."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Create the package next to "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/test_bench/src\nros2 pkg create --build-type ament_cmake bench_nodes --dependencies rclcpp std_msgs"
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/src/heartbeat_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The class is in the namespace "
+         },
+         {
+          "t": "code",
+          "v": "bench_nodes"
+         },
+         {
+          "t": "text",
+          "v": ", because in Build 2 it moves into a header that a test includes:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <memory>\n\n#include <rclcpp/rclcpp.hpp>\n#include <std_msgs/msg/int64.hpp>\n\nnamespace bench_nodes {\n\n// Publishes a counter on \"heartbeat\" ten times a second, on the node's clock.\nclass Heartbeat : public rclcpp::Node {\n public:\n  explicit Heartbeat(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"heartbeat\", options) {\n    publisher_ = create_publisher<std_msgs::msg::Int64>(\"heartbeat\", rclcpp::QoS(rclcpp::KeepLast(10)));\n    timer_ = create_timer(std::chrono::milliseconds(100), [this] {\n      std_msgs::msg::Int64 msg;\n      msg.data = next_++;\n      publisher_->publish(msg);\n    });\n  }\n\n private:\n  rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr publisher_;\n  rclcpp::TimerBase::SharedPtr timer_;\n  std::int64_t next_ = 0;\n};\n\n}  // namespace bench_nodes\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<bench_nodes::Heartbeat>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is the counter from the topics topic, on the topic "
+        },
+        {
+         "t": "code",
+         "v": "heartbeat"
+        },
+        {
+         "t": "text",
+         "v": " and ten times a second, and each of its choices matters to the bench. The counter is "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs/msg/Int64"
+        },
+        {
+         "t": "text",
+         "v": ", a signed 64-bit integer like every count in the bench, so the difference of two counter values is an ordinary signed number, negative when the second is smaller. The constructor takes "
+        },
+        {
+         "t": "code",
+         "v": "const rclcpp::NodeOptions&"
+        },
+        {
+         "t": "text",
+         "v": ", which is how a test, a launch file or a component container hands a node its parameters and remappings; the default argument keeps "
+        },
+        {
+         "t": "code",
+         "v": "std::make_shared<Heartbeat>()"
+        },
+        {
+         "t": "text",
+         "v": " working. And "
+        },
+        {
+         "t": "code",
+         "v": "create_timer"
+        },
+        {
+         "t": "text",
+         "v": " runs on the node's clock, which follows "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " when "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " is true. With the default settings it ticks like a wall timer. The difference matters once the bench runs in simulated or replayed time."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/src/monitor_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The monitor's rules live in a plain class, "
+         },
+         {
+          "t": "code",
+          "v": "HeartbeatCheck"
+         },
+         {
+          "t": "text",
+          "v": ", which knows nothing about ROS. The node only feeds it each value and logs what it says. "
+         },
+         {
+          "t": "code",
+          "v": "received()"
+         },
+         {
+          "t": "text",
+          "v": " is public so that the test can ask how many heartbeats arrived:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <cinttypes>\n#include <cstdint>\n#include <memory>\n#include <optional>\n#include <utility>\n#include <variant>\n\n#include <rclcpp/rclcpp.hpp>\n#include <std_msgs/msg/int64.hpp>\n\nnamespace bench_nodes {\n\n// What one heartbeat says about the stream.\nstruct InOrder {};\nstruct Gap {\n  std::int64_t lost;  // heartbeats missing before this one\n};\nstruct Restart {};\nusing Arrival = std::variant<InOrder, Gap, Restart>;\n\n// The monitor's rules, in a plain class that a test reaches without ROS.\nclass HeartbeatCheck {\n public:\n  [[nodiscard]] Arrival observe(std::int64_t value) {\n    ++received_;\n    const std::optional<std::int64_t> last = std::exchange(last_, value);\n    if (!last || value == *last + 1) return InOrder{};\n    if (value <= *last) return Restart{};\n    return Gap{.lost = value - *last - 1};\n  }\n\n  [[nodiscard]] std::int64_t received() const { return received_; }\n\n private:\n  std::optional<std::int64_t> last_;\n  std::int64_t received_ = 0;\n};\n\n// Feeds each heartbeat to the check and logs what it finds.\nclass Monitor : public rclcpp::Node {\n public:\n  explicit Monitor(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node(\"monitor\", options) {\n    subscription_ = create_subscription<std_msgs::msg::Int64>(\n        \"heartbeat\", rclcpp::QoS(rclcpp::KeepLast(10)),\n        [this](const std_msgs::msg::Int64& msg) { on_heartbeat(msg.data); });\n  }\n\n  [[nodiscard]] std::int64_t received() const { return check_.received(); }\n\n private:\n  void on_heartbeat(std::int64_t value) {\n    const Arrival arrival = check_.observe(value);\n    if (const auto* gap = std::get_if<Gap>(&arrival)) {\n      RCLCPP_WARN(get_logger(), \"lost %\" PRId64 \" heartbeats before %\" PRId64, gap->lost, value);\n    } else if (std::holds_alternative<Restart>(arrival)) {\n      RCLCPP_INFO(get_logger(), \"heartbeat restarted at %\" PRId64, value);\n    }\n  }\n\n  HeartbeatCheck check_;\n  rclcpp::Subscription<std_msgs::msg::Int64>::SharedPtr subscription_;\n};\n\n}  // namespace bench_nodes\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<bench_nodes::Monitor>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "HeartbeatCheck"
+        },
+        {
+         "t": "text",
+         "v": " grows out of the "
+        },
+        {
+         "t": "code",
+         "v": "SequenceCheck"
+        },
+        {
+         "t": "text",
+         "v": " from the topics exercise, and keeps its method name, "
+        },
+        {
+         "t": "code",
+         "v": "observe"
+        },
+        {
+         "t": "text",
+         "v": ". That one answered with a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": ": the number it expected, or nothing. It couldn't tell a loss from a restart, and it logged "
+        },
+        {
+         "t": "code",
+         "v": "expected 18, got 0"
+        },
+        {
+         "t": "text",
+         "v": " when the counter started again. The monitor has to tell them apart, and it counts what it receives, so its answer is a "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": " of three small types: a gap carries its count and the other two carry nothing. With a sentinel such as \"lost is -1 for a restart\", a caller that forgets the special value logs a loss of -1 heartbeats. Here the node has to ask which alternative it got, with "
+        },
+        {
+         "t": "code",
+         "v": "std::get_if"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "std::holds_alternative"
+        },
+        {
+         "t": "text",
+         "v": ". The order of the tests inside "
+        },
+        {
+         "t": "code",
+         "v": "observe"
+        },
+        {
+         "t": "text",
+         "v": " matters: the restart test comes before the gap, because a heartbeat that restarts from 0 after 500 would otherwise count as a gap of -501. "
+        },
+        {
+         "t": "code",
+         "v": "RCLCPP_WARN"
+        },
+        {
+         "t": "text",
+         "v": " formats like "
+        },
+        {
+         "t": "code",
+         "v": "printf"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "PRId64"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "<cinttypes>"
+        },
+        {
+         "t": "text",
+         "v": " is the conversion for "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " on every platform, so the log calls need no casts."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The class runs without ROS, so you can check the rules before the node ever starts. Here it is with a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that feeds it a stream with a gap and a restart:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <utility>\n#include <variant>\n\nnamespace bench_nodes {\n\n// What one heartbeat says about the stream.\nstruct InOrder {};\nstruct Gap {\n  std::int64_t lost;  // heartbeats missing before this one\n};\nstruct Restart {};\nusing Arrival = std::variant<InOrder, Gap, Restart>;\n\n// The monitor's rules, without ROS.\nclass HeartbeatCheck {\n public:\n  [[nodiscard]] Arrival observe(std::int64_t value) {\n    ++received_;\n    const std::optional<std::int64_t> last = std::exchange(last_, value);\n    if (!last || value == *last + 1) return InOrder{};\n    if (value <= *last) return Restart{};\n    return Gap{.lost = value - *last - 1};\n  }\n\n  [[nodiscard]] std::int64_t received() const { return received_; }\n\n private:\n  std::optional<std::int64_t> last_;\n  std::int64_t received_ = 0;\n};\n\n}  // namespace bench_nodes\n\n// One call operator per alternative; std::visit calls the one that matches.\nstruct Describe {\n  std::string operator()(bench_nodes::InOrder) const { return \"in order\"; }\n  std::string operator()(bench_nodes::Gap gap) const { return std::format(\"gap, {} lost\", gap.lost); }\n  std::string operator()(bench_nodes::Restart) const { return \"restart\"; }\n};\n\nint main() {\n  bench_nodes::HeartbeatCheck check;\n  for (const std::int64_t value : {3, 4, 7, 8, 0, 1}) {\n    std::cout << std::format(\"{}: {}\\n\", value, std::visit(Describe{}, check.observe(value)));\n  }\n  std::cout << std::format(\"received {}\\n\", check.received());\n}"
+      },
+      {
+       "t": "output",
+       "text": "3: in order\n4: in order\n7: gap, 2 lost\n8: in order\n0: restart\n1: in order\nreceived 6"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first value is 3 and still counts as in order. A monitor that starts late sees the stream from wherever it has got to, which step 6 shows on the real nodes."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Replace the generated "
+         },
+         {
+          "t": "code",
+          "v": "CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": ". The generated one also adds ROS 2's style linters to the tests, and uncrustify fails any code that isn't in ROS 2's own format. Adopting a formatter is a decision for later, as its own change:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "cmake_minimum_required(VERSION 3.22)\nproject(bench_nodes LANGUAGES CXX)\nset(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\nset(CMAKE_CXX_EXTENSIONS OFF)\nadd_compile_options(-Wall -Wextra -Werror)\n\nfind_package(ament_cmake REQUIRED)\nfind_package(rclcpp REQUIRED)\nfind_package(std_msgs REQUIRED)\n\nadd_executable(heartbeat src/heartbeat_node.cpp)\nadd_executable(monitor src/monitor_node.cpp)\nforeach(node heartbeat monitor)\n  target_include_directories(${node} PRIVATE include)\n  ament_target_dependencies(${node} rclcpp std_msgs)\nendforeach()\ninstall(TARGETS heartbeat monitor DESTINATION lib/${PROJECT_NAME})\n\nament_package()"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In "
+        },
+        {
+         "t": "code",
+         "v": "package.xml"
+        },
+        {
+         "t": "text",
+         "v": ", delete the two "
+        },
+        {
+         "t": "code",
+         "v": "ament_lint"
+        },
+        {
+         "t": "text",
+         "v": " test dependencies for the same reason. Keep the "
+        },
+        {
+         "t": "code",
+         "v": "depend"
+        },
+        {
+         "t": "text",
+         "v": " lines for "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std_msgs"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ". colcon now builds two packages. Then source the workspace and start both nodes, each in its own terminal:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "source ~/test_bench/install/setup.bash\nros2 run bench_nodes heartbeat        # terminal 1\nros2 run bench_nodes monitor          # terminal 2\nros2 topic hz /heartbeat              # terminal 3: average rate: 10.000 or close to it"
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Stop "
+         },
+         {
+          "t": "code",
+          "v": "heartbeat"
+         },
+         {
+          "t": "text",
+          "v": " with Ctrl+C and start it again. The monitor logs a restart. Then start the monitor before the heartbeat, and look at the first value it receives. It may not be 0: messages published before the two nodes have discovered each other are gone, because the default QoS doesn't keep old messages for late subscribers."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, push, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when both nodes run from "
+        },
+        {
+         "t": "code",
+         "v": "ros2 run"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic hz /heartbeat"
+        },
+        {
+         "t": "text",
+         "v": " shows about 10 Hz, and a restart of the heartbeat produces the restart message and no false loss."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, two GoogleTest tests run in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI: one checks the monitor's rules without ROS, and one starts both nodes in one process and checks that the monitor receives the heartbeats."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "To reach the classes, the tests have to include them. So the classes move into headers, and each "
+        },
+        {
+         "t": "code",
+         "v": ".cpp"
+        },
+        {
+         "t": "text",
+         "v": " file keeps only its "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Move "
+         },
+         {
+          "t": "code",
+          "v": "HeartbeatCheck"
+         },
+         {
+          "t": "text",
+          "v": ", with "
+         },
+         {
+          "t": "code",
+          "v": "InOrder"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "Gap"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "Restart"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "Arrival"
+         },
+         {
+          "t": "text",
+          "v": ", into "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/include/bench_nodes/heartbeat_check.hpp"
+         },
+         {
+          "t": "text",
+          "v": ". It includes only standard headers, no ROS. Move "
+         },
+         {
+          "t": "code",
+          "v": "Heartbeat"
+         },
+         {
+          "t": "text",
+          "v": " into "
+         },
+         {
+          "t": "code",
+          "v": "heartbeat.hpp"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "Monitor"
+         },
+         {
+          "t": "text",
+          "v": " into "
+         },
+         {
+          "t": "code",
+          "v": "monitor.hpp"
+         },
+         {
+          "t": "text",
+          "v": " in the same folder, each with its includes and its namespace; "
+         },
+         {
+          "t": "code",
+          "v": "monitor.hpp"
+         },
+         {
+          "t": "text",
+          "v": " includes "
+         },
+         {
+          "t": "code",
+          "v": "\"bench_nodes/heartbeat_check.hpp\""
+         },
+         {
+          "t": "text",
+          "v": ". Put "
+         },
+         {
+          "t": "code",
+          "v": "#pragma once"
+         },
+         {
+          "t": "text",
+          "v": " at the top of all three. The class code doesn't change. What remains of "
+         },
+         {
+          "t": "code",
+          "v": "heartbeat_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": " is this, and "
+         },
+         {
+          "t": "code",
+          "v": "monitor_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": " is the same with the other name:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <memory>\n\n#include <rclcpp/rclcpp.hpp>\n\n#include \"bench_nodes/heartbeat.hpp\"\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  rclcpp::spin(std::make_shared<bench_nodes::Heartbeat>());\n  rclcpp::shutdown();\n}"
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the test of the rules, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/test/test_heartbeat_check.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". It needs no ROS at all:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <variant>\n\n#include <gtest/gtest.h>\n\n#include \"bench_nodes/heartbeat_check.hpp\"\n\nTEST(HeartbeatCheck, CountsTheHeartbeatsLostInAGap) {\n  bench_nodes::HeartbeatCheck check;\n  EXPECT_TRUE(std::holds_alternative<bench_nodes::InOrder>(check.observe(4)));\n  const bench_nodes::Arrival arrival = check.observe(7);\n  ASSERT_TRUE(std::holds_alternative<bench_nodes::Gap>(arrival));\n  EXPECT_EQ(std::get<bench_nodes::Gap>(arrival).lost, 2);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add two more cases in the same style: a value lower than the last one is a "
+        },
+        {
+         "t": "code",
+         "v": "Restart"
+        },
+        {
+         "t": "text",
+         "v": ", and the value after a restart is "
+        },
+        {
+         "t": "code",
+         "v": "InOrder"
+        },
+        {
+         "t": "text",
+         "v": " again. "
+        },
+        {
+         "t": "code",
+         "v": "ASSERT_TRUE"
+        },
+        {
+         "t": "text",
+         "v": " stops the case before "
+        },
+        {
+         "t": "code",
+         "v": "std::get"
+        },
+        {
+         "t": "text",
+         "v": " would throw "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_variant_access"
+        },
+        {
+         "t": "text",
+         "v": " on a wrong alternative."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the test of the plumbing, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/test/test_exchange.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". It starts ROS once for the whole test suite:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <chrono>\n#include <memory>\n\n#include <gtest/gtest.h>\n#include <rclcpp/rclcpp.hpp>\n\n#include \"bench_nodes/heartbeat.hpp\"\n#include \"bench_nodes/monitor.hpp\"\n\nclass Exchange : public testing::Test {\n protected:\n  static void SetUpTestSuite() { rclcpp::init(0, nullptr); }\n  static void TearDownTestSuite() { rclcpp::shutdown(); }\n};"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The test case puts both nodes into one executor and spins it until the monitor has heard five heartbeats, or five seconds have passed:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "TEST_F(Exchange, MonitorHearsHeartbeat) {\n  auto heartbeat = std::make_shared<bench_nodes::Heartbeat>();\n  auto monitor = std::make_shared<bench_nodes::Monitor>();\n  rclcpp::executors::SingleThreadedExecutor executor;\n  executor.add_node(heartbeat);\n  executor.add_node(monitor);\n\n  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);\n  while (monitor->received() < 5 && std::chrono::steady_clock::now() < deadline) {\n    executor.spin_once(std::chrono::milliseconds(100));\n  }\n  EXPECT_GE(monitor->received(), 5);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each line has a reason. One executor runs both nodes' callbacks in the test's own thread, so "
+        },
+        {
+         "t": "code",
+         "v": "received()"
+        },
+        {
+         "t": "text",
+         "v": " is read by the same thread that writes it, and needs no lock. "
+        },
+        {
+         "t": "code",
+         "v": "spin_once"
+        },
+        {
+         "t": "text",
+         "v": " waits up to 100 ms for one callback to be ready, runs it, and returns, which lets the loop check its two conditions. "
+        },
+        {
+         "t": "code",
+         "v": "spin_some"
+        },
+        {
+         "t": "text",
+         "v": " would be the wrong choice here: when nothing is ready it returns at once, and the loop would keep a CPU core busy until the deadline. The deadline turns a broken exchange into a failed test instead of a CI job that hangs. The test asks for five heartbeats, not heartbeats 0 to 4, because the first ones can be lost during discovery, as you saw in Build 1."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two tests split the work. "
+        },
+        {
+         "t": "code",
+         "v": "test_heartbeat_check"
+        },
+        {
+         "t": "text",
+         "v": " decides whether the rules are right, runs in milliseconds and never depends on timing. "
+        },
+        {
+         "t": "code",
+         "v": "test_exchange"
+        },
+        {
+         "t": "text",
+         "v": " only has to show that the nodes find each other and that each heartbeat reaches the check."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add both tests to "
+         },
+         {
+          "t": "code",
+          "v": "CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": ", before "
+         },
+         {
+          "t": "code",
+          "v": "ament_package()"
+         },
+         {
+          "t": "text",
+          "v": ", and add "
+         },
+         {
+          "t": "code",
+          "v": "<test_depend>ament_cmake_gtest</test_depend>"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": "package.xml"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "if(BUILD_TESTING)\n  find_package(ament_cmake_gtest REQUIRED)\n  ament_add_gtest(test_heartbeat_check test/test_heartbeat_check.cpp)\n  target_include_directories(test_heartbeat_check PRIVATE include)\n  ament_add_gtest(test_exchange test/test_exchange.cpp)\n  target_include_directories(test_exchange PRIVATE include)\n  ament_target_dependencies(test_exchange rclcpp std_msgs)\nendif()"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ament_add_gtest"
+        },
+        {
+         "t": "text",
+         "v": " builds the test program, links GoogleTest with its "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", and registers the test with CTest. It also writes the result as XML under "
+        },
+        {
+         "t": "code",
+         "v": "build/bench_nodes/test_results/"
+        },
+        {
+         "t": "text",
+         "v": ", which is what "
+        },
+        {
+         "t": "code",
+         "v": "colcon test-result"
+        },
+        {
+         "t": "text",
+         "v": " reads. "
+        },
+        {
+         "t": "code",
+         "v": "test_heartbeat_check"
+        },
+        {
+         "t": "text",
+         "v": " gets no "
+        },
+        {
+         "t": "code",
+         "v": "ament_target_dependencies"
+        },
+        {
+         "t": "text",
+         "v": " line, and so it can't include a ROS header by accident."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", then "
+         },
+         {
+          "t": "code",
+          "v": "colcon test-result --verbose"
+         },
+         {
+          "t": "text",
+          "v": ". The summary counts the test cases from "
+         },
+         {
+          "t": "code",
+          "v": "bench_nodes"
+         },
+         {
+          "t": "text",
+          "v": ". The "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " tests don't appear there, because a plain CMake package doesn't write that XML; "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " already printed their CTest summary."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that the exchange test can fail. Change the topic name in the monitor to "
+         },
+         {
+          "t": "code",
+          "v": "heartbeats"
+         },
+         {
+          "t": "text",
+          "v": ", run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", and check that the test fails after about five seconds with the count it got, 0. Undo the change."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "note",
+       "c": [
+        {
+         "t": "text",
+         "v": "Tests that use ROS topics can hear each other. "
+        },
+        {
+         "t": "code",
+         "v": "colcon test"
+        },
+        {
+         "t": "text",
+         "v": " runs the tests of several packages at the same time, and all of them share every topic of their "
+        },
+        {
+         "t": "code",
+         "v": "ROS_DOMAIN_ID"
+        },
+        {
+         "t": "text",
+         "v": ", so one test's heartbeats can reach another test's monitor. "
+        },
+        {
+         "t": "code",
+         "v": "ament_add_ros_isolated_gtest"
+        },
+        {
+         "t": "text",
+         "v": " from the package "
+        },
+        {
+         "t": "code",
+         "v": "ament_cmake_ros"
+        },
+        {
+         "t": "text",
+         "v": " takes the same arguments and gives each isolated test on the machine a domain ID of its own, unless "
+        },
+        {
+         "t": "code",
+         "v": "ROS_DOMAIN_ID"
+        },
+        {
+         "t": "text",
+         "v": " is already set. Switch to it when the bench gets its second test that uses topics."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit, push, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when both tests pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, and you have seen the exchange test fail with a wrong topic name."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a \"Nodes\" section to "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic. For each node, give its topic, message type and rate, and what the monitor logs on a loss and on a restart. Then write three to five lines on the tests: which one checks the rules and which the plumbing, what the exchange test starts and waits for, why it waits for a count rather than for particular values, and why it has a deadline."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ros2/examples repository, Jazzy branch: the "
+     },
+     {
+      "t": "a",
+      "v": "publisher",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/topics/minimal_publisher/member_function.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "subscriber",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/topics/minimal_subscriber/member_function.cpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "timer",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/timers/minimal_timer/lambda.cpp"
+     },
+     {
+      "t": "text",
+      "v": " examples, and the "
+     },
+     {
+      "t": "a",
+      "v": "composition example",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Composition.html"
+     },
+     {
+      "t": "text",
+      "v": " for the "
+     },
+     {
+      "t": "code",
+      "v": "NodeOptions"
+     },
+     {
+      "t": "text",
+      "v": " constructor."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bilal Gill, a functional approach to testable ROS 2 code, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Leveraging_a_functional_approach_for_more_testable_and_maintainable_ros2_code.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=rQe7h-ccXpE"
+     },
+     {
+      "t": "text",
+      "v": ". Thin callbacks around a plain class that tests reach without ROS."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Algebraic Data Types, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_algebraic_data_types/back_to_basics_algebraic_data_types__arthur_odwyer__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=OJzmWqCCZaM"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": " for a result that is one of several shapes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation: "
+     },
+     {
+      "t": "a",
+      "v": "writing a publisher and subscriber",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-Client-Libraries/Writing-A-Simple-Cpp-Publisher-And-Subscriber.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "executors",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Executors.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "testing with GTest",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Testing/Cpp.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::variant",
+      "href": "https://en.cppreference.com/cpp/utility/variant"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "a",
+      "v": "fixed-width integer macros",
+      "href": "https://en.cppreference.com/cpp/types/integer"
+     },
+     {
+      "t": "text",
+      "v": " such as "
+     },
+     {
+      "t": "code",
+      "v": "PRId64"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

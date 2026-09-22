@@ -1,0 +1,1753 @@
+{
+ "id": "pat-factory-method",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "From memory, write both factories for a lateral controller with two implementations, a proportional one and one with a deadband. First a simple factory function that takes an enumeration and returns a "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr<Controller>"
+     },
+     {
+      "t": "text",
+      "v": ". Then Factory Method: a "
+     },
+     {
+      "t": "code",
+      "v": "Scenario"
+     },
+     {
+      "t": "text",
+      "v": " base class whose "
+     },
+     {
+      "t": "code",
+      "v": "first_command"
+     },
+     {
+      "t": "text",
+      "v": " does the work and calls a protected virtual creation step, with one subclass per controller. Run both and show they agree. Then say in two sentences what varies in each and who chooses it. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <string_view>\n\nclass Controller {\n public:\n  Controller() = default;\n  Controller(const Controller&) = delete;\n  Controller& operator=(const Controller&) = delete;\n  virtual ~Controller() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n  [[nodiscard]] virtual std::int32_t steer_mdeg(std::int32_t offset_mm) const = 0;\n};\n\nclass Proportional final : public Controller {\n public:\n  explicit Proportional(std::int32_t gain_mdeg_per_mm) : gain_(gain_mdeg_per_mm) {}\n  [[nodiscard]] std::string_view name() const override { return \"proportional\"; }\n  [[nodiscard]] std::int32_t steer_mdeg(std::int32_t offset_mm) const override { return offset_mm * gain_; }\n\n private:\n  std::int32_t gain_;\n};\n\nclass Deadband final : public Controller {\n public:\n  Deadband(std::int32_t tolerance_mm, std::int32_t gain_mdeg_per_mm)\n      : tolerance_(tolerance_mm), gain_(gain_mdeg_per_mm) {}\n  [[nodiscard]] std::string_view name() const override { return \"deadband\"; }\n  [[nodiscard]] std::int32_t steer_mdeg(std::int32_t offset_mm) const override {\n    return offset_mm > -tolerance_ && offset_mm < tolerance_ ? 0 : offset_mm * gain_;\n  }\n\n private:\n  std::int32_t tolerance_;\n  std::int32_t gain_;\n};\n\n// A simple factory function: one free function, a value in, a base pointer out.\nenum class ControllerKind { proportional, deadband };\n\n[[nodiscard]] std::unique_ptr<Controller> make_controller(ControllerKind kind) {\n  switch (kind) {\n    case ControllerKind::proportional:\n      return std::make_unique<Proportional>(12);\n    case ControllerKind::deadband:\n      return std::make_unique<Deadband>(30, 12);\n  }\n  return std::make_unique<Proportional>(12);\n}\n\n// Factory Method: the creation step is a virtual function inside a workflow the base class owns.\nclass Scenario {\n public:\n  Scenario() = default;\n  Scenario(const Scenario&) = delete;\n  Scenario& operator=(const Scenario&) = delete;\n  virtual ~Scenario() = default;\n\n  [[nodiscard]] std::string first_command(std::int32_t offset_mm) const {\n    const std::unique_ptr<Controller> controller = make_controller();  // the step subclasses override\n    return std::format(\"{} steers {} mdeg at {} mm off\", controller->name(), controller->steer_mdeg(offset_mm),\n                       offset_mm);\n  }\n\n protected:\n  [[nodiscard]] virtual std::unique_ptr<Controller> make_controller() const = 0;\n};\n\nclass StraightLineRun final : public Scenario {\n protected:\n  [[nodiscard]] std::unique_ptr<Controller> make_controller() const override {\n    return std::make_unique<Proportional>(12);\n  }\n};\n\nclass SlalomRun final : public Scenario {\n protected:\n  [[nodiscard]] std::unique_ptr<Controller> make_controller() const override {\n    return std::make_unique<Deadband>(30, 12);\n  }\n};\n\nint main() {\n  for (const ControllerKind kind : {ControllerKind::proportional, ControllerKind::deadband}) {\n    const std::unique_ptr<Controller> controller = make_controller(kind);\n    std::cout << std::format(\"factory function: {} steers {} mdeg at 20 mm off\\n\", controller->name(),\n                             controller->steer_mdeg(20));\n  }\n\n  const StraightLineRun straight;\n  const SlalomRun slalom;\n  std::cout << std::format(\"factory method:   {}\\n\", straight.first_command(20));\n  std::cout << std::format(\"factory method:   {}\\n\", slalom.first_command(20));\n}"
+   },
+   {
+    "t": "output",
+    "text": "factory function: proportional steers 240 mdeg at 20 mm off\nfactory function: deadband steers 0 mdeg at 20 mm off\nfactory method:   proportional steers 240 mdeg at 20 mm off\nfactory method:   deadband steers 0 mdeg at 20 mm off"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "In the factory function, the product varies and the caller chooses, by passing a value. In Factory Method, the product varies and a subclass chooses, by overriding, so the choice is fixed in the type of the object and the base class's workflow never learns which product it got. The factory function has one hierarchy, the controllers. Factory Method has two, the controllers and the scenarios, and every combination of workflow and product is a class."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the factory function returns the base by "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " and the Factory Method version puts the creation step behind a protected virtual function the base calls. Calling "
+     },
+     {
+      "t": "code",
+      "v": "make_controller()"
+     },
+     {
+      "t": "text",
+      "v": " from "
+     },
+     {
+      "t": "code",
+      "v": "Scenario"
+     },
+     {
+      "t": "text",
+      "v": "'s constructor is a fail, for the reason the failure cases section measures."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A factory is a function that builds an object in place of a constructor. Factory Method is one shape of it: a base class owns a multi-step workflow in an ordinary member function that calls a protected virtual step whose only job is to create the object the workflow uses; each subclass overrides that step to supply its own product. A simple factory function is the plainer alternative: one free function that takes an enumeration naming the product and returns it behind a "
+    },
+    {
+     "t": "code",
+     "v": "std::unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": " to the base."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Both exist because a constructor cannot make this decision: it either produces the object or throws, so it cannot hand back a failure as a value, and it cannot return a type other than its own class, so it cannot read a value at run time and decide which of several products to build, the way reading a planner's kind from a parameter file needs."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A simple factory function puts that decision where the caller makes it: it passes an enumeration, and a switch returns the matching product, one hierarchy, the products, with no inheritance in the factory. Factory Method moves the decision into the type system instead: the algorithm is fixed in the base class, the creation step is pure virtual, and a subclass answers it by overriding, so the product is fixed the moment the subclass is chosen and the workflow never learns which one it got, needing two hierarchies, the products and the workflows, with every pairing its own class."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The costs are the class count and one trap. A workflow times four products is already several subclasses holding one line each, and each is a place a future change must repeat. Worse, calling the creation step from the base class's own constructor compiles without warning and never reaches the subclass, because during a constructor the dynamic type is still the base, so it silently builds the base's own idea of the product. Where a class does not truly own a multi-step workflow, handing the finished object in through the constructor instead avoids both problems."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet the simple factory function in nearly every ROS node that reads a kind from a parameter, and Factory Method wherever a base class genuinely owns the steps and only the object inside them changes, which is the interview question itself: saying which one chooses the product, and how."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Factory Method versus simple factory versus registry",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here are two ways to build a pose out of four numbers, and why the language refuses them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "cannot be overloaded with",
+       "text": "// Two ways to build a pose out of four numbers. A constructor has no name of its own.\nstruct Pose {\n  Pose(double x, double y, double z, double yaw_rad);\n  Pose(double qx, double qy, double qz, double qw);\n\n  double x;\n  double y;\n  double z;\n  double yaw_rad;\n};\n\nint main() {\n  const Pose pose(1.0, 2.0, 0.0, 0.5);\n  return pose.x > 0.0 ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 says "
+        },
+        {
+         "t": "code",
+         "v": "‘Pose::Pose(double, double, double, double)’ cannot be overloaded with ‘Pose::Pose(double, double, double, double)’"
+        },
+        {
+         "t": "text",
+         "v": ". Two static functions called "
+        },
+        {
+         "t": "code",
+         "v": "Pose::from_yaw"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Pose::from_quaternion"
+        },
+        {
+         "t": "text",
+         "v": " compile and read better at the call, which is the smallest reason factories exist: a constructor is named after its class, so the only thing that can tell two of them apart is their parameter types."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four larger reasons follow, and each one is a thing a constructor cannot do."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A constructor cannot report failure with a value. It either produces the object or throws, because there is no object to hold a failure in ("
+         },
+         {
+          "t": "a",
+          "v": "C.42",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-throw"
+         },
+         {
+          "t": "text",
+          "v": " puts it the other way round: a constructor that cannot build a valid object should throw). A function can return "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<Config>"
+         },
+         {
+          "t": "text",
+          "v": ", a "
+         },
+         {
+          "t": "code",
+          "v": "std::variant<Config, Error>"
+         },
+         {
+          "t": "text",
+          "v": ", or, from C++23, "
+         },
+         {
+          "t": "code",
+          "v": "std::expected<Config, Error>"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A constructor cannot return a different type. A factory returns "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr<Planner>"
+         },
+         {
+          "t": "text",
+          "v": " and decides at run time whether the object behind it is a "
+         },
+         {
+          "t": "code",
+          "v": "PurePursuit"
+         },
+         {
+          "t": "text",
+          "v": " or a "
+         },
+         {
+          "t": "code",
+          "v": "Stanley"
+         },
+         {
+          "t": "text",
+          "v": ", which is what reading a parameter file means."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A constructor cannot call a virtual function and reach the derived class, because during it the dynamic type is the class whose constructor is running, as the polymorphism topic showed. Core Guidelines "
+         },
+         {
+          "t": "a",
+          "v": "C.50",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-factory"
+         },
+         {
+          "t": "text",
+          "v": " exists for this: use a factory function when you need virtual behaviour during initialisation."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A constructor always builds a new object. A factory can hand back a cached one, an object from a pool, or a value with no allocation at all."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Klaus Iglberger's Guideline 13 in C++ Software Design points out that you have been using factories all along: "
+        },
+        {
+         "t": "code",
+         "v": "std::make_unique"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::make_shared"
+        },
+        {
+         "t": "text",
+         "v": " are factory functions, and "
+        },
+        {
+         "t": "code",
+         "v": "std::make_shared"
+        },
+        {
+         "t": "text",
+         "v": " is the one that decides to put the control block and the object in one allocation. The three shapes worth telling apart are these."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A simple factory function is a free function or a static member that takes a value and returns an object, usually a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " to a base. There is one hierarchy, the products, and no inheritance at the factory itself. This is the shape ROS code wants nearly every time, because the choice arrives as a parameter and the set of products is known to the package that reads it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Factory Method is a virtual creation step inside a workflow that a base class owns. The base's non-virtual function runs the algorithm and calls the protected virtual "
+        },
+        {
+         "t": "code",
+         "v": "make_x()"
+        },
+        {
+         "t": "text",
+         "v": "; a subclass overrides that one step. The 1994 catalogue's summary is that the class defers deciding which type to build to its subclasses ("
+        },
+        {
+         "t": "a",
+         "v": "Design Patterns",
+         "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch03.html"
+        },
+        {
+         "t": "text",
+         "v": ", the creational chapter). There are two hierarchies, the products and the creators, and the creator's type decides the product's type once and for all. The shape is Template Method with the varying step being an object creation, and it carries Template Method's cost with it: every pair of workflow and product is a class."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A registry is a table from a name to a creator function, filled at run time. It is the only one of the three that lets a package this one was never linked against add a product, which is what ROS 2's "
+        },
+        {
+         "t": "a",
+         "v": "pluginlib",
+         "href": "https://github.com/ros/pluginlib"
+        },
+        {
+         "t": "text",
+         "v": " is: a package declares a class in an XML manifest and registers it with "
+        },
+        {
+         "t": "a",
+         "v": "PLUGINLIB_EXPORT_CLASS",
+         "href": "https://github.com/ros/pluginlib/blob/rolling/pluginlib/include/pluginlib/class_list_macros.hpp"
+        },
+        {
+         "t": "text",
+         "v": ", and a node loads it by name from a parameter. The price is a table the whole process shares and anyone can change, which the failure cases section shows."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Pick by where the choice comes from and how open the set is."
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The choice is a parameter and the set is closed: a simple factory function over an enumeration, with a separate step that turns the parameter's text into that enumeration and returns "
+         },
+         {
+          "t": "code",
+          "v": "std::optional"
+         },
+         {
+          "t": "text",
+          "v": ". The worked example is this shape."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The set is open and other packages supply it: a registry, and pass it to whoever needs it rather than reaching for a global one."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A base class really owns a multi-step workflow and only one object inside it varies: Factory Method. If that is not the case, hand the object in instead, which is the dependency injection topic's constructor injection and Iglberger's Guideline 20, composition over inheritance."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One rule cuts across all three. Keep the step that can fail apart from the step that builds. Validation reads text and numbers and answers with a value; creation takes something already valid and cannot fail. A ROS 2 node that throws from its constructor produces no node at all, so the only place the reason can be printed is wherever "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " catches it, without the node's own logger and without the node name in the line. A node that reads a config and gets an error back can log it against its own logger and either carry on with a default or shut down deliberately."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the shape a node uses at start-up: five parameter files, two of them wrong, then a factory that builds the planner. It also counts the allocations, using the one piece of state the language forces to namespace scope."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <cstdlib>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <new>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <variant>\n#include <vector>\n\n// A replacement operator new has a fixed signature, so the counter cannot be an argument.\nstd::int64_t allocation_count = 0;\n\nvoid* operator new(std::size_t bytes) {\n  ++allocation_count;\n  if (void* memory = std::malloc(bytes)) return memory;\n  throw std::bad_alloc{};\n}\nvoid operator delete(void* memory) noexcept { std::free(memory); }\nvoid operator delete(void* memory, std::size_t) noexcept { std::free(memory); }\n\n// ---- the planners, as plain settings structs that derive from nothing ----\n\nstruct PurePursuit {\n  std::int32_t top_speed_mm_s;\n  std::int32_t lookahead_mm;\n};\nstruct Stanley {\n  std::int32_t top_speed_mm_s;\n  std::int32_t lookahead_mm;\n};\nstruct Hold {\n  std::int32_t speed_mm_s;\n};\n\n[[nodiscard]] constexpr std::int32_t speed_of(PurePursuit p, std::int32_t to_goal_mm) {\n  return to_goal_mm >= p.lookahead_mm ? p.top_speed_mm_s : p.top_speed_mm_s * to_goal_mm / p.lookahead_mm;\n}\n[[nodiscard]] constexpr std::int32_t speed_of(Stanley p, std::int32_t to_goal_mm) {\n  return p.top_speed_mm_s * to_goal_mm / (to_goal_mm + p.lookahead_mm);\n}\n[[nodiscard]] constexpr std::int32_t speed_of(Hold p, std::int32_t) { return p.speed_mm_s; }\n\n[[nodiscard]] constexpr std::string_view name_of(PurePursuit) { return \"pure_pursuit\"; }\n[[nodiscard]] constexpr std::string_view name_of(Stanley) { return \"stanley\"; }\n[[nodiscard]] constexpr std::string_view name_of(Hold) { return \"hold\"; }\n\n// ---- reading the parameters: a step that can fail, and says why ----\n\nenum class PlannerKind { pure_pursuit, stanley, hold };\nenum class ConfigError { unknown_kind, speed_out_of_range, lookahead_out_of_range };\n\nstruct PlannerParams {  // what a node reads from its parameter file\n  std::string kind;\n  std::int32_t top_speed_mm_s;\n  std::int32_t lookahead_mm;\n};\n\nstruct PlannerConfig {  // the same values, checked\n  PlannerKind kind;\n  std::int32_t top_speed_mm_s;\n  std::int32_t lookahead_mm;\n};\n\n[[nodiscard]] std::optional<PlannerKind> kind_from(std::string_view name) {\n  if (name == \"pure_pursuit\") return PlannerKind::pure_pursuit;\n  if (name == \"stanley\") return PlannerKind::stanley;\n  if (name == \"hold\") return PlannerKind::hold;\n  return std::nullopt;\n}\n\n[[nodiscard]] constexpr std::string_view text_of(ConfigError error) {\n  switch (error) {\n    case ConfigError::unknown_kind:\n      return \"planner.kind is not one of pure_pursuit, stanley, hold\";\n    case ConfigError::speed_out_of_range:\n      return \"planner.top_speed_mm_s must be in [1, 2000]\";\n    case ConfigError::lookahead_out_of_range:\n      return \"planner.lookahead_mm must be in [100, 5000]\";\n  }\n  return \"unknown error\";\n}\n\n// C++23 spells this std::expected<PlannerConfig, ConfigError>.\n[[nodiscard]] std::variant<PlannerConfig, ConfigError> read_config(const PlannerParams& params) {\n  const std::optional<PlannerKind> kind = kind_from(params.kind);\n  if (!kind) return ConfigError::unknown_kind;\n  if (params.top_speed_mm_s < 1 || params.top_speed_mm_s > 2000) return ConfigError::speed_out_of_range;\n  if (params.lookahead_mm < 100 || params.lookahead_mm > 5000) return ConfigError::lookahead_out_of_range;\n  return PlannerConfig{.kind = *kind, .top_speed_mm_s = params.top_speed_mm_s, .lookahead_mm = params.lookahead_mm};\n}\n\n// ---- creating the planner: a step that cannot fail, because the config is already valid ----\n\nclass Planner {\n public:\n  Planner() = default;\n  Planner(const Planner&) = delete;\n  Planner& operator=(const Planner&) = delete;\n  virtual ~Planner() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n  [[nodiscard]] virtual std::int32_t speed_mm_s(std::int32_t to_goal_mm) const = 0;\n};\n\ntemplate <typename Settings>\nclass PlannerModel final : public Planner {\n public:\n  explicit PlannerModel(Settings settings) : settings_(settings) {}\n  [[nodiscard]] std::string_view name() const override { return name_of(settings_); }\n  [[nodiscard]] std::int32_t speed_mm_s(std::int32_t to_goal_mm) const override {\n    return speed_of(settings_, to_goal_mm);\n  }\n\n private:\n  Settings settings_;\n};\n\n[[nodiscard]] std::unique_ptr<Planner> make_planner(const PlannerConfig& config) {\n  switch (config.kind) {\n    case PlannerKind::pure_pursuit:\n      return std::make_unique<PlannerModel<PurePursuit>>(\n          PurePursuit{.top_speed_mm_s = config.top_speed_mm_s, .lookahead_mm = config.lookahead_mm});\n    case PlannerKind::stanley:\n      return std::make_unique<PlannerModel<Stanley>>(\n          Stanley{.top_speed_mm_s = config.top_speed_mm_s, .lookahead_mm = config.lookahead_mm});\n    case PlannerKind::hold:\n      return std::make_unique<PlannerModel<Hold>>(Hold{.speed_mm_s = config.top_speed_mm_s});\n  }\n  return std::make_unique<PlannerModel<Hold>>(Hold{.speed_mm_s = 0});\n}\n\n// The same factory over a closed set, returning a value instead of a pointer.\nusing AnyPlanner = std::variant<PurePursuit, Stanley, Hold>;\n\ntemplate <typename... Fs>\nstruct overloaded : Fs... {\n  using Fs::operator()...;\n};\n\n[[nodiscard]] AnyPlanner make_planner_value(const PlannerConfig& config) {\n  switch (config.kind) {\n    case PlannerKind::pure_pursuit:\n      return PurePursuit{.top_speed_mm_s = config.top_speed_mm_s, .lookahead_mm = config.lookahead_mm};\n    case PlannerKind::stanley:\n      return Stanley{.top_speed_mm_s = config.top_speed_mm_s, .lookahead_mm = config.lookahead_mm};\n    case PlannerKind::hold:\n      return Hold{.speed_mm_s = config.top_speed_mm_s};\n  }\n  return Hold{.speed_mm_s = 0};\n}\n\n[[nodiscard]] std::string described(const AnyPlanner& planner, std::int32_t to_goal_mm) {\n  return std::visit([to_goal_mm](const auto& p) { return std::format(\"{} {}\", name_of(p), speed_of(p, to_goal_mm)); },\n                    planner);\n}\n\nint main() {\n  const std::vector<PlannerParams> files{\n      {.kind = \"pure_pursuit\", .top_speed_mm_s = 1200, .lookahead_mm = 800},\n      {.kind = \"stanley\", .top_speed_mm_s = 1200, .lookahead_mm = 800},\n      {.kind = \"hold\", .top_speed_mm_s = 300, .lookahead_mm = 800},\n      {.kind = \"dwb\", .top_speed_mm_s = 1200, .lookahead_mm = 800},\n      {.kind = \"stanley\", .top_speed_mm_s = 9000, .lookahead_mm = 800},\n  };\n\n  std::vector<PlannerConfig> good;\n  for (const PlannerParams& params : files) {\n    const std::variant<PlannerConfig, ConfigError> result = read_config(params);\n    std::visit(overloaded{\n                   [&](const PlannerConfig& config) {\n                     good.push_back(config);\n                     std::cout << std::format(\"{:<13} accepted\\n\", params.kind);\n                   },\n                   [&](ConfigError error) {\n                     std::cout << std::format(\"{:<13} rejected: {}\\n\", params.kind, text_of(error));\n                   },\n               },\n               result);\n  }\n\n  // Both vectors reserve their buffer first, so the counts below are the planners and nothing else.\n  std::vector<std::unique_ptr<Planner>> planners;\n  planners.reserve(good.size());\n  std::vector<AnyPlanner> values;\n  values.reserve(good.size());\n\n  const std::int64_t before_pointers = allocation_count;\n  for (const PlannerConfig& config : good) planners.push_back(make_planner(config));\n  const std::int64_t pointer_allocations = allocation_count - before_pointers;\n\n  const std::int64_t before_values = allocation_count;\n  for (const PlannerConfig& config : good) values.push_back(make_planner_value(config));\n  const std::int64_t value_allocations = allocation_count - before_values;\n\n  std::cout << \"planner       400 mm out  3000 mm out\\n\";\n  for (const std::unique_ptr<Planner>& planner : planners) {\n    std::cout << std::format(\"{:<13} {:>10}  {:>11}\\n\", planner->name(), planner->speed_mm_s(400),\n                             planner->speed_mm_s(3000));\n  }\n\n  std::cout << std::format(\n      \"the three values agree: {}\\n\",\n      described(values.front(), 400) ==\n          std::format(\"{} {}\", planners.front()->name(), planners.front()->speed_mm_s(400)));\n  std::cout << std::format(\"allocations for {} planners behind unique_ptr: {}\\n\", good.size(), pointer_allocations);\n  std::cout << std::format(\"allocations for {} planners as a variant:      {}\\n\", good.size(), value_allocations);\n  std::cout << std::format(\"sizeof: unique_ptr<Planner> {}, AnyPlanner {}\\n\", sizeof(std::unique_ptr<Planner>),\n                           sizeof(AnyPlanner));\n}"
+      },
+      {
+       "t": "output",
+       "text": "pure_pursuit  accepted\nstanley       accepted\nhold          accepted\ndwb           rejected: planner.kind is not one of pure_pursuit, stanley, hold\nstanley       rejected: planner.top_speed_mm_s must be in [1, 2000]\nplanner       400 mm out  3000 mm out\npure_pursuit         600         1200\nstanley              400          947\nhold                 300          300\nthe three values agree: true\nallocations for 3 planners behind unique_ptr: 3\nallocations for 3 planners as a variant:      0\nsizeof: unique_ptr<Planner> 8, AnyPlanner 12"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Nothing throws. Two of the five files are wrong, and both produce a line a node could log against its own logger, with the parameter name and the allowed range in it. The node stays up and can fall back to "
+         },
+         {
+          "t": "code",
+          "v": "hold"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "read_config"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "make_planner"
+         },
+         {
+          "t": "text",
+          "v": " are two steps on purpose. "
+         },
+         {
+          "t": "code",
+          "v": "read_config"
+         },
+         {
+          "t": "text",
+          "v": " is where every failure lives; "
+         },
+         {
+          "t": "code",
+          "v": "make_planner"
+         },
+         {
+          "t": "text",
+          "v": " takes a "
+         },
+         {
+          "t": "code",
+          "v": "PlannerConfig"
+         },
+         {
+          "t": "text",
+          "v": ", which cannot hold a bad value, and has no failure path at all. That split is what lets "
+         },
+         {
+          "t": "code",
+          "v": "make_planner"
+         },
+         {
+          "t": "text",
+          "v": " return "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr<Planner>"
+         },
+         {
+          "t": "text",
+          "v": " rather than an optional wrapped around a pointer."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Three planners behind "
+         },
+         {
+          "t": "code",
+          "v": "unique_ptr"
+         },
+         {
+          "t": "text",
+          "v": " cost three allocations, one per "
+         },
+         {
+          "t": "code",
+          "v": "make_unique"
+         },
+         {
+          "t": "text",
+          "v": ". The same three as a "
+         },
+         {
+          "t": "code",
+          "v": "std::variant"
+         },
+         {
+          "t": "text",
+          "v": " cost zero, and the variant is 12 bytes: the largest alternative is two "
+         },
+         {
+          "t": "code",
+          "v": "int32_t"
+         },
+         {
+          "t": "text",
+          "v": ", plus the index and padding. The vectors reserve their buffers before the counting starts, so those three are the objects and nothing else."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "make_planner"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "make_planner_value"
+         },
+         {
+          "t": "text",
+          "v": " are the same factory with two return types, which is the choice the polymorphism topic framed as adding types against adding operations. A closed set of planners fixed by this package favours the variant; a set that other packages extend needs the pointer."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Both switches end with a "
+         },
+         {
+          "t": "code",
+          "v": "return"
+         },
+         {
+          "t": "text",
+          "v": " after the last "
+         },
+         {
+          "t": "code",
+          "v": "case"
+         },
+         {
+          "t": "text",
+          "v": ". That line is unreachable for the three enumerators, and it is there for a value outside them, which a cast or a corrupted parameter can produce. Without it, "
+         },
+         {
+          "t": "code",
+          "v": "-Wreturn-type"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "-Wall"
+         },
+         {
+          "t": "text",
+          "v": " is an error under "
+         },
+         {
+          "t": "code",
+          "v": "-Werror"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "PlannerModel<Settings>"
+         },
+         {
+          "t": "text",
+          "v": " puts a vtable on top of a plain struct that derives from nothing, so the same three settings types serve both factories. That is Iglberger's Guideline 31, External Polymorphism."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "workflow",
+   "title": "Base workflow with an overridable creation step, then a simple factory function",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. A test bench replays a recorded list of lateral offsets in millimetres through a controller and reports how much steering it asked for."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "code",
+          "v": "Controller"
+         },
+         {
+          "t": "text",
+          "v": " interface with "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::string_view name() const"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::int32_t steer_mdeg(std::int32_t offset_mm) const"
+         },
+         {
+          "t": "text",
+          "v": ". Two implementations: "
+         },
+         {
+          "t": "code",
+          "v": "Proportional"
+         },
+         {
+          "t": "text",
+          "v": ", built from a name and a gain in millidegrees per millimetre, which returns "
+         },
+         {
+          "t": "code",
+          "v": "offset * gain"
+         },
+         {
+          "t": "text",
+          "v": "; and "
+         },
+         {
+          "t": "code",
+          "v": "Deadband"
+         },
+         {
+          "t": "text",
+          "v": ", built from a tolerance in millimetres and a gain, which returns 0 while the offset is strictly inside the tolerance and "
+         },
+         {
+          "t": "code",
+          "v": "offset * gain"
+         },
+         {
+          "t": "text",
+          "v": " otherwise."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "code",
+          "v": "Report"
+         },
+         {
+          "t": "text",
+          "v": " holding the controller's name, the number of samples and the total of the absolute steering commands as "
+         },
+         {
+          "t": "code",
+          "v": "std::int64_t"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The Factory Method version: a "
+         },
+         {
+          "t": "code",
+          "v": "Scenario"
+         },
+         {
+          "t": "text",
+          "v": " base class with a non-virtual "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] Report run(std::span<const std::int32_t> offsets_mm) const"
+         },
+         {
+          "t": "text",
+          "v": " that builds the controller through a protected virtual "
+         },
+         {
+          "t": "code",
+          "v": "make_controller()"
+         },
+         {
+          "t": "text",
+          "v": ", feeds every offset through it and returns the report. Three subclasses: "
+         },
+         {
+          "t": "code",
+          "v": "GentleRun"
+         },
+         {
+          "t": "text",
+          "v": " with a gain of 8, "
+         },
+         {
+          "t": "code",
+          "v": "SharpRun"
+         },
+         {
+          "t": "text",
+          "v": " with a gain of 20, and "
+         },
+         {
+          "t": "code",
+          "v": "SlalomRun"
+         },
+         {
+          "t": "text",
+          "v": " with a 30 mm deadband and a gain of 12."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The factory function version: an enumeration "
+         },
+         {
+          "t": "code",
+          "v": "ControllerKind"
+         },
+         {
+          "t": "text",
+          "v": ", a "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::optional<ControllerKind> kind_from(std::string_view)"
+         },
+         {
+          "t": "text",
+          "v": " that returns nothing for a name it does not know, a "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::unique_ptr<Controller> make_controller(ControllerKind)"
+         },
+         {
+          "t": "text",
+          "v": " that cannot fail, and one "
+         },
+         {
+          "t": "code",
+          "v": "Run"
+         },
+         {
+          "t": "text",
+          "v": " class that takes the controller in its constructor."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run the offsets "
+        },
+        {
+         "t": "code",
+         "v": "{5, -40, 120, -15, 0, 60}"
+        },
+        {
+         "t": "text",
+         "v": " through all three controllers both ways and show that the reports match. Ask the second version for a controller called "
+        },
+        {
+         "t": "code",
+         "v": "dwb"
+        },
+        {
+         "t": "text",
+         "v": " as well, and print what "
+        },
+        {
+         "t": "code",
+         "v": "kind_from"
+        },
+        {
+         "t": "text",
+         "v": " gave you. Finish by printing, from two "
+        },
+        {
+         "t": "code",
+         "v": "constexpr"
+        },
+        {
+         "t": "text",
+         "v": " functions, how many classes each design needs for three workflows and four controllers. Count both hierarchies in both functions, so the two numbers compare the same thing: the "
+        },
+        {
+         "t": "code",
+         "v": "Controller"
+        },
+        {
+         "t": "text",
+         "v": " interface and one class per controller appear either way, and Factory Method adds the "
+        },
+        {
+         "t": "code",
+         "v": "Scenario"
+        },
+        {
+         "t": "text",
+         "v": " base and one subclass per pair of workflow and controller."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer four questions in writing. Which of the two lets a package that this file never mentions add a controller? What does "
+        },
+        {
+         "t": "code",
+         "v": "make_controller"
+        },
+        {
+         "t": "text",
+         "v": " do that a "
+        },
+        {
+         "t": "code",
+         "v": "Controller"
+        },
+        {
+         "t": "text",
+         "v": " constructor cannot? Why does "
+        },
+        {
+         "t": "code",
+         "v": "kind_from"
+        },
+        {
+         "t": "text",
+         "v": " return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " while "
+        },
+        {
+         "t": "code",
+         "v": "make_controller"
+        },
+        {
+         "t": "text",
+         "v": " returns a plain "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "? And which of the two designs can change its controller after the object is built?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <cstdlib>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <memory>\n#include <optional>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Report {\n  std::string controller;\n  std::int64_t samples;\n  std::int64_t total_abs_steer_mdeg;\n};\n\n[[nodiscard]] std::string shown(const Report& report) {\n  return std::format(\"{:<13} {:>3} samples, {:>6} mdeg of steering\", report.controller, report.samples,\n                     report.total_abs_steer_mdeg);\n}\n\nclass Controller {\n public:\n  Controller() = default;\n  Controller(const Controller&) = delete;\n  Controller& operator=(const Controller&) = delete;\n  virtual ~Controller() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n  [[nodiscard]] virtual std::int32_t steer_mdeg(std::int32_t offset_mm) const = 0;\n};\n\nclass Proportional final : public Controller {\n public:\n  Proportional(std::string_view name, std::int32_t gain_mdeg_per_mm) : name_(name), gain_(gain_mdeg_per_mm) {}\n  [[nodiscard]] std::string_view name() const override { return name_; }\n  [[nodiscard]] std::int32_t steer_mdeg(std::int32_t offset_mm) const override { return offset_mm * gain_; }\n\n private:\n  std::string name_;\n  std::int32_t gain_;\n};\n\nclass Deadband final : public Controller {\n public:\n  Deadband(std::int32_t tolerance_mm, std::int32_t gain_mdeg_per_mm)\n      : tolerance_(tolerance_mm), gain_(gain_mdeg_per_mm) {}\n  [[nodiscard]] std::string_view name() const override { return \"slalom\"; }\n  [[nodiscard]] std::int32_t steer_mdeg(std::int32_t offset_mm) const override {\n    return offset_mm > -tolerance_ && offset_mm < tolerance_ ? 0 : offset_mm * gain_;\n  }\n\n private:\n  std::int32_t tolerance_;\n  std::int32_t gain_;\n};\n\n// ---- 1. Factory Method: the base owns the workflow, the subclass owns the creation step ----\n\nclass Scenario {\n public:\n  Scenario() = default;\n  Scenario(const Scenario&) = delete;\n  Scenario& operator=(const Scenario&) = delete;\n  virtual ~Scenario() = default;\n\n  [[nodiscard]] Report run(std::span<const std::int32_t> offsets_mm) const {\n    const std::unique_ptr<Controller> controller = make_controller();  // the step subclasses override\n    std::int64_t total = 0;\n    for (const std::int32_t offset_mm : offsets_mm) total += std::abs(controller->steer_mdeg(offset_mm));\n    return Report{.controller = std::string(controller->name()),\n                  .samples = std::ssize(offsets_mm),\n                  .total_abs_steer_mdeg = total};\n  }\n\n protected:\n  [[nodiscard]] virtual std::unique_ptr<Controller> make_controller() const = 0;\n};\n\nclass GentleRun final : public Scenario {\n protected:\n  [[nodiscard]] std::unique_ptr<Controller> make_controller() const override {\n    return std::make_unique<Proportional>(\"gentle\", 8);\n  }\n};\n\nclass SharpRun final : public Scenario {\n protected:\n  [[nodiscard]] std::unique_ptr<Controller> make_controller() const override {\n    return std::make_unique<Proportional>(\"sharp\", 20);\n  }\n};\n\nclass SlalomRun final : public Scenario {\n protected:\n  [[nodiscard]] std::unique_ptr<Controller> make_controller() const override {\n    return std::make_unique<Deadband>(30, 12);\n  }\n};\n\n// ---- 2. A simple factory function, and one workflow class that takes what it makes ----\n\nenum class ControllerKind { gentle, sharp, slalom };\n\n[[nodiscard]] std::optional<ControllerKind> kind_from(std::string_view name) {\n  if (name == \"gentle\") return ControllerKind::gentle;\n  if (name == \"sharp\") return ControllerKind::sharp;\n  if (name == \"slalom\") return ControllerKind::slalom;\n  return std::nullopt;\n}\n\n[[nodiscard]] std::unique_ptr<Controller> make_controller(ControllerKind kind) {\n  switch (kind) {\n    case ControllerKind::gentle:\n      return std::make_unique<Proportional>(\"gentle\", 8);\n    case ControllerKind::sharp:\n      return std::make_unique<Proportional>(\"sharp\", 20);\n    case ControllerKind::slalom:\n      return std::make_unique<Deadband>(30, 12);\n  }\n  return std::make_unique<Proportional>(\"gentle\", 8);\n}\n\nclass Run {\n public:\n  explicit Run(std::unique_ptr<Controller> controller) : controller_(std::move(controller)) {}\n\n  [[nodiscard]] Report run(std::span<const std::int32_t> offsets_mm) const {\n    std::int64_t total = 0;\n    for (const std::int32_t offset_mm : offsets_mm) total += std::abs(controller_->steer_mdeg(offset_mm));\n    return Report{.controller = std::string(controller_->name()),\n                  .samples = std::ssize(offsets_mm),\n                  .total_abs_steer_mdeg = total};\n  }\n\n private:\n  std::unique_ptr<Controller> controller_;\n};\n\n// Both count the same two hierarchies: the Scenario side and the Controller side.\n[[nodiscard]] constexpr std::int32_t classes_with_factory_method(std::int32_t workflows, std::int32_t controllers) {\n  // one Scenario subclass per pair, the Scenario base, the Controller interface, one class per controller\n  return workflows * controllers + 1 + 1 + controllers;\n}\n[[nodiscard]] constexpr std::int32_t classes_with_factory_function(std::int32_t workflows, std::int32_t controllers) {\n  // one class per workflow, the Controller interface, one class per controller\n  return workflows + 1 + controllers;\n}\n\nint main() {\n  const std::vector<std::int32_t> offsets_mm{5, -40, 120, -15, 0, 60};\n\n  std::vector<std::unique_ptr<Scenario>> scenarios;\n  scenarios.push_back(std::make_unique<GentleRun>());\n  scenarios.push_back(std::make_unique<SharpRun>());\n  scenarios.push_back(std::make_unique<SlalomRun>());\n\n  std::cout << \"factory method\\n\";\n  for (const std::unique_ptr<Scenario>& scenario : scenarios) {\n    std::cout << std::format(\"  {}\\n\", shown(scenario->run(offsets_mm)));\n  }\n\n  std::cout << \"factory function\\n\";\n  for (const std::string_view wanted : {\"gentle\", \"sharp\", \"slalom\", \"dwb\"}) {\n    const std::optional<ControllerKind> kind = kind_from(wanted);\n    if (!kind) {\n      std::cout << std::format(\"  {:<13} no such controller\\n\", wanted);\n      continue;\n    }\n    const Run run(make_controller(*kind));\n    std::cout << std::format(\"  {}\\n\", shown(run.run(offsets_mm)));\n  }\n\n  std::cout << std::format(\n      \"3 workflows and 4 controllers: {} classes with Factory Method, {} with a factory function\\n\",\n      classes_with_factory_method(3, 4), classes_with_factory_function(3, 4));\n}"
+      },
+      {
+       "t": "output",
+       "text": "factory method\n  gentle          6 samples,   1920 mdeg of steering\n  sharp           6 samples,   4800 mdeg of steering\n  slalom          6 samples,   2640 mdeg of steering\nfactory function\n  gentle          6 samples,   1920 mdeg of steering\n  sharp           6 samples,   4800 mdeg of steering\n  slalom          6 samples,   2640 mdeg of steering\n  dwb           no such controller\n3 workflows and 4 controllers: 18 classes with Factory Method, 8 with a factory function"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The four answers. Neither version as written is open to another package, because both name every product in one switch or one set of subclasses; the factory function becomes open by taking a creator from its caller, and Factory Method by another package deriving its own "
+        },
+        {
+         "t": "code",
+         "v": "Scenario"
+        },
+        {
+         "t": "text",
+         "v": ", which also forces it to reimplement the workflow. "
+        },
+        {
+         "t": "code",
+         "v": "make_controller"
+        },
+        {
+         "t": "text",
+         "v": " returns a base class, which a "
+        },
+        {
+         "t": "code",
+         "v": "Controller"
+        },
+        {
+         "t": "text",
+         "v": " constructor cannot, and it turns a value into a type choice. "
+        },
+        {
+         "t": "code",
+         "v": "kind_from"
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " because a name from a parameter file may be anything, and "
+        },
+        {
+         "t": "code",
+         "v": "make_controller"
+        },
+        {
+         "t": "text",
+         "v": " does not because a "
+        },
+        {
+         "t": "code",
+         "v": "ControllerKind"
+        },
+        {
+         "t": "text",
+         "v": " can only be one of three things: the failure has already been handled one step earlier. And only the factory function version can change its controller afterwards, by building another "
+        },
+        {
+         "t": "code",
+         "v": "Run"
+        },
+        {
+         "t": "text",
+         "v": ", or by giving "
+        },
+        {
+         "t": "code",
+         "v": "Run"
+        },
+        {
+         "t": "text",
+         "v": " a setter; a "
+        },
+        {
+         "t": "code",
+         "v": "SlalomRun"
+        },
+        {
+         "t": "text",
+         "v": " is a slalom run for as long as it exists."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The class counts are the reason this matters, and both formulas count the same two hierarchies, so the comparison is fair: the controllers and their interface appear in both. Three workflows and four controllers need 18 classes with Factory Method, because every pair of workflow and controller is a "
+        },
+        {
+         "t": "code",
+         "v": "Scenario"
+        },
+        {
+         "t": "text",
+         "v": " subclass on top of those, and 8 with a factory function, because the two axes stay separate. A fifth controller adds four classes to the first design, three subclasses and the controller itself, and one to the second."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "costs",
+   "title": "Subclass explosion; returning unique_ptr",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The class count above is the first failure, and it grows the way products do. A stop-at-first-saturation workflow, a replay workflow and a timing workflow, with four controllers, is twelve subclasses that each contain one "
+        },
+        {
+         "t": "code",
+         "v": "return std::make_unique<...>"
+        },
+        {
+         "t": "text",
+         "v": " and nothing else. Every one of them is a place a change has to be repeated. The cure is to stop inheriting for the creation step and to hand the object in, which is the dependency injection topic's constructor injection: the workflow takes a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Controller>"
+        },
+        {
+         "t": "text",
+         "v": ", and the caller, or a factory function, decides what goes in it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is the one Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.50",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-factory"
+        },
+        {
+         "t": "text",
+         "v": " was written for. A creation step is a virtual function, and calling it from the base class's constructor never reaches the subclass:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <string_view>\n#include <utility>\n\nclass Controller {\n public:\n  Controller() = default;\n  Controller(const Controller&) = delete;\n  Controller& operator=(const Controller&) = delete;\n  virtual ~Controller() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n};\n\nclass Proportional final : public Controller {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"proportional\"; }\n};\n\nclass Deadband final : public Controller {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"deadband\"; }\n};\n\nclass Scenario {\n public:\n  Scenario() : controller_(make_controller()) {}  // a virtual call from a constructor: this is the bug\n  Scenario(const Scenario&) = delete;\n  Scenario& operator=(const Scenario&) = delete;\n  virtual ~Scenario() = default;\n  [[nodiscard]] std::string_view controller_name() const { return controller_->name(); }\n\n protected:\n  [[nodiscard]] virtual std::unique_ptr<Controller> make_controller() const {\n    return std::make_unique<Proportional>();\n  }\n\n private:\n  std::unique_ptr<Controller> controller_;\n};\n\nclass SlalomRun final : public Scenario {\n protected:\n  [[nodiscard]] std::unique_ptr<Controller> make_controller() const override {\n    return std::make_unique<Deadband>();\n  }\n};\n\n// The fix: build the controller before the object that holds it, and pass it in.\nclass Run {\n public:\n  explicit Run(std::unique_ptr<Controller> controller) : controller_(std::move(controller)) {}\n  [[nodiscard]] std::string_view controller_name() const { return controller_->name(); }\n\n private:\n  std::unique_ptr<Controller> controller_;\n};\n\nint main() {\n  const SlalomRun slalom;\n  std::cout << std::format(\"SlalomRun asked for a deadband and got:  {}\\n\", slalom.controller_name());\n\n  const Run injected(std::make_unique<Deadband>());\n  std::cout << std::format(\"Run was handed one and got:              {}\\n\", injected.controller_name());\n}"
+      },
+      {
+       "t": "output",
+       "text": "SlalomRun asked for a deadband and got:  proportional\nRun was handed one and got:              deadband"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nothing warns. "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra -Werror"
+        },
+        {
+         "t": "text",
+         "v": " on GCC 13 compiles this without a word, because a non-pure virtual call in a constructor is well defined: it reaches the class whose constructor is running, which is "
+        },
+        {
+         "t": "code",
+         "v": "Scenario"
+        },
+        {
+         "t": "text",
+         "v": ". The polymorphism topic's version of this was a pure virtual function, which GCC does catch, so the safe-looking fix of giving the base a default implementation is what turns a compile error into a robot that steers with the wrong controller. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.82",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-ctor-virtual"
+        },
+        {
+         "t": "text",
+         "v": " says not to call virtual functions from constructors at all, and C.50 gives the two ways out: build the object before the thing that holds it and pass it in, or use C.50's own two-step form, where a static "
+        },
+        {
+         "t": "code",
+         "v": "create"
+        },
+        {
+         "t": "text",
+         "v": " builds the object and then calls a virtual "
+        },
+        {
+         "t": "code",
+         "v": "post_initialize"
+        },
+        {
+         "t": "text",
+         "v": " on the finished object."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third point is about the return type. C.50's note says a factory should return "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " by default, and a caller who needs sharing can move it into a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", which does not work in the other direction. Returning a raw "
+        },
+        {
+         "t": "code",
+         "v": "Planner*"
+        },
+        {
+         "t": "text",
+         "v": " moves ownership into a comment, and the polymorphism topic showed what deleting through a base with a non-virtual destructor does. Returning a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " is right when the factory knows every use will be shared, which is what "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp"
+        },
+        {
+         "t": "text",
+         "v": " does with nodes; then build it with "
+        },
+        {
+         "t": "code",
+         "v": "std::make_shared"
+        },
+        {
+         "t": "text",
+         "v": ", for the one allocation the smart pointer topic measured. And returning a value, as "
+        },
+        {
+         "t": "code",
+         "v": "make_planner_value"
+        },
+        {
+         "t": "text",
+         "v": " did, beats all of them when the set is closed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth failure is the registry, and it is a singleton in a coat:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <functional>\n#include <iostream>\n#include <map>\n#include <memory>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <utility>\n\nclass Controller {\n public:\n  Controller() = default;\n  Controller(const Controller&) = delete;\n  Controller& operator=(const Controller&) = delete;\n  virtual ~Controller() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n};\n\nclass Named final : public Controller {\n public:\n  explicit Named(std::string_view name) : name_(name) {}\n  [[nodiscard]] std::string_view name() const override { return name_; }\n\n private:\n  std::string name_;\n};\n\nusing Creator = std::function<std::unique_ptr<Controller>()>;\n\n// One map, shared by the whole process, reached through initialisation on first use.\n// This is the construct the section is about, not a shape to copy.\n[[nodiscard]] std::map<std::string, Creator, std::less<>>& registry() {\n  static std::map<std::string, Creator, std::less<>> creators;\n  return creators;\n}\n\nvoid register_controller(std::string name, Creator creator) {\n  registry().insert_or_assign(std::move(name), std::move(creator));\n}\n\n[[nodiscard]] std::optional<std::unique_ptr<Controller>> create(std::string_view name) {\n  const auto found = registry().find(name);\n  if (found == registry().end()) return std::nullopt;\n  return found->second();\n}\n\n[[nodiscard]] std::string built(std::string_view name) {\n  const std::optional<std::unique_ptr<Controller>> controller = create(name);\n  return controller ? std::string((*controller)->name()) : std::string(\"nothing registered\");\n}\n\nint main() {\n  register_controller(\"lane\", [] { return std::make_unique<Named>(\"lane_follower\"); });\n  std::cout << std::format(\"production build:      {}\\n\", built(\"lane\"));\n\n  // One test wants a stub, and registers one under the same name.\n  register_controller(\"lane\", [] { return std::make_unique<Named>(\"stub\"); });\n  std::cout << std::format(\"inside that one test:  {}\\n\", built(\"lane\"));\n\n  // The next test never touched the registry.\n  std::cout << std::format(\"the next test:         {}\\n\", built(\"lane\"));\n  std::cout << std::format(\"a name nobody added:   {}\\n\", built(\"dwb\"));\n}"
+      },
+      {
+       "t": "output",
+       "text": "production build:      lane_follower\ninside that one test:  stub\nthe next test:         stub\na name nobody added:   nothing registered"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third line is the failure. One test changed the registry and every later test in the same process sees it, because the table outlives all of them and nothing puts it back. Run the tests in another order and the results change. Two more problems come with the shape. Registration usually happens through a namespace-scope object in each translation unit, whose construction order across translation units is unspecified, which is what Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.22",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global-init"
+        },
+        {
+         "t": "text",
+         "v": " warns about; the function-local static above avoids that one and keeps the rest. And the dependency does not appear in any signature, so a class that calls "
+        },
+        {
+         "t": "code",
+         "v": "create"
+        },
+        {
+         "t": "text",
+         "v": " looks like it needs nothing, which the dependency injection topic listed as the first roadblock to testing anything."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.3",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-singleton"
+        },
+        {
+         "t": "text",
+         "v": " says to avoid singletons and calls them complicated global objects in disguise. Klaus Iglberger's Guidelines 37 and 38 take a softer line that is worth holding: treat Singleton as an implementation detail rather than a design, and if a process really does need one instance, design it so it can be replaced for a test, by putting an interface in front of it and injecting the instance. In this case that means one "
+        },
+        {
+         "t": "code",
+         "v": "Registry"
+        },
+        {
+         "t": "text",
+         "v": " object that a node owns and passes to whoever creates from it. When the products really do come from packages that were not linked at build time, use the loader that already solved this, pluginlib, rather than writing a second one."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say the four things a constructor cannot do and a factory can. Give the difference between a simple factory function, Factory Method and a registry in one sentence each, with who chooses the product in each. Say what the class counts were for three workflows and four controllers. Say why validation and creation are two steps, and what a node gains by getting an error value rather than an exception from a constructor. Finish with the two traps: a virtual creation step called from a constructor, which compiles silently and returns the base's object, and a shared registry that one test can change for all the others."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Name four things a factory function can do that a constructor cannot."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between Factory Method and a simple factory function, in terms of who chooses the product and how many hierarchies exist?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does the worked example split "
+     },
+     {
+      "t": "code",
+      "v": "read_config"
+     },
+     {
+      "t": "text",
+      "v": " from "
+     },
+     {
+      "t": "code",
+      "v": "make_planner"
+     },
+     {
+      "t": "text",
+      "v": ", and what does that buy the return type of each?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a ROS 2 node lose by throwing from its constructor instead of returning an error value?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Three workflows and four controllers, counting both the workflow and the controller hierarchies: how many classes does each design need, and what does a fifth controller add to each?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A base class constructor calls its own protected virtual "
+     },
+     {
+      "t": "code",
+      "v": "make_controller()"
+     },
+     {
+      "t": "text",
+      "v": ". What runs, what does GCC 13 say, and what are the two fixes?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What return type should a factory use by default, and when is "
+     },
+     {
+      "t": "code",
+      "v": "std::shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": " right instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give three problems a global registry of creators brings, and what injecting it fixes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: a parameter file turned into a validated config that reports its error as a value, and a factory that builds a planner from it."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, C++ Software Design, O'Reilly 2022: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+     },
+     {
+      "t": "text",
+      "v": ". Guideline 13 on the patterns already in the standard library, Guideline 20 on composition over inheritance, Guideline 31 on External Polymorphism, and Guidelines 37 and 38 on treating Singleton as an implementation detail and designing it for testability."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gamma, Helm, Johnson and Vlissides, Design Patterns, Addison-Wesley 1994: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "creational chapter",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch03.html"
+     },
+     {
+      "t": "text",
+      "v": ", where Factory Method defers the choice of type to a subclass."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Design Patterns, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_design_patterns/back_to_basics_design_patterns__michael_shah__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=2UUqX2eIdSM"
+     },
+     {
+      "t": "text",
+      "v": ". What a design pattern is, the three categories the 1994 catalogue uses, and Singleton, Adapter and Iterator worked through in C++."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Pete Muldoon, Retiring the Singleton Pattern, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/retiring_the_singleton_pattern/retiring_the_singleton_pattern__peter_muldoon__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": ". What a shared instance costs, and what to reach for instead."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Pete Muldoon, Dependency Injection in C++: A Practical Guide, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Dependency_Injection_in_Cpp.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=as5Z45G59Ws"
+     },
+     {
+      "t": "text",
+      "v": ", whose title differs. Construction hidden inside functions, and singletons, as the first roadblocks to injecting anything."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "C.50",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-factory"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.42",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-throw"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.82",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-ctor-virtual"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "I.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-singleton"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "I.22",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global-init"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "I.25",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-abstract"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2's plugin loader, "
+     },
+     {
+      "t": "a",
+      "v": "pluginlib",
+      "href": "https://github.com/ros/pluginlib"
+     },
+     {
+      "t": "text",
+      "v": ", and the macro that registers a class with it, "
+     },
+     {
+      "t": "a",
+      "v": "PLUGINLIB_EXPORT_CLASS",
+      "href": "https://github.com/ros/pluginlib/blob/rolling/pluginlib/include/pluginlib/class_list_macros.hpp"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "unique_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "make_shared",
+      "href": "https://en.cppreference.com/cpp/memory/shared_ptr/make_shared"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "variant",
+      "href": "https://en.cppreference.com/cpp/utility/variant"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "expected",
+      "href": "https://en.cppreference.com/cpp/utility/expected"
+     },
+     {
+      "t": "text",
+      "v": ", which is C++23."
+     }
+    ]
+   ]
+  }
+ ]
+}

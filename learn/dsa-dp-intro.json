@@ -1,0 +1,1262 @@
+{
+ "id": "dsa-dp-intro",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A robot climbs a flight of n steps, taking one or two at a time. Write "
+     },
+     {
+      "t": "code",
+      "v": "ways(n)"
+     },
+     {
+      "t": "text",
+      "v": ", the number of distinct climbs, exactly as the definition gives it: the last move was either one step or two, so the two cases add up. Carry a counter of how many times the function is called, and print the answer and the count for n = 1, 2, 5, 10, 20 and 30. Then say what the counts tell you about the recursion, and name the property in the section title. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n\n// The number of ways to climb n steps taking one or two at a time, straight from the definition:\n// the last move was either one step or two, and the two cases share nothing.\n[[nodiscard]] std::int64_t ways(std::int64_t n, std::int64_t& calls) {\n  ++calls;\n  if (n <= 1) return 1;  // one way to stand still, one way to climb a single step\n  return ways(n - 1, calls) + ways(n - 2, calls);\n}\n\nint main() {\n  std::cout << std::format(\"{:>4}{:>12}{:>14}\\n\", \"n\", \"ways\", \"calls\");\n  for (const std::int64_t n : {1, 2, 5, 10, 20, 30}) {\n    std::int64_t calls = 0;\n    const std::int64_t answer = ways(n, calls);\n    std::cout << std::format(\"{:>4}{:>12}{:>14}\\n\", n, answer, calls);\n  }\n}"
+   },
+   {
+    "t": "output",
+    "text": "   n        ways         calls\n   1           1             1\n   2           2             3\n   5           8            15\n  10          89           177\n  20       10946         21891\n  30     1346269       2692537"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The count is "
+     },
+     {
+      "t": "code",
+      "v": "2 · ways(n) − 1"
+     },
+     {
+      "t": "text",
+      "v": " on every row, which says that the recursion does one call per leaf of its own call tree and never reuses anything. "
+     },
+     {
+      "t": "code",
+      "v": "ways(30)"
+     },
+     {
+      "t": "text",
+      "v": " took 2,692,537 calls to produce one number, and "
+     },
+     {
+      "t": "code",
+      "v": "ways(28)"
+     },
+     {
+      "t": "text",
+      "v": " was computed from scratch twice, "
+     },
+     {
+      "t": "code",
+      "v": "ways(27)"
+     },
+     {
+      "t": "text",
+      "v": " three times, "
+     },
+     {
+      "t": "code",
+      "v": "ways(26)"
+     },
+     {
+      "t": "text",
+      "v": " five times, and so on down. Those repeats are the property: the sub-problems "
+     },
+     {
+      "t": "i",
+      "v": "overlap"
+     },
+     {
+      "t": "text",
+      "v": ", so the same small question is asked exponentially often."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "That is one of the two conditions for dynamic programming. The other is "
+     },
+     {
+      "t": "i",
+      "v": "optimal substructure"
+     },
+     {
+      "t": "text",
+      "v": ": the answer for n is built from the answers to smaller inputs, and those smaller answers do not change depending on how you reached them. Both hold here, so every repeat is waste, and storing each answer once turns an exponential recursion into a linear one. The next section measures that."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The counts are also the same numbers the recursion topic measured for "
+     },
+     {
+      "t": "code",
+      "v": "fib(20)"
+     },
+     {
+      "t": "text",
+      "v": ": 21,891 calls, because "
+     },
+     {
+      "t": "code",
+      "v": "ways(n)"
+     },
+     {
+      "t": "text",
+      "v": " is the Fibonacci sequence shifted by one. Two problems with the same recurrence are the same problem, and noticing that is worth more in an interview than the code."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the recursion is right, the counts are there, and you say that the same sub-problem is recomputed many times and name overlapping sub-problems. A correct recursion with a vague \"it is slow\" is a partial pass. Missing that "
+     },
+     {
+      "t": "code",
+      "v": "ways(0)"
+     },
+     {
+      "t": "text",
+      "v": " is 1, or answering with a formula you cannot justify, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Dynamic programming solves a problem by answering each of its smaller sub-problems exactly once and reusing that answer everywhere it's needed again, instead of rederiving it. It only applies when two properties hold. The sub-problems have to overlap: a plain recursion asks the same small question many times over, which is what climbing n steps one or two at a time shows, because counting the calls a naive recursion makes reveals the same smaller counts computed again and again. And the problem needs optimal substructure: the answer for n has to be built from the answers to smaller inputs, and those smaller answers can't depend on how you got to them."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this solves is exactly that waste. A recursion with no memory of what it has already answered turns a question with only n distinct sub-problems into one with an exponential number of calls, because every path down the call tree recomputes shared work from scratch."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is to store each sub-problem's answer once known, and there are two ways to do it. Memoisation keeps the original recursion and adds a lookup: before recursing, it checks whether this input is already answered, and if so returns the stored value instead of descending further. This is top-down, because it starts at the question actually asked and only computes what that needs. A table drops the recursion entirely and fills the sub-problems in an order that guarantees each one's inputs already exist, which is bottom-up and needs no call stack at all. Once the transition only reads a fixed number of earlier states, the table can shrink to a couple of variables, trading O(n) space for O(1) at the cost of no longer recovering which choices produced the answer."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs, unannounced, is the size of the numbers. A counting recurrence like this one grows fast, so an accumulator that looks fine in every test run by hand overflows a plain "
+    },
+    {
+     "t": "code",
+     "v": "int"
+    },
+    {
+     "t": "text",
+     "v": " a few steps further on, and the wraparound is silent unless a sanitizer is watching for it. The fix is accumulating in a 64-bit type from the first line, not after something breaks."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: explain overlapping sub-problems using the number of ways to climb a flight of stairs, where the call count of the naive recursion against the same count once each answer is stored is the proof."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Overlapping sub-problems; memoisation versus tables",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same recurrence, four ways, counting what each one does:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <vector>\n\nstruct Work {\n  std::int64_t answer = 0;\n  std::int64_t steps = 0;  // calls made, or table cells filled\n};\n\n[[nodiscard]] std::int64_t plain(std::int64_t n, std::int64_t& calls) {\n  ++calls;\n  if (n <= 1) return 1;\n  return plain(n - 1, calls) + plain(n - 2, calls);\n}\n\n[[nodiscard]] std::int64_t memo(std::int64_t n, std::vector<std::optional<std::int64_t>>& known,\n                                std::int64_t& calls) {\n  ++calls;\n  if (n <= 1) return 1;\n  std::optional<std::int64_t>& slot = known[static_cast<std::size_t>(n)];\n  if (slot) return *slot;  // answered before, so this branch stops here\n  slot = memo(n - 1, known, calls) + memo(n - 2, known, calls);\n  return *slot;\n}\n\n[[nodiscard]] Work by_recursion(std::int64_t n) {\n  Work w;\n  w.answer = plain(n, w.steps);\n  return w;\n}\n\n[[nodiscard]] Work by_memo(std::int64_t n) {\n  Work w;\n  std::vector<std::optional<std::int64_t>> known(static_cast<std::size_t>(n + 1), std::nullopt);\n  w.answer = memo(n, known, w.steps);\n  return w;\n}\n\n[[nodiscard]] Work by_table(std::int64_t n) {\n  Work w;\n  std::vector<std::int64_t> table(static_cast<std::size_t>(n + 1), 0);\n  table[0] = 1;\n  ++w.steps;\n  if (n >= 1) {\n    table[1] = 1;\n    ++w.steps;\n  }\n  for (std::int64_t i = 2; i <= n; ++i) {\n    table[static_cast<std::size_t>(i)] =\n        table[static_cast<std::size_t>(i - 1)] + table[static_cast<std::size_t>(i - 2)];\n    ++w.steps;\n  }\n  w.answer = table[static_cast<std::size_t>(n)];\n  return w;\n}\n\n[[nodiscard]] Work by_rolling(std::int64_t n) {\n  Work w;\n  std::int64_t two_back = 1;  // ways(i - 2)\n  std::int64_t one_back = 1;  // ways(i - 1)\n  w.steps = 2;\n  for (std::int64_t i = 2; i <= n; ++i) {\n    const std::int64_t here = one_back + two_back;\n    two_back = one_back;\n    one_back = here;\n    ++w.steps;\n  }\n  w.answer = n <= 1 ? 1 : one_back;\n  return w;\n}\n\nint main() {\n  std::cout << std::format(\"{:>4}{:>10}{:>14}{:>8}{:>8}{:>9}{:>8}\\n\", \"n\", \"ways\", \"plain\", \"memo\", \"table\",\n                           \"rolling\", \"agree\");\n  for (const std::int64_t n : {5, 10, 20, 30}) {\n    const Work a = by_recursion(n);\n    const Work b = by_memo(n);\n    const Work c = by_table(n);\n    const Work d = by_rolling(n);\n    const bool agree = a.answer == b.answer && b.answer == c.answer && c.answer == d.answer;\n    std::cout << std::format(\"{:>4}{:>10}{:>14}{:>8}{:>8}{:>9}{:>8}\\n\", n, a.answer, a.steps, b.steps, c.steps,\n                             d.steps, agree);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "   n      ways         plain    memo   table  rolling   agree\n   5         8            15       9       6        6    true\n  10        89           177      19      11       11    true\n  20     10946         21891      39      21       21    true\n  30   1346269       2692537      59      31       31    true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four programs, one answer, and the work drops from 2,692,537 to 59. Read the columns as the four stages every dynamic programming solution goes through."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Plain recursion"
+        },
+        {
+         "t": "text",
+         "v": " is the definition typed out. It is the version to write first in an interview, because it is the one you can be sure is correct, and its call count is exponential: "
+        },
+        {
+         "t": "code",
+         "v": "2 · ways(n) − 1"
+        },
+        {
+         "t": "text",
+         "v": ", which is about 1.6ⁿ."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Memoisation"
+        },
+        {
+         "t": "text",
+         "v": " keeps the same recursion and adds a store of answers already computed. The call count becomes "
+        },
+        {
+         "t": "code",
+         "v": "2n − 1"
+        },
+        {
+         "t": "text",
+         "v": ", which is 59 at n = 30: each value from 2 to n is computed once, and every other call finds a filled slot and returns at once. This form is called "
+        },
+        {
+         "t": "i",
+         "v": "top-down"
+        },
+        {
+         "t": "text",
+         "v": ", because it starts at the question asked and descends only into the sub-problems it actually needs. The store here is "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::optional<std::int64_t>>"
+        },
+        {
+         "t": "text",
+         "v": ", and the "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " is doing real work: \"not computed yet\" has to be distinguishable from every answer the function can produce, and a sentinel such as −1 fails the moment a valid answer is −1. That is the same argument the search tree topic made about bounds."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "A table"
+        },
+        {
+         "t": "text",
+         "v": " drops the recursion. The sub-problems are filled in an order that guarantees each one's inputs are already there, which here is 0, 1, 2 and upwards. This is "
+        },
+        {
+         "t": "i",
+         "v": "bottom-up"
+        },
+        {
+         "t": "text",
+         "v": ", and it fills 31 cells at n = 30. It uses no call stack at all, which is why it is the form to ship: the memoised version is still a recursion n deep, and the recursion topic measured where that ends."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "The rolling form"
+        },
+        {
+         "t": "text",
+         "v": " notices that the table only ever reads the two cells before the one being written, so the rest of it is dead weight. Two variables replace n + 1 cells, and the space drops from O(n) to O(1). The general rule is that a table needs to keep only as far back as its recurrence reaches, so a recurrence over a two-dimensional table that reads the previous row keeps one row rather than all of them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So the recipe, and it is worth saying in this order at a whiteboard:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Name the "
+         },
+         {
+          "t": "i",
+          "v": "state"
+         },
+         {
+          "t": "text",
+          "v": ": what does one sub-problem's answer mean? Here, "
+         },
+         {
+          "t": "code",
+          "v": "ways(i)"
+         },
+         {
+          "t": "text",
+          "v": " is the number of climbs of exactly i steps."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write the "
+         },
+         {
+          "t": "i",
+          "v": "transition"
+         },
+         {
+          "t": "text",
+          "v": ": how does one state follow from smaller ones? Here, "
+         },
+         {
+          "t": "code",
+          "v": "ways(i) = ways(i - 1) + ways(i - 2)"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Name the "
+         },
+         {
+          "t": "i",
+          "v": "base cases"
+         },
+         {
+          "t": "text",
+          "v": ": the states answered outright. Here, "
+         },
+         {
+          "t": "code",
+          "v": "ways(0)"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "ways(1)"
+         },
+         {
+          "t": "text",
+          "v": " are 1."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Choose the "
+         },
+         {
+          "t": "i",
+          "v": "order"
+         },
+         {
+          "t": "text",
+          "v": " to fill, so every state's inputs are ready before it is. Memoisation gets this for free, and a table has to be filled in a correct order."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Say which state is the "
+         },
+         {
+          "t": "i",
+          "v": "answer"
+         },
+         {
+          "t": "text",
+          "v": ", and only then reduce the space."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two things are worth saying about when this applies at all. If the sub-problems do not overlap, memoising them wins nothing and the problem is ordinary divide and conquer: merge sort splits into two halves that share no element, which is why nobody memoises it. If the answer to a sub-problem depends on the route taken to reach it, there is no optimal substructure and a table over that state is wrong rather than slow, which is the trap in problems with a constraint such as \"at most k turns\": the state has to include the turns used so far, and the table gains a dimension."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One more thing changes between the cold check and production, and a sanitizer will tell you about it. The numbers grow like 1.6ⁿ, so they leave "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " at a value of n you would test by hand:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "ubsan:signed integer overflow",
+       "text": "#include <format>\n#include <iostream>\n\n// The rolling form, correct in every way except the type of its accumulator.\n[[nodiscard]] int ways(int n) {\n  int two_back = 1;\n  int one_back = 1;\n  for (int i = 2; i <= n; ++i) {\n    const int here = one_back + two_back;\n    two_back = one_back;\n    one_back = here;\n  }\n  return n <= 1 ? 1 : one_back;\n}\n\nint main() {\n  std::cout << std::format(\"ways(45) = {}\\n\", ways(45)) << std::flush;  // flushed, so it survives the abort\n  std::cout << std::format(\"ways(46) = {}\\n\", ways(46));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ways(45)"
+        },
+        {
+         "t": "text",
+         "v": " prints 1,836,311,903 and "
+        },
+        {
+         "t": "code",
+         "v": "ways(46)"
+        },
+        {
+         "t": "text",
+         "v": " stops the program: UndefinedBehaviorSanitizer reports \"signed integer overflow: 1836311903 + 1134903170 cannot be represented in type 'int'\". Signed overflow is undefined behaviour, so without the sanitizer the value silently wraps negative and the answer is wrong from n = 46 on. Counting problems overflow sooner than anyone expects, which is why the accumulators on this page are "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": ", and why problem statements that ask for an answer \"modulo 10⁹ + 7\" are doing it to keep the arithmetic inside a 64-bit type. The "
+        },
+        {
+         "t": "code",
+         "v": "std::flush"
+        },
+        {
+         "t": "text",
+         "v": " is there so the good line reaches the terminal before the abort; without it, the buffered line is lost and the output looks as though the first call failed too."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same recurrence with a decision in it. A robot lifts a payload up a stack of pallet levels, and stepping off level i costs "
+        },
+        {
+         "t": "code",
+         "v": "cost[i]"
+        },
+        {
+         "t": "text",
+         "v": " in energy. It may step up one level or two, may start on level 0 or level 1 for free, and has to get past the top:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\n// best[i] is the least energy needed to stand on level i. You may start on level 0 or 1 for free,\n// and stepping off level j costs cost[j]. The top is the position one past the last level.\n[[nodiscard]] std::vector<std::int64_t> best_table(std::span<const std::int64_t> cost) {\n  const std::ptrdiff_t n = std::ssize(cost);\n  std::vector<std::int64_t> best(static_cast<std::size_t>(n + 1), 0);\n  for (std::ptrdiff_t i = 2; i <= n; ++i)\n    best[static_cast<std::size_t>(i)] =\n        std::min(best[static_cast<std::size_t>(i - 1)] + cost[static_cast<std::size_t>(i - 1)],\n                 best[static_cast<std::size_t>(i - 2)] + cost[static_cast<std::size_t>(i - 2)]);\n  return best;\n}\n\n// The same recurrence with two variables instead of a table.\n[[nodiscard]] std::int64_t cheapest(std::span<const std::int64_t> cost) {\n  std::int64_t two_back = 0;  // best[i - 2]\n  std::int64_t one_back = 0;  // best[i - 1]\n  for (std::ptrdiff_t i = 2; i <= std::ssize(cost); ++i) {\n    const std::int64_t here = std::min(one_back + cost[static_cast<std::size_t>(i - 1)],\n                                       two_back + cost[static_cast<std::size_t>(i - 2)]);\n    two_back = one_back;\n    one_back = here;\n  }\n  return std::ssize(cost) < 2 ? 0 : one_back;\n}\n\n// The same recurrence written as a recursion that remembers its answers.\n[[nodiscard]] std::int64_t from_top(std::span<const std::int64_t> cost, std::ptrdiff_t i,\n                                    std::vector<std::optional<std::int64_t>>& known, std::int64_t& calls) {\n  ++calls;\n  if (i <= 1) return 0;\n  std::optional<std::int64_t>& slot = known[static_cast<std::size_t>(i)];\n  if (slot) return *slot;\n  slot = std::min(from_top(cost, i - 1, known, calls) + cost[static_cast<std::size_t>(i - 1)],\n                  from_top(cost, i - 2, known, calls) + cost[static_cast<std::size_t>(i - 2)]);\n  return *slot;\n}\n\n[[nodiscard]] std::string show(std::span<const std::int64_t> v) {\n  std::string out;\n  for (const std::int64_t x : v) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", x);\n  return out.empty() ? \"(none)\" : out;\n}\n\nvoid report(std::span<const std::int64_t> cost) {\n  const std::vector<std::int64_t> best = best_table(cost);\n  std::vector<std::optional<std::int64_t>> known(cost.size() + 1, std::nullopt);\n  std::int64_t calls = 0;\n  const std::int64_t top_down = from_top(cost, std::ssize(cost), known, calls);\n  std::cout << std::format(\"cost    {}\\n\", show(cost));\n  std::cout << std::format(\"best    {}\\n\", show(best));\n  std::cout << std::format(\"answer  table {}, two variables {}, memoised {} in {} calls\\n\", best.back(),\n                           cheapest(cost), top_down, calls);\n}\n\nint main() {\n  const std::vector<std::int64_t> three{10, 15, 20};\n  report(three);\n  const std::vector<std::int64_t> ten{1, 100, 1, 1, 1, 100, 1, 1, 100, 1};\n  report(ten);\n  const std::vector<std::int64_t> one{7};\n  report(one);\n  report({});\n}"
+      },
+      {
+       "t": "output",
+       "text": "cost    10 15 20\nbest    0 0 10 15\nanswer  table 15, two variables 15, memoised 15 in 5 calls\ncost    1 100 1 1 1 100 1 1 100 1\nbest    0 0 1 2 2 3 3 4 4 5 6\nanswer  table 6, two variables 6, memoised 6 in 19 calls\ncost    7\nbest    0 0\nanswer  table 0, two variables 0, memoised 0 in 1 calls\ncost    (none)\nbest    0\nanswer  table 0, two variables 0, memoised 0 in 1 calls"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Walk the recipe over this problem. The state is \"the least energy needed to stand on level i\", and choosing that wording rather than \"the least energy to climb i levels\" is what makes the base cases free: standing on level 0 or level 1 costs nothing, because you may start on either. The transition asks where you came from, which can only be level i − 1 or i − 2, and each of those costs whatever it took to stand there plus the price of stepping off it, so the transition is a "
+        },
+        {
+         "t": "code",
+         "v": "std::min"
+        },
+        {
+         "t": "text",
+         "v": " of two candidates. The order is 2 upwards. The answer is "
+        },
+        {
+         "t": "code",
+         "v": "best[n]"
+        },
+        {
+         "t": "text",
+         "v": ", the position past the top."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Follow the second row. "
+        },
+        {
+         "t": "code",
+         "v": "cost"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "1 100 1 1 1 100 1 1 100 1"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "best"
+        },
+        {
+         "t": "text",
+         "v": " fills as "
+        },
+        {
+         "t": "code",
+         "v": "0 0 1 2 2 3 3 4 4 5 6"
+        },
+        {
+         "t": "text",
+         "v": ". The step from "
+        },
+        {
+         "t": "code",
+         "v": "best[1] = 0"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "best[2] = 1"
+        },
+        {
+         "t": "text",
+         "v": " takes the cheap level 0 rather than the expensive level 1. "
+        },
+        {
+         "t": "code",
+         "v": "best[5] = 3"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "best[6] = 3"
+        },
+        {
+         "t": "text",
+         "v": " are equal, which is the table saying that level 5 costs 100 to step off, so the climb skips over it. The final 6 is the sum of the six 1s the route actually pays."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The transition is where this differs from the cold check, and it is the difference between counting and optimising. Stairs added the two cases because it wanted how many. This takes the smaller of the two because it wants the cheapest, and a problem that wants the largest takes "
+        },
+        {
+         "t": "code",
+         "v": "std::max"
+        },
+        {
+         "t": "text",
+         "v": ". Everything else, the state, the base cases, the order, the space reduction, is unchanged, which is the point of learning the shape rather than the problem."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three implementations agree on every input, and the memoised one made 19 calls for ten levels against the table's eleven cells, of which its loop writes nine and the two base cases arrive already zeroed. The memoised version costs more calls than the table costs cells, because it also calls into the base cases and into slots that are already filled. Both are O(n). The table is the one to ship: it has no recursion and therefore no depth, and the two-variable version drops its memory to O(1). What the two-variable version cannot do is say which route it took, and the exercise below is where that matters."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "robber",
+   "title": "House Robber",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes, and start from an empty file. A row of charging bays each hold some energy. A robot may empty any set of bays, except that emptying two neighbouring bays trips the shared breaker, so no two chosen bays may be adjacent. Write a function that returns both the largest total and the indices it came from, in increasing order, taking the bay values as "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const std::int64_t>"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write the recurrence down before you write any code: name the state, the transition, the base cases, the fill order and which state is the answer. Then build the table and recover the chosen indices from it by walking back."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 3, 1}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{2, 7, 9, 3, 1}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{2, 1, 1, 2}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{3, 3, 3}"
+        },
+        {
+         "t": "text",
+         "v": ", a single bay and no bays at all. Also write the two-variable version that returns the total alone, and check it agrees. State the time and the extra space of both, and say what the two-variable version gives up."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The state is \"the most that can be taken from the first i bays\". The transition asks about bay i − 1: leave it and the answer is "
+        },
+        {
+         "t": "code",
+         "v": "best[i - 1]"
+        },
+        {
+         "t": "text",
+         "v": ", or take it and the answer is its value plus "
+        },
+        {
+         "t": "code",
+         "v": "best[i - 2]"
+        },
+        {
+         "t": "text",
+         "v": ", since bay i − 2 is the last one that is not adjacent to it. The base cases are "
+        },
+        {
+         "t": "code",
+         "v": "best[0] = 0"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "best[1] = values[0]"
+        },
+        {
+         "t": "text",
+         "v": ", and the fill order is 1 upwards:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Plan {\n  std::int64_t total = 0;\n  std::vector<std::ptrdiff_t> chosen;  // indices taken, in increasing order\n};\n\n// best[i] is the most that can be taken from the first i values with no two adjacent.\n[[nodiscard]] Plan best_plan(std::span<const std::int64_t> values) {\n  const std::ptrdiff_t n = std::ssize(values);\n  std::vector<std::int64_t> best(static_cast<std::size_t>(n + 1), 0);\n  for (std::ptrdiff_t i = 1; i <= n; ++i) {\n    const std::int64_t skip = best[static_cast<std::size_t>(i - 1)];\n    const std::int64_t take = (i >= 2 ? best[static_cast<std::size_t>(i - 2)] : 0) +\n                              values[static_cast<std::size_t>(i - 1)];\n    best[static_cast<std::size_t>(i)] = std::max(skip, take);\n  }\n  Plan plan;\n  plan.total = best[static_cast<std::size_t>(n)];\n  for (std::ptrdiff_t i = n; i > 0;) {  // walk back: was value i - 1 taken?\n    const std::int64_t without = best[static_cast<std::size_t>(i - 1)];\n    if (best[static_cast<std::size_t>(i)] == without) {\n      --i;  // the best did not need this one\n    } else {\n      plan.chosen.push_back(i - 1);\n      i -= 2;\n    }\n  }\n  std::ranges::reverse(plan.chosen);\n  return plan;\n}\n\n// The same total with two variables and no way to say which values were taken.\n[[nodiscard]] std::int64_t best_total(std::span<const std::int64_t> values) {\n  std::int64_t two_back = 0;\n  std::int64_t one_back = 0;\n  for (const std::int64_t v : values) {\n    const std::int64_t here = std::max(one_back, two_back + v);\n    two_back = one_back;\n    one_back = here;\n  }\n  return one_back;\n}\n\n[[nodiscard]] std::string show(std::span<const std::ptrdiff_t> v) {\n  std::string out;\n  for (const std::ptrdiff_t x : v) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", x);\n  return out.empty() ? \"(none)\" : out;\n}\n\nvoid report(std::span<const std::int64_t> values) {\n  const Plan plan = best_plan(values);\n  std::string input;\n  for (const std::int64_t v : values) input += std::format(\"{}{}\", input.empty() ? \"\" : \" \", v);\n  std::cout << std::format(\"{:<26}{:>4}  from {:<10}  two variables {}\\n\",\n                           input.empty() ? \"(empty)\" : input, plan.total, show(plan.chosen),\n                           best_total(values));\n}\n\nint main() {\n  report(std::vector<std::int64_t>{1, 2, 3, 1});\n  report(std::vector<std::int64_t>{2, 7, 9, 3, 1});\n  report(std::vector<std::int64_t>{2, 1, 1, 2});\n  report(std::vector<std::int64_t>{3, 3, 3});\n  report(std::vector<std::int64_t>{5});\n  report({});\n}"
+      },
+      {
+       "t": "output",
+       "text": "1 2 3 1                      4  from 0 2         two variables 4\n2 7 9 3 1                   12  from 0 2 4       two variables 12\n2 1 1 2                      4  from 0 3         two variables 4\n3 3 3                        6  from 0 2         two variables 6\n5                            5  from 0           two variables 5\n(empty)                      0  from (none)      two variables 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both versions are O(n) time. The table is O(n) space and the two-variable version is O(1). Every row is a check on a different part of the recurrence: "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 3, 1}"
+        },
+        {
+         "t": "text",
+         "v": " gives 4 from bays 0 and 2 rather than the tempting 2 + 1 from the two larger-looking middle bays; "
+        },
+        {
+         "t": "code",
+         "v": "{2, 1, 1, 2}"
+        },
+        {
+         "t": "text",
+         "v": " takes the two ends, which are three apart, showing that \"not adjacent\" is not \"every other one\"; "
+        },
+        {
+         "t": "code",
+         "v": "{3, 3, 3}"
+        },
+        {
+         "t": "text",
+         "v": " takes the first and last of three equal bays; and the single bay and the empty row check the base cases."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The walk back is the part the exercise is really about. "
+        },
+        {
+         "t": "code",
+         "v": "best[i]"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "best[i - 1]"
+        },
+        {
+         "t": "text",
+         "v": " being equal means the best total for the first i bays did not need bay i − 1, so step back one. Otherwise bay i − 1 must have been taken, so record it and step back two, skipping its neighbour. That works because the table holds enough information to replay the decision, and the two-variable version does not: it keeps the totals and throws the history away. So the space reduction is not free, and the question to ask before applying it is whether the caller wants the answer or the plan. A robot that wants to know how much energy it can collect takes the two variables. A robot that has to drive to the bays needs the indices."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three mistakes are worth knowing. Indexing "
+        },
+        {
+         "t": "code",
+         "v": "best"
+        },
+        {
+         "t": "text",
+         "v": " by the same index as "
+        },
+        {
+         "t": "code",
+         "v": "values"
+        },
+        {
+         "t": "text",
+         "v": " rather than shifting by one puts "
+        },
+        {
+         "t": "code",
+         "v": "best[0]"
+        },
+        {
+         "t": "text",
+         "v": " in two roles and makes the base cases fight; the "
+        },
+        {
+         "t": "code",
+         "v": "i - 1"
+        },
+        {
+         "t": "text",
+         "v": " in the value lookup above is what keeps them apart. Taking "
+        },
+        {
+         "t": "code",
+         "v": "std::max(values[i] + best[i - 2], values[i - 1] + best[i - 3])"
+        },
+        {
+         "t": "text",
+         "v": " is a rewrite of the same idea with more chances to be wrong. And a greedy rule, take every other bay, gets "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 3, 1}"
+        },
+        {
+         "t": "text",
+         "v": " right, where the alternating 1 + 3 is the optimum, and "
+        },
+        {
+         "t": "code",
+         "v": "{2, 1, 1, 2}"
+        },
+        {
+         "t": "text",
+         "v": " wrong, where alternating from either end gives 3 against the 4 the table finds by taking the two ends. One input agreeing with a greedy rule is the reason to test a second."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the third problem on this page with the same recurrence shape: one state per position, a transition that looks back a fixed distance, and a reduction to a couple of variables. Stairs added the candidates, the pallet climb took the smallest, this one takes the largest. When an interview problem is a sequence and the question mentions a maximum, a minimum or a count subject to a local constraint, try that shape first: write the state in one sentence, and if the transition only needs a fixed number of earlier states, you have a linear solution."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the two conditions a problem needs before dynamic programming applies, and say what each one rules out when it is missing. Give the measured call counts for climbing 30 steps plain, memoised and as a table. Write the five steps of the recipe. Say the difference between top-down and bottom-up, and one reason to ship the table. Give the recurrence for House Robber and say how the chosen indices are recovered, and what the two-variable version gives up. Say which type the accumulators need and at what n an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " version broke."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What two properties must a problem have before dynamic programming is the right tool, and what does each rule out?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Climbing 30 steps: how many calls does the plain recursion make, and how many does the memoised version make?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the five steps of the recipe, in order."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between top-down and bottom-up, and why is the table the version to ship?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When can a table be reduced to a couple of variables, and what do you lose?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give the state, transition and base cases for House Robber, and say how you recover the chosen indices."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why did an "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": " version of the stairs count break, and at which n?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: House Robber, with the chosen indices returned."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh and Adam Segoli Schubert, Back to Basics: Algorithmic Complexity, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Algorithmic_Complexity.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=AY2FqpDCBGs"
+     },
+     {
+      "t": "text",
+      "v": ". Counting the work of a recursion, and what memoising changes about it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". Why the table is a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": " and why one row beats a grid."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Fedor Pikus, Undefined Behavior is Not an Error, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/undefined_behavior.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=k9N8OrhrSZw"
+     },
+     {
+      "t": "text",
+      "v": ". Signed overflow, and why a sanitizer is the only thing that tells you."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.102",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+     },
+     {
+      "t": "text",
+      "v": " on signed types for arithmetic, "
+     },
+     {
+      "t": "a",
+      "v": "ES.103",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-overflow"
+     },
+     {
+      "t": "text",
+      "v": " on avoiding overflow, "
+     },
+     {
+      "t": "a",
+      "v": "ES.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-always"
+     },
+     {
+      "t": "text",
+      "v": " on initialising every object, and "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": " on measuring before claiming."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil "
+     },
+     {
+      "t": "a",
+      "v": "tip #171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": " instead of a value stolen from the domain, which is what the memoisation store needs."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "UndefinedBehaviorSanitizer",
+      "href": "https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "GCC's instrumentation options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc-13.3.0/gcc/Instrumentation-Options.html"
+     },
+     {
+      "t": "text",
+      "v": ", which report the signed overflow the table's accumulators would otherwise hide."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::int64_t",
+      "href": "https://en.cppreference.com/cpp/types/integer"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ranges::reverse",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/reverse"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

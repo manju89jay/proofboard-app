@@ -1,0 +1,1804 @@
+{
+ "id": "dsa-intervals",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Write "
+     },
+     {
+      "t": "code",
+      "v": "merge_intervals(intervals)"
+     },
+     {
+      "t": "text",
+      "v": ", which merges overlapping intervals and returns the result sorted by start. The intervals are closed, "
+     },
+     {
+      "t": "code",
+      "v": "[start, end]"
+     },
+     {
+      "t": "text",
+      "v": ", so two intervals that share an end point overlap. "
+     },
+     {
+      "t": "code",
+      "v": "{[1,3], [2,6], [8,10], [15,18]}"
+     },
+     {
+      "t": "text",
+      "v": " gives "
+     },
+     {
+      "t": "code",
+      "v": "{[1,6], [8,10], [15,18]}"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "{[1,4], [4,5]}"
+     },
+     {
+      "t": "text",
+      "v": " gives "
+     },
+     {
+      "t": "code",
+      "v": "{[1,5]}"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "code",
+      "v": "{[8,10], [1,10], [2,3]}"
+     },
+     {
+      "t": "text",
+      "v": " gives "
+     },
+     {
+      "t": "code",
+      "v": "{[1,10]}"
+     },
+     {
+      "t": "text",
+      "v": ". Take the intervals as "
+     },
+     {
+      "t": "code",
+      "v": "std::span<const Interval>"
+     },
+     {
+      "t": "text",
+      "v": ", return a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<Interval>"
+     },
+     {
+      "t": "text",
+      "v": ", and state the time and extra space. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Interval {\n  std::int64_t start;\n  std::int64_t end;  // closed in this problem: [start, end]\n};\n\n[[nodiscard]] std::vector<Interval> merge_intervals(std::span<const Interval> intervals) {\n  std::vector<Interval> sorted(intervals.begin(), intervals.end());\n  std::ranges::sort(sorted, {}, &Interval::start);\n  std::vector<Interval> merged;\n  for (const Interval& next : sorted) {\n    if (!merged.empty() && next.start <= merged.back().end)\n      merged.back().end = std::max(merged.back().end, next.end);  // overlaps the last block: extend it\n    else\n      merged.push_back(next);  // starts after the last block ends: a new block\n  }\n  return merged;\n}\n\n[[nodiscard]] std::string show(std::span<const Interval> intervals) {\n  std::string out;\n  for (const Interval& i : intervals) out += std::format(\"[{},{}] \", i.start, i.end);\n  return out.empty() ? \"none\" : out;\n}\n\nint main() {\n  const std::vector<std::vector<Interval>> cases{\n      {{1, 3}, {2, 6}, {8, 10}, {15, 18}},\n      {{1, 4}, {4, 5}},\n      {{8, 10}, {1, 10}, {2, 3}},\n      {},\n  };\n  for (const std::vector<Interval>& intervals : cases) std::cout << show(merge_intervals(intervals)) << '\\n';\n}"
+   },
+   {
+    "t": "output",
+    "text": "[1,6] [8,10] [15,18] \n[1,5] \n[1,10] \nnone"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Sort by start, then sweep once and compare each interval with the last merged block only. It is O(n log n) time for the sort and O(n) extra space for the sorted copy and the result. The input is a "
+     },
+     {
+      "t": "code",
+      "v": "span"
+     },
+     {
+      "t": "text",
+      "v": " of "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " elements, so the function sorts a copy; if the caller hands over a vector it no longer needs, taking "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<Interval>"
+     },
+     {
+      "t": "text",
+      "v": " by value and sorting that avoids the copy."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Two details decide whether it is right. The "
+     },
+     {
+      "t": "code",
+      "v": "std::max"
+     },
+     {
+      "t": "text",
+      "v": " handles an interval that lies inside the last block: "
+     },
+     {
+      "t": "code",
+      "v": "[2,3]"
+     },
+     {
+      "t": "text",
+      "v": " must not shrink "
+     },
+     {
+      "t": "code",
+      "v": "[1,10]"
+     },
+     {
+      "t": "text",
+      "v": " to "
+     },
+     {
+      "t": "code",
+      "v": "[1,3]"
+     },
+     {
+      "t": "text",
+      "v": ". And "
+     },
+     {
+      "t": "code",
+      "v": "<="
+     },
+     {
+      "t": "text",
+      "v": " merges "
+     },
+     {
+      "t": "code",
+      "v": "[1,4]"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "[4,5]"
+     },
+     {
+      "t": "text",
+      "v": ", because closed intervals that share an end point overlap."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with a sort-then-sweep solution that keeps the larger end and merges touching closed intervals, and says O(n log n). Forgetting "
+     },
+     {
+      "t": "code",
+      "v": "std::max"
+     },
+     {
+      "t": "text",
+      "v": ", or using "
+     },
+     {
+      "t": "code",
+      "v": "<"
+     },
+     {
+      "t": "text",
+      "v": " so that "
+     },
+     {
+      "t": "code",
+      "v": "[1,4]"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "[4,5]"
+     },
+     {
+      "t": "text",
+      "v": " stay apart, is a partial pass. An O(n²) solution that compares all pairs is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "An interval is a pair of endpoints, "
+    },
+    {
+     "t": "code",
+     "v": "start"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "end"
+    },
+    {
+     "t": "text",
+     "v": "; in most interview problems both ends are included, a "
+    },
+    {
+     "t": "i",
+     "v": "closed"
+    },
+    {
+     "t": "text",
+     "v": " interval "
+    },
+    {
+     "t": "code",
+     "v": "[start, end]"
+    },
+    {
+     "t": "text",
+     "v": ", where two intervals that share an end point already overlap. The technique behind almost every interval problem is sorting by one endpoint and then walking the sorted list once, keeping only a small amount of state as you go, most often the last block merged so far."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is deciding which intervals overlap without comparing every pair against every other, an O(n²) check. Once the intervals are sorted by start, an interval can only ever touch the block that comes immediately before it, because every interval further along starts even later and cannot reach backward into an earlier block, so comparing against everything collapses into comparing against one thing."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a sweep with one invariant: the merged blocks stay disjoint and in the order they were sorted, and only the last one can still grow. For each interval in start order, if it starts at or before the last block's end the two overlap and the block's end becomes the larger of the two ends; otherwise the interval starts a fresh block. Counting instead of merging keeps the same shape with a running total in place of a block, and choosing the largest set of intervals that don't overlap at all sorts by end instead, because the interval that finishes first leaves the most room for the rest."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What goes wrong under pressure is two things. Assigning the new interval's end instead of taking the larger of the two ends passes every test where intervals only touch at an edge, and only fails once one interval sits entirely inside another and the assignment shrinks the block around it. And mixing the closed convention with a half-open one changes both the overlap test and the merge test: two closed intervals sharing an endpoint overlap and merge, but two half-open ones meeting at the same point don't overlap, even though they still merge into one contiguous block. Converting a closed "
+    },
+    {
+     "t": "code",
+     "v": "[a, b]"
+    },
+    {
+     "t": "text",
+     "v": " to the half-open "
+    },
+    {
+     "t": "code",
+     "v": "[a, b + 1)"
+    },
+    {
+     "t": "text",
+     "v": " at the edge of your own code, once, avoids running two conventions against each other."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet exactly this in the interview question itself: sorting the intervals by start before sweeping, and the nested interval that a lazy assignment instead of "
+    },
+    {
+     "t": "code",
+     "v": "std::max"
+    },
+    {
+     "t": "text",
+     "v": " gets wrong."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Sort by start, then sweep",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run the sweep from the cold check on three windows without sorting them first:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Interval {\n  std::int64_t start;\n  std::int64_t end;\n};\n\n// The sweep from the cold check, without its sort.\n[[nodiscard]] std::vector<Interval> sweep(std::span<const Interval> intervals) {\n  std::vector<Interval> merged;\n  for (const Interval& next : intervals) {\n    if (!merged.empty() && next.start <= merged.back().end)\n      merged.back().end = std::max(merged.back().end, next.end);\n    else\n      merged.push_back(next);\n  }\n  return merged;\n}\n\n[[nodiscard]] std::string show(std::span<const Interval> intervals) {\n  std::string out;\n  for (const Interval& i : intervals) out += std::format(\"[{},{}] \", i.start, i.end);\n  return out;\n}\n\nint main() {\n  std::vector<Interval> windows{{1, 3}, {8, 10}, {2, 6}};\n  std::cout << \"sweep only:       \" << show(sweep(windows)) << '\\n';\n  std::ranges::sort(windows, {}, &Interval::start);\n  std::cout << \"sort, then sweep: \" << show(sweep(windows)) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "sweep only:       [1,3] [8,10] \nsort, then sweep: [1,6] [8,10] "
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Without the sort, "
+        },
+        {
+         "t": "code",
+         "v": "[2,6]"
+        },
+        {
+         "t": "text",
+         "v": " arrives after "
+        },
+        {
+         "t": "code",
+         "v": "[8,10]"
+        },
+        {
+         "t": "text",
+         "v": ", and the sweep compares it with "
+        },
+        {
+         "t": "code",
+         "v": "[8,10]"
+        },
+        {
+         "t": "text",
+         "v": " only. It sees 2 ≤ 10 and folds "
+        },
+        {
+         "t": "code",
+         "v": "[2,6]"
+        },
+        {
+         "t": "text",
+         "v": " into a block it doesn't touch, so the time from 3 to 6 disappears from the result, and nothing looks back at "
+        },
+        {
+         "t": "code",
+         "v": "[1,3]"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Sorting by start is what makes looking at the last block enough. When the sweep meets an interval that starts after the last block ends, every later interval starts later still, so none of them can reach back into that block, and the block is final. This is the sweep's invariant: the merged blocks are disjoint and in order, every interval seen so far lies inside one of them, and only the last block can still grow. Say it in an interview, because \"sort first, and explain why\" is what the question tests. The cost is the sort, O(n log n). The sweep itself is O(n)."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same shape answers most interval questions: sort by start, walk once, and keep a small state. For merging, the state is the last block. For \"how many at once\", it is a running count, which the meeting-room exercise builds. One family sorts by end instead: choosing the largest number of intervals that don't overlap, such as bookings to accept, where the interval that ends first leaves the most room for the rest."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Decide early what an interval means at its ends. Interview problems usually give closed intervals, "
+        },
+        {
+         "t": "code",
+         "v": "[start, end]"
+        },
+        {
+         "t": "text",
+         "v": ", with both ends included. Time windows in your own code are better "
+        },
+        {
+         "t": "i",
+         "v": "half-open"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "[start, end)"
+        },
+        {
+         "t": "text",
+         "v": ": the length is "
+        },
+        {
+         "t": "code",
+         "v": "end − start"
+        },
+        {
+         "t": "text",
+         "v": ", a window ending at 10:00 and one starting at 10:00 don't overlap, and an empty window is "
+        },
+        {
+         "t": "code",
+         "v": "start == end"
+        },
+        {
+         "t": "text",
+         "v": ". That is the convention of iterator ranges and of Dijkstra's note on "
+        },
+        {
+         "t": "a",
+         "v": "why numbering should start at zero",
+         "href": "https://www.cs.utexas.edu/users/EWD/transcriptions/EWD08xx/EWD831.html"
+        },
+        {
+         "t": "text",
+         "v": ". The last section shows what goes wrong when the two meet."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A charging dock is booked in half-open windows, in minutes since midnight. The bookings arrive in any order and may overlap. Find the free gaps in the day "
+        },
+        {
+         "t": "code",
+         "v": "[0, 1440)"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Window {\n  std::int64_t start;  // minutes since midnight, half-open: [start, end)\n  std::int64_t end;\n};\n\n// The free parts of `day`; every booking lies inside it. Empty bookings are skipped.\n[[nodiscard]] std::vector<Window> free_gaps(std::span<const Window> bookings, Window day) {\n  std::vector<Window> sorted(bookings.begin(), bookings.end());\n  std::ranges::sort(sorted, {}, &Window::start);\n  std::vector<Window> gaps;\n  std::int64_t covered_until = day.start;  // [day.start, covered_until) is booked or already reported\n  for (const Window& booking : sorted) {\n    if (booking.start >= booking.end) continue;  // an empty booking would split a gap in two\n    if (booking.start > covered_until) gaps.push_back({.start = covered_until, .end = booking.start});\n    covered_until = std::max(covered_until, booking.end);\n  }\n  if (covered_until < day.end) gaps.push_back({.start = covered_until, .end = day.end});\n  return gaps;\n}\n\n[[nodiscard]] std::string hhmm(std::int64_t minutes) { return std::format(\"{:02}:{:02}\", minutes / 60, minutes % 60); }\n\nint main() {\n  const std::vector<Window> bookings{{600, 660}, {480, 540}, {630, 720}, {540, 570}, {900, 960}, {930, 945}};\n  for (const Window& gap : free_gaps(bookings, {.start = 0, .end = 24 * 60}))\n    std::cout << std::format(\"free {} to {}\\n\", hhmm(gap.start), hhmm(gap.end));\n}"
+      },
+      {
+       "t": "output",
+       "text": "free 00:00 to 08:00\nfree 09:30 to 10:00\nfree 12:00 to 15:00\nfree 16:00 to 24:00"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "After the sort, the bookings are "
+        },
+        {
+         "t": "code",
+         "v": "[480,540) [540,570) [600,660) [630,720) [900,960) [930,945)"
+        },
+        {
+         "t": "text",
+         "v": ", and the sweep goes like this:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "booking"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "starts after covered_until?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "gap reported"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "covered_until after"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "[480,540)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "480 > 0: yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "[0,480)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "540"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "[540,570)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "540 > 540: no"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "570"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "[600,660)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "600 > 570: yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "[570,600)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "660"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "[630,720)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "630 > 660: no"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "720"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "[900,960)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "900 > 720: yes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "[720,900)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "960"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "[930,945)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "930 > 960: no"
+          }
+         ],
+         [],
+         [
+          {
+           "t": "text",
+           "v": "960"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then 960 < 1440 reports the last gap, "
+        },
+        {
+         "t": "code",
+         "v": "[960,1440)"
+        },
+        {
+         "t": "text",
+         "v": ". Notice four things. "
+        },
+        {
+         "t": "code",
+         "v": "covered_until"
+        },
+        {
+         "t": "text",
+         "v": " is the end of the last merged block from the cold check, so this is the same sweep reporting the holes instead of the blocks. The test is "
+        },
+        {
+         "t": "code",
+         "v": ">"
+        },
+        {
+         "t": "text",
+         "v": " and not "
+        },
+        {
+         "t": "code",
+         "v": ">="
+        },
+        {
+         "t": "text",
+         "v": ", because the half-open bookings "
+        },
+        {
+         "t": "code",
+         "v": "[480,540)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "[540,570)"
+        },
+        {
+         "t": "text",
+         "v": " touch without a free minute between them. And "
+        },
+        {
+         "t": "code",
+         "v": "std::max"
+        },
+        {
+         "t": "text",
+         "v": " keeps "
+        },
+        {
+         "t": "code",
+         "v": "covered_until"
+        },
+        {
+         "t": "text",
+         "v": " at 960 when "
+        },
+        {
+         "t": "code",
+         "v": "[930,945)"
+        },
+        {
+         "t": "text",
+         "v": " lies inside "
+        },
+        {
+         "t": "code",
+         "v": "[900,960)"
+        },
+        {
+         "t": "text",
+         "v": "; a plain assignment would move it back to 945 and report a gap at 15:45 that isn't free. The first line of the loop skips empty bookings: without it, "
+        },
+        {
+         "t": "code",
+         "v": "[300,300)"
+        },
+        {
+         "t": "text",
+         "v": " would report "
+        },
+        {
+         "t": "code",
+         "v": "[0,300)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "[300,480)"
+        },
+        {
+         "t": "text",
+         "v": " as two gaps where there is one. It is O(n log n) time for the sort and O(n) extra space."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Meeting-room conflicts; insert an interval",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Meetings are half-open intervals "
+        },
+        {
+         "t": "code",
+         "v": "[start, end)"
+        },
+        {
+         "t": "text",
+         "v": " in minutes, so a meeting that ends at 10 and one that starts at 10 can use the same room. Write two functions that take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const Interval>"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "can_attend_all(meetings)"
+         },
+         {
+          "t": "text",
+          "v": " returns whether one person can attend every meeting."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "rooms_needed(meetings)"
+         },
+         {
+          "t": "text",
+          "v": " returns the smallest number of rooms that holds all of them, as "
+         },
+         {
+          "t": "code",
+          "v": "std::int64_t"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test them on "
+        },
+        {
+         "t": "code",
+         "v": "{[0,30), [5,10), [15,20)}"
+        },
+        {
+         "t": "text",
+         "v": " (no, 2 rooms), "
+        },
+        {
+         "t": "code",
+         "v": "{[7,10), [2,4)}"
+        },
+        {
+         "t": "text",
+         "v": " (yes, 1), "
+        },
+        {
+         "t": "code",
+         "v": "{[9,10), [10,11)}"
+        },
+        {
+         "t": "text",
+         "v": " (yes, 1), "
+        },
+        {
+         "t": "code",
+         "v": "{[1,5), [2,6), [3,7), [5,8)}"
+        },
+        {
+         "t": "text",
+         "v": " (no, 3) and no meetings (yes, 0). State the time and extra space of each."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For the first, sort by start and look for two neighbours that overlap. Checking neighbours is enough: if meeting A overlaps a later meeting C, then every meeting B that starts between them starts before A ends, so A and B overlap as well. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::adjacent_find"
+        },
+        {
+         "t": "text",
+         "v": " is the named form of that loop."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For the second, turn each meeting into two events, +1 at its start and −1 at its end, sort the events by time, and keep a running total, which is the number of rooms in use. The answer is the largest total. The running total is a prefix sum over the sorted events, as in the prefix sums topic."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <utility>\n#include <vector>\n\nstruct Interval {\n  std::int64_t start;  // half-open: [start, end)\n  std::int64_t end;\n};\n\n[[nodiscard]] bool can_attend_all(std::span<const Interval> meetings) {\n  std::vector<Interval> sorted(meetings.begin(), meetings.end());\n  std::ranges::sort(sorted, {}, &Interval::start);\n  const auto overlap = [](const Interval& a, const Interval& b) { return b.start < a.end; };\n  return std::ranges::adjacent_find(sorted, overlap) == sorted.end();\n}\n\n[[nodiscard]] std::int64_t rooms_needed(std::span<const Interval> meetings) {\n  std::vector<std::pair<std::int64_t, int>> events;  // (time, +1 at a start or -1 at an end)\n  events.reserve(2 * meetings.size());\n  for (const Interval& m : meetings) {\n    events.emplace_back(m.start, +1);\n    events.emplace_back(m.end, -1);\n  }\n  std::ranges::sort(events);  // at equal times -1 sorts before +1: a room is freed before it is taken again\n  std::int64_t in_use = 0;\n  std::int64_t most = 0;\n  for (const auto& [time, change] : events) {\n    in_use += change;\n    most = std::max(most, in_use);\n  }\n  return most;\n}\n\nint main() {\n  const std::vector<std::vector<Interval>> cases{\n      {{0, 30}, {5, 10}, {15, 20}}, {{7, 10}, {2, 4}}, {{9, 10}, {10, 11}}, {{1, 5}, {2, 6}, {3, 7}, {5, 8}}, {}};\n  for (const std::vector<Interval>& meetings : cases)\n    std::cout << std::format(\"attend all: {:<5}  rooms: {}\\n\", can_attend_all(meetings), rooms_needed(meetings));\n}"
+      },
+      {
+       "t": "output",
+       "text": "attend all: false  rooms: 2\nattend all: true   rooms: 1\nattend all: true   rooms: 1\nattend all: false  rooms: 3\nattend all: true   rooms: 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both are O(n log n) time for the sort and O(n) extra space for the copy or the events. The half-open convention lives in two places: "
+        },
+        {
+         "t": "code",
+         "v": "b.start < a.end"
+        },
+        {
+         "t": "text",
+         "v": " says that touching meetings don't overlap, and the event order puts an end before a start at the same minute. The pair's own "
+        },
+        {
+         "t": "code",
+         "v": "<"
+        },
+        {
+         "t": "text",
+         "v": " gives that order for free, because −1 is less than +1. For "
+        },
+        {
+         "t": "code",
+         "v": "{[1,5), [2,6), [3,7), [5,8)}"
+        },
+        {
+         "t": "text",
+         "v": " the total reaches 3 at minute 3, drops to 2 at minute 5 before the fourth meeting takes the freed room, and never exceeds 3."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The other common solution sorts the start times and the end times into two separate vectors and walks them with two pointers: at each start, if the earliest unfinished end is at or before it, a room is freed first. A min-heap of end times, which a later topic on heaps covers, does the same while also saying which room each meeting gets."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. A robot's reserved time windows are half-open, sorted by start, and already merged: no two of them overlap or touch. Write "
+        },
+        {
+         "t": "code",
+         "v": "insert_window(windows, added)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the list with one more window inserted, merged again so that it still has no overlapping or touching windows. Take the list as "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const Interval>"
+        },
+        {
+         "t": "text",
+         "v": " and run in O(n) time. Test it on:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "{[1,3), [6,9)}"
+         },
+         {
+          "t": "text",
+          "v": " plus "
+         },
+         {
+          "t": "code",
+          "v": "[2,5)"
+         },
+         {
+          "t": "text",
+          "v": " gives "
+         },
+         {
+          "t": "code",
+          "v": "{[1,5), [6,9)}"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "{[1,2), [3,5), [6,7), [8,10), [12,16)}"
+         },
+         {
+          "t": "text",
+          "v": " plus "
+         },
+         {
+          "t": "code",
+          "v": "[4,8)"
+         },
+         {
+          "t": "text",
+          "v": " gives "
+         },
+         {
+          "t": "code",
+          "v": "{[1,2), [3,10), [12,16)}"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "{[1,3), [6,9)}"
+         },
+         {
+          "t": "text",
+          "v": " plus "
+         },
+         {
+          "t": "code",
+          "v": "[3,6)"
+         },
+         {
+          "t": "text",
+          "v": " gives "
+         },
+         {
+          "t": "code",
+          "v": "{[1,9)}"
+         },
+         {
+          "t": "text",
+          "v": ", because it touches both;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the empty list plus "
+         },
+         {
+          "t": "code",
+          "v": "[4,5)"
+         },
+         {
+          "t": "text",
+          "v": ", a window before all others, and one after all others."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The input is already sorted, so no sort is needed. Walk it in three parts: the windows that end before the new one starts are copied, the windows that overlap or touch it are folded into it, and the rest are copied."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <vector>\n\nstruct Interval {\n  std::int64_t start;  // half-open: [start, end)\n  std::int64_t end;\n};\n\n[[nodiscard]] std::vector<Interval> insert_window(std::span<const Interval> windows, Interval added) {\n  std::vector<Interval> out;\n  out.reserve(windows.size() + 1);\n  auto it = windows.begin();\n  for (; it != windows.end() && it->end < added.start; ++it) out.push_back(*it);  // ends before, not touching\n  for (; it != windows.end() && it->start <= added.end; ++it) {                 // overlaps or touches\n    added.start = std::min(added.start, it->start);\n    added.end = std::max(added.end, it->end);\n  }\n  out.push_back(added);\n  out.insert(out.end(), it, windows.end());\n  return out;\n}\n\n[[nodiscard]] std::string show(std::span<const Interval> windows) {\n  std::string out;\n  for (const Interval& w : windows) out += std::format(\"[{},{}) \", w.start, w.end);\n  return out;\n}\n\nint main() {\n  const std::vector<Interval> two{{1, 3}, {6, 9}};\n  const std::vector<Interval> five{{1, 2}, {3, 5}, {6, 7}, {8, 10}, {12, 16}};\n  std::cout << show(insert_window(two, {2, 5})) << '\\n';\n  std::cout << show(insert_window(five, {4, 8})) << '\\n';\n  std::cout << show(insert_window(two, {3, 6})) << '\\n';\n  std::cout << show(insert_window({}, {4, 5})) << '\\n';\n  std::cout << show(insert_window(two, {-2, 0})) << '\\n';\n  std::cout << show(insert_window(two, {10, 12})) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "[1,5) [6,9) \n[1,2) [3,10) [12,16) \n[1,9) \n[4,5) \n[-2,0) [1,3) [6,9) \n[1,3) [6,9) [10,12) "
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time and O(n) extra space for the result. The second loop compares with "
+        },
+        {
+         "t": "code",
+         "v": "added.end"
+        },
+        {
+         "t": "text",
+         "v": " as it grows, and that is right: once "
+        },
+        {
+         "t": "code",
+         "v": "added"
+        },
+        {
+         "t": "text",
+         "v": " has absorbed a window that ends later than it did, the next window starts after that end, because the input was merged, so the loop stops there."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both loop conditions are true for a first stretch of the list and false after it, so each boundary is a partition point, and "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::partition_point"
+        },
+        {
+         "t": "text",
+         "v": ", which the next topic, binary search, covers, finds it in O(log n). Copying the result keeps the function O(n) anyway. Editing a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " in place, with one "
+        },
+        {
+         "t": "code",
+         "v": "erase"
+        },
+        {
+         "t": "text",
+         "v": " of the folded windows and one "
+        },
+        {
+         "t": "code",
+         "v": "insert"
+        },
+        {
+         "t": "text",
+         "v": ", is also O(n), because the elements after the edit move."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Touching intervals and inclusive ends",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three mistakes, one program:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Interval {\n  std::int64_t start;\n  std::int64_t end;\n};\n\n[[nodiscard]] std::string show(std::span<const Interval> intervals) {\n  std::string out;\n  for (const Interval& i : intervals) out += std::format(\"[{},{}] \", i.start, i.end);\n  return out;\n}\n\n// The cold check's merge with one change: the end is assigned instead of taking the larger one.\n[[nodiscard]] std::vector<Interval> merge_without_max(std::vector<Interval> intervals) {\n  std::ranges::sort(intervals, {}, &Interval::start);\n  std::vector<Interval> merged;\n  for (const Interval& next : intervals) {\n    if (!merged.empty() && next.start <= merged.back().end)\n      merged.back().end = next.end;\n    else\n      merged.push_back(next);\n  }\n  return merged;\n}\n\n// Exercise 1's count, which expects half-open intervals.\n[[nodiscard]] std::int64_t rooms_needed(std::span<const Interval> meetings) {\n  std::vector<std::pair<std::int64_t, int>> events;\n  for (const Interval& m : meetings) {\n    events.emplace_back(m.start, +1);\n    events.emplace_back(m.end, -1);\n  }\n  std::ranges::sort(events);\n  std::int64_t in_use = 0;\n  std::int64_t most = 0;\n  for (const auto& [time, change] : events) {\n    in_use += change;\n    most = std::max(most, in_use);\n  }\n  return most;\n}\n\nint main() {\n  const std::vector<Interval> nested{{1, 10}, {2, 3}, {4, 5}};\n  std::cout << \"without std::max: \" << show(merge_without_max(nested)) << '\\n';\n\n  // Closed shifts in whole minutes: both hold minute 10.\n  const std::vector<Interval> closed{{9, 10}, {10, 11}};\n  std::vector<Interval> half_open;\n  for (const Interval& c : closed) half_open.push_back({.start = c.start, .end = c.end + 1});  // [a, b] is [a, b + 1)\n  std::cout << \"closed, counted as half-open: \" << rooms_needed(closed) << \" room\\n\";\n  std::cout << \"converted first:              \" << rooms_needed(half_open) << \" rooms\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "without std::max: [1,3] [4,5] \nclosed, counted as half-open: 1 room\nconverted first:              2 rooms"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first line is the forgotten "
+        },
+        {
+         "t": "code",
+         "v": "std::max"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "[2,3]"
+        },
+        {
+         "t": "text",
+         "v": " lies inside "
+        },
+        {
+         "t": "code",
+         "v": "[1,10]"
+        },
+        {
+         "t": "text",
+         "v": ", and assigning its end shrinks the block to "
+        },
+        {
+         "t": "code",
+         "v": "[1,3]"
+        },
+        {
+         "t": "text",
+         "v": ", so "
+        },
+        {
+         "t": "code",
+         "v": "[4,5]"
+        },
+        {
+         "t": "text",
+         "v": " then looks separate. Every test with intervals that only overlap at their edges passes, which is why this bug survives until a long interval contains a short one. Put a nested case in every interval test."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The other two lines are the same data read with two conventions. As closed intervals in whole minutes, "
+        },
+        {
+         "t": "code",
+         "v": "[9,10]"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "[10,11]"
+        },
+        {
+         "t": "text",
+         "v": " both hold minute 10 and need two rooms. The event sweep was written for half-open intervals, where an end at 10 frees the room before a start at 10 takes it, so it answers 1. Neither function is wrong on its own; the bug is handing one convention to code written for the other. Convert at the boundary of your code: a closed interval of integers "
+        },
+        {
+         "t": "code",
+         "v": "[a, b]"
+        },
+        {
+         "t": "text",
+         "v": " is the half-open "
+        },
+        {
+         "t": "code",
+         "v": "[a, b + 1)"
+        },
+        {
+         "t": "text",
+         "v": ", and after that every comparison follows one rule. Guard "
+        },
+        {
+         "t": "code",
+         "v": "b + 1"
+        },
+        {
+         "t": "text",
+         "v": " if "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " can be the largest "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": ", where it overflows."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With the convention fixed, the comparisons follow from it:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "question"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "closed "
+         },
+         {
+          "t": "code",
+          "v": "[a, b]"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "[c, d]"
+         },
+         {
+          "t": "text",
+          "v": ", sorted so a ≤ c"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "half-open "
+         },
+         {
+          "t": "code",
+          "v": "[a, b)"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "[c, d)"
+         },
+         {
+          "t": "text",
+          "v": ", sorted so a ≤ c"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "do they overlap?"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "c <= b"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "c < b"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "can they merge into one block?"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "c <= b"
+          },
+          {
+           "t": "text",
+           "v": ", or "
+          },
+          {
+           "t": "code",
+           "v": "c <= b + 1"
+          },
+          {
+           "t": "text",
+           "v": " for whole numbers"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "c <= b"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "length"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "b - a + 1"
+          },
+          {
+           "t": "text",
+           "v": " for whole numbers"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "b - a"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The row that trips people is the second. For half-open windows, touching windows don't overlap, but they do merge into one block, as in Exercise 2. For closed intervals of whole numbers, "
+        },
+        {
+         "t": "code",
+         "v": "[1,4]"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "[5,6]"
+        },
+        {
+         "t": "text",
+         "v": " share no point, yet together they cover 1 to 6 with no hole, and whether they merge depends on what the question means. Ask the interviewer, then say the rule you chose out loud."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Explain why sorting by start makes it enough to compare with the last merged block, and state the sweep's invariant. Give the time and space of merging, of counting rooms, and of inserting into a merged list. Write the overlap and merge tests for closed and for half-open intervals, and the conversion from one to the other. Name the test case that catches a forgotten "
+        },
+        {
+         "t": "code",
+         "v": "std::max"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Why does sorting by start let the sweep compare each interval with the last merged block only?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between "
+     },
+     {
+      "t": "code",
+      "v": "[1,4]"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "[4,5]"
+     },
+     {
+      "t": "text",
+      "v": " merging as closed intervals and "
+     },
+     {
+      "t": "code",
+      "v": "[1,4)"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "[4,5)"
+     },
+     {
+      "t": "text",
+      "v": " as half-open ones?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How does sorting "
+     },
+     {
+      "t": "code",
+      "v": "(time, change)"
+     },
+     {
+      "t": "text",
+      "v": " pairs make the room count treat touching meetings as not overlapping?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which test case catches merge code that assigns the end instead of taking the larger one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When do you sort intervals by end instead of by start?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: merge intervals, with a nested interval and a touching pair in the tests."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". Naming a loop by its algorithm, as with "
+     },
+     {
+      "t": "code",
+      "v": "adjacent_find"
+     },
+     {
+      "t": "text",
+      "v": " here."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Edsger W. Dijkstra, "
+     },
+     {
+      "t": "a",
+      "v": "Why numbering should start at zero",
+      "href": "https://www.cs.utexas.edu/users/EWD/transcriptions/EWD08xx/EWD831.html"
+     },
+     {
+      "t": "text",
+      "v": ", EWD 831, 1982: the case for half-open ranges."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": ", prefer the standard library to handcrafted code, and "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": ", precise and strongly typed interfaces."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "ranges::sort",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/sort"
+     },
+     {
+      "t": "text",
+      "v": " with projections, "
+     },
+     {
+      "t": "a",
+      "v": "ranges::adjacent_find",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/adjacent_find"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ranges::partition_point",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/partition_point"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

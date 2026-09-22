@@ -136,6 +136,9 @@ export function renderTopic(index, topic, body, skillNames) {
     h += `<p class="hint">Do this first, without notes. Pass: go straight to the last exercise of each part. Partly: try the exercises first, then read. Fail: work through everything.</p>`;
     h += `${renderBlocks(body.check.task)}<details class="lanswer"><summary>Show the answer</summary>${renderBlocks(body.check.answer)}</details></section>`;
   }
+  if (body.interview) {
+    h += `<section class="card lsec"><h3>Interview answer</h3><p class="hint">What to say if you are asked this question, and the short explanation to read first if the topic is new to you.</p>${renderBlocks(body.interview)}</section>`;
+  }
   for (const s of body.subs || []) {
     h += `<section class="card lsec"><h3>${esc(s.title)}</h3>`;
     for (const st of s.steps || []) {
@@ -147,6 +150,9 @@ export function renderTopic(index, topic, body, skillNames) {
   h += `<section class="card lsec"><h3>Pass bar</h3><p>${esc(topic.pass)}</p></section>`;
   if (body.review) {
     h += `<section class="card lsec"><h3>Review prompts</h3><p class="hint">Answer these closed-book at each review: explain, then re-implement from a blank file, then compare.</p>${renderBlocks(body.review)}</section>`;
+  }
+  if (body.sources) {
+    h += `<section class="card lsec"><h3>Sources</h3><p class="hint">Optional reading and watching. The examples above follow these; they are not in the time estimate.</p>${renderBlocks(body.sources)}</section>`;
   }
   return h;
 }

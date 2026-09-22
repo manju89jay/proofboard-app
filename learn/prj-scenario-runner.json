@@ -1,0 +1,1821 @@
+{
+ "id": "prj-scenario-runner",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage turns \"we watched the robot move\" into a verdict nobody has to watch produce. "
+    },
+    {
+     "t": "code",
+     "v": "bench_core"
+    },
+    {
+     "t": "text",
+     "v": " now holds what a scenario is: a timetable of warm-up, drive and settle, a list of checks, each a measured number against a limit, and a verdict that passes only when every check does. "
+    },
+    {
+     "t": "code",
+     "v": "scenario_runner"
+    },
+    {
+     "t": "text",
+     "v": " wraps those rules in a node, and one script, "
+    },
+    {
+     "t": "code",
+     "v": "./run_scenario.sh smoke"
+    },
+    {
+     "t": "text",
+     "v": ", starts the world headless, runs the plan and writes a pass or fail file with an exit code to match."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is what a check may look at. Every number comes from the robot's own motion on "
+    },
+    {
+     "t": "code",
+     "v": "/odom_raw"
+    },
+    {
+     "t": "text",
+     "v": ", never from the commands sent, because a stop that was published is not proof the robot stopped. Simulated time has one deliberate exception: every deadline in the plan runs on "
+    },
+    {
+     "t": "code",
+     "v": "/clock"
+    },
+    {
+     "t": "text",
+     "v": " except a wall-clock guard, because a dead simulation also stops simulated time, and a simulated deadline would then never arrive."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: five runs in a row pass, with the margin between each measured number and its limit written down. And the runner fails two different ways on purpose: cutting the relay fails exactly the distance check, and killing Gazebo mid-run lets the guard end it on the time check instead of hanging forever."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "runner",
+   "title": "Start, run, stop and judge a scenario headless",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " holds what a scenario is and how a run of one is judged, with GoogleTest tests that you wrote before the header and saw fail."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Everything after this topic is a scenario: normal operation, odometry that stops, a cancelled mission. Each of them starts the world headless, does something to the robot, and has to answer one question without a person watching. Four decisions settle how that answer is produced, and each costs something to change later."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The verdict comes from the robot's own motion, measured by the simulator and published on "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", and never from the commands the nodes sent. The architecture topic gave the reason: a stop that was published is not proof that the robot stopped. "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " is the bridge's topic, upstream of the relay, so a scenario that cuts the relay still sees what the robot did."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The timetable is in simulated time. A busy machine changes how long a run takes on your watch, and it must not change what the robot did. Simulated time comes from "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": ", so the runner holds "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " and every deadline it keeps is a simulated deadline. One deadline is different and stays on the wall clock, which is Build 2's subject."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The numbers a scenario requires are logic, so they live in "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " where a test reaches them without ROS, next to the supervisor's rules. The node measures and hands them over; it decides nothing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A sample's time is the odometry message's stamp, the moment the pose was true. That is the opposite of the supervisor's choice, and for a reason worth saying out loud: freshness is a question about delivery, so it uses the arrival time, and a measurement is a question about the thing measured, so it uses the stamp."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The scenario this topic runs is called "
+        },
+        {
+         "t": "code",
+         "v": "smoke"
+        },
+        {
+         "t": "text",
+         "v": ", and its job is to prove the runner rather than the robot. It warms up for 2 s, drives forward at 0.2 m/s for 3 s, and then stops commanding and gives the robot 3 s to come to rest. Its four requirements each carry their arithmetic:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "the run lasted at least the 8 s of its plan, which fails when the clock stopped or the guard ended the run early;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the robot moved at least 0.30 m, about half of the 3 s × 0.2 m/s = 0.60 m the drive phase asks for, so a slow start passes and a robot that never moved fails;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "its top speed stayed at or below 0.30 m/s, which catches a runaway robot and a command in the wrong unit;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it came to rest at most 1.50 s after the last command. The supervisor's own arithmetic predicts 0.75 s: 0.50 to 0.55 s until the first stop goes out, 0.2 s of braking at 1 m/s², and up to one odometry period of 33 ms before "
+         },
+         {
+          "t": "code",
+          "v": "/odom_raw"
+         },
+         {
+          "t": "text",
+          "v": " shows it. The limit is twice that, so a busy machine doesn't turn a pass into a failure."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the tests first, in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/test/scenario_test.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The first case pins the timetable to the nanosecond:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <chrono>\n\n#include <gtest/gtest.h>\n\n#include \"bench/scenario.hpp\"\n\nusing namespace std::chrono_literals;\n\nTEST(PhaseAt, EachPhaseStartsWhereTheLastOneEnds) {\n  constexpr bench::Plan plan{.warmup = 2s, .drive = 3s, .settle = 3s};\n  EXPECT_EQ(bench::phase_at(plan, 2s - 1ns), bench::Phase::warmup);\n  EXPECT_EQ(bench::phase_at(plan, 2s), bench::Phase::drive);\n  EXPECT_EQ(bench::phase_at(plan, 8s - 1ns), bench::Phase::settle);\n  EXPECT_EQ(bench::phase_at(plan, 8s), bench::Phase::done);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add one case each for: a run whose last sample still moves has no time of rest; a run that came to rest later than the stretch asks for has none either; a robot that never moved is at rest from its first sample; an empty run measures no distance and no top speed; a check with no measured number is not met; and a verdict with one failed check of four reads "
+        },
+        {
+         "t": "code",
+         "v": "fail"
+        },
+        {
+         "t": "text",
+         "v": " on its first line. Add "
+        },
+        {
+         "t": "code",
+         "v": "scenario"
+        },
+        {
+         "t": "text",
+         "v": " to the test list in "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_core/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", which becomes "
+        },
+        {
+         "t": "code",
+         "v": "foreach(name odometry replay scenario supervisor)"
+        },
+        {
+         "t": "text",
+         "v": ". Run "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": ": it fails to compile, because "
+        },
+        {
+         "t": "code",
+         "v": "bench/scenario.hpp"
+        },
+        {
+         "t": "text",
+         "v": " doesn't exist. That is the failure to see first."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the header, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/include/bench/scenario.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", with the definitions and the unnamed namespace in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/src/scenario.cpp"
+         },
+         {
+          "t": "text",
+          "v": ", as "
+         },
+         {
+          "t": "code",
+          "v": "replay.hpp"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "replay.cpp"
+         },
+         {
+          "t": "text",
+          "v": " are split. Here is all of it as one program, with a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that judges three made-up runs:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <chrono>\n#include <cmath>\n#include <compare>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nnamespace bench {\n\n// bench/time.hpp: a reading of a node's clock, in nanoseconds since that clock's zero.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\n// bench/scenario.hpp from here on.\n\n// One reading of the robot's own state, from the simulator's odometry. The time is the message's\n// stamp, the moment the pose was true, and not the moment the message arrived.\nstruct Sample {\n  Time at;\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double speed_mps = 0.0;  // forward speed, signed\n};\n\n// A scenario's timetable, in simulated time from the first odometry message of the run.\nstruct Plan {\n  std::chrono::nanoseconds warmup;  // the world settles; no commands, and no samples are kept\n  std::chrono::nanoseconds drive;   // the runner publishes the scenario's commands\n  std::chrono::nanoseconds settle;  // no commands; the robot has to come to rest\n};\n\nenum class Phase { warmup, drive, settle, done };\n\n[[nodiscard]] std::chrono::nanoseconds length(const Plan& plan) {\n  return plan.warmup + plan.drive + plan.settle;\n}\n\n[[nodiscard]] Phase phase_at(const Plan& plan, std::chrono::nanoseconds since_start) {\n  if (since_start < plan.warmup) return Phase::warmup;\n  if (since_start < plan.warmup + plan.drive) return Phase::drive;\n  if (since_start < length(plan)) return Phase::settle;\n  return Phase::done;\n}\n\n// How a measured number is compared with its limit.\nenum class Compare { at_least, at_most };\n\n// One requirement of a scenario, with the number this run produced.\nstruct Check {\n  std::string what;\n  std::string unit;\n  Compare compare;\n  double limit;\n  std::optional<double> measured;  // nothing when the run didn't produce the number\n};\n\n[[nodiscard]] bool met(const Check& check) {\n  if (!check.measured) return false;\n  return check.compare == Compare::at_least ? *check.measured >= check.limit : *check.measured <= check.limit;\n}\n\n// One run's verdict: it passed when every check is met.\nstruct Verdict {\n  std::string scenario;\n  std::int64_t samples;\n  bool passed;\n  std::vector<Check> checks;\n};\n\n[[nodiscard]] Verdict judge(std::string scenario, std::int64_t samples, std::vector<Check> checks) {\n  const bool passed = std::ranges::all_of(checks, met);\n  return {.scenario = std::move(scenario), .samples = samples, .passed = passed, .checks = std::move(checks)};\n}\n\nnamespace {\n\n[[nodiscard]] double seconds(std::chrono::nanoseconds d) { return std::chrono::duration<double>(d).count(); }\n\n[[nodiscard]] std::string with_unit(double value, std::string_view unit) {\n  return unit.empty() ? std::format(\"{:.2f}\", value) : std::format(\"{:.2f} {}\", value, unit);\n}\n\n[[nodiscard]] std::string line(const Check& check) {\n  const std::string measured = check.measured ? with_unit(*check.measured, check.unit) : std::string(\"not measured\");\n  return std::format(\"{:<6} {}: {}, {} {}\\n\", met(check) ? \"ok\" : \"failed\", check.what, measured,\n                     check.compare == Compare::at_least ? \"at least\" : \"at most\", with_unit(check.limit, check.unit));\n}\n\n}  // namespace\n\n// The verdict file: \"pass\" or \"fail\" alone on the first line, then the run and its checks.\n[[nodiscard]] std::string describe(const Verdict& verdict) {\n  std::string text = std::format(\"{}\\nscenario: {}\\nsamples: {}\\n\", verdict.passed ? \"pass\" : \"fail\",\n                                 verdict.scenario, verdict.samples);\n  for (const Check& check : verdict.checks) text += line(check);\n  return text;\n}\n\n// The straight line from the first sample to the last. Nothing when the run has no samples.\n[[nodiscard]] std::optional<double> distance_from_start_m(std::span<const Sample> run) {\n  if (run.empty()) return std::nullopt;\n  return std::hypot(run.back().x_m - run.front().x_m, run.back().y_m - run.front().y_m);\n}\n\n[[nodiscard]] std::optional<double> top_speed_mps(std::span<const Sample> run) {\n  if (run.empty()) return std::nullopt;\n  return std::ranges::max(run | std::views::transform([](const Sample& s) { return std::abs(s.speed_mps); }));\n}\n\n// The time from which every later sample stayed within speed_limit_mps, when that stretch lasts\n// at least for_at_least. Nothing when the robot still moved at the end, or came to rest too late.\n[[nodiscard]] std::optional<Time> at_rest_since(std::span<const Sample> run, double speed_limit_mps,\n                                                std::chrono::nanoseconds for_at_least) {\n  if (run.empty()) return std::nullopt;\n  auto backwards = run | std::views::reverse;\n  const auto last_moving = std::ranges::find_if(\n      backwards, [speed_limit_mps](const Sample& s) { return std::abs(s.speed_mps) > speed_limit_mps; });\n  const auto first_at_rest = last_moving == std::ranges::end(backwards) ? run.begin() : last_moving.base();\n  if (first_at_rest == run.end()) return std::nullopt;\n  if (run.back().at.since_epoch - first_at_rest->at.since_epoch < for_at_least) return std::nullopt;\n  return first_at_rest->at;\n}\n\n// What the smoke scenario requires, measured from one run. A later scenario writes its own list\n// of checks over the same samples.\n[[nodiscard]] std::vector<Check> smoke_checks(const Plan& plan, std::optional<std::chrono::nanoseconds> elapsed,\n                                              std::span<const Sample> run, Time last_command) {\n  using namespace std::chrono_literals;\n  const std::optional<Time> rest = at_rest_since(run, 0.01, 300ms);\n  const std::optional<double> to_rest =\n      rest ? std::optional<double>(seconds(std::max(std::chrono::nanoseconds::zero(),\n                                                    rest->since_epoch - last_command.since_epoch)))\n           : std::nullopt;\n  return {{.what = \"simulated time from the first odometry message\",\n           .unit = \"s\",\n           .compare = Compare::at_least,\n           .limit = seconds(length(plan)),\n           .measured = elapsed ? std::optional<double>(seconds(*elapsed)) : std::nullopt},\n          {.what = \"distance from the start\",\n           .unit = \"m\",\n           .compare = Compare::at_least,\n           .limit = 0.30,\n           .measured = distance_from_start_m(run)},\n          {.what = \"top speed\",\n           .unit = \"m/s\",\n           .compare = Compare::at_most,\n           .limit = 0.30,\n           .measured = top_speed_mps(run)},\n          {.what = \"time from the last command to rest\",\n           .unit = \"s\",\n           .compare = Compare::at_most,\n           .limit = 1.50,\n           .measured = to_rest}};\n}\n\n}  // namespace bench\n\n[[nodiscard]] constexpr std::string_view name(bench::Phase phase) {\n  switch (phase) {\n    case bench::Phase::warmup: return \"warmup\";\n    case bench::Phase::drive: return \"drive\";\n    case bench::Phase::settle: return \"settle\";\n    case bench::Phase::done: return \"done\";\n  }\n  return \"?\";\n}\n\n// One odometry message of a made-up run, 100 ms of simulated time apart.\nstruct Moment {\n  std::chrono::milliseconds t;\n  double x_m;\n  double speed_mps;\n};\n\n[[nodiscard]] std::vector<bench::Sample> samples(std::span<const Moment> moments) {\n  std::vector<bench::Sample> run;\n  for (const Moment& moment : moments) {\n    run.push_back({.at = {moment.t}, .x_m = moment.x_m, .y_m = 0.0, .speed_mps = moment.speed_mps});\n  }\n  return run;\n}\n\nint main() {\n  using namespace std::chrono_literals;\n  constexpr bench::Plan smoke{.warmup = 2s, .drive = 3s, .settle = 3s};\n  for (const auto t : {0s, 2s, 4s, 5s, 7s, 8s}) {\n    std::cout << std::format(\"{} s into the run: {}\\n\", t.count(), name(bench::phase_at(smoke, t)));\n  }\n  std::cout << '\\n';\n\n  // A made-up run, one sample per 100 ms: the robot drives at 0.2 m/s, the last command goes out\n  // at 1000 ms, the supervisor's stop follows 550 ms later, and the robot brakes at 1 m/s^2.\n  constexpr std::array<Moment, 21> driven{{{.t = 0ms, .x_m = 0.000, .speed_mps = 0.00},\n                                           {.t = 100ms, .x_m = 0.010, .speed_mps = 0.20},\n                                           {.t = 200ms, .x_m = 0.030, .speed_mps = 0.20},\n                                           {.t = 300ms, .x_m = 0.050, .speed_mps = 0.20},\n                                           {.t = 400ms, .x_m = 0.070, .speed_mps = 0.20},\n                                           {.t = 500ms, .x_m = 0.090, .speed_mps = 0.20},\n                                           {.t = 600ms, .x_m = 0.110, .speed_mps = 0.20},\n                                           {.t = 700ms, .x_m = 0.130, .speed_mps = 0.20},\n                                           {.t = 800ms, .x_m = 0.150, .speed_mps = 0.20},\n                                           {.t = 900ms, .x_m = 0.170, .speed_mps = 0.20},\n                                           {.t = 1000ms, .x_m = 0.190, .speed_mps = 0.20},\n                                           {.t = 1100ms, .x_m = 0.210, .speed_mps = 0.20},\n                                           {.t = 1200ms, .x_m = 0.230, .speed_mps = 0.20},\n                                           {.t = 1300ms, .x_m = 0.250, .speed_mps = 0.20},\n                                           {.t = 1400ms, .x_m = 0.270, .speed_mps = 0.20},\n                                           {.t = 1500ms, .x_m = 0.290, .speed_mps = 0.20},\n                                           {.t = 1600ms, .x_m = 0.305, .speed_mps = 0.10},\n                                           {.t = 1700ms, .x_m = 0.310, .speed_mps = 0.00},\n                                           {.t = 1800ms, .x_m = 0.310, .speed_mps = 0.00},\n                                           {.t = 1900ms, .x_m = 0.310, .speed_mps = 0.00},\n                                           {.t = 2000ms, .x_m = 0.310, .speed_mps = 0.00}}};\n  const bench::Time last_command{1000ms};\n  const auto good = samples(driven);\n  std::cout << bench::describe(\n      bench::judge(\"smoke\", std::ssize(good), bench::smoke_checks(smoke, 8s, good, last_command)));\n  std::cout << '\\n';\n\n  // The same run with the relay stopped: the supervisor never opens the gate, so the robot stands\n  // where it spawned from the first sample to the last.\n  std::array<Moment, 21> held = driven;\n  for (Moment& moment : held) {\n    moment.x_m = 0.0;\n    moment.speed_mps = 0.0;\n  }\n  const auto still = samples(held);\n  std::cout << bench::describe(\n      bench::judge(\"smoke\", std::ssize(still), bench::smoke_checks(smoke, 8s, still, last_command)));\n  std::cout << '\\n';\n\n  // The guard ended the run after 3 s of simulated time, with the robot still driving.\n  const std::span<const bench::Sample> cut(good.data(), 11);\n  std::cout << bench::describe(\n      bench::judge(\"smoke\", std::ssize(cut), bench::smoke_checks(smoke, 3s, cut, last_command)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "0 s into the run: warmup\n2 s into the run: drive\n4 s into the run: drive\n5 s into the run: settle\n7 s into the run: settle\n8 s into the run: done\n\npass\nscenario: smoke\nsamples: 21\nok     simulated time from the first odometry message: 8.00 s, at least 8.00 s\nok     distance from the start: 0.31 m, at least 0.30 m\nok     top speed: 0.20 m/s, at most 0.30 m/s\nok     time from the last command to rest: 0.70 s, at most 1.50 s\n\nfail\nscenario: smoke\nsamples: 21\nok     simulated time from the first odometry message: 8.00 s, at least 8.00 s\nfailed distance from the start: 0.00 m, at least 0.30 m\nok     top speed: 0.00 m/s, at most 0.30 m/s\nok     time from the last command to rest: 0.00 s, at most 1.50 s\n\nfail\nscenario: smoke\nsamples: 11\nfailed simulated time from the first odometry message: 3.00 s, at least 8.00 s\nfailed distance from the start: 0.19 m, at least 0.30 m\nok     top speed: 0.20 m/s, at most 0.30 m/s\nfailed time from the last command to rest: not measured, at most 1.50 s"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three runs are the three shapes of answer the bench will meet. The samples in them cover the two seconds around the last command, and the length of the whole run arrives separately, as the node will hand it over."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A few choices in that code carry the rest of the topic. "
+         },
+         {
+          "t": "code",
+          "v": "Check"
+         },
+         {
+          "t": "text",
+          "v": " holds the requirement and the number side by side, so the verdict file says what was asked and what happened on the same line, which is the difference between a report you can act on and the word "
+         },
+         {
+          "t": "code",
+          "v": "fail"
+         },
+         {
+          "t": "text",
+          "v": ". Its measured value is a "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<double>"
+         },
+         {
+          "t": "text",
+          "v": ", because a run that produced no number is not a run that measured zero: the last line of the third verdict says "
+         },
+         {
+          "t": "code",
+          "v": "not measured"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "met"
+         },
+         {
+          "t": "text",
+          "v": " refuses it. "
+         },
+         {
+          "t": "code",
+          "v": "Compare"
+         },
+         {
+          "t": "text",
+          "v": " names the direction instead of a "
+         },
+         {
+          "t": "code",
+          "v": "bool"
+         },
+         {
+          "t": "text",
+          "v": ", so "
+         },
+         {
+          "t": "code",
+          "v": "{.compare = Compare::at_most}"
+         },
+         {
+          "t": "text",
+          "v": " reads at the call. "
+         },
+         {
+          "t": "code",
+          "v": "judge"
+         },
+         {
+          "t": "text",
+          "v": " is the only place that turns checks into a verdict, and it uses "
+         },
+         {
+          "t": "code",
+          "v": "std::ranges::all_of"
+         },
+         {
+          "t": "text",
+          "v": ", which is what the rule says. "
+         },
+         {
+          "t": "code",
+          "v": "describe"
+         },
+         {
+          "t": "text",
+          "v": " writes the file and the log line from the one "
+         },
+         {
+          "t": "code",
+          "v": "Verdict"
+         },
+         {
+          "t": "text",
+          "v": ", so the two can't disagree."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "at_rest_since"
+        },
+        {
+         "t": "text",
+         "v": " is the only measurement with a loop-shaped rule, and it runs backwards: the question is where the last moving sample is, which C++23 names "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::find_last_if"
+        },
+        {
+         "t": "text",
+         "v": " and C++20 reaches through "
+        },
+        {
+         "t": "code",
+         "v": "std::views::reverse"
+        },
+        {
+         "t": "text",
+         "v": ". A reverse iterator's "
+        },
+        {
+         "t": "code",
+         "v": "base()"
+        },
+        {
+         "t": "text",
+         "v": " gives the position after the element it refers to, so it points at the first sample of the trailing stretch at rest. When every sample is at rest the search ends at the reversed range's end, and the answer is the run's first sample; when the last sample still moves, "
+        },
+        {
+         "t": "code",
+         "v": "base()"
+        },
+        {
+         "t": "text",
+         "v": " is the run's end and the answer is nothing. The stretch has to last "
+        },
+        {
+         "t": "code",
+         "v": "for_at_least"
+        },
+        {
+         "t": "text",
+         "v": ", 300 ms, so one slow message between two moving ones doesn't count as rest."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the remaining test cases from step 1, run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " until it is green, and commit on a branch."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the scenario tests pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, you saw them fail before the header existed, and "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " still has no ROS dependency."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes"
+        },
+        {
+         "t": "text",
+         "v": " has a "
+        },
+        {
+         "t": "code",
+         "v": "scenario_runner"
+        },
+        {
+         "t": "text",
+         "v": " that drives the smoke scenario against the running world, writes its verdict to a file and exits with 0 or 1."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The node measures and reports, and the rules stay where Build 1 put them. It does three things the rules can't: it decides when the run has started, it publishes the commands, and it holds the one deadline that is not in simulated time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The run starts at the first odometry message. That one event says that Gazebo is up, that the bridge is bridging, that discovery has finished, and that "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " has moved, all at once, and its stamp gives the simulated time to count from. A node on simulation time that hasn't received "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " reads zero, which the ROS 2 design article on clocks calls uninitialised time, so a runner that started its timetable at construction would measure from a clock that hadn't started."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The guard is on the wall clock, and that is the point of it. Every other deadline in the runner is simulated, and a simulation that died stops simulated time, so a simulated deadline would never arrive and the run would hang in CI until something outside killed it. "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": " runs on the steady clock whatever "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " says."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the node, "
+         },
+         {
+          "t": "code",
+          "v": "include/bench_nodes/scenario_runner.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", with its "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "src/scenario_runner_node.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The fence has "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": "'s header copied in, unchanged from Build 1, so that it builds on its own:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "ros",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <chrono>\n#include <cmath>\n#include <compare>\n#include <cstdint>\n#include <format>\n#include <fstream>\n#include <memory>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\n#include <geometry_msgs/msg/twist_stamped.hpp>\n#include <nav_msgs/msg/odometry.hpp>\n#include <rclcpp/rclcpp.hpp>\n\nnamespace bench {\n\n// In the bench this is bench/time.hpp and bench/scenario.hpp from Build 1.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\nstruct Sample {\n  Time at;\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double speed_mps = 0.0;\n};\n\nstruct Plan {\n  std::chrono::nanoseconds warmup;\n  std::chrono::nanoseconds drive;\n  std::chrono::nanoseconds settle;\n};\n\nenum class Phase { warmup, drive, settle, done };\n\n[[nodiscard]] std::chrono::nanoseconds length(const Plan& plan) {\n  return plan.warmup + plan.drive + plan.settle;\n}\n\n[[nodiscard]] Phase phase_at(const Plan& plan, std::chrono::nanoseconds since_start) {\n  if (since_start < plan.warmup) return Phase::warmup;\n  if (since_start < plan.warmup + plan.drive) return Phase::drive;\n  if (since_start < length(plan)) return Phase::settle;\n  return Phase::done;\n}\n\nenum class Compare { at_least, at_most };\n\nstruct Check {\n  std::string what;\n  std::string unit;\n  Compare compare;\n  double limit;\n  std::optional<double> measured;\n};\n\n[[nodiscard]] bool met(const Check& check) {\n  if (!check.measured) return false;\n  return check.compare == Compare::at_least ? *check.measured >= check.limit : *check.measured <= check.limit;\n}\n\nstruct Verdict {\n  std::string scenario;\n  std::int64_t samples;\n  bool passed;\n  std::vector<Check> checks;\n};\n\n[[nodiscard]] Verdict judge(std::string scenario, std::int64_t samples, std::vector<Check> checks) {\n  const bool passed = std::ranges::all_of(checks, met);\n  return {.scenario = std::move(scenario), .samples = samples, .passed = passed, .checks = std::move(checks)};\n}\n\nnamespace {\n\n[[nodiscard]] double seconds(std::chrono::nanoseconds d) { return std::chrono::duration<double>(d).count(); }\n\n[[nodiscard]] std::string with_unit(double value, std::string_view unit) {\n  return unit.empty() ? std::format(\"{:.2f}\", value) : std::format(\"{:.2f} {}\", value, unit);\n}\n\n[[nodiscard]] std::string line(const Check& check) {\n  const std::string measured = check.measured ? with_unit(*check.measured, check.unit) : std::string(\"not measured\");\n  return std::format(\"{:<6} {}: {}, {} {}\\n\", met(check) ? \"ok\" : \"failed\", check.what, measured,\n                     check.compare == Compare::at_least ? \"at least\" : \"at most\", with_unit(check.limit, check.unit));\n}\n\n}  // namespace\n\n[[nodiscard]] std::string describe(const Verdict& verdict) {\n  std::string text = std::format(\"{}\\nscenario: {}\\nsamples: {}\\n\", verdict.passed ? \"pass\" : \"fail\",\n                                 verdict.scenario, verdict.samples);\n  for (const Check& check : verdict.checks) text += line(check);\n  return text;\n}\n\n[[nodiscard]] std::optional<double> distance_from_start_m(std::span<const Sample> run) {\n  if (run.empty()) return std::nullopt;\n  return std::hypot(run.back().x_m - run.front().x_m, run.back().y_m - run.front().y_m);\n}\n\n[[nodiscard]] std::optional<double> top_speed_mps(std::span<const Sample> run) {\n  if (run.empty()) return std::nullopt;\n  return std::ranges::max(run | std::views::transform([](const Sample& s) { return std::abs(s.speed_mps); }));\n}\n\n[[nodiscard]] std::optional<Time> at_rest_since(std::span<const Sample> run, double speed_limit_mps,\n                                                std::chrono::nanoseconds for_at_least) {\n  if (run.empty()) return std::nullopt;\n  auto backwards = run | std::views::reverse;\n  const auto last_moving = std::ranges::find_if(\n      backwards, [speed_limit_mps](const Sample& s) { return std::abs(s.speed_mps) > speed_limit_mps; });\n  const auto first_at_rest = last_moving == std::ranges::end(backwards) ? run.begin() : last_moving.base();\n  if (first_at_rest == run.end()) return std::nullopt;\n  if (run.back().at.since_epoch - first_at_rest->at.since_epoch < for_at_least) return std::nullopt;\n  return first_at_rest->at;\n}\n\n[[nodiscard]] std::vector<Check> smoke_checks(const Plan& plan, std::optional<std::chrono::nanoseconds> elapsed,\n                                              std::span<const Sample> run, Time last_command) {\n  using namespace std::chrono_literals;\n  const std::optional<Time> rest = at_rest_since(run, 0.01, 300ms);\n  const std::optional<double> to_rest =\n      rest ? std::optional<double>(seconds(std::max(std::chrono::nanoseconds::zero(),\n                                                    rest->since_epoch - last_command.since_epoch)))\n           : std::nullopt;\n  return {{.what = \"simulated time from the first odometry message\",\n           .unit = \"s\",\n           .compare = Compare::at_least,\n           .limit = seconds(length(plan)),\n           .measured = elapsed ? std::optional<double>(seconds(*elapsed)) : std::nullopt},\n          {.what = \"distance from the start\",\n           .unit = \"m\",\n           .compare = Compare::at_least,\n           .limit = 0.30,\n           .measured = distance_from_start_m(run)},\n          {.what = \"top speed\",\n           .unit = \"m/s\",\n           .compare = Compare::at_most,\n           .limit = 0.30,\n           .measured = top_speed_mps(run)},\n          {.what = \"time from the last command to rest\",\n           .unit = \"s\",\n           .compare = Compare::at_most,\n           .limit = 1.50,\n           .measured = to_rest}};\n}\n\n}  // namespace bench\n\nnamespace bench_nodes {\n\n// The type the supervisor takes on /cmd_vel_nav.\nusing Command = geometry_msgs::msg::TwistStamped;\n\n// Runs one scenario: it waits for the first odometry message, follows the plan on the simulation\n// clock, judges the samples it kept, writes the verdict and ends the process.\nclass ScenarioRunner : public rclcpp::Node {\n public:\n  explicit ScenarioRunner(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())\n      : Node(\"scenario_runner\", options),\n        scenario_(declare_parameter<std::string>(\"scenario\", \"smoke\")),\n        verdict_file_(declare_parameter<std::string>(\"verdict_file\", \"\")),\n        speed_mps_(declare_parameter<double>(\"drive_speed_mps\", 0.2)),\n        plan_(declare_plan()) {\n    const rclcpp::QoS qos(rclcpp::KeepLast(10));\n    commands_ = create_publisher<Command>(\"cmd_vel_nav\", qos);\n    odometry_ = create_subscription<nav_msgs::msg::Odometry>(\n        \"odom_raw\", qos, [this](const nav_msgs::msg::Odometry& msg) { on_odometry(msg); });\n    timer_ = create_timer(std::chrono::milliseconds(50), [this] { on_tick(); });\n    guard_ = create_wall_timer(std::chrono::seconds(declare_parameter<std::int64_t>(\"guard_s\", 120)),\n                               [this] { on_guard(); });\n  }\n\n  [[nodiscard]] const std::optional<bench::Verdict>& verdict() const { return verdict_; }\n\n private:\n  [[nodiscard]] bench::Plan declare_plan() {\n    return {.warmup = std::chrono::milliseconds(declare_parameter<std::int64_t>(\"warmup_ms\", 2000)),\n            .drive = std::chrono::milliseconds(declare_parameter<std::int64_t>(\"drive_ms\", 3000)),\n            .settle = std::chrono::milliseconds(declare_parameter<std::int64_t>(\"settle_ms\", 3000))};\n  }\n\n  [[nodiscard]] bench::Time clock_time() const { return {std::chrono::nanoseconds(now().nanoseconds())}; }\n\n  void on_odometry(const nav_msgs::msg::Odometry& message) {\n    if (verdict_) return;\n    const bench::Time at{std::chrono::nanoseconds(rclcpp::Time(message.header.stamp).nanoseconds())};\n    if (!started_) {\n      started_ = at;\n      RCLCPP_INFO(get_logger(), \"scenario %s starts at %.3f s of simulated time\", scenario_.c_str(),\n                  std::chrono::duration<double>(at.since_epoch).count());\n      return;\n    }\n    if (at.since_epoch - started_->since_epoch < plan_.warmup) return;\n    run_.push_back({.at = at,\n                    .x_m = message.pose.pose.position.x,\n                    .y_m = message.pose.pose.position.y,\n                    .speed_mps = message.twist.twist.linear.x});\n  }\n\n  void on_tick() {\n    if (!started_ || verdict_) return;\n    const bench::Time now_time = clock_time();\n    const bench::Phase phase = bench::phase_at(plan_, now_time.since_epoch - started_->since_epoch);\n    if (phase == bench::Phase::drive) {\n      Command command;\n      command.header.stamp = now();\n      command.header.frame_id = \"base_link\";\n      command.twist.linear.x = speed_mps_;\n      commands_->publish(command);\n      last_command_ = now_time;\n    } else if (phase == bench::Phase::done) {\n      finish();\n    }\n  }\n\n  // The guard runs on the wall clock, because a simulation that died stops simulated time.\n  void on_guard() {\n    RCLCPP_ERROR(get_logger(), \"the guard ran out before the scenario reached the end of its plan\");\n    finish();\n  }\n\n  void finish() {\n    if (verdict_) return;\n    const std::optional<std::chrono::nanoseconds> elapsed =\n        started_ ? std::optional<std::chrono::nanoseconds>(clock_time().since_epoch - started_->since_epoch)\n                 : std::nullopt;\n    verdict_ = bench::judge(scenario_, std::ssize(run_),\n                            bench::smoke_checks(plan_, elapsed, run_, last_command_.value_or(bench::Time{})));\n    const std::string text = bench::describe(*verdict_);\n    RCLCPP_INFO(get_logger(), \"%s\", text.c_str());\n    if (!verdict_file_.empty()) {\n      std::ofstream file(verdict_file_);\n      file << text;\n      if (!file) RCLCPP_ERROR(get_logger(), \"can't write %s\", verdict_file_.c_str());\n    }\n    rclcpp::shutdown();\n  }\n\n  std::string scenario_;\n  std::string verdict_file_;\n  double speed_mps_;\n  bench::Plan plan_;\n  std::optional<bench::Time> started_;\n  std::optional<bench::Time> last_command_;\n  std::vector<bench::Sample> run_;\n  std::optional<bench::Verdict> verdict_;\n  rclcpp::Publisher<Command>::SharedPtr commands_;\n  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_;\n  rclcpp::TimerBase::SharedPtr timer_;\n  rclcpp::TimerBase::SharedPtr guard_;\n};\n\n}  // namespace bench_nodes\n\nint main(int argc, char** argv) {\n  rclcpp::init(argc, argv);\n  const auto runner = std::make_shared<bench_nodes::ScenarioRunner>();\n  rclcpp::spin(runner);\n  rclcpp::shutdown();\n  const std::optional<bench::Verdict>& verdict = runner->verdict();\n  return verdict && verdict->passed ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each part of it answers one question. "
+        },
+        {
+         "t": "code",
+         "v": "on_odometry"
+        },
+        {
+         "t": "text",
+         "v": " keeps a sample once the warm-up is over, and the warm-up is measured on the message stamps rather than on the node's clock, so the samples and the timetable agree even when a message is late. "
+        },
+        {
+         "t": "code",
+         "v": "on_tick"
+        },
+        {
+         "t": "text",
+         "v": " publishes at 20 Hz during the drive phase, which is fast enough for the supervisor's 500 ms command timeout, and its tick is the same 50 ms the supervisor uses. "
+        },
+        {
+         "t": "code",
+         "v": "finish"
+        },
+        {
+         "t": "text",
+         "v": " runs once, guarded by "
+        },
+        {
+         "t": "code",
+         "v": "verdict_"
+        },
+        {
+         "t": "text",
+         "v": ", because the guard and the last tick can both reach it. "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::shutdown()"
+        },
+        {
+         "t": "text",
+         "v": " inside the callback makes "
+        },
+        {
+         "t": "code",
+         "v": "spin"
+        },
+        {
+         "t": "text",
+         "v": " return, "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " reads the verdict from the node and turns it into the process's exit code, and the verdict file carries the same text the log printed."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add it to "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_nodes/CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": ". It takes the same dependencies as the supervisor and the relay, so add its name to their "
+         },
+         {
+          "t": "code",
+          "v": "foreach"
+         },
+         {
+          "t": "text",
+          "v": " rather than writing a second one: a second loop over the old names would call "
+         },
+         {
+          "t": "code",
+          "v": "ament_target_dependencies"
+         },
+         {
+          "t": "text",
+          "v": " twice for each of them. Three lines change, and the rest of the block stays as the supervisor topic left it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "add_executable(scenario_runner src/scenario_runner_node.cpp)\nforeach(node supervisor odom_relay scenario_runner)   # the third name is the new one\n  target_include_directories(${node} PRIVATE include)\n  ament_target_dependencies(${node} rclcpp geometry_msgs nav_msgs)\nendforeach()\ntarget_link_libraries(scenario_runner bench_core::bench_core)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add "
+        },
+        {
+         "t": "code",
+         "v": "scenario_runner"
+        },
+        {
+         "t": "text",
+         "v": " to the "
+        },
+        {
+         "t": "code",
+         "v": "install(TARGETS ...)"
+        },
+        {
+         "t": "text",
+         "v": " line as well. The plain "
+        },
+        {
+         "t": "code",
+         "v": "target_link_libraries"
+        },
+        {
+         "t": "text",
+         "v": " is needed here for the reason the supervisor topic measured."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", then drive the scenario by hand, before any launch file exists:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim bench.launch.py                        # terminal 1: world and supervisor, headless\nros2 run bench_nodes odom_relay                              # terminal 2\nros2 run bench_nodes scenario_runner --ros-args -p use_sim_time:=true -p verdict_file:=/tmp/smoke.txt\necho \"exit $?\"\ncat /tmp/smoke.txt"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The runner logs the simulated time it starts at, drives the robot for three simulated seconds, and prints the four lines of its verdict. Watch "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic echo /odom_raw --field twist.twist.linear.x"
+        },
+        {
+         "t": "text",
+         "v": " in a fourth terminal while it runs: the speed rises to about 0.2, holds, and falls to zero after the supervisor's stop. Then run it again with "
+        },
+        {
+         "t": "code",
+         "v": "-p drive_speed_mps:=0.0"
+        },
+        {
+         "t": "text",
+         "v": " and watch the distance check fail and the exit code turn into 1. Stop the world and the relay by hand afterwards."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the runner writes a verdict file whose first line is "
+        },
+        {
+         "t": "code",
+         "v": "pass"
+        },
+        {
+         "t": "text",
+         "v": ", exits with 0, and exits with 1 when the drive speed is zero."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 3",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "./run_scenario.sh smoke"
+        },
+        {
+         "t": "text",
+         "v": " is the one command: it starts the world headless, runs the scenario, shuts everything down and prints pass or fail."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two pieces make that one command. A launch file starts the bench, the relay and the runner, and ends the whole group when the runner exits; a script at the top of the repository runs the launch file, reads the verdict and turns it into an exit code. The verdict is a file rather than the launch command's exit code on purpose: a launch file runs several processes, and one number at the end can't say which of them decided the scenario, or whether it decided anything at all."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_sim/launch/scenario.launch.py"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "\"\"\"Runs one Test Bench scenario headless: the bench, the relay and the scenario runner.\"\"\"\nimport os\n\nfrom ament_index_python.packages import get_package_share_directory\nfrom launch import LaunchDescription\nfrom launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, RegisterEventHandler, Shutdown\nfrom launch.conditions import IfCondition\nfrom launch.event_handlers import OnProcessExit\nfrom launch.launch_description_sources import PythonLaunchDescriptionSource\nfrom launch.substitutions import LaunchConfiguration\nfrom launch_ros.actions import Node\n\n\ndef generate_launch_description():\n    bench = IncludeLaunchDescription(\n        PythonLaunchDescriptionSource(\n            os.path.join(get_package_share_directory('bench_sim'), 'launch', 'bench.launch.py')),\n        launch_arguments={'headless': 'True'}.items())\n    relay = Node(package='bench_nodes', executable='odom_relay', output='screen',\n                 condition=IfCondition(LaunchConfiguration('relay')))\n    runner = Node(package='bench_nodes', executable='scenario_runner', output='screen',\n                  parameters=[{'use_sim_time': True,\n                               'scenario': LaunchConfiguration('scenario'),\n                               'verdict_file': LaunchConfiguration('verdict_file')}])\n    return LaunchDescription([\n        DeclareLaunchArgument('scenario', default_value='smoke'),\n        DeclareLaunchArgument('verdict_file'),\n        DeclareLaunchArgument('relay', default_value='True'),\n        bench,\n        relay,\n        runner,\n        RegisterEventHandler(OnProcessExit(target_action=runner, on_exit=[Shutdown(reason='the scenario ended')])),\n    ])"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It includes "
+        },
+        {
+         "t": "code",
+         "v": "bench.launch.py"
+        },
+        {
+         "t": "text",
+         "v": " from the supervisor topic rather than repeating the world and the supervisor, and it brings the relay into a launch file for the first time; until now the relay ran in a terminal of its own so that Ctrl+C could stop it alone. "
+        },
+        {
+         "t": "code",
+         "v": "verdict_file"
+        },
+        {
+         "t": "text",
+         "v": " is declared without a default, so a run that forgets it stops with an error instead of throwing its result away. The event handler is what makes the group end: when the runner's process exits, "
+        },
+        {
+         "t": "code",
+         "v": "Shutdown"
+        },
+        {
+         "t": "text",
+         "v": " sends every other process a signal, and Gazebo, the bridge, "
+        },
+        {
+         "t": "code",
+         "v": "robot_state_publisher"
+        },
+        {
+         "t": "text",
+         "v": ", the supervisor and the relay stop with it. The relay has a condition, which Build 4 uses to run the same scenario with the odometry path broken."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "run_scenario.sh"
+         },
+         {
+          "t": "text",
+          "v": " at the top of the repository, next to "
+         },
+         {
+          "t": "code",
+          "v": "check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", and "
+         },
+         {
+          "t": "code",
+          "v": "chmod +x"
+         },
+         {
+          "t": "text",
+          "v": " it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "#!/usr/bin/env bash\n# run_scenario.sh NAME [launch arguments]: runs scenario NAME headless and prints its verdict.\n# Exit code 0 means it passed.\ncd \"$(dirname \"$0\")\"\nsource /opt/ros/jazzy/setup.bash\nsource install/setup.bash\nset -euo pipefail\nname=${1:?usage: ./run_scenario.sh NAME [launch arguments]}\nmkdir -p results\nverdict=\"$PWD/results/$name.txt\"\nrm -f \"$verdict\"\n{ git rev-parse HEAD\n  lsb_release -ds\n  gz sim --version\n  dpkg-query -W ros-jazzy-nav2-minimal-tb3-sim; } > \"results/$name.env\"\ntimeout --signal=INT 180 ros2 launch bench_sim scenario.launch.py \\\n  scenario:=\"$name\" verdict_file:=\"$verdict\" \"${@:2}\" || true\ntest -s \"$verdict\" || { echo \"fail: the runner wrote no verdict\"; exit 1; }\ncat \"$verdict\"\nhead -1 \"$verdict\" | grep -qx pass"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both setup scripts are sourced before "
+        },
+        {
+         "t": "code",
+         "v": "set -u"
+        },
+        {
+         "t": "text",
+         "v": ", for the reason "
+        },
+        {
+         "t": "code",
+         "v": "check.sh"
+        },
+        {
+         "t": "text",
+         "v": " gives: they read variables that may not be set. The "
+        },
+        {
+         "t": "code",
+         "v": ".env"
+        },
+        {
+         "t": "text",
+         "v": " file next to the verdict records what this run was: the commit, the Ubuntu version, the Gazebo version and the version of the robot's simulation package. A verdict without it is a number nobody can reproduce in three months. "
+        },
+        {
+         "t": "code",
+         "v": "timeout --signal=INT"
+        },
+        {
+         "t": "text",
+         "v": " sends the interrupt that "
+        },
+        {
+         "t": "code",
+         "v": "ros2 launch"
+        },
+        {
+         "t": "text",
+         "v": " handles as a clean shutdown, and it is the outermost guard: the runner's own guard covers a dead simulation, and this one covers a launch that never got as far as starting the runner. "
+        },
+        {
+         "t": "code",
+         "v": "|| true"
+        },
+        {
+         "t": "text",
+         "v": " keeps the script going to the verdict whatever the launch returned. The last line is the exit code: "
+        },
+        {
+         "t": "code",
+         "v": "grep -qx pass"
+        },
+        {
+         "t": "text",
+         "v": " succeeds only when the first line is exactly "
+        },
+        {
+         "t": "code",
+         "v": "pass"
+        },
+        {
+         "t": "text",
+         "v": ", and under "
+        },
+        {
+         "t": "code",
+         "v": "set -e"
+        },
+        {
+         "t": "text",
+         "v": " its failure ends the script with 1."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add "
+         },
+         {
+          "t": "code",
+          "v": "results/"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": ".gitignore"
+         },
+         {
+          "t": "text",
+          "v": ", build, and run it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh\n./run_scenario.sh smoke; echo \"exit $?\"\ncat results/smoke.env"
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Check that the shutdown is clean. After the script returns, "
+         },
+         {
+          "t": "code",
+          "v": "pgrep -af \"gz sim\""
+         },
+         {
+          "t": "text",
+          "v": " prints nothing and "
+         },
+         {
+          "t": "code",
+          "v": "ros2 node list"
+         },
+         {
+          "t": "text",
+          "v": " is empty. A Gazebo server left behind from an earlier run makes the next scenario meet two robots, which the robot-world topic warned about. If one survives, stop it by its PID and find out which process the launch file failed to reach."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when "
+        },
+        {
+         "t": "code",
+         "v": "./run_scenario.sh smoke"
+        },
+        {
+         "t": "text",
+         "v": " starts the world, runs the scenario, prints a verdict whose first line is "
+        },
+        {
+         "t": "code",
+         "v": "pass"
+        },
+        {
+         "t": "text",
+         "v": ", exits with 0, and leaves no process behind."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 4",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, you know how much the scenario's numbers move between runs, you have seen the runner report a failure for two different causes, and the run is written down well enough to repeat in three months."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it five times and keep every verdict:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "for i in 1 2 3 4 5; do ./run_scenario.sh smoke; echo \"run $i exit $?\"; cp results/smoke.txt results/smoke_$i.txt; done\ngrep -h \"distance from the start\" results/smoke_[1-5].txt\ngrep -h \"to rest\" results/smoke_[1-5].txt"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The measured numbers differ between runs, and the verdict must not. Write down the smallest and the largest of each. Then compare each number with its limit: the margin you have is what tells you whether the limit is a real requirement or a coin toss. A distance that lands within a centimetre of 0.30 m means the limit is wrong for this scenario, not that the robot is unreliable."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Measure two numbers, and keep them apart. The first is what one run costs, which decides whether scenarios can run on every push:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "time ./run_scenario.sh smoke"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Most of that wall time is Gazebo starting, the packages loading and discovery finishing, and the scenario's 8 s of simulated time is the smaller part of it. So don't divide one by the other. The second number, how fast the simulation itself runs, comes from the scenario's own stretch: the runner logs "
+        },
+        {
+         "t": "code",
+         "v": "scenario smoke starts at ..."
+        },
+        {
+         "t": "text",
+         "v": " and then the verdict, so the wall clock between those two lines covers the 8 s of the plan and nothing else. Divide the 8 s by that. Gazebo computes the same thing for itself and publishes it on its statistics topic, which is the cross-check:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "gz topic -e -t /stats      # while a scenario runs; read real_time_factor, then Ctrl+C"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write both numbers down with the machine they came from. Headless and without rendering, the sandbox world is a small one; measure yours rather than trusting a number from another machine."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write down what makes two runs differ and what is pinned. Differing: the wall time Gazebo needs to start, the order in which the nodes discover each other, how many samples arrive before the warm-up ends, and the machine's load. Pinned: the world file and the robot's spawn pose from "
+         },
+         {
+          "t": "code",
+          "v": "nav2_minimal_tb3_sim"
+         },
+         {
+          "t": "text",
+          "v": ", the version of that package, the supervisor's two timeouts, the runner's plan and drive speed, and the commit, all of which the "
+         },
+         {
+          "t": "code",
+          "v": ".env"
+         },
+         {
+          "t": "text",
+          "v": " file and the parameters already record. Physics adds its own: Gazebo steps the world at a fixed step size, so the robot's motion is repeatable for the same sequence of commands, and the commands arrive at slightly different simulated moments each run."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that the runner reports a failure, in two different ways. First break the odometry path, which is the scenario the missing-input topic will build on:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./run_scenario.sh smoke relay:=False; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Without the relay the supervisor never sees "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": ", holds every command and publishes stops, so the robot stands still. The verdict's first line is "
+        },
+        {
+         "t": "code",
+         "v": "fail"
+        },
+        {
+         "t": "text",
+         "v": ", the failed line is the distance from the start, and the exit code is 1. The other three checks pass, which is the report doing its job: it names the requirement that broke rather than the run."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then break the simulation while a run is going, which is what the guard is for. Start "
+        },
+        {
+         "t": "code",
+         "v": "./run_scenario.sh smoke"
+        },
+        {
+         "t": "text",
+         "v": " and, a few seconds in, find the Gazebo server with "
+        },
+        {
+         "t": "code",
+         "v": "pgrep -af \"gz sim\""
+        },
+        {
+         "t": "text",
+         "v": " and stop that process by its PID. Simulated time stops, the timetable never reaches its end, and about two minutes later the guard fires on the wall clock and the run fails on the first check, the simulated time from the first odometry message. To see it without waiting out the default, run the runner by hand as in Build 2 with "
+        },
+        {
+         "t": "code",
+         "v": "-p guard_s:=20"
+        },
+        {
+         "t": "text",
+         "v": " and stop the server a few seconds in."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Put the numbers where the next topic will look for them, and commit. The scenario needs Gazebo, so it doesn't belong in "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": ", which builds and tests; the CI topic decides where it runs and how often."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "five runs in a row pass, and you have written down the range of each measured number and its margin to the limit;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the wall time of one whole run and the real-time factor of its 8 s stretch are both written down, with the machine they came from;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "relay:=False"
+         },
+         {
+          "t": "text",
+          "v": " gives a "
+         },
+         {
+          "t": "code",
+          "v": "fail"
+         },
+         {
+          "t": "text",
+          "v": " whose failed line is the distance, and exit code 1;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "killing the Gazebo server mid-run makes the guard end the run with the time check failed."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a \"Scenarios\" section to "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic, and every later scenario adds a few lines to it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the one command and what it writes: "
+        },
+        {
+         "t": "code",
+         "v": "results/<name>.txt"
+        },
+        {
+         "t": "text",
+         "v": " with pass or fail and one line per check, and "
+        },
+        {
+         "t": "code",
+         "v": "results/<name>.env"
+        },
+        {
+         "t": "text",
+         "v": " with the commit and the versions. Describe "
+        },
+        {
+         "t": "code",
+         "v": "smoke"
+        },
+        {
+         "t": "text",
+         "v": " in three lines: its timetable of 2 s, 3 s and 3 s, that it drives at 0.2 m/s through "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel_nav"
+        },
+        {
+         "t": "text",
+         "v": ", and that it measures the robot from "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " rather than from the commands. List its four checks with their limits and the arithmetic behind each, in one line each. Then two lines on the two clocks: the timetable is simulated, and the guard is on the wall clock because a dead simulation stops simulated time. End with the numbers from Build 4: the range of each measured value over five runs, the wall time one whole run took, and the real-time factor of its 8 s stretch."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 launch documentation and sources on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "architecture",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Launch-Main.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "event handlers",
+      "href": "https://github.com/ros2/launch/blob/jazzy/launch/launch/event_handlers/on_process_exit.py"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "a",
+      "v": "shutdown action",
+      "href": "https://github.com/ros2/launch/blob/jazzy/launch/launch/actions/shutdown_action.py"
+     },
+     {
+      "t": "text",
+      "v": ", which ends the whole group when the runner exits."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 design article on "
+     },
+     {
+      "t": "a",
+      "v": "clock and time",
+      "href": "https://design.ros2.org/articles/clock_and_time.html"
+     },
+     {
+      "t": "text",
+      "v": ": time from "
+     },
+     {
+      "t": "code",
+      "v": "/clock"
+     },
+     {
+      "t": "text",
+      "v": ", uninitialised time before the first message, and what a node on simulation time may assume."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "Node::create_wall_timer",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/node.hpp"
+     },
+     {
+      "t": "text",
+      "v": ", which runs on the steady clock whatever "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": " says."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo Harmonic's documentation on "
+     },
+     {
+      "t": "a",
+      "v": "the physics step and the real-time factor",
+      "href": "https://gazebosim.org/api/sim/8/physics.html"
+     },
+     {
+      "t": "text",
+      "v": ", for what a fixed step size does and does not make repeatable."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot 3 model in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_turtlebot_simulation 1.3.0",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/1.3.0/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+     },
+     {
+      "t": "text",
+      "v": ": odometry at 30 Hz and the DiffDrive acceleration limits, which the stop arithmetic uses."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "all_of"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "find_if"
+     },
+     {
+      "t": "text",
+      "v": " over a reversed view, and a projection instead of a loop."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " on precisely typed interfaces, the reason for "
+     },
+     {
+      "t": "code",
+      "v": "Compare"
+     },
+     {
+      "t": "text",
+      "v": " and for the optional measurement, and cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "reverse_iterator::base",
+      "href": "https://en.cppreference.com/cpp/iterator/reverse_iterator/base"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

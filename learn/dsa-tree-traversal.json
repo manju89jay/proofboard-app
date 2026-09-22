@@ -1,0 +1,1571 @@
+{
+ "id": "dsa-tree-traversal",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "With the node type below, write "
+     },
+     {
+      "t": "code",
+      "v": "in_order(root)"
+     },
+     {
+      "t": "text",
+      "v": ", which returns the values of a binary tree in in-order as a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<int>"
+     },
+     {
+      "t": "text",
+      "v": ", twice: once with recursion and once with a loop and your own stack. The tree owns its children through "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", and a traversal owns nothing, so both functions take a "
+     },
+     {
+      "t": "code",
+      "v": "const Node*"
+     },
+     {
+      "t": "text",
+      "v": ". Test the tree drawn below, the empty tree and a single node. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "struct Node {\n  int value = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};"
+   },
+   {
+    "t": "code",
+    "lang": "text",
+    "tag": "",
+    "expect": "",
+    "text": "        5\n      /   \\\n     3     8\n    / \\      \\\n   2   4      9\n  /\n 1"
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int value, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(value, std::move(left), std::move(right));\n}\n\nvoid in_order_into(const Node* root, std::vector<int>& out) {\n  if (root == nullptr) return;  // the empty tree is the base case\n  in_order_into(root->left.get(), out);\n  out.push_back(root->value);\n  in_order_into(root->right.get(), out);\n}\n\n[[nodiscard]] std::vector<int> in_order(const Node* root) {\n  std::vector<int> out;\n  in_order_into(root, out);\n  return out;\n}\n\n[[nodiscard]] std::vector<int> in_order_iterative(const Node* root) {\n  std::vector<int> out;\n  std::vector<const Node*> pending;  // nodes whose left subtree is being walked\n  const Node* current = root;\n  while (current != nullptr || !pending.empty()) {\n    while (current != nullptr) {  // go as far left as the tree allows\n      pending.push_back(current);\n      current = current->left.get();\n    }\n    current = pending.back();\n    pending.pop_back();\n    out.push_back(current->value);   // the leftmost node not yet taken\n    current = current->right.get();  // then its right subtree\n  }\n  return out;\n}\n\n[[nodiscard]] std::string show(std::span<const int> values) {\n  std::string out;\n  for (const int v : values) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", v);\n  return out.empty() ? \"(empty)\" : out;\n}\n\nint main() {\n  const std::unique_ptr<Node> tree = node(5, node(3, node(2, node(1)), node(4)), node(8, nullptr, node(9)));\n  std::cout << std::format(\"recursive {}\\n\", show(in_order(tree.get())));\n  std::cout << std::format(\"iterative {}\\n\", show(in_order_iterative(tree.get())));\n  std::cout << std::format(\"empty     {} and {}\\n\", show(in_order(nullptr)), show(in_order_iterative(nullptr)));\n  const std::unique_ptr<Node> one = node(7);\n  std::cout << std::format(\"one node  {} and {}\\n\", show(in_order(one.get())), show(in_order_iterative(one.get())));\n}"
+   },
+   {
+    "t": "output",
+    "text": "recursive 1 2 3 4 5 8 9\niterative 1 2 3 4 5 8 9\nempty     (empty) and (empty)\none node  7 and 7"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The recursive version is three lines in the order the traversal is named after: left subtree, node, right subtree. The null test is the base case, and it is the only null test in the function, because a missing child is handled by the call that receives it rather than by the caller."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The iterative version keeps the pending work that the recursion kept in its frames. The inner loop walks down the left spine and remembers every node it passes. When there is no further left child, the node on top of the stack is the leftmost one whose value has not been taken, so it comes off, its value goes into the result, and the walk continues in its right subtree. The outer condition allows either an unfinished descent or a non-empty stack, so the empty tree exits at once. Both are O(n) time and O(h) extra space for a tree of height h, plus the result."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The signatures follow the ownership model from the linked-list topic: each node owns its children through "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", and a function that only looks at nodes takes a raw "
+     },
+     {
+      "t": "code",
+      "v": "const Node*"
+     },
+     {
+      "t": "text",
+      "v": ", which owns nothing ("
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": "). That is why the traversals take "
+     },
+     {
+      "t": "code",
+      "v": ".get()"
+     },
+     {
+      "t": "text",
+      "v": " of a child rather than the "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " itself."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with both versions correct on all three inputs, and with O(n) time and O(h) space stated. A correct recursion and a stumbling iterative version is a partial pass. A version that dereferences a child without testing it, or that returns the values in the wrong order, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A binary tree has four standard walks, three of them the same three lines with the value recorded in a different place. Pre-order records a node before its subtrees, so replaying the output can rebuild the tree, and it serialises, copies or compares trees. In-order records a node between its two subtrees, and on a binary search tree that is ascending order, which is why it answers \"sorted values\", \"validate a BST\" and \"the k-th smallest\". Post-order records a node after both subtrees, fitting anything needing a node's children answered first: height, node count, freeing the tree, evaluating an expression tree. Level order is not one of the three: it visits by distance from the root using a queue rather than recursion, because the node to visit next usually sits in a different branch, not inside the subtree already walked, and it answers \"the shallowest node with some property\" or \"one line per level\"."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The right reach is deciding which question is being asked, because naming the traversal is most of the answer: pre-order to rebuild, in-order for BST order, post-order for bottom-up answers, level order for distance from the root. What decides between the three depth-first orders and level order is memory, not time, because every order visits each node once. A depth-first walk holds one entry per node on the current root-to-node path, O(h) for height h. Level order holds one entry per node on the frontier, O(w) for the widest. A skewed tree makes depth-first cheap and level order expensive; a perfect tree flips that, because its height is small but a middle level can hold about half the nodes."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mistake that shows up under pressure has nothing to do with which order you pick: a tree of "
+    },
+    {
+     "t": "code",
+     "v": "unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": " nodes destroys itself recursively, one node's destructor running the next one's from inside it, so a long chain, exactly what a plain binary search tree becomes from sorted input, overflows the stack at the closing brace where the tree goes out of scope, whatever the traversal logic looked like. The fix belongs to the class that owns the tree: a "
+    },
+    {
+     "t": "code",
+     "v": "clear()"
+    },
+    {
+     "t": "text",
+     "v": " that unlinks and drops nodes one at a time in a loop, so no destructor calls another."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the interview question itself: write in-order traversal two ways, recursively and with your own explicit stack, on the same tree, the substitution the fix above depends on."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Pre, in and post-order; level order with a queue",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three depth-first traversals are the same three lines in three orders, and level order is not one of them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <queue>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int value, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(value, std::move(left), std::move(right));\n}\n\nvoid pre_order(const Node* n, std::vector<int>& out) {\n  if (n == nullptr) return;\n  out.push_back(n->value);  // the node, before either subtree\n  pre_order(n->left.get(), out);\n  pre_order(n->right.get(), out);\n}\n\nvoid in_order(const Node* n, std::vector<int>& out) {\n  if (n == nullptr) return;\n  in_order(n->left.get(), out);\n  out.push_back(n->value);  // the node, between its subtrees\n  in_order(n->right.get(), out);\n}\n\nvoid post_order(const Node* n, std::vector<int>& out) {\n  if (n == nullptr) return;\n  post_order(n->left.get(), out);\n  post_order(n->right.get(), out);\n  out.push_back(n->value);  // the node, after both subtrees\n}\n\n[[nodiscard]] std::vector<int> level_order(const Node* root) {\n  std::vector<int> out;\n  if (root == nullptr) return out;\n  std::queue<const Node*> waiting;\n  waiting.push(root);\n  while (!waiting.empty()) {\n    const Node* n = waiting.front();\n    waiting.pop();\n    out.push_back(n->value);\n    if (n->left) waiting.push(n->left.get());\n    if (n->right) waiting.push(n->right.get());\n  }\n  return out;\n}\n\n[[nodiscard]] std::string show(std::span<const int> values) {\n  std::string out;\n  for (const int v : values) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", v);\n  return out;\n}\n\nint main() {\n  const std::unique_ptr<Node> tree = node(5, node(3, node(2, node(1)), node(4)), node(8, nullptr, node(9)));\n  std::vector<int> pre;\n  pre_order(tree.get(), pre);\n  std::vector<int> in;\n  in_order(tree.get(), in);\n  std::vector<int> post;\n  post_order(tree.get(), post);\n  std::cout << std::format(\"pre-order    {}\\n\", show(pre));\n  std::cout << std::format(\"in-order     {}\\n\", show(in));\n  std::cout << std::format(\"post-order   {}\\n\", show(post));\n  std::cout << std::format(\"level order  {}\\n\", show(level_order(tree.get())));\n}"
+      },
+      {
+       "t": "output",
+       "text": "pre-order    5 3 2 1 4 8 9\nin-order     1 2 3 4 5 8 9\npost-order   1 2 4 3 9 8 5\nlevel order  5 3 8 2 4 9 1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the three depth-first functions side by side: the two recursive calls never move, and only the "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " slides from the top to the middle to the bottom. That is the whole difference, and the names say where the node goes relative to its subtrees. "
+        },
+        {
+         "t": "i",
+         "v": "Pre-order"
+        },
+        {
+         "t": "text",
+         "v": " takes the node on the way down, "
+        },
+        {
+         "t": "i",
+         "v": "in-order"
+        },
+        {
+         "t": "text",
+         "v": " between the two subtrees, and "
+        },
+        {
+         "t": "i",
+         "v": "post-order"
+        },
+        {
+         "t": "text",
+         "v": " on the way back up. Every node is reached the same way in all three; what changes is when its value is recorded."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Level order is a different walk. It has no recursive form that anybody writes, because the next node to visit is not inside the subtree being worked on: it is the node to the right, in a different branch. A queue holds the frontier. Take the front node, record it, put its children at the back, repeat. "
+        },
+        {
+         "t": "code",
+         "v": "std::queue"
+        },
+        {
+         "t": "text",
+         "v": " is the right container here, and its default "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": " is the right container underneath it, because a queue pushes at one end and pops at the other and a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " has no O(1) way to remove its first element, as the stacks and queues topic showed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Which one you reach for is decided by the question, and saying so out loud is most of the answer in an interview:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "What is being asked"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Traversal"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Why"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Serialise a tree, or copy it, or compare two trees"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "pre-order"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the node is known before its subtrees, so the output can be replayed to rebuild it"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "A BST's values in sorted order, validating a BST, the k-th smallest"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "in-order"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "in a BST, in-order is ascending order, which the next topic builds on"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Height, node count, freeing the tree, evaluating an expression tree"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "post-order"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the node's answer needs both children's answers first"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "The shallowest node with some property, distance in edges from the root, one line per level"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "level order"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "nodes come out in order of distance from the root"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The sample tree makes the second row visible: its in-order is 1 2 3 4 5 8 9, sorted, because every value in a node's left subtree is smaller than the node and every value on the right is larger. That is the binary search tree property, and the next topic is about it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every traversal touches each node once and does constant work there, so all four are O(n) time for n nodes. The space is where they differ, and it is the number the interviewer is usually after. A depth-first traversal holds one entry per node on the path from the root to where it stands, so its extra space is O(h) for a tree of height h. A level-order traversal holds one entry per node on the frontier, so its extra space is O(w) where w is the widest level. Those two are opposites. In a "
+        },
+        {
+         "t": "i",
+         "v": "perfect"
+        },
+        {
+         "t": "text",
+         "v": " tree, where every level is full, h is log₂(n + 1) − 1 and the widest level holds about n/2 nodes, so depth-first is cheap and level order is expensive. In a "
+        },
+        {
+         "t": "i",
+         "v": "skewed"
+        },
+        {
+         "t": "text",
+         "v": " tree, one whose every node has at most one child, h is n − 1 and every level holds one node, so the two swap places. The worked example measures both on both shapes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two conventions collide here and interviewers rarely say which they mean. "
+        },
+        {
+         "t": "i",
+         "v": "Height"
+        },
+        {
+         "t": "text",
+         "v": " is usually counted in edges, so a single node has height 0 and the empty tree has height −1. "
+        },
+        {
+         "t": "i",
+         "v": "Depth"
+        },
+        {
+         "t": "text",
+         "v": " in the problems people set, including the exercise below, is usually counted in nodes, so a single node has depth 1 and the empty tree has depth 0. Ask which one is wanted, or state the one you are using, and the off-by-one stops being an argument."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every depth-first traversal is a recursion, so every one of them is a loop plus an explicit stack, by the transformation from the recursion topic. Here the frame holds the node and what to do with it, and the three orders differ only in where the \"visit me\" frame is pushed:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <queue>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int value, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(value, std::move(left), std::move(right));\n}\n\nenum class Order { pre, in, post };\nenum class Step { descend, visit };\n\nstruct Frame {\n  const Node* node = nullptr;\n  Step step = Step::descend;\n};\n\nstruct Walk {\n  std::vector<int> values;\n  std::ptrdiff_t widest = 0;  // the most entries ever waiting at once\n};\n\n// One loop for all three depth-first orders: only where `self` goes onto the stack changes.\n[[nodiscard]] Walk depth_first(const Node* root, Order order) {\n  Walk walk;\n  std::vector<Frame> stack;\n  if (root != nullptr) stack.push_back({.node = root, .step = Step::descend});\n  while (!stack.empty()) {\n    walk.widest = std::max(walk.widest, std::ssize(stack));\n    const Frame frame = stack.back();\n    stack.pop_back();\n    if (frame.step == Step::visit) {\n      walk.values.push_back(frame.node->value);\n      continue;\n    }\n    const Frame self{.node = frame.node, .step = Step::visit};\n    const Node* left = frame.node->left.get();\n    const Node* right = frame.node->right.get();\n    if (order == Order::post) stack.push_back(self);  // pushed first, so popped last\n    if (right != nullptr) stack.push_back({.node = right, .step = Step::descend});\n    if (order == Order::in) stack.push_back(self);\n    if (left != nullptr) stack.push_back({.node = left, .step = Step::descend});\n    if (order == Order::pre) stack.push_back(self);  // pushed last, so popped first\n  }\n  return walk;\n}\n\n[[nodiscard]] Walk breadth_first(const Node* root) {\n  Walk walk;\n  if (root == nullptr) return walk;\n  std::queue<const Node*> waiting;\n  waiting.push(root);\n  while (!waiting.empty()) {\n    walk.widest = std::max(walk.widest, std::ssize(waiting));\n    const Node* n = waiting.front();\n    waiting.pop();\n    walk.values.push_back(n->value);\n    if (n->left) waiting.push(n->left.get());\n    if (n->right) waiting.push(n->right.get());\n  }\n  return walk;\n}\n\n[[nodiscard]] std::string show(std::span<const int> values) {\n  std::string out;\n  for (const int v : values) out += std::format(\"{}{}\", out.empty() ? \"\" : \" \", v);\n  return out;\n}\n\n// A perfect tree of 2^(height+1) - 1 nodes, built from the leaves up so nothing recurses.\n[[nodiscard]] std::unique_ptr<Node> perfect(int height) {\n  std::vector<std::unique_ptr<Node>> level;\n  for (std::ptrdiff_t i = 0; i < (std::ptrdiff_t{1} << height); ++i) level.push_back(node(0));\n  while (std::ssize(level) > 1) {\n    std::vector<std::unique_ptr<Node>> parents;\n    for (std::ptrdiff_t i = 0; i < std::ssize(level); i += 2)\n      parents.push_back(node(0, std::move(level[static_cast<std::size_t>(i)]),\n                             std::move(level[static_cast<std::size_t>(i + 1)])));\n    level = std::move(parents);\n  }\n  return std::move(level.front());\n}\n\n// A chain of left children, the worst shape a binary tree can have.\n[[nodiscard]] std::unique_ptr<Node> leaning(std::ptrdiff_t nodes) {\n  std::unique_ptr<Node> root;\n  for (std::ptrdiff_t i = 0; i < nodes; ++i) root = node(0, std::move(root));\n  return root;\n}\n\nvoid row(std::string_view shape, const Node* root, std::ptrdiff_t height) {\n  const Walk depth = depth_first(root, Order::in);\n  const Walk breadth = breadth_first(root);\n  std::cout << std::format(\"{:<22}{:>7}{:>9}{:>16}{:>15}\\n\", shape, depth.values.size(), height, depth.widest,\n                           breadth.widest);\n}\n\nint main() {\n  const std::unique_ptr<Node> tree = node(5, node(3, node(2, node(1)), node(4)), node(8, nullptr, node(9)));\n  std::cout << std::format(\"pre-order    {}\\n\", show(depth_first(tree.get(), Order::pre).values));\n  std::cout << std::format(\"in-order     {}\\n\", show(depth_first(tree.get(), Order::in).values));\n  std::cout << std::format(\"post-order   {}\\n\", show(depth_first(tree.get(), Order::post).values));\n  std::cout << std::format(\"level order  {}\\n\", show(breadth_first(tree.get()).values));\n\n  std::cout << std::format(\"\\n{:<22}{:>7}{:>9}{:>16}{:>15}\\n\", \"shape\", \"nodes\", \"height\", \"deepest stack\",\n                           \"widest queue\");\n  const std::unique_ptr<Node> balanced = perfect(10);\n  row(\"perfect, height 10\", balanced.get(), 10);\n  const std::unique_ptr<Node> chain = leaning(2047);\n  row(\"2047 left children\", chain.get(), 2046);\n}"
+      },
+      {
+       "t": "output",
+       "text": "pre-order    5 3 2 1 4 8 9\nin-order     1 2 3 4 5 8 9\npost-order   1 2 4 3 9 8 5\nlevel order  5 3 8 2 4 9 1\n\nshape                   nodes   height   deepest stack   widest queue\nperfect, height 10       2047       10              21           1024\n2047 left children       2047     2046            2047              1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The four lines match the recursive output above, which is the check that matters: the iterative walk is a rewrite, not a different algorithm. The five push statements are worth reading slowly. A stack hands back the last thing pushed, so the pushes go in the reverse of the order you want the pops. Pre-order wants the node, then the left subtree, then the right, so it pushes right, left, node. Post-order wants left, right, node, so it pushes node, right, left. In-order slots the node between the two. Written this way, the order is a parameter rather than three separate functions, and the classic advice that \"iterative post-order is the hard one\" stops being true: the hard version is the one that tries to do it with a stack of bare pointers and then needs a "
+        },
+        {
+         "t": "code",
+         "v": "last_visited"
+        },
+        {
+         "t": "text",
+         "v": " pointer to tell a first visit from a second. Putting the "
+        },
+        {
+         "t": "code",
+         "v": "Step"
+        },
+        {
+         "t": "text",
+         "v": " into the frame is what the recursion was doing all along, one return address at a time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The table is the space argument with numbers on it. Both trees hold 2047 nodes. On the perfect tree this walker's stack never held more than 21 frames while the level-order queue reached 1024, half the tree. On the chain the stack held all 2047 and the queue never held more than 1. The 21 counts frames of this walker, which carries a "
+        },
+        {
+         "t": "code",
+         "v": "Step::visit"
+        },
+        {
+         "t": "text",
+         "v": " frame beside each pending child, so it holds about twice the height; the cold check's plain stack of node pointers holds one entry per level and peaks at 11 on the same tree, and at the same 2047 on the chain. Neither traversal is cheaper than the other in general; the shape decides. A perception pipeline that walks a balanced index can traverse depth-first in a few hundred bytes, and the same code on a degenerate index needs a stack the size of the data."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "perfect"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "leaning"
+        },
+        {
+         "t": "text",
+         "v": " build their trees with loops rather than with recursion, so they can build shapes that a recursive builder could not reach. That matters more than it looks, and the last section shows why."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two other traversals are worth knowing by name. "
+        },
+        {
+         "t": "i",
+         "v": "Morris traversal"
+        },
+        {
+         "t": "text",
+         "v": " walks in-order in O(1) extra space by temporarily pointing a subtree's rightmost node back at its successor and undoing the link on the way through, which trades a writable tree and roughly double the pointer reads for no stack at all. And a "
+        },
+        {
+         "t": "i",
+         "v": "reverse in-order"
+        },
+        {
+         "t": "text",
+         "v": ", right subtree first, gives a BST's values in descending order, which is the one-line answer to \"the k-th largest\" once you know that in-order gives the k-th smallest."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "problems",
+   "title": "Maximum depth; level-order traversal",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "max_depth(root)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the number of nodes on the longest path from the root to a leaf, counting nodes: 0 for the empty tree and 1 for a single node. Write it twice, once with recursion and once with a loop and your own stack, and return "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test both on the sample tree from the cold check, where the answer is 4, on the empty tree and on a single node. Then build a chain of 50,000 left children with a loop, and run the iterative version on it. State the time and the extra space of each version in terms of n and the height h, and say which of the two you would ship in a robot that indexes sensor readings by time stamp, where the readings usually arrive in order."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The recursion is the post-order shape: a node's answer needs both children's answers, so the node is handled after them. The loop carries the depth in the frame, which is what the recursion carried in its parameter:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int value, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(value, std::move(left), std::move(right));\n}\n\n[[nodiscard]] std::ptrdiff_t max_depth(const Node* n) {\n  if (n == nullptr) return 0;  // the empty tree has no nodes on any path\n  return 1 + std::max(max_depth(n->left.get()), max_depth(n->right.get()));\n}\n\nstruct Reached {\n  const Node* node = nullptr;\n  std::ptrdiff_t depth = 0;  // nodes from the root to this one, this one included\n};\n\n[[nodiscard]] std::ptrdiff_t max_depth_iterative(const Node* root) {\n  std::ptrdiff_t deepest = 0;\n  std::vector<Reached> pending;\n  if (root != nullptr) pending.push_back({.node = root, .depth = 1});\n  while (!pending.empty()) {\n    const Reached here = pending.back();\n    pending.pop_back();\n    deepest = std::max(deepest, here.depth);\n    if (here.node->left) pending.push_back({.node = here.node->left.get(), .depth = here.depth + 1});\n    if (here.node->right) pending.push_back({.node = here.node->right.get(), .depth = here.depth + 1});\n  }\n  return deepest;\n}\n\n// A chain of left children, built without recursion.\n[[nodiscard]] std::unique_ptr<Node> leaning(std::ptrdiff_t nodes) {\n  std::unique_ptr<Node> root;\n  for (std::ptrdiff_t i = 0; i < nodes; ++i) root = node(0, std::move(root));\n  return root;\n}\n\nint main() {\n  const std::unique_ptr<Node> tree = node(5, node(3, node(2, node(1)), node(4)), node(8, nullptr, node(9)));\n  const std::unique_ptr<Node> one = node(7);\n  std::cout << std::format(\"sample tree: {} recursive, {} iterative\\n\", max_depth(tree.get()),\n                           max_depth_iterative(tree.get()));\n  std::cout << std::format(\"empty tree:  {} recursive, {} iterative\\n\", max_depth(nullptr),\n                           max_depth_iterative(nullptr));\n  std::cout << std::format(\"one node:    {} recursive, {} iterative\\n\", max_depth(one.get()),\n                           max_depth_iterative(one.get()));\n  const std::unique_ptr<Node> chain = leaning(50'000);\n  std::cout << std::format(\"50000 left children: {} iterative\\n\", max_depth_iterative(chain.get()));\n}"
+      },
+      {
+       "t": "output",
+       "text": "sample tree: 4 recursive, 4 iterative\nempty tree:  0 recursive, 0 iterative\none node:    1 recursive, 1 iterative\n50000 left children: 50000 iterative"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both are O(n) time. The recursion uses O(h) stack, and the loop uses O(h) heap in "
+        },
+        {
+         "t": "code",
+         "v": "pending"
+        },
+        {
+         "t": "text",
+         "v": ", because a node is pushed when its parent is popped and the entries alive at any moment are the unexplored siblings along the current path. For the balanced case that is a few dozen entries. For the chain it is 50,000 of them, which is 16 bytes each in a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " rather than a frame each on an 8 MB stack."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The chain is the reason the loop is the version to ship. Run the recursive "
+        },
+        {
+         "t": "code",
+         "v": "max_depth"
+        },
+        {
+         "t": "text",
+         "v": " on that same chain, built the way this page's examples are built, and it crashes: on the machine these numbers come from it returned at 40,000 nodes and overflowed the stack at 41,000. Readings that arrive in time order are exactly the input that builds a chain when they go into an unbalanced tree, which the next topic measures. So the answer to the last part of the question is the loop, and the reason is the input the robot actually produces."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two details cost people the exercise. The base case has to be the null node rather than the leaf: writing "
+        },
+        {
+         "t": "code",
+         "v": "if (n->left == nullptr && n->right == nullptr) return 1;"
+        },
+        {
+         "t": "text",
+         "v": " and then recursing without a null test reads through a null child on any node with one child, and the sample tree has two of them. And "
+        },
+        {
+         "t": "code",
+         "v": "std::max"
+        },
+        {
+         "t": "text",
+         "v": " deduces one "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " from both of its arguments, so passing an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t"
+        },
+        {
+         "t": "text",
+         "v": " fails before any comparison happens: GCC 13 reports no matching call, then names the reason in the note underneath: "
+        },
+        {
+         "t": "code",
+         "v": "deduced conflicting types for parameter 'const _Tp' ('int' and 'std::ptrdiff_t' {aka 'long int'})"
+        },
+        {
+         "t": "text",
+         "v": ", whose two type names are the part that says what to change. Both types here are signed, so no sign conversion is involved and no warning flag is going to rescue it. Pick one integer type and use it through the function, "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t"
+        },
+        {
+         "t": "text",
+         "v": " here, which is what Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.102",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+        },
+        {
+         "t": "text",
+         "v": " asks for in arithmetic."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "levels(root)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the values of a binary tree one level at a time as a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::vector<int>>"
+        },
+        {
+         "t": "text",
+         "v": ", top level first and left to right within a level. The sample tree from the cold check gives "
+        },
+        {
+         "t": "code",
+         "v": "[5] [3 8] [2 4 9] [1]"
+        },
+        {
+         "t": "text",
+         "v": ", and the empty tree gives no levels at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The grouping is the point: a plain queue loop gives you the values in the right order but tells you nothing about where one level ends. Solve that without putting markers into the queue. Test the sample tree, the empty tree and a single node. Then, from the result and with no second traversal, produce the levels bottom to top, and the rightmost value of each level, which is what somebody standing to the right of the tree would see. Say what the time and the extra space are."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read "
+        },
+        {
+         "t": "code",
+         "v": "waiting.size()"
+        },
+        {
+         "t": "text",
+         "v": " before the level is drained. Whatever is in the queue at that moment is exactly one level, because the previous round put all of its children in and nothing else did:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <queue>\n#include <ranges>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int value, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(value, std::move(left), std::move(right));\n}\n\n[[nodiscard]] std::vector<std::vector<int>> levels(const Node* root) {\n  std::vector<std::vector<int>> out;\n  if (root == nullptr) return out;\n  std::queue<const Node*> waiting;\n  waiting.push(root);\n  while (!waiting.empty()) {\n    const std::ptrdiff_t width = std::ssize(waiting);  // the whole level, measured before it is drained\n    std::vector<int> level;\n    level.reserve(static_cast<std::size_t>(width));\n    for (std::ptrdiff_t i = 0; i < width; ++i) {\n      const Node* n = waiting.front();\n      waiting.pop();\n      level.push_back(n->value);\n      if (n->left) waiting.push(n->left.get());\n      if (n->right) waiting.push(n->right.get());\n    }\n    out.push_back(std::move(level));\n  }\n  return out;\n}\n\n[[nodiscard]] std::string show(std::span<const std::vector<int>> rows) {\n  std::string out;\n  for (const std::vector<int>& row : rows) {\n    std::string values;\n    for (const int v : row) values += std::format(\"{}{}\", values.empty() ? \"\" : \" \", v);\n    out += std::format(\"{}[{}]\", out.empty() ? \"\" : \" \", values);\n  }\n  return out.empty() ? \"(none)\" : out;\n}\n\nint main() {\n  const std::unique_ptr<Node> tree = node(5, node(3, node(2, node(1)), node(4)), node(8, nullptr, node(9)));\n  const std::vector<std::vector<int>> rows = levels(tree.get());\n  std::cout << std::format(\"sample  {}\\n\", show(rows));\n  std::cout << std::format(\"empty   {}\\n\", show(levels(nullptr)));\n  const std::unique_ptr<Node> one = node(7);\n  std::cout << std::format(\"one     {}\\n\", show(levels(one.get())));\n\n  std::vector<std::vector<int>> bottom_up = rows;\n  std::ranges::reverse(bottom_up);\n  std::cout << std::format(\"bottom  {}\\n\", show(bottom_up));\n\n  std::string rightmost;\n  for (const std::vector<int>& row : rows) rightmost += std::format(\"{}{}\", rightmost.empty() ? \"\" : \" \", row.back());\n  const auto widest = std::ranges::max_element(rows, {}, [](const std::vector<int>& row) { return row.size(); });\n  std::cout << std::format(\"right side {}, widest level {} nodes\\n\", rightmost, widest->size());\n}"
+      },
+      {
+       "t": "output",
+       "text": "sample  [5] [3 8] [2 4 9] [1]\nempty   (none)\none     [7]\nbottom  [1] [2 4 9] [3 8] [5]\nright side 5 8 9 1, widest level 3 nodes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time and O(w) extra space beyond the result, with w the widest level. The inner loop runs exactly "
+        },
+        {
+         "t": "code",
+         "v": "width"
+        },
+        {
+         "t": "text",
+         "v": " times, and every node pushed during it belongs to the next level, so the count taken before the loop is never stale. The alternative people write, pushing a null pointer as a level marker, works and has one more thing to get wrong at the end of the last level."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last two answers come out of the result rather than out of a second walk. Bottom to top is "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::reverse"
+        },
+        {
+         "t": "text",
+         "v": " on the copy. The right side is "
+        },
+        {
+         "t": "code",
+         "v": "row.back()"
+        },
+        {
+         "t": "text",
+         "v": " of each level, which is safe because "
+        },
+        {
+         "t": "code",
+         "v": "levels"
+        },
+        {
+         "t": "text",
+         "v": " never stores an empty level: a level exists only when a node was put into the queue for it. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::max_element"
+        },
+        {
+         "t": "text",
+         "v": " with a projection finds the widest level without a comparison lambda that unpacks both sides, which is the form the algorithms topic prefers ("
+        },
+        {
+         "t": "a",
+         "v": "ES.1",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "If the question had asked for the rightmost node of each level on a tree too large to hold the levels, the loop would track the last node of each level as it drains, and keep O(w) rather than O(n). Ask which of the two the caller needs before you pick."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "title": "Empty tree and skewed trees",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The empty tree is the cheap half of this section, and it is cheap because of one decision: every function on this page takes "
+        },
+        {
+         "t": "code",
+         "v": "const Node*"
+        },
+        {
+         "t": "text",
+         "v": " and tests it for null on entry. A node with one child then costs nothing extra, because the missing child arrives as "
+        },
+        {
+         "t": "code",
+         "v": "nullptr"
+        },
+        {
+         "t": "text",
+         "v": " at a function that expects it. The version that tests the children instead, "
+        },
+        {
+         "t": "code",
+         "v": "if (n->left != nullptr) recurse(n->left.get());"
+        },
+        {
+         "t": "text",
+         "v": ", needs the same test at every call site and in the caller of the root, and the sample tree's node 8, which has only a right child, is what catches the one you forget."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The skewed tree is the expensive half, and it breaks something that no traversal in your code can see. This program never calls a recursive function:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-overflow",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <utility>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\nint main() {\n  std::unique_ptr<Node> root;  // a chain of left children, built without recursion\n  for (std::ptrdiff_t i = 0; i < 1'000'000; ++i) root = std::make_unique<Node>(0, std::move(root), nullptr);\n  std::ptrdiff_t nodes = 0;\n  for (const Node* n = root.get(); n != nullptr; n = n->left.get()) ++nodes;  // counted with a loop\n  std::cout << std::format(\"built and counted {} nodes\\n\", nodes);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It builds the tree with a loop, counts it with a loop, and crashes at the closing brace of "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", where "
+        },
+        {
+         "t": "code",
+         "v": "root"
+        },
+        {
+         "t": "text",
+         "v": " is destroyed. AddressSanitizer reports a stack-overflow inside "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "'s destructor. This is the linked-list problem with a second link: "
+        },
+        {
+         "t": "code",
+         "v": "~Node"
+        },
+        {
+         "t": "text",
+         "v": " destroys its members, destroying "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " runs the next node's destructor from inside the current one, and a chain of a million nodes nests a million destructor calls. On the machine these numbers come from, with "
+        },
+        {
+         "t": "code",
+         "v": "ulimit -s"
+        },
+        {
+         "t": "text",
+         "v": " printing 8192, destroying such a chain worked at 58,000 nodes and crashed at 59,000 under the sanitizers. Any tree deeper than that is a crash in the destructor, whatever the traversals do, and the crash lands at a closing brace rather than at a line anyone would review."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A tree built by inserting sorted keys into a plain binary search tree "
+        },
+        {
+         "t": "i",
+         "v": "is"
+        },
+        {
+         "t": "text",
+         "v": " that chain, which is why this matters outside a demo. The repair is the one from the linked-list topic, in the class that owns the tree. Nothing may be destroyed until both of its links have been taken out of it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n// Owns a tree of nodes and takes it apart one node at a time.\nclass Tree {\n public:\n  Tree() = default;\n  Tree(const Tree&) = delete;\n  Tree& operator=(const Tree&) = delete;\n  Tree(Tree&&) noexcept = default;\n  Tree& operator=(Tree&& other) noexcept {\n    clear();  // the defaulted version would destroy the old tree recursively\n    root_ = std::move(other.root_);\n    return *this;\n  }\n  ~Tree() { clear(); }\n\n  void adopt(std::unique_ptr<Node> root) {\n    clear();\n    root_ = std::move(root);\n  }\n\n  // Rotates the left child up until the root has none, then drops the root and repeats.\n  // Every node dies with both links already empty, so no destructor calls another.\n  void clear() noexcept {\n    while (root_) {\n      if (root_->left) {\n        std::unique_ptr<Node> left = std::move(root_->left);\n        root_->left = std::move(left->right);\n        left->right = std::move(root_);\n        root_ = std::move(left);\n      } else {\n        std::unique_ptr<Node> right = std::move(root_->right);  // take the child out first\n        root_ = std::move(right);                               // then drop the root, which is now a leaf\n      }\n    }\n  }\n\n  [[nodiscard]] const Node* root() const { return root_.get(); }\n\n private:\n  std::unique_ptr<Node> root_;\n};\n\nstruct Reached {\n  const Node* node = nullptr;\n  std::ptrdiff_t depth = 0;\n};\n\n[[nodiscard]] std::ptrdiff_t max_depth_iterative(const Node* root) {\n  std::ptrdiff_t deepest = 0;\n  std::vector<Reached> pending;\n  if (root != nullptr) pending.push_back({.node = root, .depth = 1});\n  while (!pending.empty()) {\n    const Reached here = pending.back();\n    pending.pop_back();\n    deepest = std::max(deepest, here.depth);\n    if (here.node->left) pending.push_back({.node = here.node->left.get(), .depth = here.depth + 1});\n    if (here.node->right) pending.push_back({.node = here.node->right.get(), .depth = here.depth + 1});\n  }\n  return deepest;\n}\n\n[[nodiscard]] std::unique_ptr<Node> leaning(std::ptrdiff_t nodes) {\n  std::unique_ptr<Node> root;\n  for (std::ptrdiff_t i = 0; i < nodes; ++i) root = std::make_unique<Node>(0, std::move(root), nullptr);\n  return root;\n}\n\n[[nodiscard]] std::unique_ptr<Node> perfect(int height) {\n  std::vector<std::unique_ptr<Node>> level;\n  for (std::ptrdiff_t i = 0; i < (std::ptrdiff_t{1} << height); ++i)\n    level.push_back(std::make_unique<Node>(0, nullptr, nullptr));\n  while (std::ssize(level) > 1) {\n    std::vector<std::unique_ptr<Node>> parents;\n    for (std::ptrdiff_t i = 0; i < std::ssize(level); i += 2)\n      parents.push_back(std::make_unique<Node>(0, std::move(level[static_cast<std::size_t>(i)]),\n                                               std::move(level[static_cast<std::size_t>(i + 1)])));\n    level = std::move(parents);\n  }\n  return std::move(level.front());\n}\n\nint main() {\n  Tree chain;\n  chain.adopt(leaning(1'000'000));\n  std::cout << std::format(\"chain depth {}\\n\", max_depth_iterative(chain.root()));\n  Tree balanced;\n  balanced.adopt(perfect(16));\n  std::cout << std::format(\"perfect depth {}\\n\", max_depth_iterative(balanced.root()));\n  chain = std::move(balanced);\n  std::cout << std::format(\"after the move, depth {}\\n\", max_depth_iterative(chain.root()));\n}"
+      },
+      {
+       "t": "output",
+       "text": "chain depth 1000000\nperfect depth 17\nafter the move, depth 17"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "clear()"
+        },
+        {
+         "t": "text",
+         "v": " walks the tree apart with rotations and no memory of its own. While the root has a left child, that child is rotated up: it becomes the root, and the old root becomes its right child, carrying whatever the new root had on its right. That shortens the left spine by one node per turn. When the root has no left child, it has at most a right child, which is moved into a local first, so the root is dropped with both links empty and its destructor goes no deeper. Each node is rotated at most once and dropped once, so the loop is O(n) time and O(1) extra space, and it stays "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": ", which the destructor needs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Moving the right child through a local rather than writing "
+        },
+        {
+         "t": "code",
+         "v": "root_ = std::move(root_->right)"
+        },
+        {
+         "t": "text",
+         "v": " is the same rule as in the linked-list topic. A "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " move assignment resets the target first, which destroys the old root, and then assigns the deleter from the source, which is a member of the object it has already destroyed ("
+        },
+        {
+         "t": "a",
+         "v": "unique.ptr.single.asgn",
+         "href": "https://eel.is/c++draft/unique.ptr.single.asgn"
+        },
+        {
+         "t": "text",
+         "v": "). With "
+        },
+        {
+         "t": "code",
+         "v": "std::default_delete"
+        },
+        {
+         "t": "text",
+         "v": " nothing is read and the sanitizers stay quiet, and with a stateful deleter it is a use-after-free."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Declaring the destructor turns off the implicit move operations, so "
+        },
+        {
+         "t": "code",
+         "v": "Tree"
+        },
+        {
+         "t": "text",
+         "v": " declares all five special members ("
+        },
+        {
+         "t": "a",
+         "v": "C.21",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+        },
+        {
+         "t": "text",
+         "v": "), and the move assignment clears before it takes the other tree, because the defaulted one would destroy the old million-node chain recursively on that line. The last two lines of "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " are the test for exactly that: a "
+        },
+        {
+         "t": "code",
+         "v": "Tree"
+        },
+        {
+         "t": "text",
+         "v": " holding a chain of a million nodes is move-assigned a different tree, and nothing crashes."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the three depth-first orders on the sample tree and say what moves between them. Say which traversal answers which question, with one example each. Say why level order needs a queue and how you group the output by level. Give the time of all four traversals and the space of depth-first and level order, with the measured numbers for the perfect tree and the chain of 2047, saying which walker each stack number belongs to. Say what the base case of a tree recursion should be and why. Say why destroying a deep tree of "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " nodes crashes, at what depth it did, and what the rotating "
+        },
+        {
+         "t": "code",
+         "v": "clear()"
+        },
+        {
+         "t": "text",
+         "v": " does differently."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Give pre-order, in-order, post-order and level order of the tree in the cold check, from memory."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which traversal would you use to serialise a tree, to validate a BST, to compute its height, and to find the shallowest leaf?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is there no recursive level-order traversal, and which container does the iterative one need?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A tree has 2047 nodes. Give the widest level-order queue, and the deepest stack of both the cold check's plain walker and the worked example's frame walker, when the tree is perfect and when it is a chain."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In the iterative walker, why are the children pushed in the reverse of the order they are visited?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How do you take a whole level out of the queue without putting markers into it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a tree of "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " children crash when it is destroyed, and what does the fixed "
+     },
+     {
+      "t": "code",
+      "v": "clear()"
+     },
+     {
+      "t": "text",
+      "v": " do instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Re-solve in 15 minutes: maximum depth, once recursively and once with your own stack."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Herb Sutter, Leak-Freedom in C++... By Default, CppCon 2016: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2016/blob/master/Presentations/Lifetime%20Safety%20By%20Default%20-%20Making%20Code%20Leak-Free%20by%20Construction/Lifetime%20Safety%20By%20Default%20-%20Making%20Code%20Leak-Free%20by%20Construction%20-%20Herb%20Sutter%20-%20CppCon%202016.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=JfmTagWcqoE"
+     },
+     {
+      "t": "text",
+      "v": ". Trees owned by "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", and why their destruction is recursive by default."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: C++ Smart Pointers, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/Olsen-Smart-Pointers-CppCon22.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=YokY6HzLkXs"
+     },
+     {
+      "t": "text",
+      "v": ". Owning links against non-owning raw pointers."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Functions, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/Back_to_Basics_Functions_cppcon_2023.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=CpHX1Du5R0Q"
+     },
+     {
+      "t": "text",
+      "v": ". What a call frame holds, which is what the explicit stack has to carry instead."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Amir Kirsh and Adam Segoli Schubert, Back to Basics: Algorithmic Complexity, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Algorithmic_Complexity.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=AY2FqpDCBGs"
+     },
+     {
+      "t": "text",
+      "v": ". Counting a traversal's work, and the recursion stack as extra space."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": " on raw pointers owning nothing, "
+     },
+     {
+      "t": "a",
+      "v": "R.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-owner"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "R.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-use-ptr"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+     },
+     {
+      "t": "text",
+      "v": " on the five special members, "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": " on preferring the library, and "
+     },
+     {
+      "t": "a",
+      "v": "ES.102",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+     },
+     {
+      "t": "text",
+      "v": " on using signed types for arithmetic."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The C++ standard on "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " move assignment, "
+     },
+     {
+      "t": "a",
+      "v": "unique.ptr.single.asgn",
+      "href": "https://eel.is/c++draft/unique.ptr.single.asgn"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::queue",
+      "href": "https://en.cppreference.com/cpp/container/queue"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::deque",
+      "href": "https://en.cppreference.com/cpp/container/deque"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "unique_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ranges::max_element",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/max_element"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Wikipedia on "
+     },
+     {
+      "t": "a",
+      "v": "tree traversal",
+      "href": "https://en.wikipedia.org/wiki/Tree_traversal"
+     },
+     {
+      "t": "text",
+      "v": ", whose section on threading describes the Morris in-order walk in O(1) extra space."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,3641 @@
+{
+ "id": "cpp-memory-bugs",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Each program below has one bug. Without running anything, name the bug and the tool that would report it. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "std::vector<int> ids{1, 2, 3};\nconst int& first = ids[0];\nids.push_back(4);\nstd::cout << first << '\\n';"
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "struct Buffer {\n  int* data;\n  explicit Buffer(std::size_t n) : data(new int[n]{}) {}\n  ~Buffer() { delete[] data; }\n};\nconst Buffer a(4);\nconst Buffer b = a;"
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "int readings[4] = {1, 2, 3, 4};\nint sum = 0;\nfor (int i = 0; i <= 4; ++i) sum += readings[i];"
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "int speed = std::numeric_limits<int>::max();\nspeed += argc;"
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The first reads freed memory. "
+     },
+     {
+      "t": "code",
+      "v": "ids"
+     },
+     {
+      "t": "text",
+      "v": " holds three elements with room for three, so "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " allocates a bigger block, moves the elements and frees the old block, and "
+     },
+     {
+      "t": "code",
+      "v": "first"
+     },
+     {
+      "t": "text",
+      "v": " still refers into it. AddressSanitizer reports a heap-use-after-free:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "asan:heap-use-after-free",
+    "text": "#include <iostream>\n#include <vector>\n\nint main() {\n  std::vector<int> ids{1, 2, 3};\n  const int& first = ids[0];\n  ids.push_back(4);\n  std::cout << first << '\\n';\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The second deletes the same array twice. The compiler-generated copy constructor copies the pointer, so "
+     },
+     {
+      "t": "code",
+      "v": "a"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "b"
+     },
+     {
+      "t": "text",
+      "v": " both own it, and both destructors delete it. AddressSanitizer reports an attempted double free. The raw "
+     },
+     {
+      "t": "code",
+      "v": "new[]"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "delete[]"
+     },
+     {
+      "t": "text",
+      "v": " are in this example on purpose, because they are the bug: with a "
+     },
+     {
+      "t": "code",
+      "v": "std::vector<int>"
+     },
+     {
+      "t": "text",
+      "v": " member instead, the generated copy would copy the elements, and each object would free only its own."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "asan:attempting double-free",
+    "text": "#include <cstddef>\n\nstruct Buffer {\n  int* data;\n  explicit Buffer(std::size_t n) : data(new int[n]{}) {}\n  ~Buffer() { delete[] data; }\n};\n\nint main() {\n  const Buffer a(4);\n  const Buffer b = a;\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The third reads one element past the end of the array, because the loop runs while "
+     },
+     {
+      "t": "code",
+      "v": "i <= 4"
+     },
+     {
+      "t": "text",
+      "v": ". With both sanitizers on, UBSan reports it first. Its bounds check covers indexing into a built-in array whose size the compiler knows, and that is why this example keeps the dated "
+     },
+     {
+      "t": "code",
+      "v": "int readings[4]"
+     },
+     {
+      "t": "text",
+      "v": ". With AddressSanitizer alone, the report is a stack-buffer-overflow. Either tool counts as a right answer:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "ubsan:index 4 out of bounds for type 'int [4]'",
+    "text": "#include <iostream>\n\nint main() {\n  int readings[4] = {1, 2, 3, 4};\n  int sum = 0;\n  for (int i = 0; i <= 4; ++i) sum += readings[i];\n  std::cout << sum << '\\n';\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "In code of your own, the readings would sit in a "
+     },
+     {
+      "t": "code",
+      "v": "std::array"
+     },
+     {
+      "t": "text",
+      "v": ". Measured with GCC 13, UBSan doesn't report the same off-by-one there, AddressSanitizer still reports it as a stack-buffer-overflow, and a build with "
+     },
+     {
+      "t": "code",
+      "v": "-D_GLIBCXX_ASSERTIONS"
+     },
+     {
+      "t": "text",
+      "v": " makes "
+     },
+     {
+      "t": "code",
+      "v": "std::array"
+     },
+     {
+      "t": "text",
+      "v": "'s "
+     },
+     {
+      "t": "code",
+      "v": "operator[]"
+     },
+     {
+      "t": "text",
+      "v": " check the index itself and stop the program ("
+     },
+     {
+      "t": "a",
+      "v": "libstdc++ macros",
+      "href": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_macros.html"
+     },
+     {
+      "t": "text",
+      "v": ")."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The fourth overflows a signed integer. "
+     },
+     {
+      "t": "code",
+      "v": "speed"
+     },
+     {
+      "t": "text",
+      "v": " starts at the largest "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "code",
+      "v": "argc"
+     },
+     {
+      "t": "text",
+      "v": " is 1 when the program is started without arguments. Signed overflow is undefined behaviour, and UndefinedBehaviorSanitizer reports it:"
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "ubsan:signed integer overflow",
+    "text": "#include <iostream>\n#include <limits>\n\nint main(int argc, char**) {\n  int speed = std::numeric_limits<int>::max();\n  speed += argc;\n  std::cout << speed << '\\n';\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you named all four bugs and their tools. Getting the bugs right but not the tools is a partial pass, and missing a bug is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Undefined behaviour is what the C++ standard leaves unsaid about what a program does next, and it lets the compiler assume the behaviour never happens at all. Signed overflow is one example. A check like "
+    },
+    {
+     "t": "code",
+     "v": "x + 1 < x"
+    },
+    {
+     "t": "text",
+     "v": ", meant to catch an "
+    },
+    {
+     "t": "code",
+     "v": "int"
+    },
+    {
+     "t": "text",
+     "v": " about to wrap, compiles away, because the compiler may assume "
+    },
+    {
+     "t": "code",
+     "v": "x + 1"
+    },
+    {
+     "t": "text",
+     "v": " never overflows and folds the comparison to false. Most undefined behaviour you meet day to day is one of five memory bugs: reading memory after it's freed or after its scope ends, reading or writing past the end of a buffer, freeing the same pointer twice, reading a variable nobody set, and an owner that never releases what it holds, which is a leak."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that none of this shows up as a compile error and often not even as a wrong answer. A "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " that reallocates frees its old block silently, so a reference taken before the "
+    },
+    {
+     "t": "code",
+     "v": "push_back"
+    },
+    {
+     "t": "text",
+     "v": " reads freed memory afterwards and, without a sanitizer, may still print a plausible number."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The tools name what the language leaves silent. AddressSanitizer catches a use after free, a double free and most out-of-bounds accesses at the moment they happen, and it prints which region was touched and where it was allocated and freed. UndefinedBehaviorSanitizer catches the arithmetic and pointer mistakes, such as the overflow above, that stay silent even under AddressSanitizer. Both are compiler flags: "
+    },
+    {
+     "t": "code",
+     "v": "-fsanitize=address,undefined"
+    },
+    {
+     "t": "text",
+     "v": ". GDB steps through a program that already crashed or is misbehaving: "
+    },
+    {
+     "t": "code",
+     "v": "break"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "run"
+    },
+    {
+     "t": "text",
+     "v": " stop it at a line, "
+    },
+    {
+     "t": "code",
+     "v": "backtrace"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "frame"
+    },
+    {
+     "t": "text",
+     "v": " show the call chain, and "
+    },
+    {
+     "t": "code",
+     "v": "print"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "watch"
+    },
+    {
+     "t": "text",
+     "v": " show or trap a value changing."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What the sanitizers cost you is a false sense of coverage: they only report the line that actually ran, so a bug on a path no test takes stays invisible, and reading uninitialised memory is one that GCC's own sanitizers mostly miss."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in the robot itself: a lambda that captures a counter by reference, the shape callbacks take in event-driven and ROS code, can quietly rewire a write meant for a trip counter onto a battery reading, and only a watchpoint finds it, because a search for the field's name finds nothing. It is also the shape of the interview question on this page: naming the bug and the tool that would catch it from a plain reading of ten lines of code."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "ub",
+   "title": "What undefined behaviour is; the five common memory bugs",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This function is meant to detect that adding 1 would overflow:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "ubsan:signed integer overflow",
+       "text": "#include <format>\n#include <iostream>\n#include <limits>\n\n[[nodiscard]] bool will_overflow(int x) { return x + 1 < x; }\n\nint main(int argc, char**) {\n  const int big = std::numeric_limits<int>::max() - 1 + argc;  // the largest int, but the compiler can't know that\n  std::cout << std::format(\"{}\\n\", will_overflow(big));\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Built without sanitizers, GCC 13 prints "
+        },
+        {
+         "t": "code",
+         "v": "false"
+        },
+        {
+         "t": "text",
+         "v": " for the largest "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " and at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " alike. It rewrites "
+        },
+        {
+         "t": "code",
+         "v": "x + 1 < x"
+        },
+        {
+         "t": "text",
+         "v": " as "
+        },
+        {
+         "t": "code",
+         "v": "false"
+        },
+        {
+         "t": "text",
+         "v": ", because signed overflow is "
+        },
+        {
+         "t": "i",
+         "v": "undefined behaviour"
+        },
+        {
+         "t": "text",
+         "v": " and the compiler may assume it never happens. So the check can never fire. With UBSan, the addition stays in the program and is reported, as above. "
+        },
+        {
+         "t": "code",
+         "v": "argc"
+        },
+        {
+         "t": "text",
+         "v": " is in the calculation so that the compiler can't work out "
+        },
+        {
+         "t": "code",
+         "v": "big"
+        },
+        {
+         "t": "text",
+         "v": " while it compiles."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That is the practical meaning of undefined behaviour. The standard places no requirements on a program that does it ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/language/ub"
+        },
+        {
+         "t": "text",
+         "v": "), and compilers use that freedom to optimise. A valid program never overflows a signed integer, never reads past the end of an array and never dereferences a null pointer, so the compiler takes those as facts: it deletes checks that could only fire after undefined behaviour, reorders code, and assumes pointers are valid. Fedor Pikus's CppCon 2023 "
+        },
+        {
+         "t": "a",
+         "v": "talk on undefined behaviour",
+         "href": "https://www.youtube.com/watch?v=k9N8OrhrSZw"
+        },
+        {
+         "t": "text",
+         "v": " shows a check of this kind folded away for the same reason. The result is usually not a crash at the bug. It is a program that seems to work, then fails somewhere else, or only with other flags, or only on another compiler. One of the points of Greg Law's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on debugging",
+         "href": "https://www.youtube.com/watch?v=qgszy9GquRs"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2023) is to think about the time between the bug and the failure. A sanitizer shrinks that time to nothing, because it stops the program at the bad operation itself."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A working check compares before it adds, so the addition runs only when it can't overflow. Written with "
+        },
+        {
+         "t": "code",
+         "v": "std::numeric_limits"
+        },
+        {
+         "t": "text",
+         "v": ", it is portable C++, and "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " gives the case with no answer a type of its own:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <limits>\n#include <optional>\n\n// a + b, or nothing when the sum doesn't fit in an int. It compares before it adds,\n// so the addition only runs when it can't overflow.\n[[nodiscard]] constexpr std::optional<int> checked_add(int a, int b) {\n  constexpr int max = std::numeric_limits<int>::max();\n  constexpr int min = std::numeric_limits<int>::min();\n  if (b > 0 && a > max - b) return std::nullopt;\n  if (b < 0 && a < min - b) return std::nullopt;\n  return a + b;\n}\n\n// The compiler runs these calls, and it must reject undefined behaviour while it does.\nstatic_assert(checked_add(std::numeric_limits<int>::max() - 1, 1) == std::numeric_limits<int>::max());\nstatic_assert(!checked_add(std::numeric_limits<int>::max(), 1));\nstatic_assert(!checked_add(std::numeric_limits<int>::min(), -1));\n\nint main() {\n  const int speed = std::numeric_limits<int>::max() - 1;\n  for (const int step : {1, 2}) {\n    if (const auto next = checked_add(speed, step)) {\n      std::cout << std::format(\"{} + {} = {}\\n\", speed, step, *next);\n    } else {\n      std::cout << std::format(\"{} + {} does not fit in an int\\n\", speed, step);\n    }\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "2147483646 + 1 = 2147483647\n2147483646 + 2 does not fit in an int"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "max - b"
+        },
+        {
+         "t": "text",
+         "v": " can't overflow when "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " is positive, and "
+        },
+        {
+         "t": "code",
+         "v": "min - b"
+        },
+        {
+         "t": "text",
+         "v": " can't overflow when "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " is negative, so each comparison is safe on its own. GCC and Clang also offer "
+        },
+        {
+         "t": "code",
+         "v": "__builtin_add_overflow(a, b, &sum)"
+        },
+        {
+         "t": "text",
+         "v": ", which stores the sum and returns "
+        },
+        {
+         "t": "code",
+         "v": "true"
+        },
+        {
+         "t": "text",
+         "v": " when the stored value differs from the exact result ("
+        },
+        {
+         "t": "a",
+         "v": "GCC's overflow builtins",
+         "href": "https://gcc.gnu.org/onlinedocs/gcc/Integer-Overflow-Builtins.html"
+        },
+        {
+         "t": "text",
+         "v": "). It is shorter, but it is an extension of those two compilers, not standard C++."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": " lines are more than tests. During constant evaluation, the compiler must refuse an expression with undefined behaviour instead of assuming it away, so each passing line also proves that its call doesn't overflow. The broken check from the top of this section can't pass such a test. Evaluated by the compiler for the largest "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", it stops the build, although at run time it quietly returns "
+        },
+        {
+         "t": "code",
+         "v": "false"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "overflow in constant expression",
+       "text": "#include <limits>\n\n[[nodiscard]] constexpr bool will_overflow(int x) { return x + 1 < x; }\n\nstatic_assert(will_overflow(std::numeric_limits<int>::max()));\n\nint main() {}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Most undefined behaviour you will meet in C++ is one of the memory bugs in this table, a signed overflow or a data race:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Bug"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Typical cause"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What reports it"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Use after free or after scope"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a reference, pointer or view outlives its owner; a vector reallocates"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "AddressSanitizer"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Out-of-bounds access"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "an off-by-one loop; a wrong size passed to a buffer"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "AddressSanitizer; UBSan too, for built-in arrays whose size the compiler knows"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Double free, or mismatched "
+          },
+          {
+           "t": "code",
+           "v": "new[]"
+          },
+          {
+           "t": "text",
+           "v": " and "
+          },
+          {
+           "t": "code",
+           "v": "delete"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "two objects own one pointer"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "AddressSanitizer"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Read of uninitialised memory"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a variable set on only some paths"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "-Wuninitialized"
+          },
+          {
+           "t": "text",
+           "v": " and "
+          },
+          {
+           "t": "code",
+           "v": "-Wmaybe-uninitialized"
+          },
+          {
+           "t": "text",
+           "v": " in some cases; Valgrind; Clang's MemorySanitizer; not the GCC sanitizers"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Leak"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "an owner that never releases"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "LeakSanitizer, which runs with AddressSanitizer on Linux"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Signed overflow, null dereference, bad shift"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "arithmetic and pointer mistakes"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "UndefinedBehaviorSanitizer"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Data race"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "two threads touch the same object, at least one writes, no lock"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "ThreadSanitizer, in a separate build"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer and UndefinedBehaviorSanitizer are compiler options: "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=address,undefined"
+        },
+        {
+         "t": "text",
+         "v": ", with "
+        },
+        {
+         "t": "code",
+         "v": "-g"
+        },
+        {
+         "t": "text",
+         "v": " so that reports name files and lines. The "
+        },
+        {
+         "t": "a",
+         "v": "AddressSanitizer documentation",
+         "href": "https://clang.llvm.org/docs/AddressSanitizer.html"
+        },
+        {
+         "t": "text",
+         "v": " gives its typical slowdown as 2 times, and it uses more memory, which is fine for tests and development builds. By default UBSan prints its report and lets the program carry on. "
+        },
+        {
+         "t": "code",
+         "v": "-fno-sanitize-recover=all"
+        },
+        {
+         "t": "text",
+         "v": " makes it stop at the first error with a non-zero exit status, so that a test fails ("
+        },
+        {
+         "t": "a",
+         "v": "GCC instrumentation options",
+         "href": "https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html"
+        },
+        {
+         "t": "text",
+         "v": "). The examples on this page are built with "
+        },
+        {
+         "t": "code",
+         "v": "-std=c++20 -Wall -Wextra -g -fsanitize=address,undefined -fno-sanitize-recover=all"
+        },
+        {
+         "t": "text",
+         "v": ", and the ones without a planted bug also with "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "asan-report",
+   "title": "Reading an ASan report line by line",
+   "steps": [
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the report for the first cold-check program, saved as "
+        },
+        {
+         "t": "code",
+         "v": "invalidate.cpp"
+        },
+        {
+         "t": "text",
+         "v": ". It is trimmed of the frames inside the C library and of the shadow-byte map at the end, and the addresses and "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": "'s allocator arguments are shortened:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "==22732==ERROR: AddressSanitizer: heap-use-after-free on address 0x... at pc 0x... bp 0x... sp 0x...\nREAD of size 4 at 0x... thread T0\n    #0 0x... in main invalidate.cpp:8\n\n0x... is located 0 bytes inside of 12-byte region [0x...,0x...)\nfreed by thread T0 here:\n    #0 0x... in operator delete(void*, unsigned long)\n    ...\n    #5 0x... in std::vector<int>::_M_realloc_insert<int>(...) /usr/include/c++/13/bits/vector.tcc:519\n    #6 0x... in std::vector<int>::emplace_back<int>(int&&) /usr/include/c++/13/bits/vector.tcc:123\n    #7 0x... in std::vector<int>::push_back(int&&) /usr/include/c++/13/bits/stl_vector.h:1299\n    #8 0x... in main invalidate.cpp:7\n\npreviously allocated by thread T0 here:\n    #0 0x... in operator new(unsigned long)\n    ...\n    #6 0x... in std::vector<int>::vector(std::initializer_list<int>, ...) /usr/include/c++/13/bits/stl_vector.h:682\n    #7 0x... in main invalidate.cpp:5\n\nSUMMARY: AddressSanitizer: heap-use-after-free invalidate.cpp:8 in main"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read it in three parts, from the top."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first line names the kind of bug, here a heap-use-after-free. The stack under it says where the bad access happened: a 4-byte read, an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " at line 8. That is the line that prints "
+        },
+        {
+         "t": "code",
+         "v": "first"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The line starting \"is located\" says which block the address belongs to: the first byte of a 12-byte block, which is three "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": "s. \"freed by thread T0 here\" shows who released that block. Read that stack from the bottom up, starting with your own code: "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " at line 7 called "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": ", which called "
+        },
+        {
+         "t": "code",
+         "v": "_M_realloc_insert"
+        },
+        {
+         "t": "text",
+         "v": ", which freed the old storage. The frames inside "
+        },
+        {
+         "t": "code",
+         "v": "/usr/include/c++/13"
+        },
+        {
+         "t": "text",
+         "v": " are the library's own code, and you almost never need to read them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "\"previously allocated by\" shows where the block came from: the vector's constructor at line 5."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So the whole story fits in one sentence. The vector allocated three ints at line 5, freed them while growing at line 7, and line 8 read the old block through a reference taken before the growth. The fix is to take the reference after the last "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": ", or to keep an index instead of a reference."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The access stack doesn't always start in your own file. When a library function does the read, frame #0 is in the library's header, and your code appears further down. "
+        },
+        {
+         "t": "code",
+         "v": "std::format"
+        },
+        {
+         "t": "text",
+         "v": " is such a function, because it takes its arguments by reference. The cold-check program prints with "
+        },
+        {
+         "t": "code",
+         "v": "<<"
+        },
+        {
+         "t": "text",
+         "v": ", which takes the "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " by value, so its read happens in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ". Exercise 1 below gives a report of the other kind."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "planted",
+   "title": "Find and fix: iterator invalidation, double delete, uninitialised read, signed overflow",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build this with "
+        },
+        {
+         "t": "code",
+         "v": "g++ -std=c++20 -g -fsanitize=address,undefined"
+        },
+        {
+         "t": "text",
+         "v": " and run it. From the report, find the cause and fix the program so that it prints 1, 3 and 5. Take 25 minutes."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <ranges>\n#include <vector>\n\nstruct Waypoint {\n  int id;\n};\n\nint main() {\n  std::vector<Waypoint> route;\n  std::vector<const Waypoint*> marked;\n  for (const int id : std::views::iota(1, 6)) {\n    route.push_back({.id = id});\n    if (id % 2 == 1) marked.push_back(&route.back());\n  }\n  for (const Waypoint* w : marked) std::cout << std::format(\"{}\\n\", w->id);\n}"
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pointers in "
+        },
+        {
+         "t": "code",
+         "v": "marked"
+        },
+        {
+         "t": "text",
+         "v": " point into "
+        },
+        {
+         "t": "code",
+         "v": "route"
+        },
+        {
+         "t": "text",
+         "v": "'s storage, and later "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " calls reallocate it. The READ stack starts inside "
+        },
+        {
+         "t": "code",
+         "v": "<format>"
+        },
+        {
+         "t": "text",
+         "v": ", where "
+        },
+        {
+         "t": "code",
+         "v": "std::format"
+        },
+        {
+         "t": "text",
+         "v": " reads "
+        },
+        {
+         "t": "code",
+         "v": "w->id"
+        },
+        {
+         "t": "text",
+         "v": " through the reference it was given, and the first frame in your own file is "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " at line 17, the printing loop. The \"freed by\" stack ends in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " at line 14, the "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " inside the first loop. Storing indices instead of pointers fixes it, because an index stays valid when the vector moves its elements:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <ranges>\n#include <vector>\n\nstruct Waypoint {\n  int id;\n};\n\nint main() {\n  std::vector<Waypoint> route;\n  std::vector<std::ptrdiff_t> marked;  // indices into route, which stay valid when it grows\n  for (const int id : std::views::iota(1, 6)) {\n    route.push_back({.id = id});\n    if (id % 2 == 1) marked.push_back(std::ssize(route) - 1);\n  }\n  for (const std::ptrdiff_t i : marked) std::cout << std::format(\"{}\\n\", route[i].id);\n}"
+      },
+      {
+       "t": "output",
+       "text": "1\n3\n5"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "route.reserve(5)"
+        },
+        {
+         "t": "text",
+         "v": " before the loop would also stop the crash, but only for as long as nobody changes the 5. Taking the pointers after the last "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " works as long as "
+        },
+        {
+         "t": "code",
+         "v": "route"
+        },
+        {
+         "t": "text",
+         "v": " never grows again. The index version is correct for any number of waypoints."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Same task. This "
+        },
+        {
+         "t": "code",
+         "v": "Scan"
+        },
+        {
+         "t": "text",
+         "v": " class holds laser ranges in a buffer it allocates itself. Find the bug from the report and fix it. The fixed program must print "
+        },
+        {
+         "t": "code",
+         "v": "2.5 1.5"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:attempting double-free",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n\nclass Scan {\n public:\n  explicit Scan(std::ptrdiff_t n) : ranges_(new double[static_cast<std::size_t>(n)]{}) {}\n  ~Scan() { delete[] ranges_; }\n\n  [[nodiscard]] double& operator[](std::ptrdiff_t i) { return ranges_[static_cast<std::size_t>(i)]; }\n  [[nodiscard]] double operator[](std::ptrdiff_t i) const { return ranges_[static_cast<std::size_t>(i)]; }\n\n private:\n  double* ranges_;\n};\n\nint main() {\n  Scan latest(2);\n  latest[0] = 2.5;\n  latest[1] = 1.5;\n  const Scan saved = latest;\n  std::cout << std::format(\"{} {}\\n\", saved[0], saved[1]);\n}"
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "const Scan saved = latest;"
+        },
+        {
+         "t": "text",
+         "v": " uses the copy constructor the compiler wrote, which copies the pointer. Both objects then delete the same array. The report shows it: the second free and the \"freed by\" stack are both "
+        },
+        {
+         "t": "code",
+         "v": "~Scan"
+        },
+        {
+         "t": "text",
+         "v": " at line 8, called from the closing brace of "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", and \"previously allocated\" names a single allocation, in the constructor that line 18 calls for "
+        },
+        {
+         "t": "code",
+         "v": "latest"
+        },
+        {
+         "t": "text",
+         "v": ". Two destructors, one allocation."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The raw "
+        },
+        {
+         "t": "code",
+         "v": "new[]"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "delete[]"
+        },
+        {
+         "t": "text",
+         "v": " are in this exercise on purpose, because they are the bug. Code written today doesn't call them (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "R.11",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-newdelete"
+        },
+        {
+         "t": "text",
+         "v": "). The fix lets a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " own the memory. Then copying a "
+        },
+        {
+         "t": "code",
+         "v": "Scan"
+        },
+        {
+         "t": "text",
+         "v": " copies the ranges, and nothing is deleted twice:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <vector>\n\nclass Scan {\n public:\n  explicit Scan(std::ptrdiff_t n) : ranges_(static_cast<std::size_t>(n)) {}\n\n  [[nodiscard]] double& operator[](std::ptrdiff_t i) { return ranges_[static_cast<std::size_t>(i)]; }\n  [[nodiscard]] double operator[](std::ptrdiff_t i) const { return ranges_[static_cast<std::size_t>(i)]; }\n\n private:\n  std::vector<double> ranges_;\n};\n\nint main() {\n  Scan latest(2);\n  latest[0] = 2.5;\n  latest[1] = 1.5;\n  const Scan saved = latest;\n  std::cout << std::format(\"{} {}\\n\", saved[0], saved[1]);\n}"
+      },
+      {
+       "t": "output",
+       "text": "2.5 1.5"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Scan"
+        },
+        {
+         "t": "text",
+         "v": " now declares no destructor and no copy or move operations, because its one member manages itself. That is the rule of zero (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "C.20",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-zero"
+        },
+        {
+         "t": "text",
+         "v": "), which the RAII topic, next in this track, builds on. "
+        },
+        {
+         "t": "code",
+         "v": "saved[0]"
+        },
+        {
+         "t": "text",
+         "v": " calls the "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " overload of "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": ", because "
+        },
+        {
+         "t": "code",
+         "v": "saved"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ". Without that overload, the line wouldn't compile."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This function averages wheel encoder samples, and returns "
+        },
+        {
+         "t": "code",
+         "v": "std::nullopt"
+        },
+        {
+         "t": "text",
+         "v": " when there are none. Build it the same way and run it. From the report, find the cause and fix the function so that it prints the right average for these samples, which is 1000000000. It must still return "
+        },
+        {
+         "t": "code",
+         "v": "std::nullopt"
+        },
+        {
+         "t": "text",
+         "v": " for an empty span."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "ubsan:signed integer overflow",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <numeric>\n#include <optional>\n#include <span>\n#include <vector>\n\n// The mean of the encoder samples, or nothing when there are none.\n[[nodiscard]] std::optional<std::int64_t> average(std::span<const int> samples) {\n  if (samples.empty()) return std::nullopt;\n  const std::int64_t sum = std::accumulate(samples.begin(), samples.end(), 0);\n  return sum / std::ssize(samples);\n}\n\nint main() {\n  const std::vector<int> samples(3, 1'000'000'000);\n  if (const auto mean = average(samples)) std::cout << std::format(\"{}\\n\", *mean);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer one more question. An earlier version of the function summed the samples in a loop and forgot the initial value. Does it compile under "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra -Werror"
+        },
+        {
+         "t": "text",
+         "v": "? Try it at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " and at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "[[nodiscard]] std::optional<std::int64_t> average(std::span<const int> samples) {\n  if (samples.empty()) return std::nullopt;\n  std::int64_t sum;\n  for (const int s : samples) sum += s;\n  return sum / std::ssize(samples);\n}"
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "UBSan's report points into the standard library, not at your code:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "/usr/include/c++/13/bits/stl_numeric.h:141:39: runtime error: signed integer overflow: 2000000000 + 1000000000 cannot be represented in type 'int'"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The values and the type tell you what happened: an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " held two billion and had one billion added to it. Without "
+        },
+        {
+         "t": "code",
+         "v": "-fno-sanitize-recover=all"
+        },
+        {
+         "t": "text",
+         "v": ", UBSan then lets the program carry on, and it prints a wrong average, -431655765, and exits with status 0, which a test runner would count as a pass. To find the caller, run it again with "
+        },
+        {
+         "t": "code",
+         "v": "UBSAN_OPTIONS=print_stacktrace=1"
+        },
+        {
+         "t": "text",
+         "v": ", which makes UBSan print the stack as ASan does. Frame #0 is "
+        },
+        {
+         "t": "code",
+         "v": "std::accumulate"
+        },
+        {
+         "t": "text",
+         "v": ", and frame #1 is "
+        },
+        {
+         "t": "code",
+         "v": "average"
+        },
+        {
+         "t": "text",
+         "v": " at line 13."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The cause is the "
+        },
+        {
+         "t": "code",
+         "v": "0"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "std::accumulate"
+        },
+        {
+         "t": "text",
+         "v": " adds in the type of its initial value, not in the type of the variable that receives the result ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/algorithm/accumulate"
+        },
+        {
+         "t": "text",
+         "v": "), and "
+        },
+        {
+         "t": "code",
+         "v": "0"
+        },
+        {
+         "t": "text",
+         "v": " is an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ". So the sum overflows inside the call, and storing it in a "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " afterwards comes too late. Give the initial value the type the sum needs, "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t{0}"
+        },
+        {
+         "t": "text",
+         "v": ". Encoder counts are exact and can outgrow an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " over a long run, so the fixed version also takes them as "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": ", the width the Test Bench's "
+        },
+        {
+         "t": "code",
+         "v": "Ticks"
+        },
+        {
+         "t": "text",
+         "v": " uses:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <numeric>\n#include <optional>\n#include <span>\n#include <vector>\n\n// The mean of the encoder samples, or nothing when there are none.\n[[nodiscard]] std::optional<std::int64_t> average(std::span<const std::int64_t> samples) {\n  if (samples.empty()) return std::nullopt;\n  return std::accumulate(samples.begin(), samples.end(), std::int64_t{0}) / std::ssize(samples);\n}\n\nint main() {\n  const std::vector<std::int64_t> samples(3, 1'000'000'000);\n  if (const auto mean = average(samples)) std::cout << std::format(\"{}\\n\", *mean);\n  if (!average({})) std::cout << \"no samples, no average\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "1000000000\nno samples, no average"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two changes aren't interchangeable. With "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " samples and the plain "
+        },
+        {
+         "t": "code",
+         "v": "0"
+        },
+        {
+         "t": "text",
+         "v": " left in place, "
+        },
+        {
+         "t": "code",
+         "v": "accumulate"
+        },
+        {
+         "t": "text",
+         "v": " keeps its running sum in an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ": each step adds in 64 bits and converts the result back to "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ". That conversion isn't undefined: before C++20 its result was implementation-defined, and since C++20 it keeps the low 32 bits ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference on integral conversions",
+         "href": "https://en.cppreference.com/cpp/language/implicit_conversion"
+        },
+        {
+         "t": "text",
+         "v": "). So there is no undefined behaviour and nothing for UBSan to report. Measured with GCC 13, that version builds without a warning even with "
+        },
+        {
+         "t": "code",
+         "v": "-Wconversion"
+        },
+        {
+         "t": "text",
+         "v": ", because the conversion happens inside a system header. It runs without a report and returns -431655765, the same wrong number as before. Clang has an optional check for such conversions, "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=implicit-conversion"
+        },
+        {
+         "t": "text",
+         "v": ", which isn't part of "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=undefined"
+        },
+        {
+         "t": "text",
+         "v": " because the conversion is defined; GCC 13 doesn't offer it. The type of the initial value is the fix."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The loop version depends on the optimisation level. Measured with GCC 13.3, at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " it compiles without any warning, and at "
+        },
+        {
+         "t": "code",
+         "v": "-O1"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " the same flags stop it with "
+        },
+        {
+         "t": "code",
+         "v": "‘sum’ may be used uninitialized"
+        },
+        {
+         "t": "text",
+         "v": ". That warning, "
+        },
+        {
+         "t": "code",
+         "v": "-Wmaybe-uninitialized"
+        },
+        {
+         "t": "text",
+         "v": ", is part of "
+        },
+        {
+         "t": "code",
+         "v": "-Wall"
+        },
+        {
+         "t": "text",
+         "v": ", but GCC's documentation says it is only possible in an optimising build, because otherwise GCC doesn't track the state of variables ("
+        },
+        {
+         "t": "a",
+         "v": "warning options",
+         "href": "https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html"
+        },
+        {
+         "t": "text",
+         "v": "). An unoptimised build catches only the plainest cases, such as a read on the next line, which "
+        },
+        {
+         "t": "code",
+         "v": "-Wuninitialized"
+        },
+        {
+         "t": "text",
+         "v": " reports at every level:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "is used uninitialized",
+       "text": "#include <iostream>\n\nint main() {\n  int total;\n  std::cout << total + 1 << '\\n';\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So build your warnings check at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " as well as your debug build at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": ". And "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " misses some cases too, as the last section of this topic shows."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "gdb",
+   "title": "GDB on a crash: run, break, backtrace, frame, print, watch",
+   "steps": [
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program crashes when it asks for a route that doesn't exist. "
+        },
+        {
+         "t": "code",
+         "v": "find_route"
+        },
+        {
+         "t": "text",
+         "v": " returns a null pointer when no route has the name, which is the usual way to return \"an existing object, or none\", because "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " can't hold a reference in C++20. The bug is in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", which uses the result without checking it. UBSan names the problem directly:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "ubsan:member access within null pointer",
+       "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\nstruct Route {\n  std::string name;\n  int length_m;\n};\n\n// The route with this name, or nullptr when there is none.\n[[nodiscard]] const Route* find_route(std::span<const Route> routes, std::string_view name) {\n  const auto found = std::ranges::find(routes, name, &Route::name);\n  return found == routes.end() ? nullptr : &*found;\n}\n\nint main() {\n  const std::vector<Route> routes{{.name = \"day\", .length_m = 120}, {.name = \"dock\", .length_m = 40}};\n  const Route* const night = find_route(routes, \"night\");\n  std::cout << std::format(\"{} m\\n\", night->length_m);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::ranges::find"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "&Route::name"
+        },
+        {
+         "t": "text",
+         "v": " as its projection compares each route's name with "
+        },
+        {
+         "t": "code",
+         "v": "name"
+        },
+        {
+         "t": "text",
+         "v": ", so the lookup needs no loop of its own."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Without sanitizers the same program dies with a segmentation fault, and GDB shows you where and why. Build it with debug information and no optimisation, "
+        },
+        {
+         "t": "code",
+         "v": "g++ -std=c++20 -g -O0 crash.cpp -o crash"
+        },
+        {
+         "t": "text",
+         "v": ", start GDB with "
+        },
+        {
+         "t": "code",
+         "v": "gdb ./crash"
+        },
+        {
+         "t": "text",
+         "v": ", and type these commands at its "
+        },
+        {
+         "t": "code",
+         "v": "(gdb)"
+        },
+        {
+         "t": "text",
+         "v": " prompt:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "run\nbacktrace\nframe 5\nprint night\nprint routes.size()\nprint routes[0].name"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "run"
+        },
+        {
+         "t": "text",
+         "v": " starts the program and stops at the signal. GDB prints "
+        },
+        {
+         "t": "code",
+         "v": "Program received signal SIGSEGV, Segmentation fault."
+        },
+        {
+         "t": "text",
+         "v": ", then the function, the file and the line where the program stopped, and that is not "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "std::format"
+        },
+        {
+         "t": "text",
+         "v": " takes its arguments by reference, so "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " only forms a reference to "
+        },
+        {
+         "t": "code",
+         "v": "night->length_m"
+        },
+        {
+         "t": "text",
+         "v": ", and the read through the null pointer happens inside "
+        },
+        {
+         "t": "code",
+         "v": "<format>"
+        },
+        {
+         "t": "text",
+         "v": ", in the constructor of "
+        },
+        {
+         "t": "code",
+         "v": "std::basic_format_arg"
+        },
+        {
+         "t": "text",
+         "v": ". UBSan reported line 23 because it checks the member access itself, in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", before any read. Typed at this point, "
+        },
+        {
+         "t": "code",
+         "v": "print night"
+        },
+        {
+         "t": "text",
+         "v": " fails with a message that there is no symbol "
+        },
+        {
+         "t": "code",
+         "v": "night"
+        },
+        {
+         "t": "text",
+         "v": " in the current context. Every command works on the "
+        },
+        {
+         "t": "i",
+         "v": "selected frame"
+        },
+        {
+         "t": "text",
+         "v": ", which starts as the innermost one, and "
+        },
+        {
+         "t": "code",
+         "v": "night"
+        },
+        {
+         "t": "text",
+         "v": " is a local of "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "backtrace"
+        },
+        {
+         "t": "text",
+         "v": ", or "
+        },
+        {
+         "t": "code",
+         "v": "bt"
+        },
+        {
+         "t": "text",
+         "v": ", lists the call stack, one numbered frame per call, innermost first: frame #0 is the function that was running, #1 its caller, and so on. Inlined calls appear in it as frames too ("
+        },
+        {
+         "t": "a",
+         "v": "GDB manual on inline functions",
+         "href": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Inline-Functions.html"
+        },
+        {
+         "t": "text",
+         "v": "). An AddressSanitizer build of the same program, "
+        },
+        {
+         "t": "code",
+         "v": "g++ -std=c++20 -g -O0 -fsanitize=address"
+        },
+        {
+         "t": "text",
+         "v": ", reports the same stack when it crashes: frames #0 to #4 are inside "
+        },
+        {
+         "t": "code",
+         "v": "<format>"
+        },
+        {
+         "t": "text",
+         "v": ", and frame #5 is "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " at "
+        },
+        {
+         "t": "code",
+         "v": "crash.cpp:23"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "frame 5"
+        },
+        {
+         "t": "text",
+         "v": " selects "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": "'s frame; use the number your own backtrace shows for "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "GDB manual on selecting a frame",
+         "href": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Selection.html"
+        },
+        {
+         "t": "text",
+         "v": "). GDB prints that frame's source line, the one that reads "
+        },
+        {
+         "t": "code",
+         "v": "night->length_m"
+        },
+        {
+         "t": "text",
+         "v": ". Now "
+        },
+        {
+         "t": "code",
+         "v": "print night"
+        },
+        {
+         "t": "text",
+         "v": " shows a null pointer, "
+        },
+        {
+         "t": "code",
+         "v": "print routes.size()"
+        },
+        {
+         "t": "text",
+         "v": " shows 2, and "
+        },
+        {
+         "t": "code",
+         "v": "print routes[0].name"
+        },
+        {
+         "t": "text",
+         "v": " shows \"day\", so the vector is fine and the lookup is what failed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "print"
+        },
+        {
+         "t": "text",
+         "v": " evaluates any expression in the selected frame. "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "[]"
+        },
+        {
+         "t": "text",
+         "v": " are inline functions that may not exist in the program as code, and GDB can still call them because libstdc++ installs Python helpers for GDB, called xmethods, that do the same work. "
+        },
+        {
+         "t": "code",
+         "v": "info locals"
+        },
+        {
+         "t": "text",
+         "v": " shows all the selected frame's local variables at once, and "
+        },
+        {
+         "t": "code",
+         "v": "up"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "down"
+        },
+        {
+         "t": "text",
+         "v": " move one frame at a time. That is how you walk up the stack from a crash inside a library to the frame of your own code where the bad value came from ("
+        },
+        {
+         "t": "a",
+         "v": "GDB manual on backtraces",
+         "href": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Backtrace.html"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "To stop before the crash, set a breakpoint and step. "
+        },
+        {
+         "t": "code",
+         "v": "break find_route"
+        },
+        {
+         "t": "text",
+         "v": " stops at the start of the function, "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": " runs one line, "
+        },
+        {
+         "t": "code",
+         "v": "step"
+        },
+        {
+         "t": "text",
+         "v": " goes into a call, and "
+        },
+        {
+         "t": "code",
+         "v": "continue"
+        },
+        {
+         "t": "text",
+         "v": " runs to the next stop. "
+        },
+        {
+         "t": "code",
+         "v": "finish"
+        },
+        {
+         "t": "text",
+         "v": " runs to the end of the current function and prints the value it returned ("
+        },
+        {
+         "t": "a",
+         "v": "GDB manual on stepping",
+         "href": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Continuing-and-Stepping.html"
+        },
+        {
+         "t": "text",
+         "v": "). Here, "
+        },
+        {
+         "t": "code",
+         "v": "break find_route"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "run"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "finish"
+        },
+        {
+         "t": "text",
+         "v": " show "
+        },
+        {
+         "t": "code",
+         "v": "find_route"
+        },
+        {
+         "t": "text",
+         "v": " returning a null pointer for \"night\", which "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " then dereferences."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. The robot's battery rises by one on every trip, and the trip count stays at 0. No line of the program assigns to "
+        },
+        {
+         "t": "code",
+         "v": "battery_pct"
+        },
+        {
+         "t": "text",
+         "v": " by name. Find the write with a watchpoint, not by reading the code first."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <functional>\n#include <iostream>\n#include <utility>\n#include <vector>\n\nstruct Robot {\n  int battery_pct = 100;\n  int trips = 0;\n};\n\n// Calls every handler when a trip ends. It stores the handlers and calls them later.\nclass TripEvents {\n public:\n  void on_trip_end(std::function<void()> handler) { handlers_.push_back(std::move(handler)); }\n  void trip_ended() const {\n    for (const auto& handler : handlers_) handler();\n  }\n\n private:\n  std::vector<std::function<void()>> handlers_;\n};\n\n// Start-up wiring: the handler keeps a reference to the counter it increments.\nvoid count_trips(TripEvents& events, int& counter) {\n  events.on_trip_end([&counter] { ++counter; });\n}\n\nint main() {\n  Robot robot;\n  TripEvents events;\n  count_trips(events, robot.battery_pct);\n  for (int trip = 0; trip < 3; ++trip) events.trip_ended();\n  std::cout << std::format(\"battery {}%, trips {}\\n\", robot.battery_pct, robot.trips);\n}"
+      },
+      {
+       "t": "output",
+       "text": "battery 103%, trips 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build it with "
+        },
+        {
+         "t": "code",
+         "v": "g++ -std=c++20 -g -O0 trips.cpp -o trips"
+        },
+        {
+         "t": "text",
+         "v": " and start "
+        },
+        {
+         "t": "code",
+         "v": "gdb ./trips"
+        },
+        {
+         "t": "text",
+         "v": ". Stop on line 32, after "
+        },
+        {
+         "t": "code",
+         "v": "robot"
+        },
+        {
+         "t": "text",
+         "v": " exists, with "
+        },
+        {
+         "t": "code",
+         "v": "break trips.cpp:32"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "run"
+        },
+        {
+         "t": "text",
+         "v": ". Then type "
+        },
+        {
+         "t": "code",
+         "v": "watch robot.battery_pct"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "continue"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "backtrace"
+        },
+        {
+         "t": "text",
+         "v": ". Answer three questions. At which line does the value change? Why doesn't a search of the code for "
+        },
+        {
+         "t": "code",
+         "v": "battery_pct"
+        },
+        {
+         "t": "text",
+         "v": " find that write? And what would the first "
+        },
+        {
+         "t": "code",
+         "v": "continue"
+        },
+        {
+         "t": "text",
+         "v": " have stopped on if you had set the watchpoint straight after "
+        },
+        {
+         "t": "code",
+         "v": "break main"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "run"
+        },
+        {
+         "t": "text",
+         "v": "?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GDB stops as soon as the watched memory changes. It prints "
+        },
+        {
+         "t": "code",
+         "v": "Old value = 100"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "New value = 101"
+        },
+        {
+         "t": "text",
+         "v": ", then the frame it stopped in and its source line: line 26, inside the lambda that "
+        },
+        {
+         "t": "code",
+         "v": "count_trips"
+        },
+        {
+         "t": "text",
+         "v": " registered. A lambda has no name of its own, so the frame is named after the function that defined it, in the form "
+        },
+        {
+         "t": "code",
+         "v": "nm -C trips"
+        },
+        {
+         "t": "text",
+         "v": " also lists: "
+        },
+        {
+         "t": "code",
+         "v": "count_trips(TripEvents&, int&)::{lambda()#1}::operator()() const"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "backtrace"
+        },
+        {
+         "t": "text",
+         "v": " shows the lambda on top, then a few frames inside the standard library through which "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " calls it, then "
+        },
+        {
+         "t": "code",
+         "v": "TripEvents::trip_ended"
+        },
+        {
+         "t": "text",
+         "v": " at line 17 and "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " at line 33."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The write goes through an alias. The lambda captured "
+        },
+        {
+         "t": "code",
+         "v": "counter"
+        },
+        {
+         "t": "text",
+         "v": " by reference when "
+        },
+        {
+         "t": "code",
+         "v": "count_trips"
+        },
+        {
+         "t": "text",
+         "v": " ran, and "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " passed "
+        },
+        {
+         "t": "code",
+         "v": "robot.battery_pct"
+        },
+        {
+         "t": "text",
+         "v": " as that counter. So the statement that changes the battery is "
+        },
+        {
+         "t": "code",
+         "v": "++counter"
+        },
+        {
+         "t": "text",
+         "v": ", and it never names "
+        },
+        {
+         "t": "code",
+         "v": "battery_pct"
+        },
+        {
+         "t": "text",
+         "v": ". A text search follows names, and a watchpoint follows the memory. The fix is "
+        },
+        {
+         "t": "code",
+         "v": "count_trips(events, robot.trips)"
+        },
+        {
+         "t": "text",
+         "v": ", after which the program prints "
+        },
+        {
+         "t": "code",
+         "v": "battery 100%, trips 3"
+        },
+        {
+         "t": "text",
+         "v": ". Callbacks that capture by reference are common in event-driven and ROS code, and every write through such a capture is one that a search by name won't find."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Set straight after "
+        },
+        {
+         "t": "code",
+         "v": "break main"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "run"
+        },
+        {
+         "t": "text",
+         "v": ", the watchpoint would have stopped first in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " itself, where "
+        },
+        {
+         "t": "code",
+         "v": "Robot robot;"
+        },
+        {
+         "t": "text",
+         "v": " on line 30 writes 100 over whatever the stack slot held before, unless that happened to be 100 already. Breaking on line 32 skips that stop. GDB deletes a watchpoint on a local variable when execution leaves the block the variable belongs to, here when "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " returns ("
+        },
+        {
+         "t": "a",
+         "v": "GDB manual on watchpoints",
+         "href": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Watchpoints.html"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For a 4-byte "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " on x86-64, GDB sets a "
+        },
+        {
+         "t": "i",
+         "v": "hardware watchpoint"
+        },
+        {
+         "t": "text",
+         "v": ", using the CPU's debug registers. The program runs at full speed until the write, and GDB reports the change at the instruction that made it. When it can't set a hardware watchpoint, GDB sets a software watchpoint, which executes more slowly and reports the change at the next statement. That depends on the CPU and on the size of the watched object, not on "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": ", which the exercise uses so that variables and lines map cleanly to the source."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "limits",
+   "title": "What the sanitizers miss: uninitialised memory, races, untested paths",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This program reads an uninitialised variable whenever it is started with fewer than five arguments, which is almost always:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <iostream>\n\nint main(int argc, char**) {\n  int total;\n  if (argc > 5) total = 0;\n  std::cout << total + 1 << '\\n';\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is built and run like every other example on this page, with "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra -Werror"
+        },
+        {
+         "t": "text",
+         "v": " and both sanitizers, and it passes: no warning and no report. It has no output block, because there is no right output. Measured with GCC 13.3, the build doesn't warn at "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "-O1"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "-O3"
+        },
+        {
+         "t": "text",
+         "v": ", with or without the sanitizers. At "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " it prints whatever the stack slot held, 32767 in one run. From "
+        },
+        {
+         "t": "code",
+         "v": "-O1"
+        },
+        {
+         "t": "text",
+         "v": " up it prints 1, and the generated code doesn't test "
+        },
+        {
+         "t": "code",
+         "v": "argc"
+        },
+        {
+         "t": "text",
+         "v": " at all. Reading "
+        },
+        {
+         "t": "code",
+         "v": "total"
+        },
+        {
+         "t": "text",
+         "v": " uninitialised is undefined behaviour, so the optimiser may assume it doesn't happen, which leaves 0 as the only value "
+        },
+        {
+         "t": "code",
+         "v": "total"
+        },
+        {
+         "t": "text",
+         "v": " can have. The same bug gives different output at different optimisation levels, and nothing in this build reports it. Exercise 3's straight-line read was caught at every level, and its loop from "
+        },
+        {
+         "t": "code",
+         "v": "-O1"
+        },
+        {
+         "t": "text",
+         "v": " up. This conditional read isn't caught at any."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Neither GCC sanitizer tracks whether memory has been initialised. Valgrind's Memcheck does, and its manual says a program runs 20 to 30 times slower under it ("
+        },
+        {
+         "t": "a",
+         "v": "Valgrind quick start",
+         "href": "https://valgrind.org/docs/manual/quick-start.html"
+        },
+        {
+         "t": "text",
+         "v": "). Clang's MemorySanitizer does it at a typical slowdown of 3 times, but GCC doesn't offer it, and it needs all the code the program runs built with it, even the C library ("
+        },
+        {
+         "t": "a",
+         "v": "MemorySanitizer",
+         "href": "https://clang.llvm.org/docs/MemorySanitizer.html"
+        },
+        {
+         "t": "text",
+         "v": "). The cheapest defence is to give every variable a value where you declare it, here "
+        },
+        {
+         "t": "code",
+         "v": "int total = 0;"
+        },
+        {
+         "t": "text",
+         "v": " (Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.20",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-always"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "C++26 changes the rule for this case. Reading an uninitialised local variable becomes "
+        },
+        {
+         "t": "i",
+         "v": "erroneous behaviour"
+        },
+        {
+         "t": "text",
+         "v": ": the variable holds a fixed value that the implementation chooses, compilers are encouraged to diagnose the read, and the optimiser may no longer assume the read can't happen ("
+        },
+        {
+         "t": "a",
+         "v": "P2795R5",
+         "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2795r5.html"
+        },
+        {
+         "t": "text",
+         "v": "). GCC 13 predates it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A conversion that loses data is a different gap. Like the "
+        },
+        {
+         "t": "code",
+         "v": "std::accumulate"
+        },
+        {
+         "t": "text",
+         "v": " trap in exercise 3, it is defined behaviour, so UBSan has nothing to report, and the result is wrong without any error."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A data race is invisible to AddressSanitizer and UBSan too. ThreadSanitizer finds races, but GCC's documentation says it can't be combined with "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=address"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=leak"
+        },
+        {
+         "t": "text",
+         "v": ", so it needs its own build with "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=thread"
+        },
+        {
+         "t": "text",
+         "v": ". The concurrency topics use it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every sanitizer checks only the code that runs. A use-after-free in an error path that no test takes stays hidden until a user takes it. Sanitizers make your tests stronger, and they find nothing in code that no test reaches."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Explain what undefined behaviour allows the compiler to do, with the overflow check as the example, and write a check that works. Name the five common memory bugs and the tool for each, and describe how you read the three parts of an ASan report. Give the GDB commands for \"where did it crash\" and \"who changed this\", and two kinds of bug the sanitizers don't find."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "x + 1 < x"
+     },
+     {
+      "t": "text",
+      "v": " never detect overflow for an "
+     },
+     {
+      "t": "code",
+      "v": "int"
+     },
+     {
+      "t": "text",
+      "v": ", and how do you write a check that works on every compiler?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the three parts of an AddressSanitizer report, and which stack do you read first to find the cause?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which tool finds each of these: use after free, double free, signed overflow, data race, uninitialised read?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In which type does "
+     },
+     {
+      "t": "code",
+      "v": "std::accumulate(v.begin(), v.end(), 0)"
+     },
+     {
+      "t": "text",
+      "v": " add, and why does UBSan stay silent when "
+     },
+     {
+      "t": "code",
+      "v": "v"
+     },
+     {
+      "t": "text",
+      "v": " holds "
+     },
+     {
+      "t": "code",
+      "v": "std::int64_t"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In GDB, how do you find the line where a crash happened, look at a variable in the calling function, and stop when a variable changes?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why can a watchpoint find a write that a search for the variable's name misses?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a program with an iterator-invalidation bug, the ASan report it gives, and the fix."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Greg Law, Back to Basics: Debugging, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Debugging_CppCon_2023.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=qgszy9GquRs"
+     },
+     {
+      "t": "text",
+      "v": ". The time between the bug and the failure, then GDB, the sanitizers and library debug modes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Greg Law and Mike Shah, Back to Basics: Debugging and Testing, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_To_Basics_Debugging_and_Testing.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=ghurTk_A-Bo"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Fedor Pikus, Undefined Behavior, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/undefined_behavior.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=k9N8OrhrSZw"
+     },
+     {
+      "t": "text",
+      "v": ". Why the compiler may assume a program has no undefined behaviour, and what it does with that."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bob Steagall, Back to Basics: Debugging Techniques, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/back_to_basics_debugging_techniques__bob_steagall__cppcon_2021.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=M7fV-eQwxrY"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Damien Buhl, on adopting sanitizers in a code base, CppCon 2025: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2025/blob/main/Presentations/Instrumenting_the_Stack.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=TSrymTXw5w8"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The sanitizer documentation: "
+     },
+     {
+      "t": "a",
+      "v": "AddressSanitizer",
+      "href": "https://clang.llvm.org/docs/AddressSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "UndefinedBehaviorSanitizer",
+      "href": "https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "MemorySanitizer",
+      "href": "https://clang.llvm.org/docs/MemorySanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ThreadSanitizer",
+      "href": "https://clang.llvm.org/docs/ThreadSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": ", and GCC's "
+     },
+     {
+      "t": "a",
+      "v": "instrumentation options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "warning options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The GDB manual on "
+     },
+     {
+      "t": "a",
+      "v": "backtraces",
+      "href": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Backtrace.html"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "stepping",
+      "href": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Continuing-and-Stepping.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "watchpoints",
+      "href": "https://sourceware.org/gdb/current/onlinedocs/gdb.html/Set-Watchpoints.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "Valgrind Memcheck",
+      "href": "https://valgrind.org/docs/manual/mc-manual.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the libstdc++ manual on "
+     },
+     {
+      "t": "a",
+      "v": "its macros",
+      "href": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_macros.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "debug mode",
+      "href": "https://gcc.gnu.org/onlinedocs/libstdc++/manual/debug_mode.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "P.12",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rp-tools"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-always"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.65",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-deref"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "ES.103",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-overflow"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.11",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-newdelete"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-zero"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-bounds"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "undefined behavior",
+      "href": "https://en.cppreference.com/cpp/language/ub"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::accumulate",
+      "href": "https://en.cppreference.com/cpp/algorithm/accumulate"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "integral conversions",
+      "href": "https://en.cppreference.com/cpp/language/implicit_conversion"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Thomas Köppe, "
+     },
+     {
+      "t": "a",
+      "v": "P2795R5",
+      "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2795r5.html"
+     },
+     {
+      "t": "text",
+      "v": ", erroneous behaviour for uninitialised reads in C++26."
+     }
+    ]
+   ]
+  }
+ ]
+}

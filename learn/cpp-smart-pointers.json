@@ -1,0 +1,3697 @@
+{
+ "id": "cpp-smart-pointers",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "For each of five situations, say what should own the object, with a reason in one sentence: a plain member or local variable, a "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", a "
+     },
+     {
+      "t": "code",
+      "v": "std::shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", a "
+     },
+     {
+      "t": "code",
+      "v": "std::weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", or nothing, because the code only borrows the object. Then say what goes wrong when two objects hold "
+     },
+     {
+      "t": "code",
+      "v": "std::shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": "s to each other, and how you fix it. Take 10 minutes."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "A "
+      },
+      {
+       "t": "code",
+       "v": "Robot"
+      },
+      {
+       "t": "text",
+       "v": " plans with one path planner, chosen at start-up from three classes that implement a "
+      },
+      {
+       "t": "code",
+       "v": "Planner"
+      },
+      {
+       "t": "text",
+       "v": " interface."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "An occupancy map is loaded once and read by a planning thread, a localisation thread and a logging thread. Any of them can finish first, and the map must be freed when the last one is done."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A function computes the length of a path it is given, and keeps nothing after it returns."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A camera driver caches decoded frames by timestamp, so that a second request can reuse a frame someone still holds. The cache itself must not keep frames alive."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A "
+      },
+      {
+       "t": "code",
+       "v": "Robot"
+      },
+      {
+       "t": "text",
+       "v": " has one "
+      },
+      {
+       "t": "code",
+       "v": "Battery"
+      },
+      {
+       "t": "text",
+       "v": " for its whole life, and the battery's type never changes."
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "A "
+      },
+      {
+       "t": "code",
+       "v": "std::unique_ptr<Planner>"
+      },
+      {
+       "t": "text",
+       "v": " member. The robot is the only owner, and it needs a pointer because the concrete class is only known at run time ("
+      },
+      {
+       "t": "a",
+       "v": "R.20",
+       "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-owner"
+      },
+      {
+       "t": "text",
+       "v": ", "
+      },
+      {
+       "t": "a",
+       "v": "R.21",
+       "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-unique"
+      },
+      {
+       "t": "text",
+       "v": ")."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A "
+      },
+      {
+       "t": "code",
+       "v": "std::shared_ptr<const Map>"
+      },
+      {
+       "t": "text",
+       "v": " in each thread. No single owner outlives the others, which is the case shared ownership exists for ("
+      },
+      {
+       "t": "a",
+       "v": "F.27",
+       "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-shared_ptr"
+      },
+      {
+       "t": "text",
+       "v": "). The "
+      },
+      {
+       "t": "code",
+       "v": "const"
+      },
+      {
+       "t": "text",
+       "v": " matters: the reference count is safe to update from several threads, but the map is only safe to share if nobody writes to it."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Nothing: the function takes a "
+      },
+      {
+       "t": "code",
+       "v": "const Path&"
+      },
+      {
+       "t": "text",
+       "v": ". A smart pointer parameter would say that the function takes part in the path's ownership, which it doesn't, and it would refuse every caller whose path isn't held by that kind of smart pointer ("
+      },
+      {
+       "t": "a",
+       "v": "F.7",
+       "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-smart"
+      },
+      {
+       "t": "text",
+       "v": ")."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A "
+      },
+      {
+       "t": "code",
+       "v": "std::weak_ptr<const Frame>"
+      },
+      {
+       "t": "text",
+       "v": " in the cache. Its "
+      },
+      {
+       "t": "code",
+       "v": "lock()"
+      },
+      {
+       "t": "text",
+       "v": " returns a "
+      },
+      {
+       "t": "code",
+       "v": "std::shared_ptr"
+      },
+      {
+       "t": "text",
+       "v": " while some user still holds the frame, and an empty one once the last user has let go."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A plain "
+      },
+      {
+       "t": "code",
+       "v": "Battery"
+      },
+      {
+       "t": "text",
+       "v": " member and no pointer at all: no heap allocation, no null state to check, and it is destroyed with the robot. Abseil's "
+      },
+      {
+       "t": "a",
+       "v": "tip 187",
+       "href": "https://abseil.io/tips/187"
+      },
+      {
+       "t": "text",
+       "v": " turns this into a test: a "
+      },
+      {
+       "t": "code",
+       "v": "std::unique_ptr"
+      },
+      {
+       "t": "text",
+       "v": " that is never moved to or from another one probably shouldn't be a "
+      },
+      {
+       "t": "code",
+       "v": "std::unique_ptr"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "In a cycle, object A holds a "
+     },
+     {
+      "t": "code",
+      "v": "shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": " to B and B holds one to A. When the last outside owner lets go, each use count is still 1, held by the other object, so neither destructor runs and both objects leak, together with everything they own. Make the back reference a "
+     },
+     {
+      "t": "code",
+      "v": "std::weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": " ("
+     },
+     {
+      "t": "a",
+      "v": "R.24",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": "). When one object clearly owns the other, a "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " from owner to owned and a plain pointer or reference back is better still, because the owner outlives what it owns."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with all five and the cycle with its fix. Four of the five, or the cycle without a fix, is a partial pass. A "
+     },
+     {
+      "t": "code",
+      "v": "shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": " for 1 or 5, or a smart pointer parameter for 3, is a fail, because those are the mistakes this topic is about."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A smart pointer is a class that owns an object through a pointer and deletes it when ownership ends, so the pointer's own type states who owns the object instead of a comment. "
+    },
+    {
+     "t": "code",
+     "v": "std::unique_ptr<T>"
+    },
+    {
+     "t": "text",
+     "v": " owns an object alone: its destructor deletes it, and nothing else may. "
+    },
+    {
+     "t": "code",
+     "v": "std::shared_ptr<T>"
+    },
+    {
+     "t": "text",
+     "v": " owns an object jointly with every other "
+    },
+    {
+     "t": "code",
+     "v": "shared_ptr"
+    },
+    {
+     "t": "text",
+     "v": " copied from it, through a shared count of how many owners exist. "
+    },
+    {
+     "t": "code",
+     "v": "std::weak_ptr<T>"
+    },
+    {
+     "t": "text",
+     "v": " observes an object a "
+    },
+    {
+     "t": "code",
+     "v": "shared_ptr"
+    },
+    {
+     "t": "text",
+     "v": " owns, without owning it, and can tell you whether that object is still alive."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem a raw pointer leaves open is who must delete the object it points to: a function that returns one, or a class that stores one, says nothing about that, so two owners that each believe they alone must delete it cause a double free, and no owner at all leaks it. Shared ownership has the same gap in another form: two objects that each hold a "
+    },
+    {
+     "t": "code",
+     "v": "shared_ptr"
+    },
+    {
+     "t": "text",
+     "v": " to the other keep each other's count at one even once every outside reference is gone, so neither destructor runs and both leak."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism differs by type. "
+    },
+    {
+     "t": "code",
+     "v": "unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": "'s copy constructor is deleted, because two owners would each delete the same object, while its move constructor hands ownership across and leaves the source as "
+    },
+    {
+     "t": "code",
+     "v": "nullptr"
+    },
+    {
+     "t": "text",
+     "v": ". Every "
+    },
+    {
+     "t": "code",
+     "v": "shared_ptr"
+    },
+    {
+     "t": "text",
+     "v": " sharing an object points to one heap object, the "
+    },
+    {
+     "t": "i",
+     "v": "control block"
+    },
+    {
+     "t": "text",
+     "v": ", holding the use count, the weak count, the deleter and the pointer; copying a "
+    },
+    {
+     "t": "code",
+     "v": "shared_ptr"
+    },
+    {
+     "t": "text",
+     "v": " increments the use count, destroying one decrements it, and the copy that brings it to zero deletes the object. A "
+    },
+    {
+     "t": "code",
+     "v": "weak_ptr"
+    },
+    {
+     "t": "text",
+     "v": " holds a reference to that block without counting toward the use count, so making a cycle's back reference a "
+    },
+    {
+     "t": "code",
+     "v": "weak_ptr"
+    },
+    {
+     "t": "text",
+     "v": " lets the count reach zero and both objects be destroyed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that sharing is heavier than it looks: a "
+    },
+    {
+     "t": "code",
+     "v": "shared_ptr"
+    },
+    {
+     "t": "text",
+     "v": " is two pointers, and copying one updates the count with an atomic operation, since owners on different threads may copy or drop it at once. A function that only reads an object it doesn't own should take a plain reference, not a smart pointer: a smart pointer parameter claims a say over ownership it may not need."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this choice in the robot: a planner a factory hands over is a "
+    },
+    {
+     "t": "code",
+     "v": "unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": ", a map several nodes read is a "
+    },
+    {
+     "t": "code",
+     "v": "shared_ptr"
+    },
+    {
+     "t": "text",
+     "v": ", and a callback that must not keep its owner alive past its time holds a "
+    },
+    {
+     "t": "code",
+     "v": "weak_ptr"
+    },
+    {
+     "t": "text",
+     "v": ", the cycle the interview question asks you to break."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "unique",
+   "title": "unique_ptr: sole ownership, move-only, custom deleters",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot gets its planner from a factory that chooses the class at run time. The factory creates the planner and gives the caller sole ownership, and the caller moves it into the robot:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <string_view>\n#include <utility>\n\nclass Planner {\n public:\n  virtual ~Planner() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n};\n\nclass GridPlanner final : public Planner {\n public:\n  ~GridPlanner() override { std::cout << \"grid planner destroyed\\n\"; }\n  [[nodiscard]] std::string_view name() const override { return \"grid\"; }\n};\n\nclass LatticePlanner final : public Planner {\n public:\n  ~LatticePlanner() override { std::cout << \"lattice planner destroyed\\n\"; }\n  [[nodiscard]] std::string_view name() const override { return \"lattice\"; }\n};\n\nenum class PlannerKind { grid, lattice };\n\n// The factory picks the class; the caller becomes the only owner.\n[[nodiscard]] std::unique_ptr<Planner> make_planner(PlannerKind kind) {\n  if (kind == PlannerKind::grid) return std::make_unique<GridPlanner>();\n  return std::make_unique<LatticePlanner>();\n}\n\nclass Robot {\n public:\n  explicit Robot(std::unique_ptr<Planner> planner) : planner_(std::move(planner)) {}\n  [[nodiscard]] std::string_view planner_name() const { return planner_->name(); }\n\n private:\n  std::unique_ptr<Planner> planner_;\n};\n\nint main() {\n  std::unique_ptr<Planner> planner = make_planner(PlannerKind::lattice);\n  const Robot robot(std::move(planner));\n  std::cout << std::format(\"robot plans with {}; the local pointer is {}\\n\", robot.planner_name(),\n                           planner ? \"set\" : \"empty\");\n  std::cout << std::format(\"unique_ptr: {} bytes, raw pointer: {} bytes\\n\", sizeof(planner), sizeof(Planner*));\n}"
+      },
+      {
+       "t": "output",
+       "text": "robot plans with lattice; the local pointer is empty\nunique_ptr: 8 bytes, raw pointer: 8 bytes\nlattice planner destroyed"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::unique_ptr<T>"
+        },
+        {
+         "t": "text",
+         "v": " is a pointer with a duty: its destructor deletes the object, and nothing else does ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/memory/unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "). It follows that it can't be copied, because two copies would delete the same object, and that it can be moved, because a move hands the duty over. The move leaves the source empty. For most types a moved-from object is only valid but unspecified, as the copy and move topic showed, but a moved-from "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " is guaranteed to hold "
+        },
+        {
+         "t": "code",
+         "v": "nullptr"
+        },
+        {
+         "t": "text",
+         "v": ", so the test in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " is well-defined. A copy doesn't compile:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "use of deleted function",
+       "text": "#include <memory>\n\nstruct Planner {\n  int horizon = 10;\n};\n\nint main() {\n  const auto first = std::make_unique<Planner>();\n  const auto second = first;  // two owners of one Planner: refused\n  return second->horizon;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With the default deleter, a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " is the size of a raw pointer, as the output shows, and once the optimiser has run, "
+        },
+        {
+         "t": "code",
+         "v": "->"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "*"
+        },
+        {
+         "t": "text",
+         "v": " are the same load a raw pointer does. The factory and the constructor show the two ways ownership passes between functions. A function that returns a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " by value gives ownership to its caller ("
+        },
+        {
+         "t": "a",
+         "v": "F.26",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "). A function that takes one by value takes ownership from its caller, which makes it a "
+        },
+        {
+         "t": "i",
+         "v": "sink"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "R.32",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-uniqueptrparam"
+        },
+        {
+         "t": "text",
+         "v": "), and the caller has to write "
+        },
+        {
+         "t": "code",
+         "v": "std::move(planner)"
+        },
+        {
+         "t": "text",
+         "v": ", so the transfer is visible where it happens. "
+        },
+        {
+         "t": "code",
+         "v": "Planner"
+        },
+        {
+         "t": "text",
+         "v": " has a virtual destructor because the "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr<Planner>"
+        },
+        {
+         "t": "text",
+         "v": " deletes a "
+        },
+        {
+         "t": "code",
+         "v": "LatticePlanner"
+        },
+        {
+         "t": "text",
+         "v": " through a "
+        },
+        {
+         "t": "code",
+         "v": "Planner*"
+        },
+        {
+         "t": "text",
+         "v": ", and without a virtual destructor that is undefined behaviour ("
+        },
+        {
+         "t": "a",
+         "v": "C.35",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-virtual"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Create the object with "
+        },
+        {
+         "t": "code",
+         "v": "std::make_unique<T>(args...)"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "R.23",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-make_unique"
+        },
+        {
+         "t": "text",
+         "v": "). It names the type once and keeps "
+        },
+        {
+         "t": "code",
+         "v": "new"
+        },
+        {
+         "t": "text",
+         "v": " out of the code, and before C++17 it also closed the leak in calls with several arguments that the RAII topic described. The other members are for the edges of a design. "
+        },
+        {
+         "t": "code",
+         "v": "get()"
+        },
+        {
+         "t": "text",
+         "v": " lends the raw pointer and keeps ownership. "
+        },
+        {
+         "t": "code",
+         "v": "reset(p)"
+        },
+        {
+         "t": "text",
+         "v": " deletes the current object and takes ownership of "
+        },
+        {
+         "t": "code",
+         "v": "p"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "release()"
+        },
+        {
+         "t": "text",
+         "v": " gives ownership up and returns the raw pointer, which someone else must now delete, so use it only to hand the object to an API that takes ownership of a raw pointer. Between two "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s, move: David Olsen's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on smart pointers",
+         "href": "https://www.youtube.com/watch?v=YokY6HzLkXs"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2022) shows "
+        },
+        {
+         "t": "code",
+         "v": "b.reset(a.release())"
+        },
+        {
+         "t": "text",
+         "v": " and replaces it with "
+        },
+        {
+         "t": "code",
+         "v": "b = std::move(a)"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Reach for a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " when the object needs to live on the heap at all: its class is chosen at run time, as here; its address must stay put while its owner moves, because something else points at it; or it is too large to move cheaply. Otherwise make it a plain member, and make a member that is sometimes absent a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<T>"
+        },
+        {
+         "t": "text",
+         "v": ", which keeps the object inline. Abseil's "
+        },
+        {
+         "t": "a",
+         "v": "tip 187",
+         "href": "https://abseil.io/tips/187"
+        },
+        {
+         "t": "text",
+         "v": " gives the test from the cold check: a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " that is never moved to or from another one likely shouldn't be a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second template parameter is the "
+        },
+        {
+         "t": "i",
+         "v": "deleter"
+        },
+        {
+         "t": "text",
+         "v": ", the function object the destructor calls instead of "
+        },
+        {
+         "t": "code",
+         "v": "delete"
+        },
+        {
+         "t": "text",
+         "v": ". The RAII topic used one to close a "
+        },
+        {
+         "t": "code",
+         "v": "FILE*"
+        },
+        {
+         "t": "text",
+         "v": ", and measured that an empty deleter adds nothing to the size while a function pointer doubles it. Three more facts matter for design. The deleter is part of the type, so "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<std::FILE, Closer>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<std::FILE, OtherCloser>"
+        },
+        {
+         "t": "text",
+         "v": " are different types, and a function that takes one won't take the other. "
+        },
+        {
+         "t": "code",
+         "v": "std::make_unique"
+        },
+        {
+         "t": "text",
+         "v": " can't take a deleter, so you construct the "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " directly from the call that acquires the resource. And the deleter doesn't have to free anything: it can put the object back where it came from, which the exercise uses. "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " keeps its deleter somewhere else, as the next section shows."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. A camera driver must not allocate memory while it streams, so it creates its frames up front and lends them out. Write a "
+        },
+        {
+         "t": "code",
+         "v": "FramePool"
+        },
+        {
+         "t": "text",
+         "v": " that creates a fixed number of frames in its constructor and lends them as "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Frame, ReturnToPool>"
+        },
+        {
+         "t": "text",
+         "v": ", where the deleter puts the frame back in the pool instead of deleting it. A frame has an "
+        },
+        {
+         "t": "code",
+         "v": "int id"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::uint8_t>"
+        },
+        {
+         "t": "text",
+         "v": " of pixels. The constructor takes the number of frames and the pixels per frame as one "
+        },
+        {
+         "t": "code",
+         "v": "PoolSize"
+        },
+        {
+         "t": "text",
+         "v": " struct, so a call can't swap them. "
+        },
+        {
+         "t": "code",
+         "v": "acquire()"
+        },
+        {
+         "t": "text",
+         "v": " returns an empty handle when every frame is lent out. Then test these in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "With a pool of two frames, two requests succeed and a third gets an empty handle."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "After one handle is dropped, the next request succeeds and gets the same frame back. Print the frame ids."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A handle moved into a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector"
+         },
+         {
+          "t": "text",
+          "v": " that stands for the encoder's queue keeps its frame lent until the vector is cleared."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Print the size of your handle and of a plain "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr<Frame>"
+         },
+         {
+          "t": "text",
+          "v": ", and explain the difference."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions. What must be true of the pool's lifetime, compared with its handles? And why does "
+        },
+        {
+         "t": "code",
+         "v": "acquire"
+        },
+        {
+         "t": "text",
+         "v": " return an empty handle rather than a "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": "?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <vector>\n\nstruct Frame {\n  int id = 0;\n  std::vector<std::uint8_t> pixels;\n};\n\nstruct PoolSize {\n  int frames = 0;\n  int pixels_per_frame = 0;\n};\n\nclass FramePool {\n public:\n  // Called by a Lease's destructor for a non-null frame: returns the frame instead of deleting it.\n  struct ReturnToPool {\n    FramePool* pool = nullptr;\n    void operator()(Frame* frame) const noexcept { pool->give_back(frame); }\n  };\n  using Lease = std::unique_ptr<Frame, ReturnToPool>;\n\n  explicit FramePool(PoolSize size) : frames_(size.frames) {\n    free_.reserve(frames_.size());  // room for every frame, so give_back never allocates\n    int next_id = 0;\n    for (Frame& frame : frames_) {\n      frame.id = next_id++;\n      frame.pixels.resize(size.pixels_per_frame);\n      free_.push_back(&frame);\n    }\n  }\n  // Leases hold this pool's address and point into frames_, so the pool stays where it is.\n  FramePool(const FramePool&) = delete;\n  FramePool& operator=(const FramePool&) = delete;\n  FramePool(FramePool&&) = delete;\n  FramePool& operator=(FramePool&&) = delete;\n\n  [[nodiscard]] Lease acquire() {\n    if (free_.empty()) return Lease(nullptr, ReturnToPool{this});\n    Frame* frame = free_.back();\n    free_.pop_back();\n    return Lease(frame, ReturnToPool{this});\n  }\n  [[nodiscard]] std::ptrdiff_t free_frames() const { return std::ssize(free_); }\n\n private:\n  void give_back(Frame* frame) noexcept { free_.push_back(frame); }\n\n  std::vector<Frame> frames_;\n  std::vector<Frame*> free_;\n};\n\nint main() {\n  FramePool pool({.frames = 2, .pixels_per_frame = 640 * 480});\n  FramePool::Lease first = pool.acquire();\n  FramePool::Lease second = pool.acquire();\n  const FramePool::Lease third = pool.acquire();\n  std::cout << std::format(\"lent frames {} and {}; third request empty: {}\\n\", first->id, second->id,\n                           third ? \"no\" : \"yes\");\n\n  first.reset();  // the deleter returns frame 1 to the pool\n  const FramePool::Lease again = pool.acquire();\n  std::cout << std::format(\"frame 1 returned; the next request gets frame {}\\n\", again->id);\n\n  std::vector<FramePool::Lease> encoder_queue;\n  encoder_queue.push_back(std::move(second));\n  std::cout << std::format(\"frame 0 queued for the encoder; free frames: {}\\n\", pool.free_frames());\n  encoder_queue.clear();\n  std::cout << std::format(\"encoder queue cleared; free frames: {}\\n\", pool.free_frames());\n\n  std::cout << std::format(\"lease: {} bytes, plain unique_ptr: {} bytes\\n\", sizeof(FramePool::Lease),\n                           sizeof(std::unique_ptr<Frame>));\n}"
+      },
+      {
+       "t": "output",
+       "text": "lent frames 1 and 0; third request empty: yes\nframe 1 returned; the next request gets frame 1\nframe 0 queued for the encoder; free frames: 0\nencoder queue cleared; free frames: 1\nlease: 16 bytes, plain unique_ptr: 8 bytes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The lease is 16 bytes because its deleter holds a pointer to the pool, and a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " stores its deleter next to its pointer. A deleter with no data members, such as the RAII topic's "
+        },
+        {
+         "t": "code",
+         "v": "Closer"
+        },
+        {
+         "t": "text",
+         "v": ", takes no space. "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " calls the deleter only for a non-null pointer, so the empty third lease returns nothing when it is destroyed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pool must outlive every lease, because each lease's deleter writes into the pool. "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " declares the pool first, so it is destroyed last. The pool deletes its copy and move operations for the same reason: the leases hold its address, and a copy or a move would leave them pointing at the old pool. "
+        },
+        {
+         "t": "code",
+         "v": "give_back"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "noexcept"
+        },
+        {
+         "t": "text",
+         "v": " because a deleter runs inside a destructor. It can keep that promise because the constructor reserved room in "
+        },
+        {
+         "t": "code",
+         "v": "free_"
+        },
+        {
+         "t": "text",
+         "v": " for every frame, so its "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " never allocates. The nested "
+        },
+        {
+         "t": "code",
+         "v": "ReturnToPool"
+        },
+        {
+         "t": "text",
+         "v": " may call the private "
+        },
+        {
+         "t": "code",
+         "v": "give_back"
+        },
+        {
+         "t": "text",
+         "v": " because a nested class is a member of its enclosing class and has the same access to it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "acquire"
+        },
+        {
+         "t": "text",
+         "v": " returns an empty lease because a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " already has an empty state, the one every moved-from lease is in. A "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<Lease>"
+        },
+        {
+         "t": "text",
+         "v": " would have two kinds of nothing, an empty optional and an optional that holds an empty lease, and a careful caller would have to test both. "
+        },
+        {
+         "t": "code",
+         "v": "std::weak_ptr::lock"
+        },
+        {
+         "t": "text",
+         "v": ", in the next section, returns an empty "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " for the same reason."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "shared",
+   "title": "shared_ptr and weak_ptr: control block, cycles, when shared ownership is justified",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three parts of a robot read the same map, and the map must live until the last of them is done with it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <utility>\n\nclass Map {\n public:\n  explicit Map(std::string name) : name_(std::move(name)) {}\n  ~Map() { std::cout << std::format(\"{} map freed\\n\", name_); }\n\n private:\n  std::string name_;\n};\n\nint main() {\n  auto map = std::make_shared<const Map>(\"warehouse\");\n  std::cout << std::format(\"one owner: use_count {}\\n\", map.use_count());\n\n  auto planner = map;\n  auto localiser = map;\n  std::cout << std::format(\"planner and localiser share it: use_count {}\\n\", map.use_count());\n\n  const std::weak_ptr<const Map> watcher = map;\n  std::cout << std::format(\"a watcher doesn't count: use_count {}\\n\", map.use_count());\n\n  map.reset();\n  planner.reset();\n  std::cout << std::format(\"two owners gone: use_count {}, watcher expired: {}\\n\", watcher.use_count(),\n                           watcher.expired() ? \"yes\" : \"no\");\n\n  localiser.reset();\n  std::cout << std::format(\"last owner gone: watcher expired: {}\\n\", watcher.expired() ? \"yes\" : \"no\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "one owner: use_count 1\nplanner and localiser share it: use_count 3\na watcher doesn't count: use_count 3\ntwo owners gone: use_count 1, watcher expired: no\nwarehouse map freed\nlast owner gone: watcher expired: yes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " that shares an object points to the same "
+        },
+        {
+         "t": "i",
+         "v": "control block"
+        },
+        {
+         "t": "text",
+         "v": ", a small heap object that holds the "
+        },
+        {
+         "t": "i",
+         "v": "use count"
+        },
+        {
+         "t": "text",
+         "v": " (how many "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s own the object), a count of the "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s, the deleter and a pointer to the object. Copying a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " increments the use count, and destroying or resetting one decrements it. The one that brings it to zero destroys the object, here inside "
+        },
+        {
+         "t": "code",
+         "v": "localiser.reset()"
+        },
+        {
+         "t": "text",
+         "v": ". The control block stays until the last "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " is gone too, because a "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " still needs it to answer whether the object is alive. So a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " is two pointers, 16 bytes with GCC 13, and copying one does more than copy them: it updates the count with an atomic read-modify-write, so that owners in different threads can copy and drop their pointers safely ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/memory/shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": "). GCC's library skips the atomic instruction while the process has only ever had one thread, which glibc tells it through "
+        },
+        {
+         "t": "code",
+         "v": "__libc_single_threaded"
+        },
+        {
+         "t": "text",
+         "v": ". Arthur O'Dwyer's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on smart pointers",
+         "href": "https://www.youtube.com/watch?v=xGDLkt-jBJ4"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2019) draws the control block step by step."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The deleter lives in the control block, not in the type. That is why every "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<std::FILE>"
+        },
+        {
+         "t": "text",
+         "v": " has the same type, whatever closes the file. It is also why "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<Planner> p = std::make_shared<LatticePlanner>();"
+        },
+        {
+         "t": "text",
+         "v": " destroys a "
+        },
+        {
+         "t": "code",
+         "v": "LatticePlanner"
+        },
+        {
+         "t": "text",
+         "v": " correctly even when "
+        },
+        {
+         "t": "code",
+         "v": "Planner"
+        },
+        {
+         "t": "text",
+         "v": "'s destructor isn't virtual: the control block remembers the class it was created with. Don't design around that. The same object handed around as a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_ptr<Planner>"
+        },
+        {
+         "t": "text",
+         "v": " would still need the virtual destructor."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::make_shared<T>(args...)"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "R.22",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-make_shared"
+        },
+        {
+         "t": "text",
+         "v": ") puts the control block and the object in one allocation. A "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " built from a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " or from a raw pointer needs a second allocation for the control block, because the object already exists elsewhere. Counting the calls to "
+        },
+        {
+         "t": "code",
+         "v": "operator new"
+        },
+        {
+         "t": "text",
+         "v": " shows it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cstdlib>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <new>\n#include <string_view>\n\nint allocations = 0;  // global only because a replacement operator new has to be global\n\nvoid* operator new(std::size_t size) {\n  ++allocations;\n  if (void* p = std::malloc(size)) return p;\n  throw std::bad_alloc();\n}\nvoid operator delete(void* p) noexcept { std::free(p); }\nvoid operator delete(void* p, std::size_t) noexcept { std::free(p); }\n\nstruct Scan {\n  std::array<float, 360> ranges{};\n};\n\ntemplate <typename MakeOwner>\nvoid count_allocations(std::string_view label, MakeOwner make_owner) {\n  const int before = allocations;\n  { const auto owner = make_owner(); }\n  const int used = allocations - before;\n  std::cout << std::format(\"{}: {} allocation{}\\n\", label, used, used == 1 ? \"\" : \"s\");\n}\n\nint main() {\n  count_allocations(\"make_unique\", [] { return std::make_unique<Scan>(); });\n  count_allocations(\"make_shared\", [] { return std::make_shared<Scan>(); });\n  count_allocations(\"shared_ptr from make_unique\", [] { return std::shared_ptr<Scan>(std::make_unique<Scan>()); });\n}"
+      },
+      {
+       "t": "output",
+       "text": "make_unique: 1 allocation\nmake_shared: 1 allocation\nshared_ptr from make_unique: 2 allocations"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One allocation instead of two is faster to create and puts the counts next to the object in memory. Rainer Grimm's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on smart pointers",
+         "href": "https://www.youtube.com/watch?v=sQCSX7vmmKY"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2020) timed 100 million create-and-destroy loops on his machine: 2.84 s with "
+        },
+        {
+         "t": "code",
+         "v": "make_unique"
+        },
+        {
+         "t": "text",
+         "v": ", 3.40 s with "
+        },
+        {
+         "t": "code",
+         "v": "make_shared"
+        },
+        {
+         "t": "text",
+         "v": ", and 6.00 s with a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " built from "
+        },
+        {
+         "t": "code",
+         "v": "new"
+        },
+        {
+         "t": "text",
+         "v": ". The price of the single allocation is that the object's memory can only be returned together with the control block. The destructor still runs when the use count reaches zero, but the bytes stay allocated until the last "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " is gone as well. For a large object watched by long-lived "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s, create it with "
+        },
+        {
+         "t": "code",
+         "v": "make_unique"
+        },
+        {
+         "t": "text",
+         "v": " and convert."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "std::weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " refers to the control block and owns nothing. You can't dereference it. "
+        },
+        {
+         "t": "code",
+         "v": "lock()"
+        },
+        {
+         "t": "text",
+         "v": " returns a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " that owns the object if it is still alive, and an empty one if it isn't, and that "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " keeps the object alive while you use it. O'Dwyer calls a "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " a ticket you can exchange for a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "expired()"
+        },
+        {
+         "t": "text",
+         "v": " answers the same question without the exchange, but in a threaded program the answer can change before you act on it, so call "
+        },
+        {
+         "t": "code",
+         "v": "lock()"
+        },
+        {
+         "t": "text",
+         "v": " and test what it returns."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Shared ownership costs more than 16 bytes and atomic counts. It spreads the decision about when an object dies across every owner, so the destructor runs in whichever thread drops the last "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ". For a map freed inside a real-time control loop, that is a pause nobody planned. Hence "
+        },
+        {
+         "t": "a",
+         "v": "R.21",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-unique"
+        },
+        {
+         "t": "text",
+         "v": ": prefer "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " unless you need to share ownership. "
+        },
+        {
+         "t": "a",
+         "v": "F.27",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " says what sharing means: the last owner deletes the object. That is the right design when several owners' lifetimes aren't nested and none of them can be named as the one that outlives the rest. The typical cases are data handed to several threads or to asynchronous callbacks that finish in any order, and large immutable data that many parts read, held as "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr<const T>"
+        },
+        {
+         "t": "text",
+         "v": ". A parent and its children are not such a case: the parent owns the children through "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s or by value, and a child that needs its parent holds a plain pointer or reference, because the parent outlives it. Nor is \"I'm not sure who should own it\". A "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": " converts to a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " in one line when sharing becomes necessary, and there is no conversion back."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three smaller facts. The count is thread-safe and the object isn't: two threads writing to the same object through their own "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s race like any other writes, which is another reason for "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr<const T>"
+        },
+        {
+         "t": "text",
+         "v": ". One "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " variable that one thread assigns while another reads it is a race too, and C++20 adds "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic<std::shared_ptr<T>>"
+        },
+        {
+         "t": "text",
+         "v": " for that case. And the "
+        },
+        {
+         "t": "i",
+         "v": "aliasing constructor"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<const Grid>(map, &map->grid)"
+        },
+        {
+         "t": "text",
+         "v": ", shares ownership of the whole map while pointing at one member, so code that needs only the grid still keeps the map alive."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A timer calls back into its controller. The controller owns the timer and the timer owns its callback. If the callback captures a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " to the controller, the three form a cycle. The second function captures a "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " instead:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <utility>\n\nclass Timer {\n public:\n  explicit Timer(std::function<void()> callback) : callback_(std::move(callback)) {}\n  void fire() const { callback_(); }\n\n private:\n  std::function<void()> callback_;\n};\n\nclass Controller {\n public:\n  ~Controller() { std::cout << \"controller destroyed\\n\"; }\n  void tick() { std::cout << std::format(\"tick {}\\n\", ++ticks_); }\n  void set_timer(std::shared_ptr<Timer> timer) { timer_ = std::move(timer); }\n  [[nodiscard]] std::shared_ptr<Timer> timer() const { return timer_; }\n\n private:\n  std::shared_ptr<Timer> timer_;\n  int ticks_ = 0;\n};\n\n// controller -> timer -> callback -> controller: the callback owns a share of its own owner.\n[[nodiscard]] std::weak_ptr<Controller> start_with_owning_callback() {\n  auto controller = std::make_shared<Controller>();\n  controller->set_timer(std::make_shared<Timer>([controller] { controller->tick(); }));\n  controller->timer()->fire();\n  return controller;\n}\n\n// The callback only watches the controller, and skips the tick once the controller is gone.\n[[nodiscard]] std::weak_ptr<Controller> start_with_watching_callback() {\n  auto controller = std::make_shared<Controller>();\n  controller->set_timer(std::make_shared<Timer>([watched = std::weak_ptr(controller)] {\n    if (const auto alive = watched.lock()) alive->tick();\n  }));\n  controller->timer()->fire();\n  return controller;\n}\n\nint main() {\n  const std::weak_ptr<Controller> first = start_with_owning_callback();\n  std::cout << std::format(\"owning callback: controller {} after its owner returned, use_count {}\\n\",\n                           first.expired() ? \"destroyed\" : \"still alive\", first.use_count());\n\n  const std::weak_ptr<Controller> second = start_with_watching_callback();\n  std::cout << std::format(\"watching callback: controller {} after its owner returned\\n\",\n                           second.expired() ? \"destroyed\" : \"still alive\");\n\n  // Only the cycle holds the first controller now. Breaking it by hand frees it.\n  if (const auto stuck = first.lock()) stuck->set_timer(nullptr);\n}"
+      },
+      {
+       "t": "output",
+       "text": "tick 1\nowning callback: controller still alive after its owner returned, use_count 1\ntick 1\ncontroller destroyed\nwatching callback: controller destroyed after its owner returned\ncontroller destroyed"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Both functions return a "
+         },
+         {
+          "t": "code",
+          "v": "weak_ptr"
+         },
+         {
+          "t": "text",
+          "v": ", so the local "
+         },
+         {
+          "t": "code",
+          "v": "controller"
+         },
+         {
+          "t": "text",
+          "v": " is the only owner outside the timer. The first controller survives the return with a use count of 1, and that one owner is the lambda inside its own timer. Only the "
+         },
+         {
+          "t": "code",
+          "v": "weak_ptr"
+         },
+         {
+          "t": "text",
+          "v": " kept for this demo can still reach it. In a real program it would leak, with the timer and everything else it owns."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The second callback captures a "
+         },
+         {
+          "t": "code",
+          "v": "weak_ptr"
+         },
+         {
+          "t": "text",
+          "v": ", which doesn't add to the count, so the controller is destroyed as its function returns, and the timer and callback go with it. The "
+         },
+         {
+          "t": "code",
+          "v": "lock()"
+         },
+         {
+          "t": "text",
+          "v": " inside the callback asks whether the controller still exists, and keeps it alive for the length of one tick."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Nothing reports a cycle while the program runs. The use count looks normal, and the objects look alive, because they are. Remove the last line of "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " and the first controller is never destroyed, but only at exit does LeakSanitizer, which runs with AddressSanitizer on Linux, report three leaked blocks: the controller and the timer, each sharing its allocation with its control block, and the lambda that "
+         },
+         {
+          "t": "code",
+          "v": "std::function"
+         },
+         {
+          "t": "text",
+          "v": " keeps on the heap."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The rule to take away: a callback stored inside the object it calls must not own that object. A callback stored elsewhere may own it, which is how an object keeps itself alive until a reply arrives. The failure cases come back to that with "
+         },
+         {
+          "t": "code",
+          "v": "enable_shared_from_this"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Loading an occupancy map from disk is slow, and several parts of the robot ask for the same map. Write a "
+        },
+        {
+         "t": "code",
+         "v": "MapCache"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<const Map> get(std::string_view name)"
+        },
+        {
+         "t": "text",
+         "v": ". It returns the map that someone already holds, if it is still alive, and loads it again only if it isn't. The cache must not keep maps alive by itself. The constructor takes the loading step as a function, so a test can count loads. Test these in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Two requests for the same map while the first is still held: one load, the same object, and a use count of 2."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Drop both, request it again: a second load."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A request for another map: a third load."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then say why the cache stores "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s rather than "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s, and what a thread-safe version needs."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <string_view>\n#include <unordered_map>\n#include <utility>\n#include <vector>\n\nstruct Map {\n  std::string name;\n  std::vector<std::uint8_t> cells;\n};\n\nclass MapCache {\n public:\n  using Loader = std::function<Map(std::string_view)>;\n  explicit MapCache(Loader load) : load_(std::move(load)) {}\n\n  [[nodiscard]] std::shared_ptr<const Map> get(std::string_view name) {\n    std::weak_ptr<const Map>& slot = maps_[std::string(name)];\n    if (auto map = slot.lock()) return map;  // someone still holds it\n    auto map = std::make_shared<const Map>(load_(name));\n    slot = map;\n    return map;\n  }\n\n private:\n  Loader load_;\n  std::unordered_map<std::string, std::weak_ptr<const Map>> maps_;\n};\n\nint main() {\n  int loads = 0;\n  MapCache cache([&loads](std::string_view name) {\n    ++loads;\n    return Map{.name = std::string(name), .cells = std::vector<std::uint8_t>(1000)};\n  });\n\n  {\n    const auto for_planner = cache.get(\"warehouse\");\n    const auto for_localiser = cache.get(\"warehouse\");\n    std::cout << std::format(\"same map: {}, use_count {}, loads {}\\n\",\n                             for_planner == for_localiser ? \"yes\" : \"no\", for_planner.use_count(), loads);\n  }\n  const auto later = cache.get(\"warehouse\");\n  std::cout << std::format(\"after both let go, the next request loads again: loads {}\\n\", loads);\n  const auto other = cache.get(\"loading dock\");\n  std::cout << std::format(\"another map: loads {}\\n\", loads);\n}"
+      },
+      {
+       "t": "output",
+       "text": "same map: yes, use_count 2, loads 1\nafter both let go, the next request loads again: loads 2\nanother map: loads 3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A cache that stored "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s would be one more owner of every map, so no map would ever be freed while the cache exists. With "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": "s, the users decide how long a map lives, and the cache only remembers where to find it while it does. "
+        },
+        {
+         "t": "code",
+         "v": "lock()"
+        },
+        {
+         "t": "text",
+         "v": " turns that memory into ownership for the caller, or reports that the map is gone. Caching is the first use for "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " that David Olsen's talk names."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each name leaves a small entry behind after its map is freed: an expired "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " and its control block. For a handful of maps that doesn't matter. If names come from outside without limit, erase expired entries in "
+        },
+        {
+         "t": "code",
+         "v": "get"
+        },
+        {
+         "t": "text",
+         "v": " or now and then. A thread-safe version needs a "
+        },
+        {
+         "t": "code",
+         "v": "std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " held for the whole of "
+        },
+        {
+         "t": "code",
+         "v": "get"
+        },
+        {
+         "t": "text",
+         "v": ". Each "
+        },
+        {
+         "t": "code",
+         "v": "lock()"
+        },
+        {
+         "t": "text",
+         "v": " is safe on its own, but the lookup, the load and the store must happen as one step, or two threads that miss at the same time both load the map."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pitfalls",
+   "title": "Two control blocks from one raw pointer, enable_shared_from_this, smart pointers as parameters",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A planner is given the map as a raw pointer and wraps it in its own "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ". This compiles without a warning and frees the map twice:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:attempting free on address which was not malloc()-ed",
+       "text": "#include <memory>\n#include <vector>\n\nstruct Map {\n  std::vector<int> cells = std::vector<int>(16);\n};\n\nclass Planner {\n public:\n  void use_map(const Map* map) { map_ = std::shared_ptr<const Map>(map); }  // a second control block\n\n private:\n  std::shared_ptr<const Map> map_;\n};\n\nint main() {\n  const auto map = std::make_shared<const Map>();\n  Planner planner;\n  planner.use_map(map.get());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A raw pointer carries no count with it, so every "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " constructed from one creates a new control block. Now two control blocks each count one owner, and each deletes the map when its count reaches zero. The planner's goes first, and AddressSanitizer stops it. Its report explains the odd wording, and it shows what "
+        },
+        {
+         "t": "code",
+         "v": "make_shared"
+        },
+        {
+         "t": "text",
+         "v": " did. The map is \"located 16 bytes inside of 40-byte region\", so it doesn't start its allocation, and the "
+        },
+        {
+         "t": "code",
+         "v": "allocated by"
+        },
+        {
+         "t": "text",
+         "v": " frames below that line name the allocation's type: "
+        },
+        {
+         "t": "code",
+         "v": "_Sp_counted_ptr_inplace<Map const, ...>"
+        },
+        {
+         "t": "text",
+         "v": ", a control block with the map stored inside it. Its first 16 bytes are the control block's base, "
+        },
+        {
+         "t": "code",
+         "v": "_Sp_counted_base"
+        },
+        {
+         "t": "text",
+         "v": ": an 8-byte pointer to its virtual function table and the two 4-byte counts. A map created with "
+        },
+        {
+         "t": "code",
+         "v": "make_unique"
+        },
+        {
+         "t": "text",
+         "v": " and converted is a separate allocation, and the same mistake is then reported as "
+        },
+        {
+         "t": "code",
+         "v": "heap-use-after-free"
+        },
+        {
+         "t": "text",
+         "v": ": the first owner destroys and frees the map, and the second runs "
+        },
+        {
+         "t": "code",
+         "v": "~Map"
+        },
+        {
+         "t": "text",
+         "v": " again on the freed memory, where the report catches it inside "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<int>::~vector()"
+        },
+        {
+         "t": "text",
+         "v": ". Create shared ownership once, with "
+        },
+        {
+         "t": "code",
+         "v": "make_shared"
+        },
+        {
+         "t": "text",
+         "v": " or from a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", and share it only by copying a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ". Olsen shows the same bug with "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<T> b(a.get())"
+        },
+        {
+         "t": "text",
+         "v": ". Here the fix is "
+        },
+        {
+         "t": "a",
+         "v": "R.34",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-sharedptrparam-owner"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "use_map"
+        },
+        {
+         "t": "text",
+         "v": " takes a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<const Map>"
+        },
+        {
+         "t": "text",
+         "v": " by value and moves it into the member, and the caller passes "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An object that needs a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " to itself falls into the same trap with "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<Session>(this)"
+        },
+        {
+         "t": "text",
+         "v": ", which makes a second control block for an object that already has one. "
+        },
+        {
+         "t": "code",
+         "v": "std::enable_shared_from_this<T>"
+        },
+        {
+         "t": "text",
+         "v": ", as a public base, fixes it. The "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " constructor that creates the control block also stores a "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " to the object inside that base, and "
+        },
+        {
+         "t": "code",
+         "v": "shared_from_this()"
+        },
+        {
+         "t": "text",
+         "v": " locks it, so the new "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " shares the existing count. The usual reason is an asynchronous job that must keep its object alive until the job has run, the pattern O'Dwyer takes from Boost.Beast:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <functional>\n#include <iostream>\n#include <memory>\n#include <utility>\n#include <vector>\n\nclass Dispatcher {\n public:\n  void post(std::function<void()> job) { jobs_.push_back(std::move(job)); }\n  void run_all() {\n    for (const auto& job : jobs_) job();\n    jobs_.clear();\n  }\n\n private:\n  std::vector<std::function<void()>> jobs_;\n};\n\nclass Session : public std::enable_shared_from_this<Session> {\n public:\n  ~Session() { std::cout << \"session destroyed\\n\"; }\n\n  // The queued job owns a share of the session, so the session lives until the job has run.\n  void request_scan(Dispatcher& dispatcher) {\n    dispatcher.post([self = shared_from_this()] { self->on_scan(); });\n  }\n\n private:\n  void on_scan() const { std::cout << \"scan received\\n\"; }\n};\n\nint main() {\n  Dispatcher dispatcher;\n  {\n    const auto session = std::make_shared<Session>();\n    session->request_scan(dispatcher);\n    std::cout << std::format(\"the pending job holds a share: use_count {}\\n\", session.use_count());\n  }\n  std::cout << \"the caller has let go\\n\";\n  dispatcher.run_all();\n\n  Session on_stack;  // owned by no shared_ptr\n  try {\n    on_stack.request_scan(dispatcher);\n  } catch (const std::bad_weak_ptr& e) {\n    std::cout << std::format(\"on the stack: {}\\n\", e.what());\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "the pending job holds a share: use_count 2\nthe caller has let go\nscan received\nsession destroyed\non the stack: bad_weak_ptr\nsession destroyed"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The job here is a one-shot callback stored in the dispatcher, not in the session, so owning the session makes no cycle: "
+        },
+        {
+         "t": "code",
+         "v": "run_all"
+        },
+        {
+         "t": "text",
+         "v": " runs the job and destroys it, and the session goes with it. A callback the session stores in itself, like the timer in the worked example, captures "
+        },
+        {
+         "t": "code",
+         "v": "weak_from_this()"
+        },
+        {
+         "t": "text",
+         "v": " instead, which C++17 added. "
+        },
+        {
+         "t": "code",
+         "v": "shared_from_this()"
+        },
+        {
+         "t": "text",
+         "v": " fails in three ways, each measured with GCC 13, and since C++17 each throws "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/memory/enable_shared_from_this"
+        },
+        {
+         "t": "text",
+         "v": "); before C++17 they were undefined behaviour. It fails on an object no "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " owns, like "
+        },
+        {
+         "t": "code",
+         "v": "on_stack"
+        },
+        {
+         "t": "text",
+         "v": ". It fails inside the constructor, because the control block doesn't exist until the constructor has finished, so an object that registers itself somewhere must do it in a second step after "
+        },
+        {
+         "t": "code",
+         "v": "make_shared"
+        },
+        {
+         "t": "text",
+         "v": ". And it fails when the base isn't public: "
+        },
+        {
+         "t": "code",
+         "v": "class Session : std::enable_shared_from_this<Session>"
+        },
+        {
+         "t": "text",
+         "v": " inherits privately, the "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " constructor can't see the base, and every call throws, with no warning from "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "To stop anyone creating the object on the stack, its constructor has to be out of reach, but a private constructor also shuts out "
+        },
+        {
+         "t": "code",
+         "v": "std::make_shared"
+        },
+        {
+         "t": "text",
+         "v": ", which constructs the object from inside the library: GCC 13 refuses a static "
+        },
+        {
+         "t": "code",
+         "v": "create()"
+        },
+        {
+         "t": "text",
+         "v": " that calls it, with "
+        },
+        {
+         "t": "code",
+         "v": "'constexpr Session::Session()' is private within this context"
+        },
+        {
+         "t": "text",
+         "v": ". The "
+        },
+        {
+         "t": "i",
+         "v": "passkey idiom"
+        },
+        {
+         "t": "text",
+         "v": " gets around that. The constructor stays public, but it takes a parameter of a private type that only "
+        },
+        {
+         "t": "code",
+         "v": "Session"
+        },
+        {
+         "t": "text",
+         "v": " can create:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n\nclass Session : public std::enable_shared_from_this<Session> {\n  struct Token {\n    explicit Token() = default;\n  };\n\n public:\n  // Public, so make_shared can call it, but only Session can make the Token it needs.\n  explicit Session(Token /*only_from_create*/) {}\n  // A copy would be a Session that no shared_ptr owns, so copies and moves are deleted too.\n  Session(const Session&) = delete;\n  Session& operator=(const Session&) = delete;\n  Session(Session&&) = delete;\n  Session& operator=(Session&&) = delete;\n  ~Session() = default;\n  [[nodiscard]] static std::shared_ptr<Session> create() { return std::make_shared<Session>(Token{}); }\n};\n\nint main() {\n  const auto session = Session::create();\n  const auto self = session->shared_from_this();\n  std::cout << std::format(\"made by create(); shared_from_this shares its count: use_count {}\\n\",\n                           session.use_count());\n}"
+      },
+      {
+       "t": "output",
+       "text": "made by create(); shared_from_this shares its count: use_count 2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Token"
+        },
+        {
+         "t": "text",
+         "v": "'s default constructor is "
+        },
+        {
+         "t": "code",
+         "v": "explicit"
+        },
+        {
+         "t": "text",
+         "v": ", so code outside "
+        },
+        {
+         "t": "code",
+         "v": "Session"
+        },
+        {
+         "t": "text",
+         "v": " can't make one from "
+        },
+        {
+         "t": "code",
+         "v": "{}"
+        },
+        {
+         "t": "text",
+         "v": " either:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "would use explicit constructor",
+       "text": "#include <memory>\n\nclass Session : public std::enable_shared_from_this<Session> {\n  struct Token {\n    explicit Token() = default;\n  };\n\n public:\n  explicit Session(Token /*only_from_create*/) {}\n  Session(const Session&) = delete;\n  Session& operator=(const Session&) = delete;\n  Session(Session&&) = delete;\n  Session& operator=(Session&&) = delete;\n  ~Session() = default;\n  [[nodiscard]] static std::shared_ptr<Session> create() { return std::make_shared<Session>(Token{}); }\n};\n\nint main() {\n  const Session on_stack({});  // refused: only Session can make a Token\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The copy constructor was the other way in. Without the deleted copy operations, "
+        },
+        {
+         "t": "code",
+         "v": "const Session on_stack(*Session::create());"
+        },
+        {
+         "t": "text",
+         "v": " compiles under "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": ", because "
+        },
+        {
+         "t": "code",
+         "v": "Session"
+        },
+        {
+         "t": "text",
+         "v": "'s implicit copy constructor calls the protected copy constructor of "
+        },
+        {
+         "t": "code",
+         "v": "enable_shared_from_this"
+        },
+        {
+         "t": "text",
+         "v": ", which is allowed. The result is a "
+        },
+        {
+         "t": "code",
+         "v": "Session"
+        },
+        {
+         "t": "text",
+         "v": " that no "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " owns, and "
+        },
+        {
+         "t": "code",
+         "v": "shared_from_this()"
+        },
+        {
+         "t": "text",
+         "v": " on it throws "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": ". With the copy deleted, GCC 13 refuses it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "use of deleted function",
+       "text": "#include <memory>\n\nclass Session : public std::enable_shared_from_this<Session> {\n  struct Token {\n    explicit Token() = default;\n  };\n\n public:\n  explicit Session(Token /*only_from_create*/) {}\n  Session(const Session&) = delete;\n  Session& operator=(const Session&) = delete;\n  Session(Session&&) = delete;\n  Session& operator=(Session&&) = delete;\n  ~Session() = default;\n  [[nodiscard]] static std::shared_ptr<Session> create() { return std::make_shared<Session>(Token{}); }\n};\n\nint main() {\n  const Session on_stack(*Session::create());  // refused: the copy constructor is deleted\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last two failures are about parameters. A function that only reads the map but takes a "
+        },
+        {
+         "t": "code",
+         "v": "const std::shared_ptr<Map>&"
+        },
+        {
+         "t": "text",
+         "v": " can't be called with a map that isn't owned by a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "invalid initialization of reference of type",
+       "text": "#include <memory>\n\nstruct Map {\n  int cells = 0;\n};\n\n[[nodiscard]] int count_cells(const std::shared_ptr<Map>& map) { return map->cells; }\n\nint main() {\n  const Map on_stack;\n  return count_cells(on_stack);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fix is to take a "
+        },
+        {
+         "t": "code",
+         "v": "const Map&"
+        },
+        {
+         "t": "text",
+         "v": ", which accepts every map, however it is owned ("
+        },
+        {
+         "t": "a",
+         "v": "F.7",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-smart"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "a",
+         "v": "R.30",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-smartptrparam"
+        },
+        {
+         "t": "text",
+         "v": "). Abseil's "
+        },
+        {
+         "t": "a",
+         "v": "tip 188",
+         "href": "https://abseil.io/tips/188"
+        },
+        {
+         "t": "text",
+         "v": " makes the same argument. A "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<Map>"
+        },
+        {
+         "t": "text",
+         "v": " taken by value and never stored costs an atomic increment on the way in and an atomic decrement on the way out, on every call. Herb Sutter's "
+        },
+        {
+         "t": "a",
+         "v": "GotW 91",
+         "href": "https://herbsutter.com/2013/06/05/gotw-91-solution-smart-pointer-parameters/"
+        },
+        {
+         "t": "text",
+         "v": " goes through each combination, and the Core Guidelines turned it into rules R.30 to R.37. A parameter's type says what the function does with ownership:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Parameter"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What the function does"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Rule"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "const Map&"
+          },
+          {
+           "t": "text",
+           "v": " or "
+          },
+          {
+           "t": "code",
+           "v": "Map&"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "uses the map, which must exist"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "F.7"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "const Map*"
+          },
+          {
+           "t": "text",
+           "v": " or "
+          },
+          {
+           "t": "code",
+           "v": "Map*"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "uses the map, which may be absent"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "F.7"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::unique_ptr<Map>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "takes ownership: a sink"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "R.32"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::unique_ptr<Map>&"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "may make the caller's pointer point elsewhere"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "R.33"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::shared_ptr<Map>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "keeps a share; the caller moves in if it's done with its own"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "R.34"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::shared_ptr<Map>&"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "may make the caller's pointer point elsewhere"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "R.35"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "const std::shared_ptr<Map>&"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "might keep a share, and decides inside"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "R.36"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "const std::unique_ptr<Map>&"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "nothing a "
+          },
+          {
+           "t": "code",
+           "v": "const Map*"
+          },
+          {
+           "t": "text",
+           "v": " doesn't say better"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "GotW 91"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Passing the object itself instead of the smart pointer has one trap, the subject of "
+        },
+        {
+         "t": "a",
+         "v": "R.37",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-smartptrget"
+        },
+        {
+         "t": "text",
+         "v": ". The reference is only as good as the "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " it came from, and if a function further down replaces that "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", the reference dangles:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <utility>\n#include <vector>\n\nstruct Map {\n  std::vector<int> cells;\n};\n\nclass Navigator {\n public:\n  explicit Navigator(std::shared_ptr<const Map> map) : map_(std::move(map)) {}\n  void step() { plan(*map_); }  // lends the map without holding a share of it\n\n private:\n  void plan(const Map& map) {\n    reload();  // replaces map_, the only owner of the old map\n    std::cout << std::format(\"planning over {} cells\\n\", map.cells.size());\n  }\n  void reload() { map_ = std::make_shared<const Map>(Map{.cells = std::vector<int>(8)}); }\n\n  std::shared_ptr<const Map> map_;\n};\n\nint main() {\n  Navigator navigator(std::make_shared<const Map>(Map{.cells = std::vector<int>(4)}));\n  navigator.step();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "plan"
+        },
+        {
+         "t": "text",
+         "v": " reads a map that "
+        },
+        {
+         "t": "code",
+         "v": "reload"
+        },
+        {
+         "t": "text",
+         "v": " freed. The fix is one line in "
+        },
+        {
+         "t": "code",
+         "v": "step"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "const auto pinned = map_; plan(*pinned);"
+        },
+        {
+         "t": "text",
+         "v": ". The local copy holds a share for the whole call, so the old map lives until "
+        },
+        {
+         "t": "code",
+         "v": "plan"
+        },
+        {
+         "t": "text",
+         "v": " returns, whatever happens to "
+        },
+        {
+         "t": "code",
+         "v": "map_"
+        },
+        {
+         "t": "text",
+         "v": " in between. You need it only where the "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " you borrow from is reachable by the code you call, as a member or anything global is; a local "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " that you pass down can't be replaced behind your back."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say when an object is a plain member, a "
+        },
+        {
+         "t": "code",
+         "v": "unique_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " or a "
+        },
+        {
+         "t": "code",
+         "v": "weak_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", and when a function takes neither but a reference. Explain what a control block holds, what "
+        },
+        {
+         "t": "code",
+         "v": "make_shared"
+        },
+        {
+         "t": "text",
+         "v": " changes and what it costs. Describe how a callback forms a cycle with its owner and two ways to break it. Say why a second "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " built from a raw pointer frees the object twice, what "
+        },
+        {
+         "t": "code",
+         "v": "enable_shared_from_this"
+        },
+        {
+         "t": "text",
+         "v": " does instead, and when to pin a "
+        },
+        {
+         "t": "code",
+         "v": "shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": " in a local copy."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does a moved-from "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " hold, and why can't a "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " be copied?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When should an object be a plain member rather than a "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", and what is Abseil's test for it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is a "
+     },
+     {
+      "t": "code",
+      "v": "unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " with a pool-returning deleter 16 bytes, and one with the default deleter 8?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a control block hold, when is the object destroyed, and when is the control block freed?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "make_shared"
+     },
+     {
+      "t": "text",
+      "v": " save, what does it cost, and when is a separate allocation better?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How does a callback form a cycle with the object that owns it, and what should it capture instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "std::shared_ptr<T>(p.get())"
+     },
+     {
+      "t": "text",
+      "v": " free the object twice, and how does ASan's report show that "
+     },
+     {
+      "t": "code",
+      "v": "p"
+     },
+     {
+      "t": "text",
+      "v": " came from "
+     },
+     {
+      "t": "code",
+      "v": "make_shared"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In which three situations does "
+     },
+     {
+      "t": "code",
+      "v": "shared_from_this()"
+     },
+     {
+      "t": "text",
+      "v": " throw "
+     },
+     {
+      "t": "code",
+      "v": "std::bad_weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which parameter type do you choose for a function that reads a map, one that stores it, and one that replaces the caller's pointer?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a cache that hands out "
+     },
+     {
+      "t": "code",
+      "v": "std::shared_ptr<const T>"
+     },
+     {
+      "t": "text",
+      "v": " and holds only "
+     },
+     {
+      "t": "code",
+      "v": "std::weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": "s."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Smart Pointers, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_smart_pointers/back_to_basics_smart_pointers__arthur_odwyer__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=xGDLkt-jBJ4"
+     },
+     {
+      "t": "text",
+      "v": ". The control block drawn step by step, "
+     },
+     {
+      "t": "code",
+      "v": "weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": " as a ticket, and "
+     },
+     {
+      "t": "code",
+      "v": "enable_shared_from_this"
+     },
+     {
+      "t": "text",
+      "v": " for an object that keeps itself alive during an asynchronous call."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Smart Pointers, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_smart_pointers/back_to_basics_smart_pointers__rainer_grimm__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=sQCSX7vmmKY"
+     },
+     {
+      "t": "text",
+      "v": ". The timings of "
+     },
+     {
+      "t": "code",
+      "v": "make_shared"
+     },
+     {
+      "t": "text",
+      "v": " against "
+     },
+     {
+      "t": "code",
+      "v": "new"
+     },
+     {
+      "t": "text",
+      "v": ", and the table of smart pointer parameters."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: C++ Smart Pointers, CppCon 2022: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2022/blob/main/Presentations/Olsen-Smart-Pointers-CppCon22.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=YokY6HzLkXs"
+     },
+     {
+      "t": "text",
+      "v": ". Moves instead of "
+     },
+     {
+      "t": "code",
+      "v": "release"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "reset"
+     },
+     {
+      "t": "text",
+      "v": ", two owners made from one raw pointer, and caching with "
+     },
+     {
+      "t": "code",
+      "v": "weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "R.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-owner"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-unique"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.22",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-make_shared"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.23",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-make_unique"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.24",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.30",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-smartptrparam"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.32",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-uniqueptrparam"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.33",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-reseat"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.34",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-sharedptrparam-owner"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.35",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-sharedptrparam"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.36",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-sharedptrparam-const"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "R.37",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-smartptrget"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.7",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-smart"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.26",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "F.27",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "C.35",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-virtual"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Herb Sutter, "
+     },
+     {
+      "t": "a",
+      "v": "GotW 91 on smart pointer parameters",
+      "href": "https://herbsutter.com/2013/06/05/gotw-91-solution-smart-pointer-parameters/"
+     },
+     {
+      "t": "text",
+      "v": ": what each parameter type says, and the cost of copying a "
+     },
+     {
+      "t": "code",
+      "v": "shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tips "
+     },
+     {
+      "t": "a",
+      "v": "187, on unique_ptr that is never moved",
+      "href": "https://abseil.io/tips/187"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "188, on smart pointers as parameters",
+      "href": "https://abseil.io/tips/188"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "unique_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "shared_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/shared_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "weak_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "make_shared",
+      "href": "https://en.cppreference.com/cpp/memory/shared_ptr/make_shared"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "enable_shared_from_this",
+      "href": "https://en.cppreference.com/cpp/memory/enable_shared_from_this"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

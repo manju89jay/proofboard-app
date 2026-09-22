@@ -1,0 +1,1451 @@
+{
+ "id": "ros-rotations",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "In a few sentences and without notes, explain why ROS messages and tf2 store a 3D orientation as a quaternion instead of as roll, pitch and yaw. Name two problems with Euler angles, and what the quaternion costs you in return. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Three angles mean nothing until you fix a convention: which axes, in which order, and whether the axes stay fixed or move with the body. REP 103 counts 24 valid conventions. Even with the convention fixed, the angles have a singularity. At a pitch of ±90° the roll axis and the yaw axis line up, one degree of freedom disappears, which is called "
+     },
+     {
+      "t": "i",
+      "v": "gimbal lock"
+     },
+     {
+      "t": "text",
+      "v": ", and near that pose a turn of one degree can change the roll and yaw readings by 180°. Angles also don't compose or interpolate by adding them: yaw 170° and yaw −170° are 20° apart, and their average, 0°, points the opposite way."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A unit quaternion (x, y, z, w) covers every rotation without a singularity. Two rotations compose with one quaternion product of 16 multiplications, and slerp interpolates between two orientations along the shortest arc at a constant rate. The price is one redundant number. The four components must keep a norm of 1, rounding makes the norm drift, and code has to normalise. Every rotation also has two quaternions, q and −q, so comparing or averaging them needs care. A rotation matrix has no singularity either, but it stores nine numbers held together by six constraints."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you named the convention problem or gimbal lock, the trouble with composing or interpolating angles, and the unit-norm constraint. One problem and no cost is a partial pass. \"Quaternions are faster\" on its own is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "An orientation in 3D can be written three ways. Roll, pitch and yaw are three angles about three axes, in a fixed order agreed on before the numbers mean anything. A rotation matrix turns coordinates directly, with no such ambiguity. A unit quaternion stores the same rotation as four numbers, an axis and a half-angle folded together, written as x, y, z, then w."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that three angles alone don't determine a rotation: the same numbers mean a different orientation depending on which axes are used, in which order, and whether they are fixed to the world or the body, and many conventions are valid at once. Even with a convention fixed, angles carry a singularity: at one orientation two of the three axes line up, one degree of freedom disappears, and a tiny turn there can swing two readings by a huge amount, the failure called gimbal lock. Angles also don't average correctly by adding the numbers, because the numbers wrap where the rotations don't."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A unit quaternion sidesteps both problems: it represents every orientation with no singularity, two quaternions compose by one multiplication in a fixed formula, and interpolating along the shortest path is a closed formula too, something roll, pitch and yaw cannot do correctly. A rotation matrix shares the no-singularity property but spends nine numbers on three degrees of freedom, tied by constraints that rounding slowly loosens."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The quaternion's own cost is a fourth, redundant number: it must stay unit length or the rotation is subtly wrong, so code composing many of them has to renormalise now and then. Every rotation also has two quaternions representing it, a number and its exact negative, so comparing orientations by their four numbers directly is wrong; you compare how close their product is to no rotation instead. Roll, pitch and yaw remain right for reading a number aloud or plotting one over time, and gimbal lock matters only to a body that can reach that orientation, ruling it out for a wheeled robot but not an arm or drone."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This is the interview question itself: naming the convention problem and gimbal lock as what roll, pitch and yaw cost, and the extra number with the double meaning of a sign as what a quaternion costs back, which is why ROS and tf2 store orientation as a quaternion and convert to angles only for a person to read."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "rotations",
+   "title": "Rotation matrices, Euler angles, quaternions",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Turn the nose of a robot, which starts on the x axis, by 90° about z and by 90° about y, once in each order:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cmath>\n#include <format>\n#include <iostream>\n#include <numbers>\n#include <string>\n\nusing Vec3 = std::array<double, 3>;\nusing Mat3 = std::array<Vec3, 3>;  // three rows\n\n[[nodiscard]] Vec3 operator*(const Mat3& m, const Vec3& v) {\n  Vec3 out{};\n  for (int r = 0; r < 3; ++r) {\n    out[r] = m[r][0] * v[0] + m[r][1] * v[1] + m[r][2] * v[2];\n  }\n  return out;\n}\n\n// Rotations about the fixed x, y and z axes, counterclockwise when the axis points at you.\n[[nodiscard]] Mat3 rot_x(double a) {\n  const double c = std::cos(a), s = std::sin(a);\n  return {{{1, 0, 0}, {0, c, -s}, {0, s, c}}};\n}\n[[nodiscard]] Mat3 rot_y(double a) {\n  const double c = std::cos(a), s = std::sin(a);\n  return {{{c, 0, s}, {0, 1, 0}, {-s, 0, c}}};\n}\n[[nodiscard]] Mat3 rot_z(double a) {\n  const double c = std::cos(a), s = std::sin(a);\n  return {{{c, -s, 0}, {s, c, 0}, {0, 0, 1}}};\n}\n\n[[nodiscard]] double tidy(double v) { return std::round(v * 1000) / 1000 + 0.0; }  // prints -0.000 as 0.000\n\n[[nodiscard]] std::string show(const Vec3& v) {\n  return std::format(\"({:.3f}, {:.3f}, {:.3f})\", tidy(v[0]), tidy(v[1]), tidy(v[2]));\n}\n\nint main() {\n  constexpr double quarter = std::numbers::pi / 2;\n  constexpr Vec3 nose{1, 0, 0};\n  std::cout << \"yaw, then pitch: \" << show(rot_y(quarter) * (rot_z(quarter) * nose)) << '\\n';\n  std::cout << \"pitch, then yaw: \" << show(rot_z(quarter) * (rot_y(quarter) * nose)) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "yaw, then pitch: (0.000, 1.000, 0.000)\npitch, then yaw: (0.000, 0.000, -1.000)"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Yaw first turns the nose to the left, along y, and the pitch about y then leaves it there. Pitch first points the nose at the floor, and a yaw about the vertical axis can't move a vector that lies on that axis. Rotations in 3D don't commute, so three angles describe an orientation only together with an order and a choice of axes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each of "
+        },
+        {
+         "t": "code",
+         "v": "rot_x"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "rot_y"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "rot_z"
+        },
+        {
+         "t": "text",
+         "v": " returns a "
+        },
+        {
+         "t": "i",
+         "v": "rotation matrix"
+        },
+        {
+         "t": "text",
+         "v": ". Its columns are where the x, y and z axes end up, so the columns are orthonormal and the determinant is +1. The inverse is the transpose, and \"apply B, then A\" is the product A·B, read from right to left. A rotation matrix composes and inverts cleanly, but it spends nine numbers on three degrees of freedom, and the six constraints between them are what rounding slowly breaks."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "REP 103 fixes the convention for ROS. Roll, pitch and yaw are rotations about the fixed x, y and z axes, applied in that order, so R = Rz(yaw)·Ry(pitch)·Rx(roll). Read from the robot's point of view, the same matrix is a yaw about the robot's own z axis, then a pitch about its new y axis, then a roll about its newest x axis. Both readings produce the same matrix, which is why you meet both descriptions. REP 103 lists quaternions as the preferred representation, then rotation matrices, then these fixed-axis angles, and it discourages other Euler angle conventions because 24 of them are valid and different fields default to different ones."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The camera from the topic on poses is an example. Its URDF gives the optical frame a roll of −1.57 and a yaw of −1.57, which stand for −90°. Rz(−90°)·Rx(−90°) has the columns (0, −1, 0), (0, 0, −1) and (1, 0, 0), exactly the matrix "
+        },
+        {
+         "t": "code",
+         "v": "camera_from_optical"
+        },
+        {
+         "t": "text",
+         "v": " that the worked example there wrote down column by column: image right is the camera's −y, image down is its −z, and the viewing direction is its +x."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "unit quaternion"
+        },
+        {
+         "t": "text",
+         "v": " stores a rotation by the angle θ about the unit axis n as four numbers: x, y and z are n·sin(θ/2), and w is cos(θ/2). ROS writes them in that order, with w last. The message "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/Quaternion"
+        },
+        {
+         "t": "text",
+         "v": " has four "
+        },
+        {
+         "t": "code",
+         "v": "float64"
+        },
+        {
+         "t": "text",
+         "v": " fields that default to (0, 0, 0, 1), the rotation that does nothing. Eigen's "
+        },
+        {
+         "t": "code",
+         "v": "Quaterniond"
+        },
+        {
+         "t": "text",
+         "v": " constructor takes w first. Mixing the two orders is a classic bug, and the code below names every field with a designated initialiser so that the order can't be misread."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here are the operations in plain C++: the product that composes two rotations, the sandwich q·v·q* that rotates a vector, and slerp:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <cmath>\n#include <format>\n#include <iostream>\n#include <numbers>\n#include <string>\n\nusing Vec3 = std::array<double, 3>;\n\nstruct Quat {  // ROS order: the vector part x, y, z, then the scalar w\n  double x, y, z, w;\n};\n\nstruct Rpy {\n  double roll, pitch, yaw;\n};\n\n// Hamilton product: a * b applies b first, then a.\n[[nodiscard]] constexpr Quat operator*(const Quat& a, const Quat& b) {\n  return {.x = a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,\n          .y = a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,\n          .z = a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,\n          .w = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z};\n}\n\n[[nodiscard]] constexpr Quat operator-(const Quat& q) { return {.x = -q.x, .y = -q.y, .z = -q.z, .w = -q.w}; }\n\n[[nodiscard]] constexpr Quat conjugate(const Quat& q) { return {.x = -q.x, .y = -q.y, .z = -q.z, .w = q.w}; }\n\n[[nodiscard]] constexpr double dot(const Quat& a, const Quat& b) {\n  return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;\n}\n\n// A rotation by `angle` radians about a unit axis.\n[[nodiscard]] Quat from_axis_angle(const Vec3& axis, double angle) {\n  const double s = std::sin(angle / 2);\n  return {.x = axis[0] * s, .y = axis[1] * s, .z = axis[2] * s, .w = std::cos(angle / 2)};\n}\n\n// The ROS convention: roll about the fixed x axis, then pitch about fixed y, then yaw about fixed z.\n[[nodiscard]] Quat from_rpy(const Rpy& a) {\n  return from_axis_angle({0, 0, 1}, a.yaw) * from_axis_angle({0, 1, 0}, a.pitch) *\n         from_axis_angle({1, 0, 0}, a.roll);\n}\n\n// v' = q v q*, with v written as a quaternion whose w is 0.\n[[nodiscard]] constexpr Vec3 rotate(const Quat& q, const Vec3& v) {\n  const Quat r = q * Quat{.x = v[0], .y = v[1], .z = v[2], .w = 0} * conjugate(q);\n  return {r.x, r.y, r.z};\n}\n\n[[nodiscard]] double yaw_of(const Quat& q) {\n  return std::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));\n}\n\n// Spherical linear interpolation along the shorter arc, for t from 0 to 1.\n[[nodiscard]] Quat slerp(const Quat& a, Quat b, double t) {\n  double cos_half = dot(a, b);\n  if (cos_half < 0) {  // -b is the same rotation as b, and closer to a\n    b = -b;\n    cos_half = -cos_half;\n  }\n  const double half = std::acos(std::min(cos_half, 1.0));\n  if (half < 1e-9) {\n    return a;\n  }\n  const double wa = std::sin((1 - t) * half) / std::sin(half);\n  const double wb = std::sin(t * half) / std::sin(half);\n  return {.x = wa * a.x + wb * b.x, .y = wa * a.y + wb * b.y, .z = wa * a.z + wb * b.z, .w = wa * a.w + wb * b.w};\n}\n\n[[nodiscard]] double tidy(double v) { return std::round(v * 1000) / 1000 + 0.0; }\n\n[[nodiscard]] std::string show(const Vec3& v) {\n  return std::format(\"({:.3f}, {:.3f}, {:.3f})\", tidy(v[0]), tidy(v[1]), tidy(v[2]));\n}\n\n[[nodiscard]] std::string show(const Quat& q) {\n  return std::format(\"(x {:.3f}, y {:.3f}, z {:.3f}, w {:.3f})\", tidy(q.x), tidy(q.y), tidy(q.z), tidy(q.w));\n}\n\nint main() {\n  constexpr double deg = std::numbers::pi / 180;\n  constexpr Vec3 nose{1, 0, 0};\n\n  const Quat left = from_rpy({.roll = 0, .pitch = 0, .yaw = 90 * deg});\n  std::cout << \"yaw 90:      \" << show(left) << \" turns the nose to \" << show(rotate(left, nose)) << '\\n';\n  std::cout << \"its negative \" << show(-left) << \" turns the nose to \" << show(rotate(-left, nose)) << '\\n';\n\n  const Quat a = from_rpy({.roll = 0, .pitch = 0, .yaw = 170 * deg});\n  const Quat b = from_rpy({.roll = 0, .pitch = 0, .yaw = -170 * deg});\n  std::cout << std::format(\"halfway from 170 to -170: average of angles {:.1f}, slerp {:.1f}\\n\",\n                           tidy((170.0 + -170.0) / 2), tidy(yaw_of(slerp(a, b, 0.5)) / deg));\n}"
+      },
+      {
+       "t": "output",
+       "text": "yaw 90:      (x 0.000, y 0.000, z 0.707, w 0.707) turns the nose to (0.000, 1.000, 0.000)\nits negative (x 0.000, y 0.000, z -0.707, w -0.707) turns the nose to (0.000, 1.000, 0.000)\nhalfway from 170 to -170: average of angles 0.0, slerp 180.0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A yaw of 90° is (0, 0, sin 45°, cos 45°), and it turns the nose from x to y. The product composes like the matrices: "
+        },
+        {
+         "t": "code",
+         "v": "a * b"
+        },
+        {
+         "t": "text",
+         "v": " applies "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " first. "
+        },
+        {
+         "t": "code",
+         "v": "from_rpy"
+        },
+        {
+         "t": "text",
+         "v": " multiplies three single-axis quaternions in the REP 103 order. It gives the same numbers as the closed formula in tf2's "
+        },
+        {
+         "t": "code",
+         "v": "setRPY"
+        },
+        {
+         "t": "text",
+         "v": ": on a grid of 2,805 angle triples, the largest difference was 2.2e-16, which is rounding. For a unit quaternion the conjugate, with x, y and z negated, is also the inverse, which is why the sandwich "
+        },
+        {
+         "t": "code",
+         "v": "q * v * conjugate(q)"
+        },
+        {
+         "t": "text",
+         "v": " rotates a vector."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second line is the "
+        },
+        {
+         "t": "i",
+         "v": "double cover"
+        },
+        {
+         "t": "text",
+         "v": ". Negating all four numbers adds 180° to θ/2, so it adds 360° to θ, and the rotation doesn't change: q and −q are the same orientation. Two consequences follow. You can't compare orientations by comparing components, because a filter or a library may hand you either sign; compare |q1·q2| with 1 instead. And interpolation has to pick a sign first."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That is what the last line shows. The average of the angles, 0°, points backwards, because the numbers wrap at ±180° and the orientations don't. "
+        },
+        {
+         "t": "code",
+         "v": "slerp"
+        },
+        {
+         "t": "text",
+         "v": " flips "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " when the dot product is negative, which selects the shorter arc, then moves along the great circle between the two quaternions at a constant angular rate. It passes through 180°, the true midpoint of the 20° turn. tf2's "
+        },
+        {
+         "t": "code",
+         "v": "slerp"
+        },
+        {
+         "t": "text",
+         "v": " makes the same flip, and a tf2 listener uses slerp to interpolate the rotation between two stamped transforms."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The product of two unit quaternions has norm 1 in exact arithmetic. In floating point it drifts, so code that composes many small rotations divides by the norm now and then. A normalised quaternion has three degrees of freedom, like the rotation it stands for."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In ROS code you seldom write these functions yourself. "
+        },
+        {
+         "t": "a",
+         "v": "tf2::Quaternion",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/include/tf2/LinearMath/Quaternion.hpp"
+        },
+        {
+         "t": "text",
+         "v": " has "
+        },
+        {
+         "t": "code",
+         "v": "setRPY(roll, pitch, yaw)"
+        },
+        {
+         "t": "text",
+         "v": " with the convention above, "
+        },
+        {
+         "t": "code",
+         "v": "normalize()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "inverse()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "slerp()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "operator*"
+        },
+        {
+         "t": "text",
+         "v": ". Its default constructor leaves all four numbers uninitialised, unlike the message, so call "
+        },
+        {
+         "t": "code",
+         "v": "setRPY"
+        },
+        {
+         "t": "text",
+         "v": " or pass four values. "
+        },
+        {
+         "t": "code",
+         "v": "tf2::toMsg"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "tf2::fromMsg"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "tf2_geometry_msgs"
+        },
+        {
+         "t": "text",
+         "v": " convert to and from "
+        },
+        {
+         "t": "code",
+         "v": "geometry_msgs::msg::Quaternion"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "tf2::Matrix3x3(q).getRPY(roll, pitch, yaw)"
+        },
+        {
+         "t": "text",
+         "v": " converts back to angles. The Jazzy tutorial on "
+        },
+        {
+         "t": "a",
+         "v": "quaternion fundamentals",
+         "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Quaternion-Fundamentals.html"
+        },
+        {
+         "t": "text",
+         "v": " shows each call."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Start from "
+        },
+        {
+         "t": "code",
+         "v": "Quat"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Rpy"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "from_axis_angle"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "from_rpy"
+        },
+        {
+         "t": "text",
+         "v": " in the example above."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] Rpy to_rpy(const Quat& q)"
+         },
+         {
+          "t": "text",
+          "v": " for a unit quaternion, in the ROS convention, with the pitch in the range [−90°, 90°]."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::optional<Quat> normalized(const Quat& q)"
+         },
+         {
+          "t": "text",
+          "v": ". It returns no value when the norm is below 1e-9, because a zero quaternion has no direction to scale back to."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Round-trip these triples of roll, pitch and yaw in degrees through "
+         },
+         {
+          "t": "code",
+          "v": "from_rpy"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "to_rpy"
+         },
+         {
+          "t": "text",
+          "v": ": (10, 20, 30), (0, 0, 179), (−45, 60, 135) and (10, 90, 20). Predict the last one before you run it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Without running code, say which rotation (x 0, y 0, z 0.383, w 0.924) is, and which rotation (0, 0, −0.383, −0.924) is. Then say what (0, 0, 0.7, 0.7) is meant to be, and why it isn't a rotation as written. Check your answers with "
+         },
+         {
+          "t": "code",
+          "v": "normalized"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "to_rpy"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For a unit quaternion in the ROS convention, sin(pitch) is 2(wy − zx). Roll and yaw each come from an "
+        },
+        {
+         "t": "code",
+         "v": "atan2"
+        },
+        {
+         "t": "text",
+         "v": " of two matrix entries written in quaternion components. When |sin(pitch)| reaches 1, both pairs of arguments are zero up to rounding, and the code needs a branch of its own:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cmath>\n#include <format>\n#include <iostream>\n#include <numbers>\n#include <optional>\n\nusing Vec3 = std::array<double, 3>;\n\nstruct Quat {\n  double x, y, z, w;\n};\n\nstruct Rpy {\n  double roll, pitch, yaw;\n};\n\n[[nodiscard]] constexpr Quat operator*(const Quat& a, const Quat& b) {\n  return {.x = a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,\n          .y = a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,\n          .z = a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,\n          .w = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z};\n}\n\n[[nodiscard]] Quat from_axis_angle(const Vec3& axis, double angle) {\n  const double s = std::sin(angle / 2);\n  return {.x = axis[0] * s, .y = axis[1] * s, .z = axis[2] * s, .w = std::cos(angle / 2)};\n}\n\n[[nodiscard]] Quat from_rpy(const Rpy& a) {\n  return from_axis_angle({0, 0, 1}, a.yaw) * from_axis_angle({0, 1, 0}, a.pitch) *\n         from_axis_angle({1, 0, 0}, a.roll);\n}\n\n[[nodiscard]] std::optional<Quat> normalized(const Quat& q) {\n  const double norm = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);\n  if (norm < 1e-9) {\n    return std::nullopt;  // no direction to scale back to\n  }\n  return Quat{.x = q.x / norm, .y = q.y / norm, .z = q.z / norm, .w = q.w / norm};\n}\n\n// q must be a unit quaternion. The pitch comes back in [-pi/2, pi/2].\n[[nodiscard]] Rpy to_rpy(const Quat& q) {\n  constexpr double pi = std::numbers::pi;\n  const double sin_pitch = 2 * (q.w * q.y - q.z * q.x);\n  if (std::abs(sin_pitch) > 1 - 1e-9) {\n    // Gimbal lock: only yaw - roll (pitch +90, nose down) or yaw + roll (pitch -90, nose up) is defined.\n    // Report all of it as yaw.\n    const double yaw = std::remainder(2 * std::atan2(q.z, q.w), 2 * pi);\n    return {.roll = 0, .pitch = std::copysign(pi / 2, sin_pitch), .yaw = yaw};\n  }\n  return {.roll = std::atan2(2 * (q.w * q.x + q.y * q.z), 1 - 2 * (q.x * q.x + q.y * q.y)),\n          .pitch = std::asin(sin_pitch),\n          .yaw = std::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))};\n}\n\n[[nodiscard]] double tidy(double v) { return std::round(v * 1000) / 1000 + 0.0; }\n\nint main() {\n  constexpr double deg = std::numbers::pi / 180;\n  constexpr std::array<Rpy, 4> cases{{{.roll = 10, .pitch = 20, .yaw = 30},\n                                      {.roll = 0, .pitch = 0, .yaw = 179},\n                                      {.roll = -45, .pitch = 60, .yaw = 135},\n                                      {.roll = 10, .pitch = 90, .yaw = 20}}};\n  for (const Rpy& c : cases) {\n    const Rpy back = to_rpy(from_rpy({.roll = c.roll * deg, .pitch = c.pitch * deg, .yaw = c.yaw * deg}));\n    std::cout << std::format(\"({:.0f}, {:.0f}, {:.0f}) -> ({:.3f}, {:.3f}, {:.3f})\\n\", c.roll, c.pitch, c.yaw,\n                             tidy(back.roll / deg), tidy(back.pitch / deg), tidy(back.yaw / deg));\n  }\n\n  constexpr std::array<Quat, 4> given{{{.x = 0, .y = 0, .z = 0.383, .w = 0.924},\n                                       {.x = 0, .y = 0, .z = -0.383, .w = -0.924},\n                                       {.x = 0, .y = 0, .z = 0.7, .w = 0.7},\n                                       {.x = 0, .y = 0, .z = 0, .w = 0}}};\n  for (const Quat& q : given) {\n    if (const std::optional<Quat> unit = normalized(q)) {\n      std::cout << std::format(\"z {:.3f}, w {:.3f}: yaw {:.1f}\\n\", q.z, q.w, tidy(to_rpy(*unit).yaw / deg));\n    } else {\n      std::cout << std::format(\"z {:.3f}, w {:.3f}: not a rotation\\n\", q.z, q.w);\n    }\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "(10, 20, 30) -> (10.000, 20.000, 30.000)\n(0, 0, 179) -> (0.000, 0.000, 179.000)\n(-45, 60, 135) -> (-45.000, 60.000, 135.000)\n(10, 90, 20) -> (0.000, 90.000, 10.000)\nz 0.383, w 0.924: yaw 45.0\nz -0.383, w -0.924: yaw 45.0\nz 0.700, w 0.700: yaw 90.0\nz 0.000, w 0.000: not a rotation"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first three triples come back unchanged. The fourth comes back as (0, 90, 10), and that is the same rotation. With the pitch at 90°, a roll of φ about the fixed x axis turns into a rotation about the vertical axis, so only yaw − roll is defined, here 20° − 10° = 10°. The function reports it as a yaw and sets the roll to 0. Another library may split it differently, so compare rotations, never angle triples. Take the branch out, and the same input comes back from GCC 13 as a roll of 7.125° and a yaw of 11.768°. Each is the "
+        },
+        {
+         "t": "code",
+         "v": "atan2"
+        },
+        {
+         "t": "text",
+         "v": " of two rounding errors near 1e-16, and their difference isn't even 10°."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The quaternion (0, 0, 0.383, 0.924) has w = cos(θ/2) = 0.924, so θ/2 is 22.5° and θ is 45°, and the axis is z: a yaw of 45°, a left turn. The second is its negative and the same rotation. (0, 0, 0.7, 0.7) is someone's rounded 90° yaw, but its squared norm is 0.98, so it rotates and also shrinks every vector by 2 %. Normalising it gives (0, 0, 0.707, 0.707), the 90° yaw. The zero quaternion has no value from "
+        },
+        {
+         "t": "code",
+         "v": "normalized"
+        },
+        {
+         "t": "text",
+         "v": ", which is exactly the case the "
+        },
+        {
+         "t": "code",
+         "v": "optional"
+        },
+        {
+         "t": "text",
+         "v": " is there for."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "uncertainty",
+   "title": "Probability basics and covariance in pose messages",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Echo the odometry of the bench robot, with the simulation from the robot world project running, and look at the uncertainty field:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 topic echo /odom --field pose.covariance --once"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It prints a list of 36 zeros. The Gazebo DiffDrive system publishes "
+        },
+        {
+         "t": "code",
+         "v": "gz.msgs.Odometry"
+        },
+        {
+         "t": "text",
+         "v": ", which has no covariance, and the bridge's conversion to "
+        },
+        {
+         "t": "code",
+         "v": "nav_msgs/msg/Odometry"
+        },
+        {
+         "t": "text",
+         "v": " leaves the field at its default. A zero variance claims that the pose is known exactly. Any consumer that fuses this odometry needs a covariance from somewhere else, and to supply one you need the few ideas below."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A measured quantity such as the robot's x position is a "
+        },
+        {
+         "t": "i",
+         "v": "random variable"
+        },
+        {
+         "t": "text",
+         "v": ": repeat the same drive, and it comes out a little different each time. Its "
+        },
+        {
+         "t": "i",
+         "v": "mean"
+        },
+        {
+         "t": "text",
+         "v": " μ is the average over many repetitions. Its "
+        },
+        {
+         "t": "i",
+         "v": "variance"
+        },
+        {
+         "t": "text",
+         "v": " σ² is the average squared distance from the mean, and its "
+        },
+        {
+         "t": "i",
+         "v": "standard deviation"
+        },
+        {
+         "t": "text",
+         "v": " σ is the square root of the variance, in the same unit as the quantity. For x in metres, the variance is in m² and σ is in metres. Many errors are close to "
+        },
+        {
+         "t": "i",
+         "v": "Gaussian"
+        },
+        {
+         "t": "text",
+         "v": ", the bell curve, and for a Gaussian in one dimension 68 % of the values fall within 1σ of the mean, 95 % within 2σ and 99.7 % within 3σ."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two quantities can vary together. Their "
+        },
+        {
+         "t": "i",
+         "v": "covariance"
+        },
+        {
+         "t": "text",
+         "v": " is the average of (x − μx)(y − μy): positive when x tends to be large when y is large, negative when the opposite holds, and zero when neither tells you anything about the other. Divided by σx·σy it becomes the "
+        },
+        {
+         "t": "i",
+         "v": "correlation"
+        },
+        {
+         "t": "text",
+         "v": ", a number from −1 to 1. For n quantities the variances and covariances form an n × n "
+        },
+        {
+         "t": "i",
+         "v": "covariance matrix"
+        },
+        {
+         "t": "text",
+         "v": ". The variances are on the diagonal, the matrix is symmetric because cov(x, y) = cov(y, x), and it is positive semi-definite: no combination of the quantities has a negative variance."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "geometry_msgs/msg/PoseWithCovariance"
+        },
+        {
+         "t": "text",
+         "v": " carries a 6 × 6 matrix as "
+        },
+        {
+         "t": "code",
+         "v": "float64[36] covariance"
+        },
+        {
+         "t": "text",
+         "v": ", which C++ sees as a "
+        },
+        {
+         "t": "code",
+         "v": "std::array<double, 36>"
+        },
+        {
+         "t": "text",
+         "v": ", stored row by row. The rows and columns are x, y, z, then rotation about the fixed x, y and z axes, so the yaw variance is at index 35 and the x-y covariance appears twice, at indices 1 and 6. The units are m² in the top-left block, rad² in the bottom-right block, and m·rad between them. "
+        },
+        {
+         "t": "code",
+         "v": "nav_msgs/msg/Odometry"
+        },
+        {
+         "t": "text",
+         "v": " has one such matrix for the pose and one for the twist. "
+        },
+        {
+         "t": "code",
+         "v": "sensor_msgs/msg/Imu"
+        },
+        {
+         "t": "text",
+         "v": " uses three 3 × 3 matrices, and its message definition gives two conventions: all zeros means the covariance is unknown, and −1 in element 0 means the sensor gives no estimate of that quantity at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is how to read such a matrix, for an odometry estimate with σx = 0.2 m, σy = 0.1 m, an x-y covariance of 0.012 m² and σyaw = 0.05 rad:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cmath>\n#include <format>\n#include <iostream>\n#include <numbers>\n\n// The order of the 6 x 6 matrix in geometry_msgs/msg/PoseWithCovariance.\nenum class Axis { x, y, z, rot_x, rot_y, rot_z };\n\n// Wraps the message's float64[36], which C++ sees as std::array<double, 36>, row by row.\nclass PoseCovariance {\n public:\n  [[nodiscard]] static constexpr int index(Axis row, Axis col) {\n    return 6 * static_cast<int>(row) + static_cast<int>(col);\n  }\n  [[nodiscard]] double at(Axis row, Axis col) const { return values_[index(row, col)]; }\n  void set(Axis row, Axis col, double v) {  // keeps the matrix symmetric\n    values_[index(row, col)] = v;\n    values_[index(col, row)] = v;\n  }\n\n private:\n  std::array<double, 36> values_{};\n};\n\nstruct Ellipse {\n  double major_m, minor_m, angle_rad;\n};\n\n// The x-y ellipse at `scale` standard deviations: its semi-axes and the direction of the long one.\n[[nodiscard]] Ellipse xy_ellipse(const PoseCovariance& c, double scale) {\n  const double sxx = c.at(Axis::x, Axis::x), syy = c.at(Axis::y, Axis::y), sxy = c.at(Axis::x, Axis::y);\n  const double mid = (sxx + syy) / 2;\n  const double half_gap = std::hypot((sxx - syy) / 2, sxy);  // the eigenvalues are mid +- half_gap\n  return {.major_m = scale * std::sqrt(mid + half_gap),\n          .minor_m = scale * std::sqrt(mid - half_gap),\n          .angle_rad = std::atan2(2 * sxy, sxx - syy) / 2};\n}\n\nint main() {\n  constexpr double deg = std::numbers::pi / 180;\n  PoseCovariance odom;\n  odom.set(Axis::x, Axis::x, 0.04);            // m^2\n  odom.set(Axis::y, Axis::y, 0.01);            // m^2\n  odom.set(Axis::x, Axis::y, 0.012);           // m^2, written at both mirrored indices\n  odom.set(Axis::rot_z, Axis::rot_z, 0.0025);  // rad^2\n\n  const double sx = std::sqrt(odom.at(Axis::x, Axis::x));\n  const double sy = std::sqrt(odom.at(Axis::y, Axis::y));\n  const double syaw = std::sqrt(odom.at(Axis::rot_z, Axis::rot_z));\n  std::cout << std::format(\"x-y at indices {} and {}, yaw variance at index {}\\n\",\n                           PoseCovariance::index(Axis::x, Axis::y), PoseCovariance::index(Axis::y, Axis::x),\n                           PoseCovariance::index(Axis::rot_z, Axis::rot_z));\n  std::cout << std::format(\"sigma x {:.3f} m, sigma y {:.3f} m, sigma yaw {:.3f} rad ({:.2f} deg)\\n\", sx, sy, syaw,\n                           syaw / deg);\n  std::cout << std::format(\"correlation of x and y: {:.2f}\\n\", odom.at(Axis::x, Axis::y) / (sx * sy));\n\n  const double one_sigma = 1 - std::exp(-0.5);            // share inside the 1-sigma ellipse in two dimensions\n  const double scale_95 = std::sqrt(-2 * std::log(0.05));  // 2.448 standard deviations hold 95 % in two dimensions\n  const Ellipse e = xy_ellipse(odom, scale_95);\n  std::cout << std::format(\"inside the 1-sigma ellipse: {:.1f} %\\n\", 100 * one_sigma);\n  std::cout << std::format(\"95 % ellipse: {:.3f} m by {:.3f} m, long axis at {:.1f} deg\\n\", e.major_m, e.minor_m,\n                           e.angle_rad / deg);\n  for (const double metres : {1.0, 10.0, 50.0}) {\n    std::cout << std::format(\"sideways sigma after {:>4.0f} m straight: {:.3f} m\\n\", metres, metres * syaw);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "x-y at indices 1 and 6, yaw variance at index 35\nsigma x 0.200 m, sigma y 0.100 m, sigma yaw 0.050 rad (2.86 deg)\ncorrelation of x and y: 0.60\ninside the 1-sigma ellipse: 39.3 %\n95 % ellipse: 0.515 m by 0.186 m, long axis at 19.3 deg\nsideways sigma after    1 m straight: 0.050 m\nsideways sigma after   10 m straight: 0.500 m\nsideways sigma after   50 m straight: 2.500 m"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The diagonal gives the σ values directly, after a square root. The positive correlation of 0.6 tilts the uncertainty: the points of equal probability form an ellipse whose long axis lies 19.3° from x, along the eigenvector of the 2 × 2 block, with the square roots of the eigenvalues as its semi-axes at 1σ. RViz's Odometry display draws this ellipse through its Covariance option."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth line breaks a common assumption. The 68 % rule is for one dimension. In two dimensions only 39.3 % of a Gaussian lies inside the 1σ ellipse, and a 95 % ellipse needs 2.448σ, because the share inside k standard deviations is 1 − e^(−k²/2). If a requirement says \"within 0.5 m with 95 % confidence\", compare 0.5 m with the 95 % ellipse, not with σ."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last three lines show why odometry uncertainty grows without limit. A heading that is off by a fixed small angle δ moves the robot sideways by about d·δ after d metres, so a yaw σ of 0.05 rad becomes a sideways σ of 0.5 m after 10 m and 2.5 m after 50 m. Over longer drives the cloud of possible positions bends into a curved band, because a heading error carries the robot along an arc. This growth is why odometry alone drifts and why REP 105 separates the smooth "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " frame from the corrected "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " frame. The topic on frames with tf2 builds on this."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Gimbal lock; unnormalised quaternions",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Gimbal lock does more than remove a degree of freedom at exactly 90°. Every angle triple near it is badly conditioned, and the readout jumps as the body passes through. Tilt a body about y from 88° to 92°, as the tool of a robot arm does when it turns past vertical, and convert each orientation to roll, pitch and yaw. The second half of the program shows what averaging quaternions component by component does:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cmath>\n#include <format>\n#include <iostream>\n#include <numbers>\n#include <optional>\n\nusing Vec3 = std::array<double, 3>;\n\nstruct Quat {\n  double x, y, z, w;\n};\n\nstruct Rpy {\n  double roll, pitch, yaw;\n};\n\n[[nodiscard]] Quat from_axis_angle(const Vec3& axis, double angle) {\n  const double s = std::sin(angle / 2);\n  return {.x = axis[0] * s, .y = axis[1] * s, .z = axis[2] * s, .w = std::cos(angle / 2)};\n}\n\n[[nodiscard]] double norm(const Quat& q) { return std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w); }\n\n[[nodiscard]] std::optional<Quat> normalized(const Quat& q) {\n  const double n = norm(q);\n  if (n < 1e-9) {\n    return std::nullopt;\n  }\n  return Quat{.x = q.x / n, .y = q.y / n, .z = q.z / n, .w = q.w / n};\n}\n\n[[nodiscard]] Rpy to_rpy(const Quat& q) {\n  constexpr double pi = std::numbers::pi;\n  const double sin_pitch = 2 * (q.w * q.y - q.z * q.x);\n  if (std::abs(sin_pitch) > 1 - 1e-9) {\n    return {.roll = 0, .pitch = std::copysign(pi / 2, sin_pitch),\n            .yaw = std::remainder(2 * std::atan2(q.z, q.w), 2 * pi)};\n  }\n  return {.roll = std::atan2(2 * (q.w * q.x + q.y * q.z), 1 - 2 * (q.x * q.x + q.y * q.y)),\n          .pitch = std::asin(sin_pitch),\n          .yaw = std::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))};\n}\n\n// The mean of two readings, component by component.\n[[nodiscard]] Quat naive_mean(const Quat& a, const Quat& b) {\n  return {.x = (a.x + b.x) / 2, .y = (a.y + b.y) / 2, .z = (a.z + b.z) / 2, .w = (a.w + b.w) / 2};\n}\n\n[[nodiscard]] double tidy(double v) { return std::round(v * 1000) / 1000 + 0.0; }\n\nint main() {\n  constexpr double deg = std::numbers::pi / 180;\n  std::cout << \"tilting about y past vertical:\\n\";\n  for (const double tilt : {88.0, 89.0, 90.0, 91.0, 92.0}) {\n    const Quat q = from_axis_angle({0, 1, 0}, tilt * deg);\n    const Rpy a = to_rpy(q);\n    std::cout << std::format(\"  {:.0f} deg: y {:.3f}, w {:.3f} -> roll {:.1f}, pitch {:.1f}, yaw {:.1f}\\n\", tilt,\n                             tidy(q.y), tidy(q.w), tidy(a.roll / deg), tidy(a.pitch / deg), tidy(a.yaw / deg));\n  }\n\n  const Quat east = from_axis_angle({0, 0, 1}, 90 * deg);\n  const Quat same_east{.x = -east.x, .y = -east.y, .z = -east.z, .w = -east.w};\n  const Quat north = from_axis_angle({0, 0, 1}, 0);\n  const Quat mean = naive_mean(east, north);\n  std::cout << std::format(\"mean of yaw 90 and yaw 0: norm {:.3f}, squared {:.3f}\\n\", norm(mean),\n                           norm(mean) * norm(mean));\n  std::cout << std::format(\"  normalized: yaw {:.1f}\\n\", tidy(to_rpy(normalized(mean).value()).yaw / deg));\n  const Quat zero = naive_mean(east, same_east);\n  std::cout << std::format(\"mean of q and -q: norm {:.3f}, normalized has a value: {}\\n\", norm(zero),\n                           normalized(zero).has_value());\n}"
+      },
+      {
+       "t": "output",
+       "text": "tilting about y past vertical:\n  88 deg: y 0.695, w 0.719 -> roll 0.0, pitch 88.0, yaw 0.0\n  89 deg: y 0.701, w 0.713 -> roll 0.0, pitch 89.0, yaw 0.0\n  90 deg: y 0.707, w 0.707 -> roll 0.0, pitch 90.0, yaw 0.0\n  91 deg: y 0.713, w 0.701 -> roll 180.0, pitch 89.0, yaw 180.0\n  92 deg: y 0.719, w 0.695 -> roll 180.0, pitch 88.0, yaw 180.0\nmean of yaw 90 and yaw 0: norm 0.924, squared 0.854\n  normalized: yaw 45.0\nmean of q and -q: norm 0.000, normalized has a value: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The quaternion changes by about 0.006 per degree, all the way through. The angles are continuous until 90°, then roll and yaw jump by 180° while the pitch turns around, because a pitch beyond 90° is written as a pitch below 90° with the body flipped over. Both triples are correct. A controller that works on the angle difference, or a plot of the log, sees a jump that the body never made. Keep orientations as quaternions or matrices in code, compute errors with quaternion products, and convert to angles only for display, or for a robot that stays far from ±90° pitch, such as a wheeled base where the yaw alone is safe."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Where does an unnormalised quaternion come from? Rarely from drift in "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": ". Composing 3.6 million products of one small rotation, an hour of a 1 kHz gyro, kept the norm within 1.6e-10 of 1 in "
+        },
+        {
+         "t": "code",
+         "v": "double"
+        },
+        {
+         "t": "text",
+         "v": " with GCC 13. The same loop in "
+        },
+        {
+         "t": "code",
+         "v": "float"
+        },
+        {
+         "t": "text",
+         "v": " moves it by whole per cent, and the direction depends on the step: about the unit axis (0.48, 0.6, 0.64), steps of 0.001 rad grew the norm by 3.1 %, steps of 0.01 rad shrank it by 5.9 %, and steps of 0.0005 rad shrank it by 16.7 %. The common sources are hand-typed values such as (0, 0, 0.7, 0.7), values rounded to a few decimals in a YAML file or a launch argument, and averages taken component by component. The mean of yaw 0° and yaw 90° has a norm of 0.924 and a squared norm of 0.854. After normalising, it is the correct 45°, but only after. Worse, when one of two readings of the same heading arrives as −q, which a filter or a driver is free to send, the component mean is the zero quaternion. It has no direction at all, and no normalisation rescues it. To average orientations, flip each quaternion so its dot product with the first is positive, then average, then normalise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "tf2 refuses an unnormalised rotation instead of guessing. "
+        },
+        {
+         "t": "a",
+         "v": "BufferCore::setTransform",
+         "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/src/buffer_core.cpp"
+        },
+        {
+         "t": "text",
+         "v": " logs an error that starts with "
+        },
+        {
+         "t": "code",
+         "v": "TF_DENORMALIZED_QUATERNION"
+        },
+        {
+         "t": "text",
+         "v": ", names the child frame, and ignores the transform when x² + y² + z² + w² differs from 1 by 0.01 or more. The constant in the source is written "
+        },
+        {
+         "t": "code",
+         "v": "10e-3"
+        },
+        {
+         "t": "text",
+         "v": ", which is 0.01, not 0.001. So (0, 0, 0.707, 0.707), with a squared norm of 0.9997, passes, and (0, 0, 0.7, 0.7), at 0.98, is dropped. A lookup that needs that frame then fails with a missing frame, far from the line that built the message. A transform with a NaN anywhere is dropped the same way with "
+        },
+        {
+         "t": "code",
+         "v": "TF_NAN_INPUT"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. State the ROS roll, pitch and yaw convention as a matrix product, and how a unit quaternion encodes an angle and an axis. Explain why q and −q are the same rotation and what that means for comparing and interpolating. Say where the 6 × 6 pose covariance keeps the yaw variance, and what 1σ and 95 % mean in two dimensions. Name where gimbal lock bites and two ways to get a quaternion that tf2 rejects."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Which matrix product is R for roll φ, pitch θ and yaw ψ in the ROS convention, and how does the same product read in the robot's own axes?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which rotation is (x 0, y 0, z 0.259, w 0.966), and which quaternion is the same rotation with every sign flipped?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does slerp negate one quaternion when the dot product is negative, and what goes wrong without it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "At which index of "
+     },
+     {
+      "t": "code",
+      "v": "PoseWithCovariance.covariance"
+     },
+     {
+      "t": "text",
+      "v": " is the covariance of y and yaw, and in which unit?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is the 1σ ellipse of a 2D Gaussian not a 68 % region, and which scale gives 95 %?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does tf2 do with a transform whose quaternion has a squared norm of 0.98, and what error do you see instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: "
+     },
+     {
+      "t": "code",
+      "v": "to_rpy"
+     },
+     {
+      "t": "text",
+      "v": " with the gimbal lock branch, and "
+     },
+     {
+      "t": "code",
+      "v": "normalized"
+     },
+     {
+      "t": "text",
+      "v": " returning "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation, the tutorial on "
+     },
+     {
+      "t": "a",
+      "v": "quaternion fundamentals",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Tf2/Quaternion-Fundamentals.html"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "tf2::Quaternion"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "setRPY"
+     },
+     {
+      "t": "text",
+      "v": ", the fixed-axis convention, and the conversions with "
+     },
+     {
+      "t": "code",
+      "v": "tf2_geometry_msgs"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "REP 103",
+      "href": "https://www.ros.org/reps/rep-0103.html"
+     },
+     {
+      "t": "text",
+      "v": ": axis conventions, the preferred order of rotation representations, and the covariance layout."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "tf2 source on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "Quaternion.hpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/include/tf2/LinearMath/Quaternion.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "setRPY"
+     },
+     {
+      "t": "text",
+      "v": " and the shortest-path "
+     },
+     {
+      "t": "code",
+      "v": "slerp"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "buffer_core.cpp",
+      "href": "https://github.com/ros2/geometry2/blob/jazzy/tf2/src/buffer_core.cpp"
+     },
+     {
+      "t": "text",
+      "v": " for the normalisation check."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Message definitions on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "Quaternion",
+      "href": "https://github.com/ros2/common_interfaces/blob/jazzy/geometry_msgs/msg/Quaternion.msg"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "PoseWithCovariance",
+      "href": "https://github.com/ros2/common_interfaces/blob/jazzy/geometry_msgs/msg/PoseWithCovariance.msg"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Imu",
+      "href": "https://github.com/ros2/common_interfaces/blob/jazzy/sensor_msgs/msg/Imu.msg"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Joan Solà, Quaternion kinematics for the error-state Kalman filter, 2017: "
+     },
+     {
+      "t": "a",
+      "v": "arXiv 1711.02508",
+      "href": "https://arxiv.org/abs/1711.02508"
+     },
+     {
+      "t": "text",
+      "v": ". The Hamilton convention, the double cover, and slerp, written for robotics."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Ken Shoemake, Animating rotation with quaternion curves, SIGGRAPH 1985: "
+     },
+     {
+      "t": "a",
+      "v": "ACM",
+      "href": "https://dl.acm.org/doi/10.1145/325165.325242"
+     },
+     {
+      "t": "text",
+      "v": ". Where slerp comes from."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Ben Eater and Grant Sanderson, "
+     },
+     {
+      "t": "a",
+      "v": "visualising quaternions",
+      "href": "https://eater.net/quaternions"
+     },
+     {
+      "t": "text",
+      "v": ", an interactive explanation that the ROS tutorial links to."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Eigen's "
+     },
+     {
+      "t": "a",
+      "v": "Quaternion class",
+      "href": "https://eigen.tuxfamily.org/dox/classEigen_1_1Quaternion.html"
+     },
+     {
+      "t": "text",
+      "v": ", for its constructor that takes w first."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Sebastian Thrun, Wolfram Burgard and Dieter Fox, Probabilistic Robotics, MIT Press 2005, chapter 2 on probability and chapter 5 on motion uncertainty: "
+     },
+     {
+      "t": "a",
+      "v": "book",
+      "href": "https://mitpress.mit.edu/9780262201629/probabilistic-robotics/"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " on precise interfaces, which the designated initialisers for "
+     },
+     {
+      "t": "code",
+      "v": "Quat"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "Rpy"
+     },
+     {
+      "t": "text",
+      "v": " follow, and Abseil tip "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values, the reason "
+     },
+     {
+      "t": "code",
+      "v": "normalized"
+     },
+     {
+      "t": "text",
+      "v": " returns "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::atan2",
+      "href": "https://en.cppreference.com/cpp/numeric/math/atan2"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::remainder",
+      "href": "https://en.cppreference.com/cpp/numeric/math/remainder"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::numbers",
+      "href": "https://en.cppreference.com/cpp/numeric/constants"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}
