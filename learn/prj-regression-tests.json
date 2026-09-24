@@ -1,0 +1,1165 @@
+{
+ "id": "prj-regression-tests",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage turns the failures we produced by hand into a suite that runs them without us. Every check in the bench had been proved once, at a keyboard: we ran the missing-odometry scenario with the relay switched off, raised the supervisor's odometry timeout to five seconds, and watched the right line of the verdict fail each time. A proof you have to repeat by hand is not a net."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is that half the suite expects failure. A suite that runs only the happy path tells you the robot still works and nothing about whether the checks are still watching it, so each case carries an expectation: this one passes, or this one fails and this named check is the one that fails. The comparison lives in "
+    },
+    {
+     "t": "code",
+     "v": "bench_core"
+    },
+    {
+     "t": "text",
+     "v": ", tested like the rest of it, and the shell script does nothing but run scenarios and hand over files."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: one command runs five cases, prints a line each, and exits non-zero when any expectation is unmet. Breaking the supervisor again turns one line red without anyone having to remember what to look at."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "tests",
+   "title": "Scenario regression tests",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " can say whether a verdict file met the expectation a case set for it, with GoogleTest tests you wrote first and saw fail, and a "
+        },
+        {
+         "t": "code",
+         "v": "check_verdict"
+        },
+        {
+         "t": "text",
+         "v": " tool that asks the same question from the command line."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take stock first. These are the failures you have produced by hand over the last five topics, and each one is a check proving it can fail:"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "What you broke"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The line that caught it"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Where"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "the relay left out of the launch"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "goals reached in order"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the normal scenario"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "a drive speed of zero"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "distance from the start"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the scenario runner"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "a time tolerance below the measured time"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "time from the first movement to the last goal"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the normal scenario"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "a drop shorter than the odometry timeout"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "time from the cue to the robot at rest"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the missing-input scenario"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "an odometry timeout raised to 5000 ms"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "time from the cue to the robot at rest"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the missing-input scenario"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "the robot moved while it was meant to be stopped"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "simulator: distance from the stop point"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the stop verification"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three of those deserve a place in a suite and three do not, and the rule is worth stating before you choose. A failure earns a test when it would be silent if it came back, when it fails for one nameable reason, and when running it costs less than the damage of missing it. The robot moved by hand fails the first part of that: it needs a person to drag a model, so it is a checklist item for the milestone review rather than a test. A drive speed of zero fails the second: it breaks everything at once and tells you nothing the other cases do not."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Some of the net already exists, and this topic does not rebuild it. "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " runs the "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " unit tests, the four supervisor fake-input cases, the two relay drop cases and "
+        },
+        {
+         "t": "code",
+         "v": "StopsWithinTheOdometryTimeout"
+        },
+        {
+         "t": "text",
+         "v": ", all in seconds and with no simulator. That is the layer that catches a rule changing. What nothing yet catches automatically is a scenario changing its verdict, and that is this topic's gap."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A case is three facts about a verdict file: its name, whether the run should pass, and, when it should fail, which check should be the failing one. That last part is what makes the suite worth having. A case that only asks for "
+        },
+        {
+         "t": "code",
+         "v": "fail"
+        },
+        {
+         "t": "text",
+         "v": " goes green when the scenario breaks in a new way, and green on a broken bench is worse than no suite."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the tests first, in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/test/regression_test.cpp"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <gtest/gtest.h>\n\n#include \"bench/regression.hpp\"\n\nTEST(JudgeExpectation, RefusesAFailureOnADifferentCheck) {\n  const bench::Expectation expected{\n      .name = \"normal without the relay\", .passes = false, .failing = \"goals reached in order\"};\n  const std::string_view verdict = \"fail\\nscenario: normal\\nsamples: 790\\n\"\n                                   \"failed top speed: 0.40 m/s, at most 0.30 m/s\\n\";\n  EXPECT_EQ(bench::judge_expectation(expected, verdict), bench::Outcome::wrong_check);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add one case each for: a passing run that was expected to pass; a passing run that was expected to fail; a failing run whose named check is the failed one; an empty file; and a file whose first line is neither "
+        },
+        {
+         "t": "code",
+         "v": "pass"
+        },
+        {
+         "t": "text",
+         "v": " nor "
+        },
+        {
+         "t": "code",
+         "v": "fail"
+        },
+        {
+         "t": "text",
+         "v": ". Add "
+        },
+        {
+         "t": "code",
+         "v": "regression"
+        },
+        {
+         "t": "text",
+         "v": " to the test list in "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_core/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ". Run "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and watch it fail to compile."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/include/bench/regression.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", with the definitions in "
+         },
+         {
+          "t": "code",
+          "v": "src/regression.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". Here it is as one program, judging four verdict files:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\nnamespace bench {\n\n// bench/regression.hpp: what one regression case expects of a verdict file, and whether it got it.\n\nstruct Expectation {\n  std::string name;     // what the case is called in the report\n  bool passes;          // whether the scenario is supposed to pass\n  std::string failing;  // the check that has to be the failed one; empty when the run should pass\n};\n\nenum class Outcome { met, wrong_verdict, wrong_check, unreadable };\n\n[[nodiscard]] std::string_view describe(Outcome outcome) {\n  switch (outcome) {\n    case Outcome::met: return \"as expected\";\n    case Outcome::wrong_verdict: return \"the verdict came out the other way round\";\n    case Outcome::wrong_check: return \"it failed, on a different check\";\n    case Outcome::unreadable: return \"no verdict file to read\";\n  }\n  return \"?\";\n}\n\n// The verdict file's first line is \"pass\" or \"fail\", and each check's line starts with \"ok\" or\n// \"failed\" and then names the check. Nothing here reads a file: the caller passes the text in.\n[[nodiscard]] Outcome judge_expectation(const Expectation& expected, std::string_view verdict) {\n  std::vector<std::string_view> lines;\n  for (const auto part : std::views::split(verdict, '\\n')) {\n    const std::string_view line(part.begin(), part.end());\n    if (!line.empty()) lines.push_back(line);\n  }\n  if (lines.empty()) return Outcome::unreadable;\n  if (lines.front() != \"pass\" && lines.front() != \"fail\") return Outcome::unreadable;\n  if ((lines.front() == \"pass\") != expected.passes) return Outcome::wrong_verdict;\n  if (expected.failing.empty()) return Outcome::met;\n\n  const auto named = std::ranges::find_if(lines, [&expected](std::string_view line) {\n    return line.starts_with(\"failed\") && line.find(expected.failing) != std::string_view::npos;\n  });\n  return named == lines.end() ? Outcome::wrong_check : Outcome::met;\n}\n\n// One line for the suite's report, which is what the tool prints and the script collects.\n[[nodiscard]] std::string report_line(const Expectation& expected, Outcome outcome) {\n  return std::format(\"{:<7} {}: {}\\n\", outcome == Outcome::met ? \"ok\" : \"failed\", expected.name,\n                     describe(outcome));\n}\n\n}  // namespace bench\n\nint main() {\n  // Four verdict files, as the runner writes them.\n  constexpr std::string_view passed =\n      \"pass\\nscenario: normal\\nsamples: 812\\n\"\n      \"ok     goals reached in order: 2.00, at least 2.00\\n\"\n      \"ok     distance from the last goal at the end: 0.05 m, at most 0.10 m\\n\";\n  constexpr std::string_view no_relay =\n      \"fail\\nscenario: normal\\nsamples: 790\\n\"\n      \"failed goals reached in order: 0.00, at least 2.00\\n\"\n      \"ok     top speed: 0.00 m/s, at most 0.30 m/s\\n\";\n  constexpr std::string_view slow =\n      \"fail\\nscenario: normal\\nsamples: 815\\n\"\n      \"ok     goals reached in order: 2.00, at least 2.00\\n\"\n      \"failed time from the first movement to the last goal: 21.30 s, at most 20.00 s\\n\";\n  constexpr std::string_view nothing;\n\n  const std::array<bench::Expectation, 4> cases{{{.name = \"normal\", .passes = true, .failing = \"\"},\n                                                 {.name = \"normal without the relay\",\n                                                  .passes = false,\n                                                  .failing = \"goals reached in order\"},\n                                                 {.name = \"normal, checked against a slow run\",\n                                                  .passes = false,\n                                                  .failing = \"goals reached in order\"},\n                                                 {.name = \"missing_odom\", .passes = true, .failing = \"\"}}};\n  const std::array<std::string_view, 4> verdicts{passed, no_relay, slow, nothing};\n\n  std::int64_t met = 0;\n  for (std::int64_t i = 0; i < std::ssize(cases); ++i) {\n    const auto k = static_cast<std::size_t>(i);\n    const bench::Outcome outcome = bench::judge_expectation(cases[k], verdicts[k]);\n    if (outcome == bench::Outcome::met) ++met;\n    std::cout << bench::report_line(cases[k], outcome);\n  }\n  std::cout << std::format(\"{} of {} cases met their expectation\\n\", met, std::ssize(cases));\n}"
+      },
+      {
+       "t": "output",
+       "text": "ok      normal: as expected\nok      normal without the relay: as expected\nfailed  normal, checked against a slow run: it failed, on a different check\nfailed  missing_odom: no verdict file to read\n2 of 4 cases met their expectation"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third line is the one to look at twice. That run did fail, which is what the case asked for, and it failed on the time tolerance rather than on the goals, so the case is not met. A suite that checked only the verdict would have called it green while the scenario had changed underneath it. The fourth is the failure that hides even better: no file at all, because the launch never started, and an "
+        },
+        {
+         "t": "code",
+         "v": "Outcome::unreadable"
+        },
+        {
+         "t": "text",
+         "v": " that a missing check would have read as silence."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Two details carry it. "
+         },
+         {
+          "t": "code",
+          "v": "judge_expectation"
+         },
+         {
+          "t": "text",
+          "v": " takes the text rather than a path, so the tests pass a string literal and nothing touches a disk, which is why the fence above runs here at all. And "
+         },
+         {
+          "t": "code",
+          "v": "Outcome"
+         },
+         {
+          "t": "text",
+          "v": " is an enum of four rather than a "
+         },
+         {
+          "t": "code",
+          "v": "bool"
+         },
+         {
+          "t": "text",
+          "v": ", because \"it did not meet the expectation\" is three different problems with three different next actions: look at the robot, look at the checks, or look at the launch."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the tool, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/app/check_verdict.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". It judges one case and prints the line, and the shell tallies:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// check_verdict NAME pass|fail FAILING_CHECK VERDICT_FILE. Exit 0 when the case met its expectation.\nint main(int argc, char** argv) {\n  if (argc != 5) { std::cerr << \"usage: check_verdict NAME pass|fail FAILING_CHECK VERDICT_FILE\\n\"; return 2; }\n  const bench::Expectation expected{\n      .name = argv[1], .passes = std::string_view(argv[2]) == \"pass\", .failing = argv[3]};\n  std::ifstream in(argv[4]);\n  std::ostringstream text;\n  text << in.rdbuf();\n  const bench::Outcome outcome = bench::judge_expectation(expected, text.str());\n  std::cout << bench::report_line(expected, outcome);\n  return outcome == bench::Outcome::met ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An unreadable file is not an error here, it is a result: "
+        },
+        {
+         "t": "code",
+         "v": "std::ifstream"
+        },
+        {
+         "t": "text",
+         "v": " on a missing path leaves the stream empty, "
+        },
+        {
+         "t": "code",
+         "v": "judge_expectation"
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "unreadable"
+        },
+        {
+         "t": "text",
+         "v": ", and the line says so. Add it to "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": " beside "
+        },
+        {
+         "t": "code",
+         "v": "compare_runs"
+        },
+        {
+         "t": "text",
+         "v": ", then run "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and commit."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the regression tests pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, you saw them fail before the header existed, and "
+        },
+        {
+         "t": "code",
+         "v": "check_verdict"
+        },
+        {
+         "t": "text",
+         "v": " prints the same four lines as the fence when you feed it four files by hand."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "./run_regressions.sh"
+        },
+        {
+         "t": "text",
+         "v": " runs the whole suite and tells you which cases met their expectation, and you have watched it turn red for a regression you put back on purpose."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Give the two failing cases a scenario file of their own, so that a case is a name and nothing more. "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_sim/config/missing_odom_short.yaml"
+         },
+         {
+          "t": "text",
+          "v": " is "
+         },
+         {
+          "t": "code",
+          "v": "missing_odom.yaml"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "drop_ms: 200"
+         },
+         {
+          "t": "text",
+          "v": ", and it needs one more line, because the runner has been choosing its checks by the scenario's name:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In ScenarioRunner: which set of checks to apply, defaulting to the scenario's own name, so a\n// variant of a scenario is judged by the checks of the scenario it varies.\nchecks_ = declare_parameter<std::string>(\"checks\", scenario_);\n// Every `scenario_ == \"missing_odom\"` in on_tick() and finish() becomes checks_ == \"missing_odom\"."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "missing_odom_short.yaml"
+        },
+        {
+         "t": "text",
+         "v": " then sets "
+        },
+        {
+         "t": "code",
+         "v": "checks: missing_odom"
+        },
+        {
+         "t": "text",
+         "v": ". The other failing case, the normal scenario without the relay, needs no file: "
+        },
+        {
+         "t": "code",
+         "v": "relay"
+        },
+        {
+         "t": "text",
+         "v": " is already a launch argument."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "cases.txt"
+         },
+         {
+          "t": "text",
+          "v": " at the top of the repository. Five columns, and a "
+         },
+         {
+          "t": "code",
+          "v": "#"
+         },
+         {
+          "t": "text",
+          "v": " line to say so:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "# case            | scenario           | expect | failing check                          | arguments\nsmoke             | smoke              | pass   |                                        |\nnormal            | normal             | pass   |                                        |\nnormal_no_relay   | normal             | fail   | goals reached in order                 | relay:=False\nmissing_odom      | missing_odom       | pass   |                                        |\nmissing_odom_short| missing_odom_short | fail   | time from the cue to the robot at rest |"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three passing and two failing is the shape to aim for. The passing ones say the robot still does its job; the failing ones say the checks still notice when it does not."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "run_regressions.sh"
+         },
+         {
+          "t": "text",
+          "v": " next to "
+         },
+         {
+          "t": "code",
+          "v": "run_scenario.sh"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "#!/usr/bin/env bash\n# run_regressions.sh: runs every case in cases.txt and reports which met its expectation.\ncd \"$(dirname \"$0\")\"\nsource /opt/ros/jazzy/setup.bash\nsource install/setup.bash\nset -euo pipefail\ntrim() { sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<< \"$1\"; }\nmkdir -p results/regression\nmet=0\ntotal=0\nwhile IFS='|' read -r name scenario expect failing arguments; do\n  name=$(trim \"$name\"); scenario=$(trim \"$scenario\"); expect=$(trim \"$expect\")\n  failing=$(trim \"$failing\"); arguments=$(trim \"$arguments\")\n  total=$((total + 1))\n  ./run_scenario.sh \"$scenario\" $arguments > \"results/regression/$name.log\" 2>&1 || true\n  cp \"results/$scenario.txt\" \"results/regression/$name.txt\" 2>/dev/null || true\n  if install/bench_core/bin/check_verdict \"$name\" \"$expect\" \"$failing\" \"results/regression/$name.txt\"; then\n    met=$((met + 1))\n  fi\ndone < <(grep -v '^[[:space:]]*\\(#\\|$\\)' cases.txt)\necho \"$met of $total cases met their expectation\"\ntest \"$met\" -eq \"$total\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three lines in it are deliberate. "
+        },
+        {
+         "t": "code",
+         "v": "$arguments"
+        },
+        {
+         "t": "text",
+         "v": " is unquoted, because it has to split into separate launch arguments or vanish when it is empty, and it is the one place in the bench where word splitting is wanted. "
+        },
+        {
+         "t": "code",
+         "v": "|| true"
+        },
+        {
+         "t": "text",
+         "v": " after each run keeps the loop going, since a case that is supposed to fail makes "
+        },
+        {
+         "t": "code",
+         "v": "run_scenario.sh"
+        },
+        {
+         "t": "text",
+         "v": " exit 1 and that is the expected outcome, not an error. And the copy has its own "
+        },
+        {
+         "t": "code",
+         "v": "|| true"
+        },
+        {
+         "t": "text",
+         "v": ", because a launch that never wrote a verdict is a result the tool reports rather than a crash of the script."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it and time it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh\ntime ./run_regressions.sh; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down the wall time of the whole suite and of the slowest case. That number is the decision: a suite of a few minutes runs on every push, and one of twenty runs at night with a link to the report in the morning. The CI topic spends that number; this topic's job is to measure it. Note also that every case calls "
+        },
+        {
+         "t": "code",
+         "v": "run_scenario.sh"
+        },
+        {
+         "t": "text",
+         "v": ", which starts the world, so the suite is bounded by Gazebo starting five times rather than by anything the bench does."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove the suite catches a regression. Put the break back that the stop-verification topic made by hand: change the default of "
+         },
+         {
+          "t": "code",
+          "v": "odom_timeout_ms"
+         },
+         {
+          "t": "text",
+          "v": " in "
+         },
+         {
+          "t": "code",
+          "v": "include/bench_nodes/supervisor.hpp"
+         },
+         {
+          "t": "text",
+          "v": " from 250 to 5000, rebuild, and run the suite:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh; echo \"check exit $?\"\n./run_regressions.sh; echo \"suite exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two things happen, and both are worth seeing. "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " goes red in seconds, because "
+        },
+        {
+         "t": "code",
+         "v": "StopsWithinTheOdometryTimeout"
+        },
+        {
+         "t": "text",
+         "v": " measures that promise directly and needs no simulator. The suite goes red a few minutes later on "
+        },
+        {
+         "t": "code",
+         "v": "missing_odom"
+        },
+        {
+         "t": "text",
+         "v": ", with "
+        },
+        {
+         "t": "code",
+         "v": "the verdict came out the other way round"
+        },
+        {
+         "t": "text",
+         "v": ", and on "
+        },
+        {
+         "t": "code",
+         "v": "missing_odom_short"
+        },
+        {
+         "t": "text",
+         "v": ", which now meets its expectation for the wrong reason. Put the default back and run both again."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That pair is the argument for having two layers. The unit test tells you in seconds which promise you broke; the scenario suite tells you that the robot in the world behaves the way the promise claims. Neither replaces the other, and the fast one is the one you run on every save."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "./run_regressions.sh"
+         },
+         {
+          "t": "text",
+          "v": " runs the five cases and prints five lines and a tally;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "it exits 0 with the bench as it stands, and non-zero with the odometry timeout at 5000 ms;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the wall time of the suite and of its slowest case are written down;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "results/regression/"
+         },
+         {
+          "t": "text",
+          "v": " is in "
+         },
+         {
+          "t": "code",
+          "v": ".gitignore"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a \"Regression suite\" section to "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic, and the CI topic reads it to decide what runs where."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the one command, the five cases with what each one is for in a line, and the rule the cases were chosen by: a failure earns a test when it would be silent if it came back, when it fails for one nameable reason, and when running it costs less than missing it. Name the three failures that did not earn one, and why each was left out."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then the two layers, in three lines: what "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " covers and how long it takes, what "
+        },
+        {
+         "t": "code",
+         "v": "./run_regressions.sh"
+        },
+        {
+         "t": "text",
+         "v": " covers and how long it takes, and which one you run before a commit. Finish with the regression you put back, which line went red in each layer, and how long each took to tell you."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "testing",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Testing/Testing-Main.html"
+     },
+     {
+      "t": "text",
+      "v": " and on "
+     },
+     {
+      "t": "a",
+      "v": "integration tests with launch",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Testing/Integration.html"
+     },
+     {
+      "t": "text",
+      "v": ", which is where a suite like this one goes next if it outgrows a shell script."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Phil Nash, Back to Basics: Testing, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/back_to_basics_testing.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=7_H4qzhWbnQ"
+     },
+     {
+      "t": "text",
+      "v": ". What a test is for, and why one that cannot fail is not one."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Dave Steffen, Back to Basics: Unit Testing, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Unit_Testing.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=MwoAM3sznS0"
+     },
+     {
+      "t": "text",
+      "v": ". The layers of a suite and what belongs in each."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::views::split",
+      "href": "https://en.cppreference.com/cpp/ranges/split_view"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::string_view::starts_with",
+      "href": "https://en.cppreference.com/cpp/string/basic_string_view/starts_with"
+     },
+     {
+      "t": "text",
+      "v": ", which are what reads the verdict file."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "GNU coreutils manual",
+      "href": "https://www.gnu.org/software/coreutils/manual/coreutils.html"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "timeout"
+     },
+     {
+      "t": "text",
+      "v": " and exit codes, for a suite that has to survive a case that hangs."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,875 @@
+{
+ "id": "pat-singleton",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "From memory, write a "
+     },
+     {
+      "t": "code",
+      "v": "Registry"
+     },
+     {
+      "t": "text",
+      "v": " behind a private constructor and a "
+     },
+     {
+      "t": "code",
+      "v": "static Registry& instance()"
+     },
+     {
+      "t": "text",
+      "v": " returning a function-local static reference, with a "
+     },
+     {
+      "t": "code",
+      "v": "note()"
+     },
+     {
+      "t": "text",
+      "v": " that counts how many times it was called. Call "
+     },
+     {
+      "t": "code",
+      "v": "instance()"
+     },
+     {
+      "t": "text",
+      "v": " three times and show, by comparing references with "
+     },
+     {
+      "t": "code",
+      "v": "=="
+     },
+     {
+      "t": "text",
+      "v": " rather than printing an address, that every call reaches the same object. Then write two sentences: what C++11 guarantees about that function when two threads call it at the same moment, and one thing that guarantee does not cover once the object exists. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <format>\n#include <iostream>\n\nclass Registry {\n public:\n  static Registry& instance() {\n    static Registry registry;  // built the first time control reaches this line, not before main\n    return registry;\n  }\n  void note() { ++seen_; }\n  [[nodiscard]] int seen() const { return seen_; }\n\n private:\n  Registry() { std::cout << \"Registry() runs here, on first use\\n\"; }\n  int seen_ = 0;\n};\n\nint main() {\n  std::cout << \"before the first call to instance()\\n\";\n  Registry::instance().note();\n  Registry::instance().note();\n  std::cout << std::format(\"both calls returned the same object: {}\\n\",\n                           &Registry::instance() == &Registry::instance());\n  std::cout << std::format(\"seen() counts both calls: {}\\n\", Registry::instance().seen());\n}"
+   },
+   {
+    "t": "output",
+    "text": "before the first call to instance()\nRegistry() runs here, on first use\nboth calls returned the same object: true\nseen() counts both calls: 2"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "What C++11 guarantees: if two threads reach "
+     },
+     {
+      "t": "code",
+      "v": "static Registry registry;"
+     },
+     {
+      "t": "text",
+      "v": " at the same moment, exactly one of them runs the constructor, the other waits for it to finish, and both go on to see the same fully built object. What it does not cover is anything past that point. Calling "
+     },
+     {
+      "t": "code",
+      "v": "note()"
+     },
+     {
+      "t": "text",
+      "v": " from two threads at once is an ordinary, unsynchronised "
+     },
+     {
+      "t": "code",
+      "v": "++seen_"
+     },
+     {
+      "t": "text",
+      "v": ", on which the standard says nothing at all."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the identity check compares references with "
+     },
+     {
+      "t": "code",
+      "v": "=="
+     },
+     {
+      "t": "text",
+      "v": " rather than printing and eyeballing two addresses, and if both sentences separate the one guaranteed moment, construction, from every call the object receives afterward. Getting the identity right without saying where the guarantee stops is a partial pass. Saying the finished object is now safe to call from several threads is a fail: that is exactly the mistake the guarantee invites."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Singleton is a creational pattern that promises a class exactly one instance, reached through one point of access that anyone in the program can call, rather than a reference passed to whoever needs it. In C++ its usual shape is a private constructor and a static member function returning a reference to a function-local static object of the class: the "
+    },
+    {
+     "t": "i",
+     "v": "Meyers singleton"
+    },
+    {
+     "t": "text",
+     "v": ", after Scott Meyers, who proposed it as the fix for a different problem, the order in which ordinary global objects in separate files get built."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Naming it a pattern is generous. The problem it is reached for, exactly one shared instance the whole program can see, already has an honest fix: build the object once, in "
+    },
+    {
+     "t": "code",
+     "v": "main"
+    },
+    {
+     "t": "text",
+     "v": " or in whatever owns it, and pass a reference to whoever needs it. A Singleton skips that fix and puts the instance behind a function name instead of a parameter, so a class that needs it does not receive it from its caller: it reaches into the function and takes it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism does get one thing right. C++11 guarantees that the first construction of a function-local static is thread-safe even when two threads call the function at the same moment, one building it while the other waits, with a hidden guard that makes every later call cheap. That guarantee stops at construction. It says nothing about calling the object's own methods from two threads afterward, and it removes neither of the pattern's real costs: a class that reaches for a Singleton hides that dependency from its own constructor, so no test can hand it a fake, and the object is torn down, at program exit, in the reverse order of when it was first used, an order a second Singleton's destructor can outlive by one line in "
+    },
+    {
+     "t": "code",
+     "v": "main"
+    },
+    {
+     "t": "text",
+     "v": " that never looked wrong."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet a genuine need for exactly one instance in a small number of places the language itself forces: a signal handler's flag, whose fixed signature has no room for a captured object, and the counter inside a replacement "
+    },
+    {
+     "t": "code",
+     "v": "operator new"
+    },
+    {
+     "t": "text",
+     "v": ". Everywhere else, and in this interview, the honest answer passes the instance in."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "meyers",
+   "title": "Function-local static instance and its guarantees",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " is the shape every Meyers singleton takes: a private constructor, and a "
+        },
+        {
+         "t": "code",
+         "v": "static Config& instance()"
+        },
+        {
+         "t": "text",
+         "v": " whose only two lines are the function-local static and the "
+        },
+        {
+         "t": "code",
+         "v": "return"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n\nclass Config {\n public:\n  static Config& instance() {\n    std::cout << \"instance() called\\n\";\n    static Config config;  // built the first time control reaches this line, and never again\n    return config;\n  }\n  [[nodiscard]] const std::string& robot_name() const { return robot_name_; }\n  [[nodiscard]] static int built_count() { return built_count_; }\n\n private:\n  Config() : robot_name_(\"bench-forward-01\") { ++built_count_; }\n  std::string robot_name_;\n  static inline int built_count_ = 0;\n};\n\nint main() {\n  std::cout << \"before any call to instance()\\n\";\n  std::cout << std::format(\"robot_name(): {}\\n\", Config::instance().robot_name());\n  std::cout << std::format(\"robot_name(): {}\\n\", Config::instance().robot_name());\n  std::cout << std::format(\"robot_name(): {}\\n\", Config::instance().robot_name());\n  std::cout << std::format(\"constructor ran {} time(s)\\n\", Config::built_count());\n  std::cout << std::format(\"both references are the same object: {}\\n\",\n                           &Config::instance() == &Config::instance());\n}"
+      },
+      {
+       "t": "output",
+       "text": "before any call to instance()\ninstance() called\nrobot_name(): bench-forward-01\ninstance() called\nrobot_name(): bench-forward-01\ninstance() called\nrobot_name(): bench-forward-01\nconstructor ran 1 time(s)\ninstance() called\ninstance() called\nboth references are the same object: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "instance()"
+        },
+        {
+         "t": "text",
+         "v": " prints on every call, and the constructor's own counter still reads 1 after three of them: "
+        },
+        {
+         "t": "code",
+         "v": "static Config config;"
+        },
+        {
+         "t": "text",
+         "v": " is built the first time control passes through that declaration, not before "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " starts and never again after. That order of calls, not a fixed position in the file, is what makes the object lazy. The reference "
+        },
+        {
+         "t": "code",
+         "v": "instance()"
+        },
+        {
+         "t": "text",
+         "v": " returns is the same object every time, shown here by comparing two references with "
+        },
+        {
+         "t": "code",
+         "v": "=="
+        },
+        {
+         "t": "text",
+         "v": " rather than printing an address: two separate runs of this program would print two different addresses, and a page whose output has to be exact never prints one it cannot compare instead."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Laziness is not the whole guarantee. Before C++11, two threads reaching "
+        },
+        {
+         "t": "code",
+         "v": "static Config config;"
+        },
+        {
+         "t": "text",
+         "v": " at once could both see an uninitialised guard and both start building "
+        },
+        {
+         "t": "code",
+         "v": "config"
+        },
+        {
+         "t": "text",
+         "v": ", a plain race. The 2011 standard closed it, and cppreference states the fix directly: if multiple threads attempt to initialise the same function-local static concurrently, the initialisation occurs exactly once, and usual implementations reduce the cost of every later call to a single non-atomic boolean check once the object exists. Read that sentence for what it leaves out. It covers the one call that builds "
+        },
+        {
+         "t": "code",
+         "v": "config"
+        },
+        {
+         "t": "text",
+         "v": ". It says nothing about "
+        },
+        {
+         "t": "code",
+         "v": "robot_name()"
+        },
+        {
+         "t": "text",
+         "v": ", or any method the finished object exposes afterward, and nothing in the standard extends the same protection there. Two threads calling a method that mutates "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " once it exists still race exactly as they would on any other shared object with no lock of its own: the guard C++11 added protects the moment of construction, not the object's whole lifetime. The chapter on mutexes later in this course is where that gap actually closes, with a lock the class owns for itself."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Scott Meyers proposed the function-local static in "
+        },
+        {
+         "t": "i",
+         "v": "Effective C++"
+        },
+        {
+         "t": "text",
+         "v": ", Item 4, not as a pattern to reach for on purpose but as the fix for a narrower problem: two ordinary global objects in separate translation units, one needed by the other during its own construction, with no rule in the standard for which file's globals run first. Moving each into its own function-local static sidesteps the question, because a function-local static builds on first use, and first use has a definite order that the program's own control flow decides rather than the linker. Reused as a Singleton, the same mechanism fixes that ordering question and opens two new ones, worked through below: everyone who calls "
+        },
+        {
+         "t": "code",
+         "v": "instance()"
+        },
+        {
+         "t": "text",
+         "v": " now shares one object with no say in when it appears, and, as the failure cases below show, no say in when it disappears either. A finished Singleton class also deletes its copy and move operations the way this course's other polymorphic bases do, because nothing about a function-local static stops "
+        },
+        {
+         "t": "code",
+         "v": "Config copy = Config::instance();"
+        },
+        {
+         "t": "text",
+         "v": " from building a second, fully working instance, which would make \"exactly one\" a claim the compiler never checks."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "costs",
+   "title": "Global coupling, hidden dependencies, static destruction order, testing",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Before the costs, it is worth being precise about where something like a Singleton is not a choice at all. A signal handler's signature is fixed by the operating system, "
+        },
+        {
+         "t": "code",
+         "v": "void(int)"
+        },
+        {
+         "t": "text",
+         "v": ", with no parameter for a captured object, so the flag it sets has nowhere to live but namespace scope:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <csignal>\n#include <format>\n#include <iostream>\n\n// A signal handler's signature is fixed by the operating system and takes no captured state,\n// so the flag it sets has nowhere to live but namespace scope.\nvolatile std::sig_atomic_t g_stop = 0;\n\nextern \"C\" void on_sigint(int) { g_stop = 1; }\n\nint main() {\n  std::signal(SIGINT, on_sigint);\n  std::cout << std::format(\"before raise(SIGINT): g_stop = {}\\n\", g_stop);\n  std::raise(SIGINT);\n  std::cout << std::format(\"after raise(SIGINT):  g_stop = {}\\n\", g_stop);\n}"
+      },
+      {
+       "t": "output",
+       "text": "before raise(SIGINT): g_stop = 0\nafter raise(SIGINT):  g_stop = 1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The Factory Method topic's worked example used the other forced case for real, a counter inside a replacement "
+        },
+        {
+         "t": "code",
+         "v": "operator new"
+        },
+        {
+         "t": "text",
+         "v": ", whose signature is equally fixed and equally unable to take the counter as an argument. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.2",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global"
+        },
+        {
+         "t": "text",
+         "v": " names global mutable state as something to avoid, and both of these are its stated exceptions, not a licence to reach for a third one. Neither is a Singleton class with a getter; both are a plain variable at namespace scope, used exactly where the language leaves no other place to put it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Everywhere else, the same shape hides a dependency instead of forcing one. A function that calls "
+        },
+        {
+         "t": "code",
+         "v": "Config::instance()"
+        },
+        {
+         "t": "text",
+         "v": " inside its own body takes no "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " parameter, so its signature promises less than it needs: the dependency injection topic named this as the first roadblock to testing anything, a class that builds or reaches for what it depends on instead of receiving it. A test that wants a different "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " cannot hand one to the function; it can only mutate the one "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " every other test shares, which is the exact bug the factory method topic measured in a registry: one test's change to shared state outlives that test and reaches the next one, in whichever order the test runner happens to pick."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third cost is destruction order, and it takes real code to see it, not a description alone. "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " above and a new "
+        },
+        {
+         "t": "code",
+         "v": "Logger"
+        },
+        {
+         "t": "text",
+         "v": " are both Meyers singletons; "
+        },
+        {
+         "t": "code",
+         "v": "Logger"
+        },
+        {
+         "t": "text",
+         "v": "'s destructor writes one last line through "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <string>\n\nclass Config {\n public:\n  static Config& instance() {\n    static Config config;\n    return config;\n  }\n  [[nodiscard]] const std::string& name() const { return name_; }\n\n private:\n  Config() : name_(\"bench-forward-01, a name long enough to defeat the small string optimisation\") {}\n  std::string name_;\n};\n\nclass Logger {\n public:\n  static Logger& instance() {\n    static Logger logger;\n    return logger;\n  }\n  ~Logger() { std::cout << std::format(\"shutting down: {}\\n\", Config::instance().name()); }\n\n private:\n  Logger() = default;\n};\n\nint main() {\n  Logger::instance();  // first use: Logger's static is built first\n  Config::instance();  // first use: Config's static is built second\n  std::cout << \"both singletons are alive here\\n\";\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports a "
+        },
+        {
+         "t": "code",
+         "v": "heap-use-after-free"
+        },
+        {
+         "t": "text",
+         "v": " read inside "
+        },
+        {
+         "t": "code",
+         "v": "Logger::~Logger"
+        },
+        {
+         "t": "text",
+         "v": ", on the heap buffer that used to hold "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": "'s name. The standard destroys function-local statics in the reverse order of when their construction finished, and that order is exactly the order "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " happened to call them in: "
+        },
+        {
+         "t": "code",
+         "v": "Logger"
+        },
+        {
+         "t": "text",
+         "v": " first, so "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " second, so at exit "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " is torn down first and "
+        },
+        {
+         "t": "code",
+         "v": "Logger"
+        },
+        {
+         "t": "text",
+         "v": " second, and "
+        },
+        {
+         "t": "code",
+         "v": "Logger"
+        },
+        {
+         "t": "text",
+         "v": "'s own destructor reads a "
+        },
+        {
+         "t": "code",
+         "v": "Config"
+        },
+        {
+         "t": "text",
+         "v": " that no longer exists. Nothing about this needs two threads or an unlucky race. It is entirely deterministic, and it is exactly as fragile as the two lines in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that decided the order, which a change to some unrelated piece of start-up code, months later, can silently reverse."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every one of these three costs comes from the same source: a Singleton is reachable from anywhere, so nothing about where it is used tells you what depends on it, in what order it was built, or whether a test changed it under you. Global coupling is the name for that property, not an extra fourth cost, and it is why Klaus Iglberger's Guidelines 37 and 38 in C++ Software Design treat Singleton as an implementation detail at best: if a process genuinely needs exactly one instance of something, put an interface in front of it and inject that one instance everywhere it is used, the same constructor injection the dependency injection topic already gave you, so a test can inject a different one instead of fighting the real one for control of a shared global. Pete Muldoon's CppCon talk on retiring the pattern makes the same case from the other side: nearly every reason code reaches for a Singleton is better served by building the object once, where the program starts, and passing it down."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a function-local static guarantees since C++11, in one sentence, and say what that guarantee does not extend to. Name the two places the language itself forces something like global state, and why neither is a licence for a third. Say what a Singleton hides from a caller's signature, and why that defeats a test the same way an unpassed dependency does. Explain the destruction-order bug in your own words: which singleton is destroyed first, and why. Finish with what to do instead: build the one instance where the program starts, and pass it to whoever needs it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does C++11 guarantee about two threads calling a function with a function-local static at the same moment, and what does it not guarantee about the object afterward?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What problem was the function-local static idiom originally written to fix, and who proposed it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the two places the language forces something like global mutable state, and what about each one's signature forces it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a function that calls a Singleton's "
+     },
+     {
+      "t": "code",
+      "v": "instance()"
+     },
+     {
+      "t": "text",
+      "v": " inside itself hide a dependency, and what does that break in a test?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In the destruction-order example, which of "
+     },
+     {
+      "t": "code",
+      "v": "Config"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "Logger"
+     },
+     {
+      "t": "text",
+      "v": " is destroyed first, and why?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What did AddressSanitizer report in the destruction-order example, and on whose freed memory?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is global coupling, and how do the three costs in this topic all come from it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What should a class do instead of reaching for "
+     },
+     {
+      "t": "code",
+      "v": "Config::instance()"
+     },
+     {
+      "t": "text",
+      "v": " inside its own body?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: a Meyers singleton, what its guarantee covers, and one sentence on what to do instead of writing one."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Scott Meyers, Effective C++, 3rd edition: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.aristeia.com/effective-c++.html"
+     },
+     {
+      "t": "text",
+      "v": ". Item 4, the reference-returning function built on a local static, written to fix the order ordinary globals across files are built in."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, C++ Software Design, O'Reilly 2022: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+     },
+     {
+      "t": "text",
+      "v": ". Guidelines 37 and 38, treating Singleton as an implementation detail and designing it so a test can inject a different instance."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Pete Muldoon, Retiring the Singleton Pattern, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/retiring_the_singleton_pattern/retiring_the_singleton_pattern__peter_muldoon__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": ". What a shared instance costs, and building it once instead."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Design Patterns, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_design_patterns/back_to_basics_design_patterns__michael_shah__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=2UUqX2eIdSM"
+     },
+     {
+      "t": "text",
+      "v": ". Singleton, Adapter and Iterator worked through in C++."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "I.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global"
+     },
+     {
+      "t": "text",
+      "v": " on global mutable state, "
+     },
+     {
+      "t": "a",
+      "v": "I.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-singleton"
+     },
+     {
+      "t": "text",
+      "v": " on avoiding singletons, and "
+     },
+     {
+      "t": "a",
+      "v": "I.22",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global-init"
+     },
+     {
+      "t": "text",
+      "v": " on initialisation order across translation units."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "storage duration",
+      "href": "https://en.cppreference.com/cpp/language/storage_duration"
+     },
+     {
+      "t": "text",
+      "v": ", for the exact C++11 guarantee on a function-local static, and on "
+     },
+     {
+      "t": "a",
+      "v": "signal handling",
+      "href": "https://en.cppreference.com/cpp/utility/program/signal"
+     },
+     {
+      "t": "text",
+      "v": ", for what a handler may safely do."
+     }
+    ]
+   ]
+  }
+ ]
+}

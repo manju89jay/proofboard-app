@@ -1,0 +1,1236 @@
+{
+ "id": "sim-reproducibility",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You run "
+     },
+     {
+      "t": "code",
+      "v": "./run_scenario.sh normal"
+     },
+     {
+      "t": "text",
+      "v": " twice on the same machine, from the same commit, with nothing else changed, and the two verdict files disagree. On paper, name four things that could make the runs differ. For each one say whether it belongs to the simulator or to the ROS side, and what you would do about it. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Four that come up constantly:"
+     }
+    ]
+   },
+   {
+    "t": "ul",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Randomness with no fixed seed. Gazebo draws sensor noise from its own generator, and without "
+      },
+      {
+       "t": "code",
+       "v": "--seed"
+      },
+      {
+       "t": "text",
+       "v": " on the command line each run starts from a different one. The simulator's, and the fix is to pass a seed and record which one."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Something timed on the wall clock rather than the node's clock. A "
+      },
+      {
+       "t": "code",
+       "v": "create_wall_timer"
+      },
+      {
+       "t": "text",
+       "v": " or a "
+      },
+      {
+       "t": "code",
+       "v": "std::chrono::steady_clock"
+      },
+      {
+       "t": "text",
+       "v": " deadline inside robot logic fires a different number of times per simulated second whenever the real-time factor moves, and the factor moves with the load on the machine. The ROS side, and the fix is "
+      },
+      {
+       "t": "code",
+       "v": "use_sim_time"
+      },
+      {
+       "t": "text",
+       "v": " on every node and "
+      },
+      {
+       "t": "code",
+       "v": "create_timer"
+      },
+      {
+       "t": "text",
+       "v": " everywhere except a guard that must survive a dead simulator."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Start order and executor interleaving. Which node comes up first decides which messages the others miss, and which of two ready callbacks the executor runs first is not something you chose. The ROS side, and the fix is to start measuring at the first message rather than at launch, and to judge on tolerances rather than on exact values."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Floating point differing between builds or machines: a fused multiply-add the compiler is allowed to contract, a different version of the maths library, a different optimisation level. Both sides, and the fix is one container image for anything you intend to compare."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Also worth full marks: a different version of any package, an edited parameter file, CPU load changing the real-time factor, and messages dropped by QoS."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The distinction the answer is really testing is that the physics is the reliable part. Gazebo's step function receives the step size and the state and never the wall clock, so the same world stepped the same way repeats; almost everything that fails to repeat is outside the simulator."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with four causes, the right side for at least three, and a workable fix for each. Three causes is a partial pass. Naming the simulator as the source of the nondeterminism is a fail, because it sends you looking in the one place that is behaving."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A reproducible run is one you can perform again and get the same answer from. There are two meanings and choosing between them is the first decision. Bit-identical means every number matches exactly, which a unit test can demand. Equivalent within tolerance means every check lands on the same side of its limit, which is what a robot scenario can promise, because the trajectory is a physical simulation and the numbers move in the last digits."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is that a passing run is worthless as evidence unless somebody else can produce it. Without reproducibility, a failure is an anecdote: the person who saw it cannot show it, the person who fixed it cannot prove it, and the test that passes in the morning and fails at night teaches the team to ignore the test."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Three things have to be pinned. The software: the commit, the operating system version, the simulator version, every package version, and ideally the digest of one container image, because floating-point results move with the compiler and the maths library. The configuration: the world file, the parameter files, the launch arguments and the environment variables that change behaviour. And the randomness: every generator gets a seed chosen by you and recorded with the run, including the simulator's own, which on Gazebo is a command-line option and cannot be changed once the server is running."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is discipline rather than money. Every number that varies has to be recorded rather than assumed, every run writes an environment file next to its result, and anything timed on the wall clock has to move onto the simulated clock, which is a real constraint on how you write nodes."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Where you meet it is the day a scenario fails once in ten runs. Reproducibility is what turns that into a number: pinned versions and a recorded seed let you repeat the failing run instead of waiting for it, and repeated runs turn \"it usually passes\" into a measured rate with a stated confidence."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "pin",
+   "title": "Pinned versions, configuration, seeds, recorded inputs",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every scenario run in the bench writes two files, and the second one exists entirely for this topic:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./run_scenario.sh normal        # results/normal.txt is the verdict, results/normal.env is the environment\ncat results/normal.env          # the commit, the Ubuntu version, the Gazebo version, nav2_minimal_tb3_sim"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The question this section answers is whether those four lines are enough, and the answer is no, which is worth working out rather than being told."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start with what is already reliable. The time-stepping topic established that Gazebo's pacing is separate from its physics: the step function receives the step size and the state, never the wall clock, so a headless run at a real-time factor of ten passes through the same states as the same run at one. Every step is exactly "
+        },
+        {
+         "t": "code",
+         "v": "max_step_size"
+        },
+        {
+         "t": "text",
+         "v": ", simulated time is an integer count of nanoseconds, and the physics engine is deterministic for the same inputs. That is a strong guarantee and it is the reason this page is mostly about everything else."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The simulator's one source of randomness is its own generator, used for sensor noise. "
+        },
+        {
+         "t": "code",
+         "v": "gz sim --seed N"
+        },
+        {
+         "t": "text",
+         "v": " calls "
+        },
+        {
+         "t": "code",
+         "v": "ServerConfig::SetSeed"
+        },
+        {
+         "t": "text",
+         "v": ", which sets "
+        },
+        {
+         "t": "code",
+         "v": "math::Rand"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "ServerConfig.cc",
+         "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/ServerConfig.cc"
+        },
+        {
+         "t": "text",
+         "v": "), and logs "
+        },
+        {
+         "t": "code",
+         "v": "Setting seed value: N"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "gz.cc",
+         "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/gz.cc"
+        },
+        {
+         "t": "text",
+         "v": "). The option is only read at start-up: a "
+        },
+        {
+         "t": "code",
+         "v": "seed"
+        },
+        {
+         "t": "text",
+         "v": " field in a "
+        },
+        {
+         "t": "code",
+         "v": "WorldControl"
+        },
+        {
+         "t": "text",
+         "v": " request is refused with "
+        },
+        {
+         "t": "code",
+         "v": "Changing seed is not supported."
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "SimulationRunner.cc",
+         "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/SimulationRunner.cc"
+        },
+        {
+         "t": "text",
+         "v": "). Leave it out and each run draws a different one, so two runs of a world with a noisy lidar differ from the first scan onwards. Pass it, record it in the environment file, and a noisy run becomes as repeatable as a noiseless one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now the three things to pin, in the order they bite."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "The software."
+        },
+        {
+         "t": "text",
+         "v": " The commit is the least of it. The Gazebo version changes the physics engine's behaviour between releases, a package version changes a controller's defaults, and the compiler and the C library change the last bits of every trajectory: a fused multiply-add the compiler is free to contract produces a different rounding from the same expression compiled without it, and "
+        },
+        {
+         "t": "code",
+         "v": "sin"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "cos"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "exp"
+        },
+        {
+         "t": "text",
+         "v": " are not correctly rounded, so their results move between versions of the maths library. None of that is a bug, and none of it can be argued away. The practical answer is that two runs are comparable when they come from the same container image, and only approximately comparable otherwise, and the thing to record is the image's digest rather than its tag, because a tag moves."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bench does not have that image yet, and saying so is more use than pretending otherwise. Its CI has one container job, which builds the ROS snippets in "
+        },
+        {
+         "t": "code",
+         "v": "ros:jazzy-ros-base"
+        },
+        {
+         "t": "text",
+         "v": " without running them, and "
+        },
+        {
+         "t": "code",
+         "v": "ros-base"
+        },
+        {
+         "t": "text",
+         "v": " carries no Gazebo, so nothing in CI can run a scenario at all. That makes it the pin for the snippet build and not for scenario runs, and it means a comparison between your machine and CI has no other side to compare against. Building the image a scenario run happens in, with Gazebo and the simulation packages pinned by digest, and adding a job that runs one, is the change this section is asking for rather than a box already ticked."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "The configuration."
+        },
+        {
+         "t": "text",
+         "v": " The world file, the parameter file for the scenario, every launch argument, and the environment variables that change behaviour rather than describing the machine: "
+        },
+        {
+         "t": "code",
+         "v": "RMW_IMPLEMENTATION"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ROS_DOMAIN_ID"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ROS_AUTOMATIC_DISCOVERY_RANGE"
+        },
+        {
+         "t": "text",
+         "v": " and anything pointing at a vendor's XML. A run where "
+        },
+        {
+         "t": "code",
+         "v": "RMW_IMPLEMENTATION"
+        },
+        {
+         "t": "text",
+         "v": " was different is not a repeat of the run before it, and nothing in the verdict will say so unless the environment file does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "The randomness."
+        },
+        {
+         "t": "text",
+         "v": " Every generator gets a seed you chose, and the seed is recorded. Gazebo's is the obvious one. Yours are the ones people forget: any retry policy with jitter, which is why the reliability topic's "
+        },
+        {
+         "t": "code",
+         "v": "Retry"
+        },
+        {
+         "t": "text",
+         "v": " takes a seed rather than calling "
+        },
+        {
+         "t": "code",
+         "v": "std::random_device"
+        },
+        {
+         "t": "text",
+         "v": "; any randomised starting pose; any test that shuffles an input. The rule is that a program must never contain a generator whose seed nobody wrote down."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Recorded inputs"
+        },
+        {
+         "t": "text",
+         "v": " are the strongest form of all of this, and they come from a different direction. A recording removes the simulator from the loop for everything downstream of the recording point: feed the same messages in and the node under test must produce the same output, with no physics, no scheduler and no real-time factor involved. That is what the bench's record and replay work is for, and "
+        },
+        {
+         "t": "code",
+         "v": "compare_runs"
+        },
+        {
+         "t": "text",
+         "v": " exists to say whether two replays match. What replay cannot reproduce is anything that was a decision rather than a message, and anything that depended on when a message arrived rather than on what it said, which is exactly the class of bug the rest of this page is about."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last piece is what to record per run, and the answer is more than pass or fail. Record the verdict, the environment, the seeds, the launch arguments, and the measured value of every check rather than whether it met its limit. The measured values are what let you see a margin shrinking three weeks before it turns into a failure, and they cost one line each."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That is also the difference between evidence and an anecdote. One passing run tells you almost nothing, and it is worth knowing how little:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cmath>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <vector>\n\n// With no failure in `runs` runs, the highest failure rate still consistent with that at 95%\n// confidence. The rule of thumb 3/runs is the approximation of this.\n[[nodiscard]] double upper_bound(std::int64_t runs) {\n  return 1.0 - std::pow(0.05, 1.0 / static_cast<double>(runs));\n}\n\n// The chance that a scenario which really fails one run in twenty passes `runs` runs in a row,\n// which is the chance it looks clean while it is not.\n[[nodiscard]] double looks_clean(std::int64_t runs, double real_rate) {\n  return std::pow(1.0 - real_rate, static_cast<double>(runs));\n}\n\nint main() {\n  constexpr double real_rate = 0.05;\n  std::cout << std::format(\"{:>6} {:>22} {:>26}\\n\", \"runs\", \"failure rate under\", \"a 5% flake passes them all\");\n  for (const std::int64_t runs : std::vector<std::int64_t>{1, 5, 10, 20, 60, 100}) {\n    std::cout << std::format(\"{:>6} {:>21.1f}% {:>25.1f}%\\n\", runs, 100.0 * upper_bound(runs),\n                             100.0 * looks_clean(runs, real_rate));\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "  runs     failure rate under a 5% flake passes them all\n     1                  95.0%                      95.0%\n     5                  45.1%                      77.4%\n    10                  25.9%                      59.9%\n    20                  13.9%                      35.8%\n    60                   4.9%                       4.6%\n   100                   3.0%                       0.6%"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the middle column first. One clean run is consistent with a failure rate of up to 95%, and ten clean runs still leave room for one in four. Sixty is where the bound crosses 5%, which is the arithmetic behind the rule of thumb that three divided by the number of runs is the upper bound once the number is over about thirty. The right-hand column is the same fact from the other side: a scenario that really does fail one run in twenty passes ten runs in a row three times out of five, so \"I ran it ten times and it was fine\" is not evidence that it is fine. None of this makes a flaky scenario acceptable. It sets the price of calling one reliable, and it is the reason a scenario worth trusting is one whose failures you have pinned, reproduced and removed rather than one you have watched pass."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "repeat",
+   "title": "Repeat a run and compare the results",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run "
+         },
+         {
+          "t": "code",
+          "v": "./run_scenario.sh normal"
+         },
+         {
+          "t": "text",
+          "v": " ten times, keeping each "
+         },
+         {
+          "t": "code",
+          "v": "results/normal.txt"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "results/normal.env"
+         },
+         {
+          "t": "text",
+          "v": " under a name of its own."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Go through the verdict files. Say which fields must be identical across all ten and which may vary, with the reason for each. The verdict's first line is "
+         },
+         {
+          "t": "code",
+          "v": "pass"
+         },
+         {
+          "t": "text",
+          "v": " or "
+         },
+         {
+          "t": "code",
+          "v": "fail"
+         },
+         {
+          "t": "text",
+          "v": ", then "
+         },
+         {
+          "t": "code",
+          "v": "scenario:"
+         },
+         {
+          "t": "text",
+          "v": ", then "
+         },
+         {
+          "t": "code",
+          "v": "samples:"
+         },
+         {
+          "t": "text",
+          "v": ", then one line per check with its measured value."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "spread_of"
+         },
+         {
+          "t": "text",
+          "v": " in plain C++: given the ten measured values of one check and the limit it must stay under, return the lowest, the highest and how many were outside. Print a row per check with the margin left at the worst run, and say what each column tells you that the others do not."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Name four things missing from "
+         },
+         {
+          "t": "code",
+          "v": "results/normal.env"
+         },
+         {
+          "t": "text",
+          "v": " before you would trust a comparison between your machine and CI."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "One of the ten fails. Say what you keep, what you change first, and how you decide whether you are looking at a flake or at a bug."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 2. "
+        },
+        {
+         "t": "code",
+         "v": "scenario:"
+        },
+        {
+         "t": "text",
+         "v": " must be identical, because it names which set of checks ran, and a difference means the two runs are not comparable at all. The first line should be identical, and the exercise exists because sometimes it is not. Everything else may vary. "
+        },
+        {
+         "t": "code",
+         "v": "samples:"
+        },
+        {
+         "t": "text",
+         "v": " is the number of odometry messages the runner collected, and it varies because the run's length in simulated time varies by a few messages and because a message can be dropped. Every measured value varies, in the last digits from the physics and in the first digits from anything that depends on timing. The distinction to make out loud is between fields that identify the run and fields that measure it: the first kind must match or the comparison is meaningless, and the second kind is the comparison."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 3:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <span>\n#include <string>\n#include <string_view>\n#include <vector>\n\n// One run of a check is a number. Ten runs are a number and a spread, and only the spread says\n// whether the limit has any margin left.\nstruct Spread {\n  double lowest;\n  double highest;\n  std::int64_t outside;\n};\n\n[[nodiscard]] Spread spread_of(std::span<const double> values, double at_most) {\n  Spread result{.lowest = values.front(), .highest = values.front(), .outside = 0};\n  for (const double value : values) {\n    result.lowest = std::min(result.lowest, value);\n    result.highest = std::max(result.highest, value);\n    if (value > at_most) ++result.outside;\n  }\n  return result;\n}\n\nstruct Check {\n  std::string_view what;\n  std::string_view unit;\n  double at_most;\n  std::vector<double> runs;\n};\n\nint main() {\n  // Ten runs of the same scenario. Put your own numbers here.\n  const std::vector<Check> checks{\n      {.what = \"time from first movement\",\n       .unit = \"s\",\n       .at_most = 20.0,\n       .runs = {7.66, 7.70, 7.64, 7.72, 7.68, 7.65, 7.71, 7.69, 7.67, 7.73}},\n      {.what = \"top speed\",\n       .unit = \"m/s\",\n       .at_most = 0.30,\n       .runs = {0.204, 0.207, 0.203, 0.298, 0.205, 0.206, 0.204, 0.208, 0.205, 0.203}},\n      {.what = \"distance from the last goal\",\n       .unit = \"m\",\n       .at_most = 0.10,\n       .runs = {0.041, 0.038, 0.044, 0.099, 0.040, 0.043, 0.039, 0.101, 0.042, 0.040}},\n  };\n\n  std::cout << std::format(\"{:<28} {:>11} {:>8} {:>8} {:>8} {:>8}\\n\", \"check\", \"limit\", \"lowest\", \"highest\",\n                           \"margin\", \"outside\");\n  for (const Check& check : checks) {\n    const Spread spread = spread_of(check.runs, check.at_most);\n    const double margin = 100.0 * (check.at_most - spread.highest) / check.at_most;\n    std::cout << std::format(\"{:<28} {:>11} {:>8.3f} {:>8.3f} {:>7.1f}% {:>8}\\n\", check.what,\n                             std::format(\"{:.3f} {}\", check.at_most, check.unit), spread.lowest, spread.highest,\n                             margin, spread.outside);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "check                              limit   lowest  highest   margin  outside\ntime from first movement        20.000 s    7.640    7.730    61.4%        0\ntop speed                      0.300 m/s    0.203    0.298     0.7%        0\ndistance from the last goal      0.100 m    0.038    0.101    -1.0%        1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The numbers in the program stand for ten runs; the point is what the three rows say, and each row says something different. The first check passes with 61% of its limit unused, so it is not measuring anything: a check whose margin never falls below half its limit is a check that will pass whatever breaks, and it should be tightened until it can fail. The second passes ten times out of ten with 0.7% of margin at the worst run, which is the row to worry about, because nine of the ten runs sat between 0.203 and 0.208 and one reached 0.298: something occasionally happens that makes the robot about 1.45 times as fast as it normally gets, and the check is one bad run away from failing without anybody having changed the robot. The third has failed once already, at 0.101 against a limit of 0.100."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "So the columns divide the work. The count outside tells you whether anything failed, which is what the verdict already said. The highest and the margin tell you how close the rest came, which is the part a pass hides. And the lowest, next to the highest, tells you whether the run is tight or scattered: 0.203 to 0.298 on a check whose normal value is 0.205 is a scatter, and a scatter means something in the system is not repeating."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4. Four things missing from the environment file, in order of how much they matter: the digest of the container image, because the tag moves and the compiler and maths library inside it decide the last digits of every number; the seed passed to "
+        },
+        {
+         "t": "code",
+         "v": "gz sim"
+        },
+        {
+         "t": "text",
+         "v": ", without which the sensor noise differs run to run; the values of the environment variables that change behaviour, at least "
+        },
+        {
+         "t": "code",
+         "v": "RMW_IMPLEMENTATION"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ROS_DOMAIN_ID"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "ROS_AUTOMATIC_DISCOVERY_RANGE"
+        },
+        {
+         "t": "text",
+         "v": "; and the launch arguments and the parameter file's contents, because "
+        },
+        {
+         "t": "code",
+         "v": "relay:=False"
+        },
+        {
+         "t": "text",
+         "v": " or an edited "
+        },
+        {
+         "t": "code",
+         "v": "drop_ms"
+        },
+        {
+         "t": "text",
+         "v": " makes a different scenario with the same name. A fifth is worth adding once the first four exist: the real-time factor the run achieved, because a run at 0.3 on a loaded machine and a run at 1.0 are not the same test even when everything else matches."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5. Keep everything: the verdict, the environment file, the log, and the bag if one was recorded. A failure you did not keep is a failure you will meet again from the start. Change nothing about the system first; change the number of runs. Run the same scenario, from the same commit, in the same container, with the seed from the failing run, twenty more times and count. If it fails again with that seed, it is reproducible and it is a bug, and the seed is the reproduction. If it never fails again with that seed but fails sometimes with others, the fault is timing rather than physics, and the table above says where to look: compare the measured values of the failing run with the ten passing ones and find the check whose scatter is wide. If it does not fail again at all in twenty runs, the sample is one failure in thirty rather than none in twenty, because the run that started this does not stop counting: the one-sided 95% bound on a sample with one failure in thirty is about 15%, which is not \"fixed\", and the honest entry in the tracker says so. Reading the clean streak on its own would give 13.9%, and dropping the failure you are investigating is exactly the mistake the table three paragraphs above is there to stop."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Thread scheduling and wall-clock dependence",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four things break a repeat, and none of them is the physics."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A wall-clock timer inside robot logic is the first and the most common. "
+        },
+        {
+         "t": "code",
+         "v": "create_wall_timer"
+        },
+        {
+         "t": "text",
+         "v": " counts on a steady clock whatever "
+        },
+        {
+         "t": "code",
+         "v": "use_sim_time"
+        },
+        {
+         "t": "text",
+         "v": " says, so at a real-time factor of 0.5 it fires twice per simulated second where a node-clock timer fires once, and the factor is decided by how loaded the machine is. A control loop on a wall timer is a control loop whose rate depends on what else is running, and two runs of that are two different experiments. The bench has exactly one wall timer, the guard that ends a scenario when the simulation has died, and it is on a wall clock precisely because a dead simulation stops simulated time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Executor interleaving is the second. When two callbacks are ready in the same pass, the order comes from the wait set rather than from arrival, which the executors topic measured, and with a multi-threaded executor the two can overlap. Neither is a bug and neither repeats. The defence is not to make the executor deterministic, which you cannot, but to keep callbacks small and their results independent of the order, and to judge on values that a reordering cannot change."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start order and discovery timing is the third, and it produces the failure that looks most like a fluke. A subscriber that comes up after a publisher has already sent misses everything before it joined unless the topic is transient local, which the QoS topic covers, and how late it is depends on how long discovery took, which depends on the network. A scenario that starts measuring at launch is measuring the start-up as well; the bench starts the run at the first odometry message for this reason, and that single decision removes more variation than any amount of pinning."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Unseeded randomness is the fourth, and it hides in your own code more than in the simulator's. "
+        },
+        {
+         "t": "code",
+         "v": "std::mt19937 generator{std::random_device{}()}"
+        },
+        {
+         "t": "text",
+         "v": " is a new sequence every run. So is anything seeded from the clock. A subtler one is iteration order: walking a "
+        },
+        {
+         "t": "code",
+         "v": "std::unordered_map"
+        },
+        {
+         "t": "text",
+         "v": " gives an order that is stable for one build and one insertion sequence and is not stable across library versions or when the insertions change, so a report built by iterating one is not comparable between machines even when every number in it is identical."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Floating point closes the list, and it is the one to state carefully rather than dramatically. The same source, compiled with different optimisation levels or on a different machine, can give different results in the last bits: the compiler may contract a multiply and an add into one instruction with a single rounding, and the maths library's "
+        },
+        {
+         "t": "code",
+         "v": "sin"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "exp"
+        },
+        {
+         "t": "text",
+         "v": " are not correctly rounded and change between versions. This is not a reason to despair, it is a reason to compare with a tolerance and to pin one image for anything you intend to compare exactly."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the two meanings of a repeated run and say which one a scenario can promise. Say what Gazebo's stepping guarantees and name its one source of randomness, with the option that fixes it and the reason a running server refuses a new one. List the three things to pin, with one example of each. Say what a recorded input reproduces and what it cannot. Give the four things that break a repeat on the ROS side and the fix for each. Finish with the number of clean runs it takes to put the failure rate under 5%, and why ten is not evidence."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What are the two meanings of \"the same run\", and which one can a robot scenario promise?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does Gazebo's step function receive, and why does that make the physics the repeatable part?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which command-line option fixes Gazebo's randomness, and what happens if you try to change it while the server runs?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the three categories to pin, and give one item in each that people leave out."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is a container tag not a pin, and what is?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a recorded input reproduce that a rerun does not, and what can it not reproduce at all?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a wall-clock timer in robot logic make two runs different, and where is the one place the bench uses one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A check passes ten times with 0.7% of margin at the worst run. What do you do, and why is it not \"nothing\"?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How many clean runs put the failure rate under 5% with 95% confidence, and what does the rule of thumb say?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A scenario failed once in ten runs. Give your next three actions in order."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page in 10 minutes: everything you would write into an environment file so that somebody on another machine could repeat your run."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Gazebo Sim on the gz-sim8 branch: "
+     },
+     {
+      "t": "a",
+      "v": "gz.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/gz.cc"
+     },
+     {
+      "t": "text",
+      "v": ", where "
+     },
+     {
+      "t": "code",
+      "v": "--seed"
+     },
+     {
+      "t": "text",
+      "v": " is read at start-up and logged; "
+     },
+     {
+      "t": "a",
+      "v": "ServerConfig.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/ServerConfig.cc"
+     },
+     {
+      "t": "text",
+      "v": ", where "
+     },
+     {
+      "t": "code",
+      "v": "SetSeed"
+     },
+     {
+      "t": "text",
+      "v": " seeds "
+     },
+     {
+      "t": "code",
+      "v": "math::Rand"
+     },
+     {
+      "t": "text",
+      "v": "; and "
+     },
+     {
+      "t": "a",
+      "v": "SimulationRunner.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/SimulationRunner.cc"
+     },
+     {
+      "t": "text",
+      "v": ", which answers a seed in a world-control request with "
+     },
+     {
+      "t": "code",
+      "v": "Changing seed is not supported."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo's documentation on "
+     },
+     {
+      "t": "a",
+      "v": "pausing and running a simulation",
+      "href": "https://gazebosim.org/api/sim/8/pause_run_simulation.html"
+     },
+     {
+      "t": "text",
+      "v": " and on the "
+     },
+     {
+      "t": "a",
+      "v": "server command line",
+      "href": "https://gazebosim.org/docs/harmonic/install/"
+     },
+     {
+      "t": "text",
+      "v": ", for the options a scenario launch has to record."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation: "
+     },
+     {
+      "t": "a",
+      "v": "Executors",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Executors.html"
+     },
+     {
+      "t": "text",
+      "v": " for the order two ready callbacks run in, and "
+     },
+     {
+      "t": "a",
+      "v": "Quality of service settings",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html"
+     },
+     {
+      "t": "text",
+      "v": " for what a late subscriber receives."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "timer.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/timer.hpp"
+     },
+     {
+      "t": "text",
+      "v": ": a wall timer is built on the steady clock whatever "
+     },
+     {
+      "t": "code",
+      "v": "use_sim_time"
+     },
+     {
+      "t": "text",
+      "v": " says."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "GCC optimisation options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html"
+     },
+     {
+      "t": "text",
+      "v": ", where "
+     },
+     {
+      "t": "code",
+      "v": "-ffp-contract"
+     },
+     {
+      "t": "text",
+      "v": " decides whether a multiply and an add become one instruction with one rounding, and David Goldberg's "
+     },
+     {
+      "t": "a",
+      "v": "paper on floating-point arithmetic for programmers",
+      "href": "https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Google's testing blog, "
+     },
+     {
+      "t": "a",
+      "v": "on flaky tests and how they are handled",
+      "href": "https://testing.googleblog.com/2016/05/flaky-tests-at-google-and-how-we.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "on where they come from",
+      "href": "https://testing.googleblog.com/2017/04/where-do-our-flaky-tests-come-from.html"
+     },
+     {
+      "t": "text",
+      "v": ": what a test costs a team once it cannot be reproduced."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "rule of three for a sample with no failures",
+      "href": "https://en.wikipedia.org/wiki/Rule_of_three_(statistics"
+     },
+     {
+      "t": "text",
+      "v": "), which is where the three-divided-by-the-number-of-runs bound comes from, and which the program above computes exactly rather than approximately."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "mersenne_twister_engine",
+      "href": "https://en.cppreference.com/cpp/numeric/random/mersenne_twister_engine"
+     },
+     {
+      "t": "text",
+      "v": ", whose sequence the standard fixes for a given seed, and on "
+     },
+     {
+      "t": "a",
+      "v": "unordered_map",
+      "href": "https://en.cppreference.com/cpp/container/unordered_map"
+     },
+     {
+      "t": "text",
+      "v": ", whose iteration order it does not."
+     }
+    ]
+   ]
+  }
+ ]
+}

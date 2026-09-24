@@ -1,0 +1,1407 @@
+{
+ "id": "pat-builder",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A "
+     },
+     {
+      "t": "code",
+      "v": "PidConfig"
+     },
+     {
+      "t": "text",
+      "v": " has one required gain, "
+     },
+     {
+      "t": "code",
+      "v": "kp"
+     },
+     {
+      "t": "text",
+      "v": ", and three fields with sensible defaults: "
+     },
+     {
+      "t": "code",
+      "v": "ki"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "kd"
+     },
+     {
+      "t": "text",
+      "v": " and an output limit. From memory, write a constructor that takes all four as positional parameters, call it with two of the same-typed arguments swapped, and show that it compiles and runs anyway. Then write the same configuration with a designated initialiser, and explain in one sentence why a builder is worth considering here even though this one case does not need it. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <format>\n#include <iostream>\n\n// Positional and same-typed: easy to write, easy to swap.\nstruct PidConfigLong {\n  double kp;\n  double ki;\n  double kd;\n  double output_limit;\n};\n[[nodiscard]] PidConfigLong make_pid_long(double kp, double ki, double kd, double output_limit) {\n  return {kp, ki, kd, output_limit};\n}\n\n// A required field and three optional ones, each named at the call site.\nstruct PidConfig {\n  double kp;\n  double ki = 0.0;\n  double kd = 0.0;\n  double output_limit = 100.0;\n};\n\nint main() {\n  // Meant: kp=2.5, ki=0.1, kd=0.05, limit=100. Two middle arguments swapped, and it still compiles.\n  const PidConfigLong swapped = make_pid_long(2.5, 0.05, 0.1, 100.0);\n  std::cout << std::format(\"long ctor:  kp {}, ki {}, kd {}\\n\", swapped.kp, swapped.ki, swapped.kd);\n\n  const PidConfig named{.kp = 2.5, .ki = 0.1, .kd = 0.05};\n  std::cout << std::format(\"designated: kp {}, ki {}, kd {}\\n\", named.kp, named.ki, named.kd);\n}"
+   },
+   {
+    "t": "output",
+    "text": "long ctor:  kp 2.5, ki 0.05, kd 0.1\ndesignated: kp 2.5, ki 0.1, kd 0.05"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Nothing about "
+     },
+     {
+      "t": "code",
+      "v": "make_pid_long(2.5, 0.05, 0.1, 100.0)"
+     },
+     {
+      "t": "text",
+      "v": " looks wrong at the call site; "
+     },
+     {
+      "t": "code",
+      "v": "ki"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "kd"
+     },
+     {
+      "t": "text",
+      "v": " are both "
+     },
+     {
+      "t": "code",
+      "v": "double"
+     },
+     {
+      "t": "text",
+      "v": ", so the swap compiles and runs with the gains exchanged. The designated initialiser names each value, so the same slip is not available to make."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if both versions are written, the swap in the long constructor is real, meaning two same-typed arguments actually exchanged, and the designated initialiser is shown free of that risk. A builder earns its place once the configuration also needs a rule a single struct cannot check by itself, such as one field's valid range depending on another's, which the exercise below is about; for four independent fields with no such rule, the designated initialiser is already the whole answer."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Builder separates constructing a complex object from the object itself: instead of one constructor that takes every field, a separate class collects the values, usually through chained methods that each return the builder, and produces the finished object from a final "
+    },
+    {
+     "t": "code",
+     "v": "build()"
+    },
+    {
+     "t": "text",
+     "v": ". The class being built is the "
+    },
+    {
+     "t": "i",
+     "v": "product"
+    },
+    {
+     "t": "text",
+     "v": "; the class collecting the values is the "
+    },
+    {
+     "t": "i",
+     "v": "builder"
+    },
+    {
+     "t": "text",
+     "v": "."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is a constructor with many parameters, some required and some optional, where positional arguments of the same type can be swapped without the compiler noticing, and every optional combination that used to need its own overload now needs none, because the builder's methods are named and called in any order. Before named arguments existed in the language, this was the only way to give a constructor call readable names."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism, in modern C++, mostly already exists without writing a builder at all: a struct with a designated initialiser gives every field a name at the call site, "
+    },
+    {
+     "t": "code",
+     "v": "Config{.kp = 2.5, .ki = 0.1}"
+    },
+    {
+     "t": "text",
+     "v": ", in less code than a builder class and with the same protection against a positional swap. What a plain struct cannot do is check a rule that spans several fields, or reject a value that is individually well-typed but out of range; a designated initialiser sets whatever is written and defaults whatever is not, with no step where \"is this any good\" gets asked."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What a builder costs, beyond the struct it usually wraps, is one class whose only job is calling that struct's own validation from "
+    },
+    {
+     "t": "code",
+     "v": "build()"
+    },
+    {
+     "t": "text",
+     "v": "; the validation does the real work, and the builder is a name for the shape a caller writes it in. Where the validation is the point, a validating factory function does the same check with no class at all: "
+    },
+    {
+     "t": "code",
+     "v": "make_config(Params)"
+    },
+    {
+     "t": "text",
+     "v": " returning the checked type, or throwing."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this wherever a configuration has fields that must be filled in before it means anything, and the interview question is exactly the boundary: a designated initialiser for values that only need naming, a validating factory or a builder for values that also need checking."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Builder versus long constructors versus designated initialisers",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The classic Builder wraps the same struct the cold check already had, one method per optional field, each returning the builder so calls can be chained:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n\nstruct PidConfig {\n  double kp;\n  double ki = 0.0;\n  double kd = 0.0;\n  double output_limit = 100.0;\n};\n\n// The classic Builder: one setter per optional field, each returning *this, and a final build().\nclass PidConfigBuilder {\n public:\n  explicit PidConfigBuilder(double kp) : config_{.kp = kp} {}\n  PidConfigBuilder& ki(double value) {\n    config_.ki = value;\n    return *this;\n  }\n  PidConfigBuilder& kd(double value) {\n    config_.kd = value;\n    return *this;\n  }\n  PidConfigBuilder& output_limit(double value) {\n    config_.output_limit = value;\n    return *this;\n  }\n  [[nodiscard]] PidConfig build() const { return config_; }\n\n private:\n  PidConfig config_;\n};\n\nint main() {\n  const PidConfig built = PidConfigBuilder(2.5).ki(0.1).kd(0.05).build();\n  const PidConfig named{.kp = 2.5, .ki = 0.1, .kd = 0.05};\n\n  std::cout << std::format(\"builder:    kp {}, ki {}, kd {}, limit {}\\n\", built.kp, built.ki, built.kd,\n                           built.output_limit);\n  std::cout << std::format(\"designated: kp {}, ki {}, kd {}, limit {}\\n\", named.kp, named.ki, named.kd,\n                           named.output_limit);\n  std::cout << std::format(\"same values: {}\\n\", built.kp == named.kp && built.ki == named.ki &&\n                                                    built.kd == named.kd &&\n                                                    built.output_limit == named.output_limit);\n}"
+      },
+      {
+       "t": "output",
+       "text": "builder:    kp 2.5, ki 0.1, kd 0.05, limit 100\ndesignated: kp 2.5, ki 0.1, kd 0.05, limit 100\nsame values: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "PidConfigBuilder(2.5).ki(0.1).kd(0.05).build()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "PidConfig{.kp = 2.5, .ki = 0.1, .kd = 0.05}"
+        },
+        {
+         "t": "text",
+         "v": " produce the same object, and the second one needed no class. Gamma, Helm, Johnson and Vlissides describe Builder in the creational chapter of the 1994 catalogue ("
+        },
+        {
+         "t": "a",
+         "v": "Design Patterns",
+         "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch03.html"
+        },
+        {
+         "t": "text",
+         "v": ") as separating the construction of a complex object from its representation, written for a language whose constructors take positional arguments and cannot check anything about them individually as they are set. C++20's designated initialiser reaches most of the same goal, named values at the call site, in a language where it was never true that a struct could only be filled in positionally, and Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "I.4",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+        },
+        {
+         "t": "text",
+         "v": " has asked all along for a call that says what it means, which a designated initialiser now gives you directly."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What a designated initialiser cannot do is refuse a value. It sets "
+        },
+        {
+         "t": "code",
+         "v": "kp"
+        },
+        {
+         "t": "text",
+         "v": " to whatever is written, checks nothing about it, and defaults every field left out, which is exactly as far as a plain struct goes: naming values, not judging them. That gap, not the four fields themselves, is where a builder, or something smaller, still earns a place, and the worked example measures exactly where the line falls."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A field that is left out of a designated initialiser is one question a struct still answers for you, as long as that field has no default of its own:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "missing initializer for member",
+       "text": "struct PidConfig {\n  double kp;\n  double ki = 0.0;\n  double kd = 0.0;\n  double output_limit = 100.0;\n};\n\nint main() {\n  const PidConfig broken{.ki = 0.4};  // kp is never given a value\n  return broken.kp == 0.0 ? 0 : 1;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 refuses it, "
+        },
+        {
+         "t": "code",
+         "v": "missing initializer for member 'PidConfig::kp'"
+        },
+        {
+         "t": "text",
+         "v": ", under "
+        },
+        {
+         "t": "code",
+         "v": "-Wextra"
+        },
+        {
+         "t": "text",
+         "v": "'s "
+        },
+        {
+         "t": "code",
+         "v": "-Wmissing-field-initializers"
+        },
+        {
+         "t": "text",
+         "v": ", because "
+        },
+        {
+         "t": "code",
+         "v": "kp"
+        },
+        {
+         "t": "text",
+         "v": " has no member initialiser of its own to fall back on and the designated initialiser never named it. "
+        },
+        {
+         "t": "code",
+         "v": "ki"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "kd"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "output_limit"
+        },
+        {
+         "t": "text",
+         "v": " can all be left out silently, because each already has a default that says what \"left out\" means; "
+        },
+        {
+         "t": "code",
+         "v": "kp"
+        },
+        {
+         "t": "text",
+         "v": " cannot, because leaving it out would silently mean zero, which is not a gain anyone chose."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That check answers only one question, whether a value was given, not whether the value given makes sense:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <stdexcept>\n\nstruct PidConfig {\n  double kp;\n  double ki = 0.0;\n  double kd = 0.0;\n  double output_limit = 100.0;\n};\n\n// Checks the one thing a missing-initializer warning cannot: whether a given value makes sense.\n[[nodiscard]] PidConfig make_pid(PidConfig config) {\n  if (config.kp <= 0.0) throw std::invalid_argument(\"kp must be positive\");\n  if (config.output_limit <= 0.0) throw std::invalid_argument(\"output_limit must be positive\");\n  return config;\n}\n\nint main() {\n  // kp was given a value, so the compiler has nothing left to say. The value itself is nonsense.\n  const PidConfig questionable{.kp = -5.0};\n  std::cout << std::format(\"aggregate alone: kp {} compiles, no error raised\\n\", questionable.kp);\n\n  try {\n    const PidConfig checked = make_pid({.kp = -5.0});\n    std::cout << std::format(\"unreachable: kp {}\\n\", checked.kp);\n  } catch (const std::invalid_argument& e) {\n    std::cout << std::format(\"make_pid caught it: {}\\n\", e.what());\n  }\n\n  const PidConfig good = make_pid({.kp = 2.5, .ki = 0.4});\n  std::cout << std::format(\"a valid config: kp {}, ki {}\\n\", good.kp, good.ki);\n}"
+      },
+      {
+       "t": "output",
+       "text": "aggregate alone: kp -5 compiles, no error raised\nmake_pid caught it: kp must be positive\na valid config: kp 2.5, ki 0.4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "kp = -5.0"
+        },
+        {
+         "t": "text",
+         "v": " satisfies "
+        },
+        {
+         "t": "code",
+         "v": "-Wmissing-field-initializers"
+        },
+        {
+         "t": "text",
+         "v": " completely; the field was named and given a value, and the warning has nothing left to check. "
+        },
+        {
+         "t": "code",
+         "v": "make_pid"
+        },
+        {
+         "t": "text",
+         "v": " is the step that reads the value rather than only its presence, and it is a free function, not a class: nothing about checking "
+        },
+        {
+         "t": "code",
+         "v": "kp <= 0.0"
+        },
+        {
+         "t": "text",
+         "v": " needs a builder, a chained interface or a "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": " to return. Reach for a builder over a validating factory only when the values arrive one at a time, across several calls, rather than all at once in a single expression a factory can already take as one struct."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "scenario",
+   "title": "Validated test-scenario configuration with required and optional fields",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. A test bench configures a scenario with two fields that must be given a sensible value and three with defaults, and needs the same validated result whether the values arrive in one call or one method at a time."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "struct ScenarioParams { std::int32_t robot_count; std::int32_t duration_s; std::int32_t obstacle_density_pct = 0; std::int64_t seed = 0; bool record_video = false; };"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "struct ScenarioConfig"
+         },
+         {
+          "t": "text",
+          "v": ", the same five fields, meant to be reached only through a check."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] ScenarioConfig make_scenario(ScenarioParams params)"
+         },
+         {
+          "t": "text",
+          "v": ", throwing "
+         },
+         {
+          "t": "code",
+          "v": "std::invalid_argument"
+         },
+         {
+          "t": "text",
+          "v": " when "
+         },
+         {
+          "t": "code",
+          "v": "robot_count"
+         },
+         {
+          "t": "text",
+          "v": " is not positive, when "
+         },
+         {
+          "t": "code",
+          "v": "duration_s"
+         },
+         {
+          "t": "text",
+          "v": " is not positive, or when "
+         },
+         {
+          "t": "code",
+          "v": "obstacle_density_pct"
+         },
+         {
+          "t": "text",
+          "v": " is outside 0 to 100; otherwise returning the checked "
+         },
+         {
+          "t": "code",
+          "v": "ScenarioConfig"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "class ScenarioBuilder"
+         },
+         {
+          "t": "text",
+          "v": ", constructed from "
+         },
+         {
+          "t": "code",
+          "v": "robot_count"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "duration_s"
+         },
+         {
+          "t": "text",
+          "v": ", with chained methods "
+         },
+         {
+          "t": "code",
+          "v": "obstacle_density_pct"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "seed"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "record_video"
+         },
+         {
+          "t": "text",
+          "v": ", and a "
+         },
+         {
+          "t": "code",
+          "v": "build()"
+         },
+         {
+          "t": "text",
+          "v": " that calls "
+         },
+         {
+          "t": "code",
+          "v": "make_scenario"
+         },
+         {
+          "t": "text",
+          "v": " on what was collected."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build one scenario through "
+        },
+        {
+         "t": "code",
+         "v": "make_scenario"
+        },
+        {
+         "t": "text",
+         "v": " directly, with a designated initialiser for its "
+        },
+        {
+         "t": "code",
+         "v": "ScenarioParams"
+        },
+        {
+         "t": "text",
+         "v": ", and an equivalent one through "
+        },
+        {
+         "t": "code",
+         "v": "ScenarioBuilder"
+        },
+        {
+         "t": "text",
+         "v": ", and print both to show they produce the same values. Then try to build a scenario with "
+        },
+        {
+         "t": "code",
+         "v": "obstacle_density_pct"
+        },
+        {
+         "t": "text",
+         "v": " set to 150 through both "
+        },
+        {
+         "t": "code",
+         "v": "make_scenario"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "ScenarioBuilder"
+        },
+        {
+         "t": "text",
+         "v": ", and show that each throws the same message."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions in writing. Why does "
+        },
+        {
+         "t": "code",
+         "v": "ScenarioBuilder::build()"
+        },
+        {
+         "t": "text",
+         "v": " call "
+        },
+        {
+         "t": "code",
+         "v": "make_scenario"
+        },
+        {
+         "t": "text",
+         "v": " instead of repeating its checks? What would have to change if "
+        },
+        {
+         "t": "code",
+         "v": "robot_count"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "duration_s"
+        },
+        {
+         "t": "text",
+         "v": " also needed a rule that involves both of them together, such as a maximum number of robot-seconds?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <stdexcept>\n#include <string>\n#include <utility>\n\n// What a caller fills in. Two fields are required in spirit; three have sensible defaults.\nstruct ScenarioParams {\n  std::int32_t robot_count;\n  std::int32_t duration_s;\n  std::int32_t obstacle_density_pct = 0;\n  std::int64_t seed = 0;\n  bool record_video = false;\n};\n\n// What the rest of the program uses. Reaching this type means the values were checked.\nstruct ScenarioConfig {\n  std::int32_t robot_count;\n  std::int32_t duration_s;\n  std::int32_t obstacle_density_pct;\n  std::int64_t seed;\n  bool record_video;\n};\n\n[[nodiscard]] ScenarioConfig make_scenario(ScenarioParams params) {\n  if (params.robot_count <= 0) throw std::invalid_argument(\"robot_count must be positive\");\n  if (params.duration_s <= 0) throw std::invalid_argument(\"duration_s must be positive\");\n  if (params.obstacle_density_pct < 0 || params.obstacle_density_pct > 100) {\n    throw std::invalid_argument(\"obstacle_density_pct must be within 0 to 100\");\n  }\n  return ScenarioConfig{.robot_count = params.robot_count,\n                        .duration_s = params.duration_s,\n                        .obstacle_density_pct = params.obstacle_density_pct,\n                        .seed = params.seed,\n                        .record_video = params.record_video};\n}\n\n// A fluent front end over the same check: required fields at construction, optional ones by name.\nclass ScenarioBuilder {\n public:\n  ScenarioBuilder(std::int32_t robot_count, std::int32_t duration_s)\n      : params_{.robot_count = robot_count, .duration_s = duration_s} {}\n  ScenarioBuilder& obstacle_density_pct(std::int32_t value) {\n    params_.obstacle_density_pct = value;\n    return *this;\n  }\n  ScenarioBuilder& seed(std::int64_t value) {\n    params_.seed = value;\n    return *this;\n  }\n  ScenarioBuilder& record_video(bool value) {\n    params_.record_video = value;\n    return *this;\n  }\n  [[nodiscard]] ScenarioConfig build() const { return make_scenario(params_); }\n\n private:\n  ScenarioParams params_;\n};\n\n[[nodiscard]] std::string shown(const ScenarioConfig& config) {\n  return std::format(\"{} robots, {} s, {}% obstacles, seed {}, video {}\", config.robot_count, config.duration_s,\n                     config.obstacle_density_pct, config.seed, config.record_video);\n}\n\nint main() {\n  const ScenarioConfig from_factory =\n      make_scenario({.robot_count = 4, .duration_s = 120, .obstacle_density_pct = 15, .seed = 42});\n  const ScenarioConfig from_builder = ScenarioBuilder(4, 120).obstacle_density_pct(15).seed(42).build();\n  std::cout << std::format(\"factory: {}\\n\", shown(from_factory));\n  std::cout << std::format(\"builder: {}\\n\", shown(from_builder));\n\n  try {\n    [[maybe_unused]] const ScenarioConfig bad =\n        make_scenario({.robot_count = 4, .duration_s = 120, .obstacle_density_pct = 150});\n  } catch (const std::invalid_argument& e) {\n    std::cout << std::format(\"factory rejected it: {}\\n\", e.what());\n  }\n  try {\n    [[maybe_unused]] const ScenarioConfig bad = ScenarioBuilder(4, 120).obstacle_density_pct(150).build();\n  } catch (const std::invalid_argument& e) {\n    std::cout << std::format(\"builder rejected it: {}\\n\", e.what());\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "factory: 4 robots, 120 s, 15% obstacles, seed 42, video false\nbuilder: 4 robots, 120 s, 15% obstacles, seed 42, video false\nfactory rejected it: obstacle_density_pct must be within 0 to 100\nbuilder rejected it: obstacle_density_pct must be within 0 to 100"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two answers. "
+        },
+        {
+         "t": "code",
+         "v": "build()"
+        },
+        {
+         "t": "text",
+         "v": " calls "
+        },
+        {
+         "t": "code",
+         "v": "make_scenario"
+        },
+        {
+         "t": "text",
+         "v": " instead of repeating its checks so that there is exactly one place the rules live; two copies of the same three checks would agree today and drift the first time either one is edited without the other. A rule spanning "
+        },
+        {
+         "t": "code",
+         "v": "robot_count"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "duration_s"
+        },
+        {
+         "t": "text",
+         "v": " together changes nothing about "
+        },
+        {
+         "t": "code",
+         "v": "ScenarioBuilder"
+        },
+        {
+         "t": "text",
+         "v": ", only "
+        },
+        {
+         "t": "code",
+         "v": "make_scenario"
+        },
+        {
+         "t": "text",
+         "v": ", which already receives both fields at once and is the one function that reads them together; the builder stays a way of collecting values, and the factory stays the only place that judges them."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "compare",
+   "title": "Compare the P0 patterns with their simpler alternatives",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ScenarioConfig"
+        },
+        {
+         "t": "text",
+         "v": " is a plain struct with public fields, and nothing stops code from building one directly, skipping "
+        },
+        {
+         "t": "code",
+         "v": "make_scenario"
+        },
+        {
+         "t": "text",
+         "v": " and every check inside it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <stdexcept>\n\nstruct ScenarioParams {\n  std::int32_t robot_count;\n  std::int32_t duration_s;\n  std::int32_t obstacle_density_pct = 0;\n};\n\nstruct ScenarioConfig {\n  std::int32_t robot_count;\n  std::int32_t duration_s;\n  std::int32_t obstacle_density_pct;\n};\n\n[[nodiscard]] ScenarioConfig make_scenario(ScenarioParams params) {\n  if (params.robot_count <= 0) throw std::invalid_argument(\"robot_count must be positive\");\n  if (params.duration_s <= 0) throw std::invalid_argument(\"duration_s must be positive\");\n  if (params.obstacle_density_pct < 0 || params.obstacle_density_pct > 100) {\n    throw std::invalid_argument(\"obstacle_density_pct must be within 0 to 100\");\n  }\n  return ScenarioConfig{.robot_count = params.robot_count,\n                        .duration_s = params.duration_s,\n                        .obstacle_density_pct = params.obstacle_density_pct};\n}\n\nint main() {\n  // Bypasses make_scenario entirely: ScenarioConfig is a plain aggregate with public fields.\n  const ScenarioConfig unchecked{.robot_count = -5, .duration_s = 120, .obstacle_density_pct = 15};\n  std::cout << std::format(\"built directly, no validation ran: robot_count {}\\n\", unchecked.robot_count);\n}"
+      },
+      {
+       "t": "output",
+       "text": "built directly, no validation ran: robot_count -5"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nothing warns, because nothing about "
+        },
+        {
+         "t": "code",
+         "v": "ScenarioConfig"
+        },
+        {
+         "t": "text",
+         "v": " says it may only be built by "
+        },
+        {
+         "t": "code",
+         "v": "make_scenario"
+        },
+        {
+         "t": "text",
+         "v": "; a validated type and an unvalidated one look identical once the validating function has returned. Where this matters, the fix is to stop the plain construction from compiling: a private constructor on "
+        },
+        {
+         "t": "code",
+         "v": "ScenarioConfig"
+        },
+        {
+         "t": "text",
+         "v": " that only "
+        },
+        {
+         "t": "code",
+         "v": "make_scenario"
+        },
+        {
+         "t": "text",
+         "v": " can call, through a "
+        },
+        {
+         "t": "code",
+         "v": "friend"
+        },
+        {
+         "t": "text",
+         "v": " declaration, closes the door the same way a factory's product class can be made unreachable except through the factory. Where a scenario config is read in one place, right after it is built, and never reconstructed from stored fields elsewhere, the risk this failure shows never has anywhere to happen."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Builder is the last of the patterns this course covers, and every one of the other nine already came with a plainer alternative that won for most of the cases the pattern itself was built to handle."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Pattern"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Its simpler alternative"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "When the alternative wins"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Dependency injection"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Pass the dependency as an ordinary argument, or nothing at all"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The member never varies, or the function is pure and its arguments already are its dependencies"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Strategy"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "An "
+          },
+          {
+           "t": "code",
+           "v": "enum"
+          },
+          {
+           "t": "text",
+           "v": " and a "
+          },
+          {
+           "t": "code",
+           "v": "switch"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The set of behaviours is small and closed, and nobody is expected to add a fourth one"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Factory Method"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "A free factory function over an "
+          },
+          {
+           "t": "code",
+           "v": "enum"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "One hierarchy of products, chosen by a parameter, with no multi-step workflow that genuinely varies per product"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Adapter"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "A plain converting function"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Exactly one call site, with no interface another kind of adaptee will ever plug into"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Facade"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Call the subsystems directly, in order, in one function"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "One caller, one place the sequence is written, with no second caller to duplicate it"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Iterator"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Forward the container you already hold"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Your storage already has a "
+          },
+          {
+           "t": "code",
+           "v": "std::vector"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "std::array"
+          },
+          {
+           "t": "text",
+           "v": " or similar with an iterator of its own"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Observer"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Call the known listeners by name"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The set of listeners is small, fixed at compile time, and never destroyed before the subject"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "State"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "An "
+          },
+          {
+           "t": "code",
+           "v": "enum"
+          },
+          {
+           "t": "text",
+           "v": " and a "
+          },
+          {
+           "t": "code",
+           "v": "switch"
+          },
+          {
+           "t": "text",
+           "v": ", or a "
+          },
+          {
+           "t": "code",
+           "v": "std::variant"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "States differ in one or two values, not in several overridden operations each"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Command"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Call the function directly"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The call happens once, right where it is decided, and is never queued, logged, sent elsewhere or undone"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Builder"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "A designated initialiser, or a validating factory function"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "The fields only need naming, or the values only need checking once, all at once"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every row names a real cost the pattern buys something with: an interface to maintain, a class per case, an object where a call would do. The pattern is the right answer exactly when that cost buys a capability the simpler form cannot offer at all, not by default."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a designated initialiser already gives you that Builder was invented to provide, and the one question it still cannot answer. Name the GCC warning that catches a required field left with no value, and what it does not catch. Say why "
+        },
+        {
+         "t": "code",
+         "v": "ScenarioBuilder::build()"
+        },
+        {
+         "t": "text",
+         "v": " calls the same function a plain caller could call directly, rather than repeating its checks. Give the fix for a validated type whose fields are still public. Finish by naming, from memory, the simpler alternative to three of the other nine patterns and the one condition under which each alternative wins."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does a designated initialiser already solve that Builder was invented to solve in an older C++?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the one question a designated initialiser cannot answer about a value it is given?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which GCC warning caught a required field left out of a designated initialiser, and why did it not fire for the three optional ones?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "ScenarioBuilder::build()"
+     },
+     {
+      "t": "text",
+      "v": " call "
+     },
+     {
+      "t": "code",
+      "v": "make_scenario"
+     },
+     {
+      "t": "text",
+      "v": " instead of repeating its three checks?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What lets code build an invalid "
+     },
+     {
+      "t": "code",
+      "v": "ScenarioConfig"
+     },
+     {
+      "t": "text",
+      "v": " directly, bypassing "
+     },
+     {
+      "t": "code",
+      "v": "make_scenario"
+     },
+     {
+      "t": "text",
+      "v": " entirely, and what closes that door?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the simpler alternative to Strategy, to Observer and to Command, and the one condition under which each alternative wins."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: a "
+     },
+     {
+      "t": "code",
+      "v": "Params"
+     },
+     {
+      "t": "text",
+      "v": " struct, a validating factory that checks it, and a builder whose "
+     },
+     {
+      "t": "code",
+      "v": "build()"
+     },
+     {
+      "t": "text",
+      "v": " calls that same factory."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Gamma, Helm, Johnson and Vlissides, Design Patterns, Addison-Wesley 1994: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "creational chapter",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch03.html"
+     },
+     {
+      "t": "text",
+      "v": ", where Builder separates constructing a complex object from its representation."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " on a call that says what it means, and "
+     },
+     {
+      "t": "a",
+      "v": "C.42",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-throw"
+     },
+     {
+      "t": "text",
+      "v": " on reporting a construction failure as a value or an exception rather than a half-built object."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "GCC 13, "
+     },
+     {
+      "t": "a",
+      "v": "warning options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc-13.3.0/gcc/Warning-Options.html"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "-Wmissing-field-initializers"
+     },
+     {
+      "t": "text",
+      "v": ", part of "
+     },
+     {
+      "t": "code",
+      "v": "-Wextra"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "aggregate initialization",
+      "href": "https://en.cppreference.com/cpp/language/aggregate_initialization"
+     },
+     {
+      "t": "text",
+      "v": ", which documents designated initialisers and the rule that omitted fields take their default member initialiser or are value-initialised."
+     }
+    ]
+   ]
+  }
+ ]
+}

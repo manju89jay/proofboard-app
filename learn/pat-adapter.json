@@ -1,0 +1,1474 @@
+{
+ "id": "pat-adapter",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A third-party pressure sensor reports raw ADC counts, 0 to 4095 across a range of 0 to 1000 kPa, through a class you cannot change. From memory, wrap it behind a "
+     },
+     {
+      "t": "code",
+      "v": "PressureSensor"
+     },
+     {
+      "t": "text",
+      "v": " interface your own code already calls: one virtual function returning kilopascals as an exact "
+     },
+     {
+      "t": "code",
+      "v": "std::int32_t"
+     },
+     {
+      "t": "text",
+      "v": ". Hold the legacy object by reference inside the wrapper, convert with integer arithmetic, and print a reading through the interface. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n\n// Third-party class: raw ADC counts, 0 to 4095 across 0 to 1000 kPa. We cannot change it.\nclass LegacyPressureSensor {\n public:\n  explicit LegacyPressureSensor(std::int32_t raw_counts) : raw_counts_(raw_counts) {}\n  [[nodiscard]] std::int32_t raw_counts() const { return raw_counts_; }\n\n private:\n  std::int32_t raw_counts_;\n};\n\n// The interface our own code is written against.\nclass PressureSensor {\n public:\n  PressureSensor() = default;\n  PressureSensor(const PressureSensor&) = delete;\n  PressureSensor& operator=(const PressureSensor&) = delete;\n  virtual ~PressureSensor() = default;\n  [[nodiscard]] virtual std::int32_t kilopascals() const = 0;\n};\n\n// The adapter: a PressureSensor on the outside, a LegacyPressureSensor on the inside.\nclass PressureSensorAdapter final : public PressureSensor {\n public:\n  explicit PressureSensorAdapter(const LegacyPressureSensor& legacy) : legacy_(legacy) {}\n  [[nodiscard]] std::int32_t kilopascals() const override { return legacy_.raw_counts() * 1000 / 4095; }\n\n private:\n  const LegacyPressureSensor& legacy_;\n};\n\nvoid report(const PressureSensor& sensor) { std::cout << std::format(\"{} kPa\\n\", sensor.kilopascals()); }\n\nint main() {\n  const LegacyPressureSensor legacy(2048);\n  const PressureSensorAdapter adapter(legacy);\n  report(adapter);\n}"
+   },
+   {
+    "t": "output",
+    "text": "500 kPa"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The wrapper's own function does the one thing a caller should never have to repeat: it reads the legacy object in its own vocabulary, "
+     },
+     {
+      "t": "code",
+      "v": "raw_counts()"
+     },
+     {
+      "t": "text",
+      "v": ", and answers in the vocabulary the rest of the code expects, "
+     },
+     {
+      "t": "code",
+      "v": "kilopascals()"
+     },
+     {
+      "t": "text",
+      "v": ". Nothing about "
+     },
+     {
+      "t": "code",
+      "v": "LegacyPressureSensor"
+     },
+     {
+      "t": "text",
+      "v": " changed, and nothing in "
+     },
+     {
+      "t": "code",
+      "v": "PressureSensor"
+     },
+     {
+      "t": "text",
+      "v": " mentions an ADC count."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the wrapper implements a virtual interface, holds the legacy object by reference or pointer rather than copying it, and does the conversion once, inside itself, rather than at the call site. Converting at the call site and handing "
+     },
+     {
+      "t": "code",
+      "v": "report"
+     },
+     {
+      "t": "text",
+      "v": " the raw counts still runs today and is a partial pass: it repeats at every other call site tomorrow. Adding a "
+     },
+     {
+      "t": "code",
+      "v": "kilopascals()"
+     },
+     {
+      "t": "text",
+      "v": " member straight onto "
+     },
+     {
+      "t": "code",
+      "v": "LegacyPressureSensor"
+     },
+     {
+      "t": "text",
+      "v": " is a fail when that class really is a vendor's and not yours to edit."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Adapter wraps an object whose interface you cannot change so it satisfies an interface your own code already calls. The class being wrapped is the "
+    },
+    {
+     "t": "i",
+     "v": "adaptee"
+    },
+    {
+     "t": "text",
+     "v": ", unchanged, often a vendor's own class; the interface your code calls is the "
+    },
+    {
+     "t": "i",
+     "v": "target"
+    },
+    {
+     "t": "text",
+     "v": "; the small class doing the translating is the adapter. What the adaptee computes never changes, only the shape a caller uses to reach it: a function's name, a parameter's type, a unit, or how a failure is reported."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is a class that does the right thing in the wrong words. A rangefinder library that returns inches as a "
+    },
+    {
+     "t": "code",
+     "v": "double"
+    },
+    {
+     "t": "text",
+     "v": ", or reports a fault as -999 instead of nothing, forces every caller who reads it to repeat the same conversion and the same fault check, correctly, every time. Change the vendor, and every one of those call sites has to change with it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a small class, holding a reference or pointer to an adaptee object that already exists, that implements the target interface and, inside each of its own functions, calls the matching function on that adaptee and translates the answer: converts the unit, renames the call, turns a sentinel into "
+    },
+    {
+     "t": "code",
+     "v": "std::optional"
+    },
+    {
+     "t": "text",
+     "v": ". That is the "
+    },
+    {
+     "t": "i",
+     "v": "object adapter"
+    },
+    {
+     "t": "text",
+     "v": ". C++ also allows a "
+    },
+    {
+     "t": "i",
+     "v": "class adapter"
+    },
+    {
+     "t": "text",
+     "v": ", inheriting the adaptee privately and the target publicly instead of pointing at one: that only compiles when the adaptee can be derived from, it builds its own adaptee as part of itself rather than wrapping one that already exists, and it lets the adapter override one of the adaptee's own virtual functions from the inside, which holding a reference never allows."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is one indirect call and a class that exists only to translate, and it earns nothing at a single call site: a plain function that converts and returns is smaller there and equally safe. Reach for it once the target is called from several places, or held in something like a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " of interfaces that mixes more than one kind of adaptee."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this wherever a driver, a message type or a vendor SDK speaks a different unit or a different vocabulary from the rest of the robot, and it is the interview question itself: hold the adaptee or inherit it, and why."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Object adapter versus class adapter",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A vendor's rotary encoder reports ticks as a plain "
+        },
+        {
+         "t": "code",
+         "v": "std::int32_t"
+        },
+        {
+         "t": "text",
+         "v": ", under the name "
+        },
+        {
+         "t": "code",
+         "v": "count"
+        },
+        {
+         "t": "text",
+         "v": ". The project already has its own name for the same idea, "
+        },
+        {
+         "t": "code",
+         "v": "Ticks"
+        },
+        {
+         "t": "text",
+         "v": ", and a "
+        },
+        {
+         "t": "code",
+         "v": "WheelEncoder"
+        },
+        {
+         "t": "text",
+         "v": " interface that every reader of an encoder, real or simulated, is written against:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <vector>\n\n// The project's own type: an exact tick count, never a float.\nstruct Ticks {\n  std::int64_t count;\n};\n\n// The interface the rest of the code calls. It knows nothing about any vendor.\nclass WheelEncoder {\n public:\n  WheelEncoder() = default;\n  WheelEncoder(const WheelEncoder&) = delete;\n  WheelEncoder& operator=(const WheelEncoder&) = delete;\n  virtual ~WheelEncoder() = default;\n  [[nodiscard]] virtual Ticks ticks() const = 0;\n};\n\n// The vendor's class: 32-bit counts, its own name for the same idea. We cannot change it.\nclass VendorEncoder {\n public:\n  explicit VendorEncoder(std::int32_t count) : count_(count) {}\n  [[nodiscard]] std::int32_t count() const { return count_; }\n\n private:\n  std::int32_t count_;\n};\n\n// Object adapter: holds the vendor type, exposes only WheelEncoder.\nclass VendorEncoderAdapter final : public WheelEncoder {\n public:\n  explicit VendorEncoderAdapter(const VendorEncoder& legacy) : legacy_(legacy) {}\n  [[nodiscard]] Ticks ticks() const override { return Ticks{.count = legacy_.count()}; }\n\n private:\n  const VendorEncoder& legacy_;\n};\n\n// Class adapter: inherits the vendor type privately instead of holding it, and the target publicly.\nclass VendorEncoderClassAdapter final : private VendorEncoder, public WheelEncoder {\n public:\n  using VendorEncoder::VendorEncoder;\n  [[nodiscard]] Ticks ticks() const override { return Ticks{.count = count()}; }\n};\n\n// Enough for one call site: no polymorphism, so no class is needed at all.\n[[nodiscard]] Ticks ticks_from(const VendorEncoder& legacy) { return Ticks{.count = legacy.count()}; }\n\nint main() {\n  const VendorEncoder legacy(150000);\n\n  const VendorEncoderAdapter object_adapter(legacy);\n  std::cout << std::format(\"object adapter through WheelEncoder&: {}\\n\", object_adapter.ticks().count);\n\n  const VendorEncoderClassAdapter class_adapter(150000);\n  std::cout << std::format(\"class adapter through WheelEncoder&:  {}\\n\", class_adapter.ticks().count);\n\n  std::cout << std::format(\"one call site, no interface needed: {}\\n\", ticks_from(legacy).count);\n\n  std::vector<std::unique_ptr<WheelEncoder>> fleet;\n  fleet.push_back(std::make_unique<VendorEncoderAdapter>(legacy));\n  fleet.push_back(std::make_unique<VendorEncoderClassAdapter>(150000));\n  for (const auto& encoder : fleet) std::cout << std::format(\"fleet member reports {} ticks\\n\", encoder->ticks().count);\n\n  std::cout << std::format(\"sizeof VendorEncoderAdapter:      {}\\n\", sizeof(VendorEncoderAdapter));\n  std::cout << std::format(\"sizeof VendorEncoderClassAdapter: {}\\n\", sizeof(VendorEncoderClassAdapter));\n}"
+      },
+      {
+       "t": "output",
+       "text": "object adapter through WheelEncoder&: 150000\nclass adapter through WheelEncoder&:  150000\none call site, no interface needed: 150000\nfleet member reports 150000 ticks\nfleet member reports 150000 ticks\nsizeof VendorEncoderAdapter:      16\nsizeof VendorEncoderClassAdapter: 16"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Gamma, Helm, Johnson and Vlissides name the two shapes in the structural chapter of the 1994 catalogue ("
+        },
+        {
+         "t": "a",
+         "v": "Design Patterns",
+         "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch04.html"
+        },
+        {
+         "t": "text",
+         "v": "): an "
+        },
+        {
+         "t": "i",
+         "v": "object adapter"
+        },
+        {
+         "t": "text",
+         "v": " composes the adaptee, an instance held inside it, and a "
+        },
+        {
+         "t": "i",
+         "v": "class adapter"
+        },
+        {
+         "t": "text",
+         "v": " inherits it. "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoderAdapter"
+        },
+        {
+         "t": "text",
+         "v": " is the first: it holds a "
+        },
+        {
+         "t": "code",
+         "v": "const VendorEncoder&"
+        },
+        {
+         "t": "text",
+         "v": ", and the reference is a private implementation detail that nothing outside the class can reach. "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoderClassAdapter"
+        },
+        {
+         "t": "text",
+         "v": " is the second, and the catalogue's own C++ idiom for it inherits the target publicly, because the adapter has to satisfy it, and the adaptee privately, because nothing outside the class needs to see it. "
+        },
+        {
+         "t": "code",
+         "v": "using VendorEncoder::VendorEncoder;"
+        },
+        {
+         "t": "text",
+         "v": " still brings its constructor in, and "
+        },
+        {
+         "t": "code",
+         "v": "count()"
+        },
+        {
+         "t": "text",
+         "v": " is still callable from inside "
+        },
+        {
+         "t": "code",
+         "v": "ticks()"
+        },
+        {
+         "t": "text",
+         "v": ", because private inheritance only closes the door from the outside, not from within the class that inherited it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both report the same 150000 ticks through a "
+        },
+        {
+         "t": "code",
+         "v": "WheelEncoder&"
+        },
+        {
+         "t": "text",
+         "v": ", and the fleet loop shows why that is the point of the pattern: code holding a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::unique_ptr<WheelEncoder>>"
+        },
+        {
+         "t": "text",
+         "v": " cannot tell a real encoder from a simulated one, or an object adapter from a class adapter, and does not need to. Reaching for the class adapter's own "
+        },
+        {
+         "t": "code",
+         "v": "count()"
+        },
+        {
+         "t": "text",
+         "v": " from outside the class does not compile:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "is inaccessible within this context",
+       "text": "#include <cstdint>\n\nstruct Ticks {\n  std::int64_t count;\n};\n\nclass WheelEncoder {\n public:\n  WheelEncoder() = default;\n  WheelEncoder(const WheelEncoder&) = delete;\n  WheelEncoder& operator=(const WheelEncoder&) = delete;\n  virtual ~WheelEncoder() = default;\n  [[nodiscard]] virtual Ticks ticks() const = 0;\n};\n\nclass VendorEncoder {\n public:\n  explicit VendorEncoder(std::int32_t count) : count_(count) {}\n  [[nodiscard]] std::int32_t count() const { return count_; }\n\n private:\n  std::int32_t count_;\n};\n\nclass VendorEncoderClassAdapter final : private VendorEncoder, public WheelEncoder {\n public:\n  using VendorEncoder::VendorEncoder;\n  [[nodiscard]] Ticks ticks() const override { return Ticks{.count = count()}; }\n};\n\nint main() {\n  const VendorEncoderClassAdapter adapter(150000);\n  return static_cast<int>(adapter.count());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 refuses it, "
+        },
+        {
+         "t": "code",
+         "v": "'int32_t VendorEncoder::count() const' is inaccessible within this context"
+        },
+        {
+         "t": "text",
+         "v": ", on exactly the call an object adapter never has to defend against, because it never gives "
+        },
+        {
+         "t": "code",
+         "v": "count()"
+        },
+        {
+         "t": "text",
+         "v": " a way to reach the outside in the first place: "
+        },
+        {
+         "t": "code",
+         "v": "object_adapter.count()"
+        },
+        {
+         "t": "text",
+         "v": " does not exist at all, since the vendor object is a member, not a base."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [],
+        [
+         {
+          "t": "text",
+          "v": "Object adapter"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Class adapter"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Holds the adaptee"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a reference to an object built and owned elsewhere"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "its own adaptee subobject, built as part of the adapter"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Which adaptee"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a different existing "
+          },
+          {
+           "t": "code",
+           "v": "VendorEncoder"
+          },
+          {
+           "t": "text",
+           "v": ", or a public class derived from it, chosen at construction"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "one concrete class, fixed forever in the adapter's own type"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Can override the adaptee's own virtual functions"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "no"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "yes"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "legacy"
+        },
+        {
+         "t": "text",
+         "v": " in the program above is built once, in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", before either adapter exists, and "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoderAdapter"
+        },
+        {
+         "t": "text",
+         "v": " merely points at it: the same reference could equally have been bound to a "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoder"
+        },
+        {
+         "t": "text",
+         "v": " built somewhere else entirely, shared with other code, or handed back from a factory. "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoderClassAdapter"
+        },
+        {
+         "t": "text",
+         "v": " cannot wrap that "
+        },
+        {
+         "t": "code",
+         "v": "legacy"
+        },
+        {
+         "t": "text",
+         "v": " object at all. Its constructor builds a new "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoder"
+        },
+        {
+         "t": "text",
+         "v": " from scratch, as part of itself, because the adaptee is a base subobject, not a pointer to something that can already exist. A class adapter also refuses to exist at all when the adaptee is marked "
+        },
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": ", which vendor SDKs do more often than library code, precisely to stop anyone deriving from a class they did not design for it. An object adapter never asks that question, because holding a reference needs nothing from the adaptee beyond its public functions."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both cost the same 16 bytes here, and, built this way, neither leaves the adaptee's own interface reachable from outside either. What is left to choose on is whether the code already has an adaptee object to wrap, or is content to let the adapter build its own, and whether the adapter needs to override one of the adaptee's own virtual functions from the inside, which only inheriting from it makes possible. That is Klaus Iglberger's comparison in Guideline 24 of C++ Software Design, \"Use Adapters to Standardize Interfaces\": he compares the two forms alongside function adapters, small standard-library wrappers such as "
+        },
+        {
+         "t": "code",
+         "v": "std::not_fn"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::mem_fn"
+        },
+        {
+         "t": "text",
+         "v": " that adapt a callable's shape rather than an object's, and treats the object form as the default, keeping the class form for the one case above an object adapter cannot match."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ticks_from"
+        },
+        {
+         "t": "text",
+         "v": " is the fourth column the table above leaves out: a function, not a class, converting once and returning. It is enough exactly when "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoder"
+        },
+        {
+         "t": "text",
+         "v": " is read from one place, with no interface anyone plugs another kind of encoder into. The moment a second kind of encoder needs to sit next to it in the same list, or a control loop is tested against a fake without knowing it is one, the function stops being enough and the adapter starts earning the class it costs."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sensor",
+   "title": "Legacy Fahrenheit sensor behind a Celsius interface, with tests",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. A vendor's temperature probe is a "
+        },
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": " class you cannot change, "
+        },
+        {
+         "t": "code",
+         "v": "LegacyFahrenheitProbe"
+        },
+        {
+         "t": "text",
+         "v": ", with "
+        },
+        {
+         "t": "code",
+         "v": "double read_fahrenheit() const"
+        },
+        {
+         "t": "text",
+         "v": " returning tenths of a Fahrenheit degree, and -999.0 when the probe is disconnected. The rest of the project speaks Celsius as exact millidegrees and has no sentinel for a missing reading."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "code",
+          "v": "TemperatureSensor"
+         },
+         {
+          "t": "text",
+          "v": " interface with "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] virtual std::optional<std::int32_t> millidegrees_c() const"
+         },
+         {
+          "t": "text",
+          "v": ", and the destructor and copy operations a polymorphic base needs."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "FahrenheitAdapter"
+         },
+         {
+          "t": "text",
+          "v": ", an object adapter holding "
+         },
+         {
+          "t": "code",
+          "v": "const LegacyFahrenheitProbe&"
+         },
+         {
+          "t": "text",
+          "v": ". It returns "
+         },
+         {
+          "t": "code",
+          "v": "std::nullopt"
+         },
+         {
+          "t": "text",
+          "v": " when the probe reports -999.0. Otherwise it rounds the reading to the nearest millidegree Fahrenheit exactly once, by adding 0.5 (or -0.5 below zero) before truncating to "
+         },
+         {
+          "t": "code",
+          "v": "std::int64_t"
+         },
+         {
+          "t": "text",
+          "v": ", and finishes the conversion in integer arithmetic: subtract 32000, multiply by 5, divide by 9."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "code",
+          "v": "shown"
+         },
+         {
+          "t": "text",
+          "v": " function that turns the "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<std::int32_t>"
+         },
+         {
+          "t": "text",
+          "v": " into text: "
+         },
+         {
+          "t": "code",
+          "v": "\"no probe\""
+         },
+         {
+          "t": "text",
+          "v": " for "
+         },
+         {
+          "t": "code",
+          "v": "std::nullopt"
+         },
+         {
+          "t": "text",
+          "v": ", otherwise the whole degrees, a point, and three digits of thousandths, with the sign only on the whole part."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test the adapter against five hand-computed expected values, printed next to what the adapter actually returns, with a boolean showing whether they match: 98.6 Fahrenheit (body temperature, 37.000 Celsius), 32.0 (freezing, 0.000), 212.0 (boiling, 100.000), -40.0 (the one point where the two scales cross, -40.000), and -999.0 (disconnected, no probe)."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer three questions in writing. Why does "
+        },
+        {
+         "t": "code",
+         "v": "FahrenheitAdapter"
+        },
+        {
+         "t": "text",
+         "v": " hold "
+        },
+        {
+         "t": "code",
+         "v": "LegacyFahrenheitProbe"
+        },
+        {
+         "t": "text",
+         "v": " by reference instead of inheriting from it, given that the theory section's "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoder"
+        },
+        {
+         "t": "text",
+         "v": " could be inherited from? Where would the sentinel check belong if this project had ten call sites reading the probe directly instead of one adapter? What would change in "
+        },
+        {
+         "t": "code",
+         "v": "FahrenheitAdapter"
+        },
+        {
+         "t": "text",
+         "v": " if the probe reported Kelvin instead of Fahrenheit?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <utility>\n#include <vector>\n\n// The vendor probe: tenths of a Fahrenheit degree as a double, -999.0 when disconnected.\n// It is final and we cannot change it.\nclass LegacyFahrenheitProbe final {\n public:\n  explicit LegacyFahrenheitProbe(double reading_f) : reading_f_(reading_f) {}\n  [[nodiscard]] double read_fahrenheit() const { return reading_f_; }\n\n private:\n  double reading_f_;\n};\n\nconstexpr double kDisconnected = -999.0;\n\n// The interface the rest of the project calls: exact millidegrees Celsius, or nothing when there is no probe.\nclass TemperatureSensor {\n public:\n  TemperatureSensor() = default;\n  TemperatureSensor(const TemperatureSensor&) = delete;\n  TemperatureSensor& operator=(const TemperatureSensor&) = delete;\n  virtual ~TemperatureSensor() = default;\n  [[nodiscard]] virtual std::optional<std::int32_t> millidegrees_c() const = 0;\n};\n\n// The object adapter: a TemperatureSensor on the outside, a LegacyFahrenheitProbe on the inside.\nclass FahrenheitAdapter final : public TemperatureSensor {\n public:\n  explicit FahrenheitAdapter(const LegacyFahrenheitProbe& legacy) : legacy_(legacy) {}\n\n  [[nodiscard]] std::optional<std::int32_t> millidegrees_c() const override {\n    const double raw_f = legacy_.read_fahrenheit();\n    if (raw_f == kDisconnected) return std::nullopt;\n    // Round to the nearest millidegree Fahrenheit once, at this boundary; everything after is exact integers.\n    const std::int64_t milli_f = static_cast<std::int64_t>(raw_f * 1000.0 + (raw_f >= 0.0 ? 0.5 : -0.5));\n    return static_cast<std::int32_t>((milli_f - 32'000) * 5 / 9);\n  }\n\n private:\n  const LegacyFahrenheitProbe& legacy_;\n};\n\n[[nodiscard]] std::string shown(const std::optional<std::int32_t>& milli_c) {\n  if (!milli_c) return \"no probe\";\n  const std::int32_t whole = *milli_c / 1000;\n  const std::int32_t thousandths = *milli_c % 1000;\n  return std::format(\"{}.{:03} C\", whole, thousandths < 0 ? -thousandths : thousandths);\n}\n\nint main() {\n  const std::vector<std::pair<double, std::optional<std::int32_t>>> cases{\n      {98.6, 37000}, {32.0, 0}, {212.0, 100000}, {-40.0, -40000}, {kDisconnected, std::nullopt}};\n\n  for (const auto& [raw_f, expected] : cases) {\n    const LegacyFahrenheitProbe probe(raw_f);\n    const FahrenheitAdapter adapter(probe);\n    const std::optional<std::int32_t> got = adapter.millidegrees_c();\n    std::cout << std::format(\"{:>7.1f} F -> {:<10} expected {:<10} match {}\\n\", raw_f, shown(got), shown(expected),\n                             got == expected);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "   98.6 F -> 37.000 C   expected 37.000 C   match true\n   32.0 F -> 0.000 C    expected 0.000 C    match true\n  212.0 F -> 100.000 C  expected 100.000 C  match true\n  -40.0 F -> -40.000 C  expected -40.000 C  match true\n -999.0 F -> no probe   expected no probe   match true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three answers. "
+        },
+        {
+         "t": "code",
+         "v": "FahrenheitAdapter"
+        },
+        {
+         "t": "text",
+         "v": " holds the probe rather than inheriting it because "
+        },
+        {
+         "t": "code",
+         "v": "LegacyFahrenheitProbe"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "final"
+        },
+        {
+         "t": "text",
+         "v": ": the language refuses a class adapter here before any design question comes up, so the choice the theory section framed as a trade-off is, for this vendor, made for you. With ten call sites reading the probe directly, each one would need its own copy of the -999.0 check and the same rounding, and the day the vendor changes the sentinel to -273.15, all ten have to be found and fixed; with one adapter, there is exactly one place to change. Reporting Kelvin instead of Fahrenheit changes nothing about the shape of "
+        },
+        {
+         "t": "code",
+         "v": "FahrenheitAdapter"
+        },
+        {
+         "t": "text",
+         "v": ", only its arithmetic: the sentinel check stays, and the conversion becomes a subtraction of one exact constant instead of the affine formula above, still done once, inside the same function."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "compare",
+   "title": "Adapter versus Facade versus Decorator; conversion errors",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The constant below reads like the conversion factor from Celsius to Fahrenheit's five-ninths, and compiles without a single warning:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n\nclass LegacyFahrenheitProbe final {\n public:\n  explicit LegacyFahrenheitProbe(double reading_f) : reading_f_(reading_f) {}\n  [[nodiscard]] double read_fahrenheit() const { return reading_f_; }\n\n private:\n  double reading_f_;\n};\n\nconstexpr double kDisconnected = -999.0;\n\nclass TemperatureSensor {\n public:\n  TemperatureSensor() = default;\n  TemperatureSensor(const TemperatureSensor&) = delete;\n  TemperatureSensor& operator=(const TemperatureSensor&) = delete;\n  virtual ~TemperatureSensor() = default;\n  [[nodiscard]] virtual std::optional<std::int32_t> millidegrees_c() const = 0;\n};\n\n// The constant looks right and reads well. 5 / 9 divides two ints first: the result is 0, not 0.5555...\nconstexpr double kCPerF = 5 / 9;\n\nclass BuggyAdapter final : public TemperatureSensor {\n public:\n  explicit BuggyAdapter(const LegacyFahrenheitProbe& legacy) : legacy_(legacy) {}\n  [[nodiscard]] std::optional<std::int32_t> millidegrees_c() const override {\n    const double raw_f = legacy_.read_fahrenheit();\n    if (raw_f == kDisconnected) return std::nullopt;\n    return static_cast<std::int32_t>((raw_f - 32.0) * kCPerF * 1000.0);\n  }\n\n private:\n  const LegacyFahrenheitProbe& legacy_;\n};\n\nint main() {\n  const LegacyFahrenheitProbe body_temp(98.6);\n  const BuggyAdapter adapter(body_temp);\n  std::cout << std::format(\"kCPerF = {}\\n\", kCPerF);\n  std::cout << std::format(\"98.6 F through the buggy adapter: {} millidegrees C\\n\", *adapter.millidegrees_c());\n}"
+      },
+      {
+       "t": "output",
+       "text": "kCPerF = 0\n98.6 F through the buggy adapter: 0 millidegrees C"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "5"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "9"
+        },
+        {
+         "t": "text",
+         "v": " are both "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ", so "
+        },
+        {
+         "t": "code",
+         "v": "5 / 9"
+        },
+        {
+         "t": "text",
+         "v": " divides as integers before the result ever meets "
+        },
+        {
+         "t": "code",
+         "v": "constexpr double"
+        },
+        {
+         "t": "text",
+         "v": ", and GCC 13's "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra"
+        },
+        {
+         "t": "text",
+         "v": " has no warning for an integer expression converted to a wider floating type. Every reading this adapter ever converts comes out as 0.000 Celsius, silently, because the one number the whole class depends on was wrong before "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " ran. This is exactly the failure the exercise's "
+        },
+        {
+         "t": "code",
+         "v": "FahrenheitAdapter"
+        },
+        {
+         "t": "text",
+         "v": " avoids: it never builds a Celsius-per-Fahrenheit constant at all, only exact integers carried through subtraction, multiplication and division in that order, "
+        },
+        {
+         "t": "code",
+         "v": "(milli_f - 32'000) * 5 / 9"
+        },
+        {
+         "t": "text",
+         "v": ", where "
+        },
+        {
+         "t": "code",
+         "v": "5"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "9"
+        },
+        {
+         "t": "text",
+         "v": " are the last two operations on an already-large numerator rather than a ratio computed on its own first. Writing "
+        },
+        {
+         "t": "code",
+         "v": "5.0 / 9.0"
+        },
+        {
+         "t": "text",
+         "v": ", or writing the multiplication before the division whenever both are integers, is the fix; Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "ES.100",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-mix"
+        },
+        {
+         "t": "text",
+         "v": " is the rule that names mixed-type arithmetic as the place these mistakes live."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is not a cost of the class adapter itself, it is what the theory section's compile-fail already ruled out, built the way a class adapter is built when nobody stops to ask which inheritance to use. Say a second vendor's encoder is mounted backward, so its count falls while the wheel turns forward, and the adapter must negate it to match the project's convention:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n\nstruct Ticks {\n  std::int64_t count;\n};\n\nclass WheelEncoder {\n public:\n  WheelEncoder() = default;\n  WheelEncoder(const WheelEncoder&) = delete;\n  WheelEncoder& operator=(const WheelEncoder&) = delete;\n  virtual ~WheelEncoder() = default;\n  [[nodiscard]] virtual Ticks ticks() const = 0;\n};\n\n// Mounted backward: the vendor's count falls while the wheel turns forward.\nclass VendorEncoder {\n public:\n  explicit VendorEncoder(std::int32_t count) : count_(count) {}\n  [[nodiscard]] std::int32_t count() const { return count_; }\n\n private:\n  std::int32_t count_;\n};\n\n// The mistake: VendorEncoder inherited publicly instead of privately. Its own count() stays public.\nclass VendorEncoderClassAdapter final : public VendorEncoder, public WheelEncoder {\n public:\n  using VendorEncoder::VendorEncoder;\n  [[nodiscard]] Ticks ticks() const override { return Ticks{.count = -count()}; }  // corrects the sign\n};\n\nint main() {\n  const VendorEncoderClassAdapter adapter(4000);\n  const WheelEncoder& through_the_port = adapter;\n  std::cout << std::format(\"through WheelEncoder&, corrected: {}\\n\", through_the_port.ticks().count);\n  std::cout << std::format(\"through the adapter's own count(), uncorrected: {}\\n\", adapter.count());\n}"
+      },
+      {
+       "t": "output",
+       "text": "through WheelEncoder&, corrected: -4000\nthrough the adapter's own count(), uncorrected: 4000"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nothing here is undefined behaviour and nothing warns: "
+        },
+        {
+         "t": "code",
+         "v": "count()"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoder"
+        },
+        {
+         "t": "text",
+         "v": "'s own public function, inherited publicly instead of privately, so it is exactly as callable on a "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoderClassAdapter"
+        },
+        {
+         "t": "text",
+         "v": " as "
+        },
+        {
+         "t": "code",
+         "v": "ticks()"
+        },
+        {
+         "t": "text",
+         "v": " is. Code that reaches for "
+        },
+        {
+         "t": "code",
+         "v": ".count()"
+        },
+        {
+         "t": "text",
+         "v": " out of habit, or because the concrete type is what a container of adapters happens to hold, reads the sign the vendor gave it, not the sign the project agreed on. Writing "
+        },
+        {
+         "t": "code",
+         "v": "private VendorEncoder"
+        },
+        {
+         "t": "text",
+         "v": " here, the way the theory section did, closes the door at compile time, with the same message the compile-fail there gave: "
+        },
+        {
+         "t": "code",
+         "v": ".count()"
+        },
+        {
+         "t": "text",
+         "v": " becomes inaccessible, and the only sign a caller can read is the corrected one "
+        },
+        {
+         "t": "code",
+         "v": "ticks()"
+        },
+        {
+         "t": "text",
+         "v": " returns. An object adapter never opens the door to begin with: "
+        },
+        {
+         "t": "code",
+         "v": "VendorEncoderAdapter"
+        },
+        {
+         "t": "text",
+         "v": " from the theory section exposes "
+        },
+        {
+         "t": "code",
+         "v": "ticks()"
+        },
+        {
+         "t": "text",
+         "v": " and nothing else, because the vendor object is a private member, not a base at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Adapter, Facade and Decorator all wrap something, and only one of the three changes what a call does. "
+        },
+        {
+         "t": "i",
+         "v": "Adapter"
+        },
+        {
+         "t": "text",
+         "v": " takes one adaptee and makes it answer to an interface the caller already has, and the answer it gives is exactly what the adaptee would have given, translated. "
+        },
+        {
+         "t": "i",
+         "v": "Decorator"
+        },
+        {
+         "t": "text",
+         "v": ", a pattern this course does not cover on its own, wraps one object behind the interface it already has and adds behaviour before or after forwarding the call, so several decorators can stack around the same object. "
+        },
+        {
+         "t": "i",
+         "v": "Facade"
+        },
+        {
+         "t": "text",
+         "v": ", the next topic, does not adapt any single interface at all: it stands in front of several different subsystems and offers one simpler entry point across all of them, hiding coordination rather than translating a shape. Reaching for Facade to solve an Adapter problem gives you a coordinating class in front of one object, which is a wrapper doing nothing; reaching for Adapter to solve a Facade problem gives you one class inheriting four unrelated interfaces, which still compiles: if two of them declare a function with the same name, the two meanings collapse into whatever single override that class provides, and only when the class overrides neither name does an unqualified call to it become ambiguous instead."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the adaptee, the target and the adapter, and say what changes and what does not when one wraps the other. Give the two ways to hold the adaptee, what each costs in bytes on this page, and the inheritance a class adapter needs on each side to keep the adaptee's own interface as closed as an object adapter's. Say when a plain function beats writing an adapter class at all. Name the arithmetic mistake that produced a Celsius reading of zero for every input, and the rule that would have caught it. Finish with one sentence each for Adapter, Facade and Decorator, choosing the word that tells them apart: translate, coordinate, add."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Name the adaptee, the target and the adapter in a wrapper around a vendor's rangefinder."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does an object adapter hold, and what does a class adapter do instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which side of a class adapter's inheritance has to be public, which has to be private, and what does GCC 13 say when code reaches for the adaptee's function through the private side?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What has to be true of a vendor class before a class adapter can even be written, and what did "
+     },
+     {
+      "t": "code",
+      "v": "LegacyFahrenheitProbe"
+     },
+     {
+      "t": "text",
+      "v": " do to rule it out?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When does a plain converting function beat writing an adapter class, and what changes once a second kind of adaptee needs to sit next to the first?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Where does "
+     },
+     {
+      "t": "code",
+      "v": "FahrenheitAdapter"
+     },
+     {
+      "t": "text",
+      "v": " do its rounding, and why only once?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What did "
+     },
+     {
+      "t": "code",
+      "v": "5 / 9"
+     },
+     {
+      "t": "text",
+      "v": " evaluate to before it ever reached "
+     },
+     {
+      "t": "code",
+      "v": "constexpr double kCPerF"
+     },
+     {
+      "t": "text",
+      "v": ", and why did "
+     },
+     {
+      "t": "code",
+      "v": "-Wall -Wextra -Werror"
+     },
+     {
+      "t": "text",
+      "v": " build it without a warning?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In one sentence each, what does Adapter do that Facade and Decorator do not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: an object adapter over a legacy sensor, with a fault sentinel translated into "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Gamma, Helm, Johnson and Vlissides, Design Patterns, Addison-Wesley 1994: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "structural chapter",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch04.html"
+     },
+     {
+      "t": "text",
+      "v": ", where Adapter is defined and split into the object and class forms."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, C++ Software Design, O'Reilly 2022: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+     },
+     {
+      "t": "text",
+      "v": ". Guideline 24, \"Use Adapters to Standardize Interfaces\": object versus class adapters, function adapters such as "
+     },
+     {
+      "t": "code",
+      "v": "std::not_fn"
+     },
+     {
+      "t": "text",
+      "v": ", and the comparison between Adapter and Strategy."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Design Patterns, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_design_patterns/back_to_basics_design_patterns__michael_shah__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=2UUqX2eIdSM"
+     },
+     {
+      "t": "text",
+      "v": ". Singleton, Adapter and Iterator worked through in C++, as the talk's structural example."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "ES.100",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-mix"
+     },
+     {
+      "t": "text",
+      "v": " on mixed-type arithmetic, "
+     },
+     {
+      "t": "a",
+      "v": "F.60",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-ptr-ref"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": " on a non-owning reference, and "
+     },
+     {
+      "t": "a",
+      "v": "C.139",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rh-final"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "final"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "final",
+      "href": "https://en.cppreference.com/cpp/language/final"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::format",
+      "href": "https://en.cppreference.com/cpp/utility/format/format"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

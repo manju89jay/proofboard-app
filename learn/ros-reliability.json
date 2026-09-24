@@ -1,0 +1,1346 @@
+{
+ "id": "ros-reliability",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A node publishes a zero velocity on "
+     },
+     {
+      "t": "code",
+      "v": "/cmd_vel"
+     },
+     {
+      "t": "text",
+      "v": " and logs \"stopped\". On paper, say why that is not the same as the robot having stopped, and list every place between that publish and the wheels where the stop can be lost. Then say what evidence would convince you the robot actually stopped, and where it has to come from. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Publishing a stop is a statement about what one node did. Stopping is a statement about the robot. Between them is every part of the system, and each one can drop the message without telling anybody."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The places, in order: the publisher's own queue, if the node is publishing faster than the middleware can send and the history depth is small; a QoS mismatch, which the QoS topic showed produces no connection at all and one warning that only prints while the node spins; discovery not having happened yet, so the subscriber does not exist as far as the publisher is concerned; the network, where a lost datagram on a best-effort topic stays lost; the subscriber's node being blocked in another callback, so the message is taken from the middleware minutes later or never; the subscriber's own queue overflowing; a second publisher on the same topic sending a non-zero velocity the instant after yours; the base's own timeout or lack of one, since a base that holds the last command it received will keep driving if your zero never lands; and the hardware, where a motor controller can be in a fault state that ignores commands entirely."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The evidence that convinces is the robot's measured motion, and it has to come from something that is not the command path. Odometry from the wheels, a scan that stops changing, a pose from a localiser, a reading from the simulator's own state. The property that matters is independence: a check that reads the same topic the stop was sent on tests the topic, not the robot."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the distinction is stated clearly, four or more places are named, and the evidence is independent of the command path. Naming the network alone is a partial pass. Answering that the log line proves it is a fail, and it is the answer that ships robots that report a stop they did not make."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Reliability in a ROS 2 system is about a graph of separate processes that talk over a network, where the usual failure is not a crash but a part that carries on looking healthy while it has stopped being useful."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The failures that belong to this shape are specific. A node dies, and nothing restarts it unless somebody arranged that. A node hangs, and it keeps its place in the graph, keeps its topics listed and never publishes again. A publisher keeps publishing values that stopped changing, which no framework can detect for you. Two nodes never connect because their quality-of-service settings disagree, which produces no error and no message. And a callback blocks, which stops every other callback of that node."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this creates is that nothing in a distributed graph tells a consumer that its input has stopped being true. A subscription with no message waiting looks exactly like a subscription whose publisher is fine and quiet."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism to reach for is freshness, and it belongs to the consumer. Every input carries a timestamp, every consumer compares it against its own clock, and a consumer whose input is older than a limit stops trusting it and says so. The limit is a multiple of the input's period, chosen above the measured delivery delay. That single rule covers a dead publisher, a hung one, a lost network and a blocked executor, without needing to tell them apart."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What the framework adds is narrower than people expect. Quality of service offers liveliness and deadline events, lifecycle nodes give a managed startup and shutdown, and launch can respawn a process that dies. None of them notices a value that is wrong."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Where you meet it is the difference between asking for a stop and verifying one. The system design topic gives the general rule about failing safe; the ROS form of it is that the check has to read the robot's measured motion from something that is not the command path, because a check that reads the command proves only that the command was sent."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Stale data, cancellation, lost processes, stop verification",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This page and the system design topic on reliability answer different questions and it is worth saying which is which before starting. That one is the systems view: availability as a number, timeouts from a measured tail, backoff, redundancy and what a watchdog can prove. This one is the ROS view: which parts of a robot's graph fail, how a node notices, and what the framework does and does not give you. Where they meet, this page names the ROS mechanism and points back."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start with the failure that has no error message. A subscription with nothing waiting and a subscription whose publisher died are the same thing from inside the callback: nothing happens. There is no exception, no return code, no event. That is the shape of almost every failure in a distributed graph, and it is why the first tool is not a framework feature but a habit: "
+        },
+        {
+         "t": "i",
+         "v": "every input gets a freshness check"
+        },
+        {
+         "t": "text",
+         "v": ", and the check lives in the consumer."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The time topic built the machinery, so this page can take it as read: the consumer records when each message arrived on its own clock, compares that with now, and calls the input stale past a limit. Three things are worth adding here. The limit is a multiple of the input's period: the bench's supervisor uses 250 ms against odometry at 30 Hz, which is seven and a half periods, and writing it that way is what keeps it meaningful the day somebody changes the rate. The limit has to sit above the measured delivery delay, and the bench's demonstration of getting that wrong is "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "max_age_ms:=5"
+        },
+        {
+         "t": "text",
+         "v": ", which reports a healthy transform stale for ever. And the check has to be on the arrival as well as on the header stamp, because a publisher that is still running but computing from stale inputs produces fresh stamps on stale content."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The value of that one rule is how much it covers. A dead publisher, a hung publisher, a network that dropped the packets, a blocked executor on the receiving side, a QoS mismatch that meant the two never connected: all of them look identical to a freshness check, and the reaction is the same in every case. Distinguishing them is a diagnostic job, done afterwards with the tools below; reacting to them is one branch."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "What the framework gives you"
+        },
+        {
+         "t": "text",
+         "v": " is worth knowing precisely, because it is less than the documentation's enthusiasm suggests."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "QoS liveliness is the closest thing to a built-in heartbeat. With a lease duration set, a subscription gets a "
+        },
+        {
+         "t": "code",
+         "v": "LivelinessChanged"
+        },
+        {
+         "t": "text",
+         "v": " event when a publisher stops asserting itself, and the publisher gets "
+        },
+        {
+         "t": "code",
+         "v": "LivelinessLost"
+        },
+        {
+         "t": "text",
+         "v": ". The QoS topic covered the catch: the defaults are automatic liveliness with no lease at all, and a subscription that asks for a lease cannot connect to a publisher that offers none, so turning it on means changing both ends. Deadline is the same shape: a "
+        },
+        {
+         "t": "code",
+         "v": "RequestedDeadlineMissed"
+        },
+        {
+         "t": "text",
+         "v": " event fires when messages stop arriving often enough, and again only if the publisher offered a deadline at least as short."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Lifecycle nodes give you managed startup and shutdown, which is a reliability feature at the system level: the lifecycle manager brings nodes up in an order, so nothing starts working before its inputs exist. The callbacks topic gave the limits, of which the one that matters here is that only publishers are deactivated for you."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Launch can restart a process. "
+        },
+        {
+         "t": "code",
+         "v": "launch.actions.ExecuteProcess"
+        },
+        {
+         "t": "text",
+         "v": ", which "
+        },
+        {
+         "t": "code",
+         "v": "launch_ros"
+        },
+        {
+         "t": "text",
+         "v": "'s "
+        },
+        {
+         "t": "code",
+         "v": "Node"
+        },
+        {
+         "t": "text",
+         "v": " action is built on, takes "
+        },
+        {
+         "t": "code",
+         "v": "respawn"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "respawn_delay"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "respawn_max_retries"
+        },
+        {
+         "t": "text",
+         "v": ", with a negative retry count meaning forever ("
+        },
+        {
+         "t": "a",
+         "v": "execute_local.py",
+         "href": "https://github.com/ros2/launch/blob/jazzy/launch/launch/actions/execute_local.py"
+        },
+        {
+         "t": "text",
+         "v": "). That is real and it is also a trap without a budget, which the errors and recovery topic argued: a node that crashes on its first message and respawns forever produces a log full of starts and a system that never works, and nothing reports a failure because nothing ever gives up. Set "
+        },
+        {
+         "t": "code",
+         "v": "respawn_max_retries"
+        },
+        {
+         "t": "text",
+         "v": " and decide what happens when it runs out."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Diagnostics are the convention rather than a mechanism. The "
+        },
+        {
+         "t": "code",
+         "v": "diagnostic_updater"
+        },
+        {
+         "t": "text",
+         "v": " package lets a node publish a "
+        },
+        {
+         "t": "code",
+         "v": "diagnostic_msgs/DiagnosticArray"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "/diagnostics"
+        },
+        {
+         "t": "text",
+         "v": " with a level, a message and key-value pairs per check, and an aggregator combines them. The value is that it standardises where health lives so an operator interface can show it; the cost is that it reports only what you wrote a check for."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "And the command-line tools are for diagnosis after the fact, not detection. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 node list"
+        },
+        {
+         "t": "text",
+         "v": " shows what discovery found, and the DDS topic gave the warning that a daemon caches it, so "
+        },
+        {
+         "t": "code",
+         "v": "ros2 daemon stop"
+        },
+        {
+         "t": "text",
+         "v": " before trusting it. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic hz"
+        },
+        {
+         "t": "text",
+         "v": " measures a rate as seen by a new subscription with its own QoS, not by your node. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 doctor --report"
+        },
+        {
+         "t": "text",
+         "v": " prints the middleware, the network interfaces and a quality-of-service compatibility listing. All three tell you about the graph as it is now, and none of them was watching when the failure happened, which is why a node that records its own health is worth more than any of them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Cancellation"
+        },
+        {
+         "t": "text",
+         "v": " is the second ROS-specific failure. The actions topic established that a cancel is a request: the server moves to canceling and the work stops only when the server's code checks. So a cancelled navigation goal is not a stopped robot until the server has noticed, and how long that takes is the server's choice. Three things follow. An action server has to check often enough that a cancel takes effect within one control period. A client that has requested a cancel must not assume anything until the result arrives with a canceled state. And the layer above must not rely on cancellation for safety at all: if the robot has to stop, something in the command path stops it, and the cancel is how the higher layer tidies up afterwards."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "A lost process"
+        },
+        {
+         "t": "text",
+         "v": " is the third, and the property that makes it hard is that a ROS graph has no owner. Nobody is watching for a node that exits. The graph updates, the topic loses a publisher, and every subscriber carries on with no message. Three levels of answer exist and they are worth ranking. The consumer's freshness check catches it, and this is the one that always works because it does not care why. Launch or systemd restarts it, which addresses the cause and needs a retry budget. And a supervisor that knows the expected set of nodes can report which one is missing, which is the diagnostic layer rather than the safety layer."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Stop verification"
+        },
+        {
+         "t": "text",
+         "v": " is the fourth and it is the point of the page. The architecture topic stated the principle for the bench: the pass criterion comes from the simulator's own state, the robot's actual speed, and not from the messages the nodes sent. A stop command that was published is not proof that the robot stopped. The reason is the list from the cold check, and the shape of the fix is always the same: measure the thing you claimed, from a source that does not share a failure with the thing that was supposed to make it happen."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bench does this in a way worth copying. Its missing-odometry scenario cuts "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " at the relay, so the follower goes quiet and the supervisor publishes stops. The check that the robot stopped reads "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", which comes from the bridge upstream of the relay, so it still flows when the input the robot steers by has been taken away. That is independence in the concrete: the measurement survives the failure being injected, because it comes from a different place than the thing that failed."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "detect",
+   "title": "Detect a stale input and react",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes on paper and at the keyboard, in a package of your own."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Take the bench's supervisor as it stands: it gates "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel_nav"
+         },
+         {
+          "t": "text",
+          "v": " onto "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel"
+         },
+         {
+          "t": "text",
+          "v": ", holds a freshness check per input with "
+         },
+         {
+          "t": "code",
+          "v": "odom_timeout_ms"
+         },
+         {
+          "t": "text",
+          "v": " at 250 and "
+         },
+         {
+          "t": "code",
+          "v": "cmd_timeout_ms"
+         },
+         {
+          "t": "text",
+          "v": " at 500, and publishes a stop at 20 Hz while either is stale. Write down, in one line each, the five distinct failures that make the odometry check go stale, and say whether the supervisor can tell them apart."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Add a sixth failure the current check cannot catch: odometry that keeps arriving on time with a value that stopped changing. Describe the check that would catch it and what it would cost in false alarms."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Decide what the supervisor should publish about its own health, and in what form. Give three fields and say what each one lets an operator conclude that the others do not."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Say what the supervisor should do when its own publisher to "
+         },
+         {
+          "t": "code",
+          "v": "/cmd_vel"
+         },
+         {
+          "t": "text",
+          "v": " has no subscriber, and how it can find that out."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write the state machine for the gate in words: the states, the transitions and what is published in each. Then say which transition you would test first and why."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 1, the five failures and what the check sees."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Failure"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What the supervisor sees"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Can it tell?"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "The relay process exited"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Messages stop"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "The relay is running and blocked in a callback"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Messages stop"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "The bridge stopped, so the relay has no input"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Messages stop"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "The network dropped them, or the QoS never matched"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Messages stop"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Its own executor is blocked, so nothing is taken"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "Messages stop"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "No"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That column of noes is the answer and it is a feature. The supervisor reacts to the absence of fresh evidence, not to a diagnosis, so there is exactly one branch and it is correct for all five. Telling them apart is a separate job for a separate moment: "
+        },
+        {
+         "t": "code",
+         "v": "ros2 node list"
+        },
+        {
+         "t": "text",
+         "v": " after "
+        },
+        {
+         "t": "code",
+         "v": "ros2 daemon stop"
+        },
+        {
+         "t": "text",
+         "v": " for the first, the node's own lateness reporting for the second and fifth, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info --verbose"
+        },
+        {
+         "t": "text",
+         "v": " for the fourth. Doing that work inside the safety path would be slower, more code and wrong more often."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 2. The sixth failure is a publisher that is alive and stuck: the driver keeps publishing, the stamps advance, and the pose has not moved for two seconds while the wheels are turning. A freshness check passes it, because everything about it is fresh except the content. The check that catches it is a staleness check on the value rather than on the arrival: the pose has not changed by more than a threshold while a non-zero command has been going out for longer than the robot needs to move that far. Its cost is the false alarms, and they are real: a robot legitimately stopped at a goal, a robot pushed against a wall, a robot on a slippery floor, all look the same. That is why the check belongs at a longer time scale than the freshness one and why its reaction should be a report rather than a stop. The general rule: freshness is cheap and safe to act on, content checks are expensive and belong in diagnostics."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 3, three fields the supervisor publishes about itself, as a "
+        },
+        {
+         "t": "code",
+         "v": "diagnostic_msgs/DiagnosticStatus"
+        },
+        {
+         "t": "text",
+         "v": " or a small message of its own:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The gate's current state, as a name: open, no odometry, no commands. This is the one an operator reads first, and it says what the supervisor is doing now."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The age of each input at the last tick, in milliseconds. This is the one that shows a problem coming: an odometry age that normally sits at 35 ms and has started touching 200 is a warning three weeks before it becomes a stop, and neither the state nor the transition count would show it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The number of transitions into each closed state since start. This is the one that survives an operator not watching: a robot that gated twice during a shift and is open now looks perfect in the first two fields."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4. A publisher can ask: "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::Publisher::get_subscription_count"
+        },
+        {
+         "t": "text",
+         "v": " returns how many subscriptions the middleware has matched, and "
+        },
+        {
+         "t": "code",
+         "v": "SubscriptionOptions"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "PublisherOptions"
+        },
+        {
+         "t": "text",
+         "v": " carry a matched-event callback that fires when one connects or disconnects, alongside the incompatible-QoS and deadline callbacks the QoS topic used ("
+        },
+        {
+         "t": "a",
+         "v": "event_handler.hpp",
+         "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/event_handler.hpp"
+        },
+        {
+         "t": "text",
+         "v": "). A supervisor whose "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " has no subscriber is a supervisor shouting into nothing, and the honest reaction is to log it loudly at startup and once per transition, not to stop, because there is nothing it can do about it and a robot with nobody listening to "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " is already not moving. The reason to report it at all is the debugging session six months later, where \"the supervisor was publishing stops to nobody\" is the whole answer and is invisible without this line."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5, the gate. Three states. "
+        },
+        {
+         "t": "i",
+         "v": "Open"
+        },
+        {
+         "t": "text",
+         "v": ": both inputs fresh, and "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel_nav"
+        },
+        {
+         "t": "text",
+         "v": " is forwarded to "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " message for message. "
+        },
+        {
+         "t": "i",
+         "v": "No odometry"
+        },
+        {
+         "t": "text",
+         "v": ": the odometry check is stale, and a zero velocity goes out at 20 Hz. "
+        },
+        {
+         "t": "i",
+         "v": "No commands"
+        },
+        {
+         "t": "text",
+         "v": ": the odometry is fresh but the command stream is stale, and a zero velocity goes out at 20 Hz. Transitions are evaluated on every tick from the two freshness checks, and every transition is logged once with the ages that caused it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The transition to test first is open to no-odometry, and the reason is not that it is the most likely: it is that it is the only one whose failure is dangerous. A bug in the other direction, staying closed when it should open, stops a working robot, which is a nuisance. A bug in this one lets a robot drive on a pose nobody is updating, which is the failure the supervisor exists to prevent. Test the dangerous direction first, and test it with the clock driven by the test rather than by waiting, which is what taking the time as an argument bought."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "verify",
+   "title": "Verify a stop from independent state",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four ways a stop is reported and does not happen, in the order you will meet them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first is the one from the cold check: the stop was published and nothing received it. The distinguishing evidence is that the publisher's own log says it sent and the base never saw it, and the way to tell is "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic info /cmd_vel --verbose"
+        },
+        {
+         "t": "text",
+         "v": " on a running system, which shows every endpoint with its QoS. The reason this one is common is that "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " usually has more than one potential publisher across a project's life, and the day somebody adds a second one, the last writer wins and it is not always yours."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second is a stop that was received and then overridden. A base holds the last command it received, which the Gazebo basics topic showed for the simulated one, so a stop followed 50 ms later by a non-zero command from another node is a robot that did not stop. This is the reason the bench's supervisor is the only publisher on "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " and the follower publishes to "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel_nav"
+        },
+        {
+         "t": "text",
+         "v": " instead. The general form is that a safety action has to own its output exclusively, and a topic that anybody can publish to is not owned."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third is a stop that was applied and did not take effect, which is physics rather than software: the robot was on a slope, the brakes are not engaged, the wheels are slipping. No amount of message inspection finds it. It is found only by measuring motion, and it is the case that proves the general rule, because every software check in the system can be green while the robot is still moving."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth is the verification itself being wrong. Two shapes. A check that reads the robot's speed from the same topic the controller reads is only independent of the controller, not of the sensor, so a stuck odometry publisher passes it while the robot drives. And a check that reads a commanded speed rather than a measured one is not a check at all: "
+        },
+        {
+         "t": "code",
+         "v": "Twist"
+        },
+        {
+         "t": "text",
+         "v": " on "
+        },
+        {
+         "t": "code",
+         "v": "/cmd_vel"
+        },
+        {
+         "t": "text",
+         "v": " is a request, and "
+        },
+        {
+         "t": "code",
+         "v": "Odometry"
+        },
+        {
+         "t": "text",
+         "v": "'s twist is a measurement, and confusing the two is the single most common way a stop verification comes out green for a moving robot."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That gives the rule in its final form. A stop is verified by a measurement of motion, taken from a source that does not share a failure with the thing that was supposed to stop the robot, over a window long enough that a slow creep cannot hide in it. The bench's "
+        },
+        {
+         "t": "code",
+         "v": "missing_odom"
+        },
+        {
+         "t": "text",
+         "v": " checks are written exactly that way: at rest within 1.50 s of the cue, at most 0.25 m of creep, driving again above 0.05 m/s after the drop ends, all measured from "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " upstream of the relay the scenario cuts. The last of those three is worth noticing on its own, because a robot that stops and never restarts has also failed, and a verification that only checks for stopping would pass it."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say in one line how this page and the systems view of reliability divide. Say what a subscription with nothing waiting cannot tell you, and give the one rule that covers five different failures at once. Name what QoS, lifecycle and launch each give you and what none of them detects. Say what a cancel actually is and what must never depend on it. Give the difference between requesting a stop and verifying one, and the two properties a verification needs. Finish with the bench's arrangement: which topic the check reads and why that one."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does a subscription with no message waiting tell you about its publisher?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name five distinct failures that a single freshness check reacts to correctly, and say why not distinguishing them is a feature."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is a freshness limit written as a multiple of a period rather than as a number of milliseconds?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does QoS liveliness give you, and what has to be true of both ends before it works at all?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What do "
+     },
+     {
+      "t": "code",
+      "v": "respawn"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "respawn_delay"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "respawn_max_retries"
+     },
+     {
+      "t": "text",
+      "v": " do, and what goes wrong with an unlimited retry count?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A navigation goal is cancelled. What has actually happened, and when is the robot stopped?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give four places a published stop can be lost before it reaches the wheels."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is "
+     },
+     {
+      "t": "code",
+      "v": "Twist"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "/cmd_vel"
+     },
+     {
+      "t": "text",
+      "v": " not evidence of anything about the robot's motion?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What two properties does a stop verification need, and what does the bench read to get them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does the bench's missing-odometry scenario also check that the robot drove again afterwards?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page: the three states of a gate on a command stream, what is published in each, and which transition you would test first."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "rclcpp on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "event_handler.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/event_handler.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the liveliness, deadline and matched event callbacks a publisher or subscription can install, and "
+     },
+     {
+      "t": "a",
+      "v": "publisher_base.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/publisher_base.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "get_subscription_count"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "launch on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "execute_local.py",
+      "href": "https://github.com/ros2/launch/blob/jazzy/launch/launch/actions/execute_local.py"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "respawn"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "respawn_delay"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "respawn_max_retries"
+     },
+     {
+      "t": "text",
+      "v": ", and the negative value that means forever."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "diagnostics repository for Jazzy",
+      "href": "https://github.com/ros/diagnostics/tree/ros2-jazzy"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "diagnostic_updater"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "code",
+      "v": "diagnostic_msgs/DiagnosticArray"
+     },
+     {
+      "t": "text",
+      "v": " convention for publishing a node's own health."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation: "
+     },
+     {
+      "t": "a",
+      "v": "quality of service",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html"
+     },
+     {
+      "t": "text",
+      "v": " for the liveliness and deadline events and the compatibility they need, and the design article on "
+     },
+     {
+      "t": "a",
+      "v": "actions",
+      "href": "https://design.ros2.org/articles/actions.html"
+     },
+     {
+      "t": "text",
+      "v": " for what a cancel request is and is not."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ros2cli on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "ros2doctor",
+      "href": "https://github.com/ros2/ros2cli/tree/jazzy/ros2doctor"
+     },
+     {
+      "t": "text",
+      "v": ", whose report includes a quality-of-service compatibility listing, and "
+     },
+     {
+      "t": "a",
+      "v": "ros2topic",
+      "href": "https://github.com/ros2/ros2cli/tree/jazzy/ros2topic"
+     },
+     {
+      "t": "text",
+      "v": ", whose "
+     },
+     {
+      "t": "code",
+      "v": "info --verbose"
+     },
+     {
+      "t": "text",
+      "v": " prints every endpoint's profile."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "gz-sim on the gz-sim8 branch, "
+     },
+     {
+      "t": "a",
+      "v": "DiffDrive.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/diff_drive/DiffDrive.cc"
+     },
+     {
+      "t": "text",
+      "v": ": the base that keeps applying the last command it received, which is why a lost stop keeps the robot moving."
+     }
+    ]
+   ]
+  }
+ ]
+}

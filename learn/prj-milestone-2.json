@@ -1,0 +1,618 @@
+{
+ "id": "prj-milestone-2",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This is the second checkpoint, and it measures something different from the first. Milestone 1 asked whether the parts existed. This one asks whether the bench can answer a question about the robot without a person driving it: the runner writes a verdict, the relay can take odometry away on command, the supervisor's state handling is covered by tests that run in seconds, and the normal and missing-odometry scenarios pass with tolerances taken from measured runs rather than guessed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is checking it on a fresh clone rather than in the workspace we have been living in. A bench that works only on the machine that built it is a demonstration, and the failure it hides is always the same: something that was never committed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: one command runs five scenario cases and prints a line each, a second command runs every unit test in seconds, and both go red for a supervisor whose odometry timeout has been raised. The rest of this review is finding out which parts of that are weaker than they look."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "review",
+   "title": "Check the milestone list; update the debugging notes",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, every item of the second milestone list has been run against a fresh clone, and each one has passed or has an entry in the debugging notes with a date and a next step."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The change since the first milestone is that most of the checking is now one command. That makes this review shorter to run and easier to fool: a suite that passes tells you the cases you wrote still hold, and says nothing about the cases you did not write. So the list below has two halves. The first is what the machine checks, and you run it and read the output. The second is what only a person can check, and it is the half worth the time."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "The milestone says"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What proves it today"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Written down in"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "the runner works"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "./run_scenario.sh smoke"
+          },
+          {
+           "t": "text",
+           "v": " passes, writes "
+          },
+          {
+           "t": "code",
+           "v": "results/smoke.txt"
+          },
+          {
+           "t": "text",
+           "v": " and "
+          },
+          {
+           "t": "code",
+           "v": "results/smoke.env"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the \"Scenarios\" section of "
+          },
+          {
+           "t": "code",
+           "v": "README.md"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "one fault relay"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "a service call on "
+          },
+          {
+           "t": "code",
+           "v": "/odom_relay/drop"
+          },
+          {
+           "t": "text",
+           "v": " makes the supervisor stop the robot and the drop ends by itself"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the \"Supervisor\" section of "
+          },
+          {
+           "t": "code",
+           "v": "README.md"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "supervisor state handling"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the four fake-input cases and "
+          },
+          {
+           "t": "code",
+           "v": "StopsWithinTheOdometryTimeout"
+          },
+          {
+           "t": "text",
+           "v": " pass in "
+          },
+          {
+           "t": "code",
+           "v": "./check.sh"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the \"Supervisor\" section, with the stop arithmetic"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "the normal checks"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "./run_scenario.sh normal"
+          },
+          {
+           "t": "text",
+           "v": " passes, tolerances above the largest of five measured runs"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the \"Scenarios\" section, with the measured range"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "the missing-input checks"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "./run_scenario.sh missing_odom"
+          },
+          {
+           "t": "text",
+           "v": " passes, both witnesses agreeing"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "\"How the bench knows the robot stopped\""
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Clone and build, and start it first because it is the slow item:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "git clone git@github.com:<you>/test_bench.git /tmp/milestone2\ncd /tmp/milestone2\nrosdep install --from-paths src --ignore-src -y\n./check.sh; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "While it runs, read "
+        },
+        {
+         "t": "code",
+         "v": "docs/simulation.md"
+        },
+        {
+         "t": "text",
+         "v": " for one line the last few topics added: the version of "
+        },
+        {
+         "t": "code",
+         "v": "nav2_minimal_tb3_sim"
+        },
+        {
+         "t": "text",
+         "v": " that "
+        },
+        {
+         "t": "code",
+         "v": "models/waffle_with_pose.sdf.xacro"
+        },
+        {
+         "t": "text",
+         "v": " was copied from. If that line is missing, the copy is already a liability, and writing it down is the ten-minute fix this review is for."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run the whole suite from the clone and read every line of it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "source /tmp/milestone2/install/setup.bash\ntime ./run_regressions.sh; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Five lines and a tally. Compare the wall time with the number you wrote down in the regression topic; a suite that has grown by half without anyone noticing is a finding of its own."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Check the two things the suite cannot. First, that the relay's service still behaves when a person uses it, because the suite only ever calls it from the runner:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ros2 launch bench_sim bench.launch.py headless:=False        # terminal 1\nros2 run bench_nodes odom_relay --ros-args -p use_sim_time:=true -p drop_ms:=2000   # terminal 2\nros2 topic pub --rate 10 /cmd_vel_nav geometry_msgs/msg/TwistStamped \"{twist: {linear: {x: 0.2}}}\"   # terminal 3\nros2 service call /odom_relay/drop example_interfaces/srv/Trigger \"{}\"              # terminal 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Second, the experiment that needs a hand: while the robot is stopped, drag it in the Gazebo window and watch the two witnesses disagree. The stop-verification topic explained why this is not in the suite; running it once per milestone is the compromise."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Read one verdict file all the way through rather than trusting its first line. Open "
+         },
+         {
+          "t": "code",
+          "v": "results/regression/missing_odom.txt"
+         },
+         {
+          "t": "text",
+          "v": " and put each number against what the design predicts: the time from the cue to rest against the 0.53 s the supervisor's arithmetic gives, the distance after the cue against 8 cm, and the two witnesses' distances against each other. A number that passes its limit while drifting away from the prediction is the finding this step exists for, and it is invisible from a tally."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Now the half a machine cannot do. Write one line on each of these, and be honest, because the answers become the next weeks' work:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Which check would still pass if the supervisor stopped publishing altogether?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Which of the five cases has the least room between its measurement and its limit?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What does the bench still prove only once, by hand, and what would it cost to automate?"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Which file would hurt most if it drifted from upstream without anyone noticing?"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the result of each row and each question. Anything fixable in ten minutes, fix now on a branch and merge it. Anything longer becomes a dated entry in "
+         },
+         {
+          "t": "code",
+          "v": "docs/debugging.md"
+         },
+         {
+          "t": "text",
+          "v": " with a next step, and the milestone stays open until it has one."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when every row of the list has a written result, the two hand checks have been run once, the four questions have written answers, and the fresh clone passes "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "./run_regressions.sh"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Update "
+        },
+        {
+         "t": "code",
+         "v": "docs/debugging.md"
+        },
+        {
+         "t": "text",
+         "v": " and add a milestone entry to "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". Together they are the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For the notes, add every problem met since the first milestone in the same six-line shape: symptom, where it was seen, what you looked at, the cause, the fix, and the command that finds it in one step next time. The topics since then produced a specific crop of them, and the ones worth writing down are the ones whose symptom looked like something else: a bridge that delivered empty frame names, a launch argument that went nowhere, a drop shorter than a timeout that looked like a broken supervisor, a test that passed because a witness had nothing to say. Each of those cost time because the first guess was wrong, which is exactly what makes an entry worth keeping."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then revisit the \"first moves\" list at the top of the file. You have four topics of new experience since you wrote it, so add the moves that have actually been earning their place: reading one verdict file line by line rather than its first line, asking "
+        },
+        {
+         "t": "code",
+         "v": "gz topic -e"
+        },
+        {
+         "t": "text",
+         "v": " what a Gazebo topic really carries before writing code against its bridged form, and running the fast layer before the slow one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For the README, write the milestone entry: the date, which rows passed on the first try, what is still open with its entry in the notes, and the four answers from step 5. Those four are the honest part of this page, and in three months they will read as the plan you should have followed."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "testing",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Testing/Testing-Main.html"
+     },
+     {
+      "t": "text",
+      "v": " and on "
+     },
+     {
+      "t": "a",
+      "v": "services from the command line",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Services/Understanding-ROS2-Services.html"
+     },
+     {
+      "t": "text",
+      "v": ", for the two checks a person still runs by hand."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Greg Law, Back to Basics: Debugging, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Debugging_CppCon_2023.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=qgszy9GquRs"
+     },
+     {
+      "t": "text",
+      "v": ". Shortening the distance between a bug and the failure it produces, which is what the notes are for."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Dave Steffen, Back to Basics: Unit Testing, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Unit_Testing.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=MwoAM3sznS0"
+     },
+     {
+      "t": "text",
+      "v": ". Why a fast layer and a slow layer answer different questions."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "rosdep documentation",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Rosdep.html"
+     },
+     {
+      "t": "text",
+      "v": ", for what the fresh clone installs before it builds."
+     }
+    ]
+   ]
+  }
+ ]
+}

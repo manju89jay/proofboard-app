@@ -1,0 +1,1477 @@
+{
+ "id": "cpp-profiling",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Take 10 minutes, on paper, closed book."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Name the three things you measure before you change a line of code for speed, and say what each one is for."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Your colleague says the scan filter is slow because of cache misses. What do you ask for?"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "You time a loop and it reports 0.0 ms for a hundred million iterations. Give two explanations and say how you tell them apart."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A change makes a benchmark 3% faster on one run. What do you do before you believe it?"
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Three numbers, in this order. First, the cost of the whole operation against its budget: how long the thing takes and how long it is allowed to take, because an operation inside its budget needs no work at all ("
+      },
+      {
+       "t": "a",
+       "v": "Per.1",
+       "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-reason"
+      },
+      {
+       "t": "text",
+       "v": ", "
+      },
+      {
+       "t": "a",
+       "v": "Per.3",
+       "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-critical"
+      },
+      {
+       "t": "text",
+       "v": "). Second, where the time goes inside it, from a profiler rather than from reading the code, because the hotspot is somewhere else more often than not. Third, a repeatable baseline, with the method written down: which build, which input, how many runs, and how much the number moved between them. Without the third you cannot tell a real improvement from noise."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "For the measurement. \"Cache misses\" is a mechanism, not evidence: ask which run, which build, what fraction of the time is in that function, and what the miss rate actually was, from "
+      },
+      {
+       "t": "code",
+       "v": "perf stat"
+      },
+      {
+       "t": "text",
+       "v": " or an equivalent. A mechanism proposed before a profile is a guess with a technical accent."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Either the loop is genuinely that fast, or the optimiser deleted it because its result is never used. You tell them apart by looking: disassemble the function with "
+      },
+      {
+       "t": "code",
+       "v": "objdump -d"
+      },
+      {
+       "t": "text",
+       "v": " and see whether the loop is there. I did exactly that below, and it was not."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Run it enough times to know the spread, on both versions, and compare the distributions rather than two numbers; check that the workload is the one you care about; and check the build is the one that ships. A 3% difference is inside the run-to-run variation of most benchmarks on a laptop, so on its own it is not a result."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with the three measurements in 1 and the disassembly answer in 3. Naming a tool instead of a number in 1 is a partial pass. Accepting 2 as a diagnosis is a fail: this topic exists because the guess is usually wrong."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Profiling is measuring where a program's time actually goes, before changing anything, and then measuring again to see whether the change helped. A "
+    },
+    {
+     "t": "i",
+     "v": "profiler"
+    },
+    {
+     "t": "text",
+     "v": " samples the program many times a second and records which function was running, so you get a list ordered by how much of the time each one owned; the top of that list is the "
+    },
+    {
+     "t": "i",
+     "v": "hotspot"
+    },
+    {
+     "t": "text",
+     "v": "."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is that programmers are bad at guessing. The code that looks expensive is often not where the time goes, and cache misses, allocations and branches are mechanisms rather than evidence until somebody measures which one is biting. Three measurements from this page for scale. At "
+    },
+    {
+     "t": "code",
+     "v": "-O2"
+    },
+    {
+     "t": "text",
+     "v": ", the same additions over eight million integers ran 8 to 11 times slower in a shuffled order than in memory order, and an unpredictable branch cost 8 to 9 times a predictable one when the compiler kept the branch, and nothing when it replaced it with a conditional move. A loop that returned a "
+    },
+    {
+     "t": "code",
+     "v": "std::string"
+    },
+    {
+     "t": "text",
+     "v": " per beam made 720000 allocations, against none for the same loop returning an enumeration, and ran 10 times slower at "
+    },
+    {
+     "t": "code",
+     "v": "-O2"
+    },
+    {
+     "t": "text",
+     "v": ". In a sanitizer build the first two ratios nearly vanish and the third grows five times, which is why the build is part of the number."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism of a sampling profiler is a timer interrupt and the call stack. "
+    },
+    {
+     "t": "code",
+     "v": "perf record"
+    },
+    {
+     "t": "text",
+     "v": " collects samples and stack traces, "
+    },
+    {
+     "t": "code",
+     "v": "perf report"
+    },
+    {
+     "t": "text",
+     "v": " orders them, and a flame graph draws the same data as nested boxes whose width is the share of samples, so a wide box near the top is where the work is."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that a measurement is only as good as its method, and the method moves the number more than the machine does. After the build comes the optimiser, which deletes benchmarks whose results nobody uses: a loop of a hundred million iterations reported 0.0 milliseconds until I handed its result to the caller, and the disassembly showed the loop was gone. Then warm-up and noise, which is why a benchmark reports a spread over several runs rather than one number."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "In the robot you meet this the first time a node misses its deadline, and the sequence is always the same: measure the budget, profile for the hotspot, fix one cause, measure again the same way, and keep both numbers."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "hardware",
+   "title": "CPU caches, allocations, branches: what makes code slow",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start with the one that dominates everything else. This program adds up the same eight million integers twice, in memory order and in a shuffled order, with the same number of additions:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <chrono>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numeric>\n#include <random>\n#include <vector>\n\n// Same additions, same data, two orders of visiting it.\n[[nodiscard]] double time_ms(const std::vector<std::int32_t>& data, const std::vector<std::int32_t>& order,\n                             std::int64_t& sink) {\n  const auto start = std::chrono::steady_clock::now();\n  std::int64_t total = 0;\n  for (std::ptrdiff_t i = 0; i < std::ssize(order); ++i) total += data[order[i]];\n  sink += total;\n  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();\n}\n\nint main() {\n  constexpr std::ptrdiff_t kCount = 8'000'000;  // 32 MB of data, and a 32 MB index to walk it with\n  std::vector<std::int32_t> data(kCount, 1);\n  std::vector<std::int32_t> in_order(kCount);\n  std::iota(in_order.begin(), in_order.end(), 0);\n  std::vector<std::int32_t> shuffled = in_order;\n  std::mt19937 generator(12345);  // a fixed seed, so the two runs see the same permutation\n  std::ranges::shuffle(shuffled, generator);\n\n  std::int64_t sink = 0;\n  for (int round = 0; round < 3; ++round) {\n    const double sequential = time_ms(data, in_order, sink);\n    const double random = time_ms(data, shuffled, sink);\n    std::cout << std::format(\"round {}: in order {:.1f} ms, shuffled {:.1f} ms, ratio {:.1f}\\n\", round, sequential,\n                             random, random / sequential);\n  }\n  std::cout << std::format(\"sink {}\\n\", sink);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Timings differ per machine and per run, so there is no output block. Two runs of that binary at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " on an Intel i7-14700HX:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "round 0: in order 4.2 ms, shuffled 33.6 ms, ratio 8.0\nround 1: in order 4.1 ms, shuffled 33.6 ms, ratio 8.3\nround 2: in order 4.0 ms, shuffled 33.5 ms, ratio 8.4\nround 0: in order 3.3 ms, shuffled 33.7 ms, ratio 10.1\nround 1: in order 2.9 ms, shuffled 32.8 ms, ratio 11.4\nround 2: in order 3.0 ms, shuffled 32.5 ms, ratio 10.9"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Eight to eleven times, for the same arithmetic. The processor does not fetch integers, it fetches "
+        },
+        {
+         "t": "i",
+         "v": "cache lines"
+        },
+        {
+         "t": "text",
+         "v": " of 64 bytes, which is sixteen of these. Walking in order, one fetch serves the next fifteen additions and the hardware prefetcher has the line after that on its way before you ask. Jumping about, every addition can want a different line, and the data is 32 MB against 33 MB of L3 and 2 MB of L2 per core, so most of those wants reach main memory. The same source built the way this page's fences are built, "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " with AddressSanitizer and UndefinedBehaviorSanitizer, gives about 2.5, nine rounds across two machines falling between 2.3 and 2.7, because the sanitizer's own work per access dwarfs the stall it was hiding. Same program, same machine, same minute, and a ratio four times smaller: a number without its build is not a measurement. That aside, this is the effect behind "
+        },
+        {
+         "t": "a",
+         "v": "Per.19",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-access"
+        },
+        {
+         "t": "text",
+         "v": ", access memory predictably, and behind "
+        },
+        {
+         "t": "a",
+         "v": "Per.16",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-compact"
+        },
+        {
+         "t": "text",
+         "v": ", use compact data structures: a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " of objects and a "
+        },
+        {
+         "t": "code",
+         "v": "std::list"
+        },
+        {
+         "t": "text",
+         "v": " of the same objects do the same work, and the list pays the shuffled price on every step."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second mechanism you can count rather than time, which makes it travel between machines. The counting "
+        },
+        {
+         "t": "code",
+         "v": "operator new"
+        },
+        {
+         "t": "text",
+         "v": " from the smart pointer topic turns \"this feels allocation-heavy\" into a number:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <cstdlib>\n#include <format>\n#include <iostream>\n#include <new>\n#include <string>\n#include <string_view>\n#include <vector>\n\nstd::int64_t allocations = 0;  // global only because a replacement operator new has to be global\n\nvoid* operator new(std::size_t size) {\n  ++allocations;\n  if (void* p = std::malloc(size)) return p;\n  throw std::bad_alloc();\n}\nvoid operator delete(void* p) noexcept { std::free(p); }\nvoid operator delete(void* p, std::size_t) noexcept { std::free(p); }\n\n// Returns a new string every call. The text is 25 characters, past the 15 a std::string holds inside itself.\n[[nodiscard]] std::string describe_by_value(float range) {\n  if (range < 1.0F) return std::string(\"obstacle within one metre\");\n  if (range < 5.0F) return std::string(\"clear for the next metres\");\n  return std::string(\"nothing within five metres\");\n}\n\n// Returns a view of a string literal, which lives for the whole program.\n[[nodiscard]] std::string_view describe_by_view(float range) {\n  if (range < 1.0F) return \"obstacle within one metre\";\n  if (range < 5.0F) return \"clear for the next metres\";\n  return \"nothing within five metres\";\n}\n\nint main() {\n  constexpr std::ptrdiff_t kBeams = 3600;\n  std::vector<float> ranges(kBeams);\n  for (std::ptrdiff_t i = 0; i < kBeams; ++i) ranges[i] = 0.2F + static_cast<float>((i * 37) % 900) / 100.0F;\n\n  std::int64_t near_by_value = 0;\n  const std::int64_t before_value = allocations;\n  for (const float range : ranges) {\n    if (describe_by_value(range).starts_with(\"obstacle\")) ++near_by_value;\n  }\n  const std::int64_t value_allocations = allocations - before_value;\n\n  std::int64_t near_by_view = 0;\n  const std::int64_t before_view = allocations;\n  for (const float range : ranges) {\n    if (describe_by_view(range).starts_with(\"obstacle\")) ++near_by_view;\n  }\n  const std::int64_t view_allocations = allocations - before_view;\n\n  std::cout << std::format(\"{} beams, {} near either way: {}\\n\", kBeams, near_by_value,\n                           near_by_value == near_by_view);\n  std::cout << std::format(\"returning std::string: {} allocations\\n\", value_allocations);\n  std::cout << std::format(\"returning std::string_view: {} allocations\\n\", view_allocations);\n}"
+      },
+      {
+       "t": "output",
+       "text": "3600 beams, 320 near either way: true\nreturning std::string: 3600 allocations\nreturning std::string_view: 0 allocations"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One allocation per beam against none, and the two counts are the same in every build and on every machine, which is what makes a count better evidence than a time. An allocation is a call into the allocator, a lock or a thread-local cache, and a block of memory that will not be in your cache when you touch it; "
+        },
+        {
+         "t": "a",
+         "v": "Per.14",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-alloc"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "a",
+         "v": "Per.15",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-alloc0"
+        },
+        {
+         "t": "text",
+         "v": " ask you to have fewer of them and none on a critical path. The 25-character strings are deliberate: shorter text would sit inside the "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " object and allocate nothing, which is the kind of detail that decides whether a function allocates at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third mechanism is the one everybody quotes and almost nobody measures. A branch the processor cannot predict costs a pipeline restart, and the classic demonstration sorts an array so that the branch becomes predictable. On this machine, with GCC 13 at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", counting elements above a threshold gave a ratio of 1.0 to 1.3 between sorted and shuffled: no effect at all. The reason is in the disassembly of the loop, from "
+        },
+        {
+         "t": "code",
+         "v": "objdump -d"
+        },
+        {
+         "t": "text",
+         "v": " with the instruction encodings removed and nothing else left out:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "    2d08:  xor    %edi,%edi\n    2d0a:  cmpl   $0x80,(%rdx)\n    2d10:  setg   %dil\n    2d14:  add    $0x4,%rdx\n    2d18:  add    %rdi,%rcx\n    2d1b:  cmp    %rdx,%r8\n    2d1e:  jne    2d08 <time_ms+0x28>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "There is no conditional jump on the data. GCC turned \"if the value is above 128, add one\" into a compare and a "
+        },
+        {
+         "t": "code",
+         "v": "setg"
+        },
+        {
+         "t": "text",
+         "v": ", which writes 0 or 1 without branching, so the predictor is never asked. The "
+        },
+        {
+         "t": "code",
+         "v": "jne"
+        },
+        {
+         "t": "text",
+         "v": " at the end is the loop's own back-edge, which the predictor gets right every time. Put something in the branch that the compiler cannot flatten, here a call it is not allowed to inline, and a second jump appears, this one on the data:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "    2d20:  mov    (%rdx),%edi\n    2d22:  cmp    $0x80,%edi\n    2d28:  jle    2d32 <time_ms+0x42>\n    2d2a:  call   2ce0 <weigh(int)>\n    2d2f:  add    %rax,%rsi\n    2d32:  add    $0x4,%rdx\n    2d36:  cmp    %rdx,%rcx\n    2d39:  jne    2d20 <time_ms+0x30>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That version measured 1.3 to 1.5 ms sorted against 12.1 to 12.8 ms shuffled over six rounds, a ratio of 8.3 to 9.5. So the branch predictor is worth 8 to 9 times when there is a branch, and nothing when there is not, and the only way to know which you have is to look at the instructions. In the sanitizer build the same program gives about 1.1, six rounds across two machines falling between 1.0 and 1.15, for the same reason the cache ratio shrank there: the instrumentation costs more per element than the mispredictions do. That is the habit this topic is really teaching: the mechanism you are reasoning about has to be the one in the binary."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three mechanisms, three kinds of evidence: a time for cache behaviour, a count for allocations, and an instruction listing for branches. Reach for the cheapest evidence that settles the question."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "perf",
+   "title": "perf record and report on a small program; reading a flame graph",
+   "steps": [
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "note",
+       "c": [
+        {
+         "t": "text",
+         "v": "There is no "
+        },
+        {
+         "t": "code",
+         "v": "perf"
+        },
+        {
+         "t": "text",
+         "v": " in the WSL 2 kernel these pages are written on, so no "
+        },
+        {
+         "t": "code",
+         "v": "perf"
+        },
+        {
+         "t": "text",
+         "v": " output is pasted here. The commands are the ones to run on a Linux machine that has it, and what they print is described from the "
+        },
+        {
+         "t": "a",
+         "v": "perf wiki",
+         "href": "https://perfwiki.github.io/main/tutorial/"
+        },
+        {
+         "t": "text",
+         "v": ". The profile that "
+        },
+        {
+         "t": "i",
+         "v": "is"
+        },
+        {
+         "t": "text",
+         "v": " pasted below came from "
+        },
+        {
+         "t": "code",
+         "v": "gprof"
+        },
+        {
+         "t": "text",
+         "v": ", which I ran."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The program to profile classifies 3600 beams over 20000 scans, building a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " for each beam, which is the shape of the exercise that follows. On a machine with perf, three commands cover almost every question:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "# 1. What is the program's shape: instructions, cache misses, branch misses, all in one line each.\nperf stat ./scan_pipeline\n\n# 2. Where does the time go: sample the whole run, with call stacks.\nperf record -g --call-graph=dwarf ./scan_pipeline\nperf report --stdio --sort=overhead\n\n# 3. The same samples as a picture.\nperf script | stackcollapse-perf.pl | flamegraph.pl > profile.svg"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "perf stat"
+        },
+        {
+         "t": "text",
+         "v": " prints counters: instructions, cycles, instructions per cycle, branch misses, cache references and cache misses. It answers \"is this program bound on memory or on arithmetic\" before you look at a single function. "
+        },
+        {
+         "t": "code",
+         "v": "perf record"
+        },
+        {
+         "t": "text",
+         "v": " samples the running program some hundreds of times a second, recording the instruction pointer and, with "
+        },
+        {
+         "t": "code",
+         "v": "-g"
+        },
+        {
+         "t": "text",
+         "v": ", the call stack; "
+        },
+        {
+         "t": "code",
+         "v": "perf report"
+        },
+        {
+         "t": "text",
+         "v": " then lists functions by their share of samples, with the callers underneath each. The two columns to read are self time, the samples in that function's own instructions, and children, the samples in everything it called. A function with a large children share and a small self share is a router, not a hotspot."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "flame graph"
+        },
+        {
+         "t": "text",
+         "v": " is the same sample set drawn as a picture: each box is a function, the boxes above it are what it called, and the width is the share of samples. Width is the only thing that means anything, and the order left to right is alphabetical rather than chronological ("
+        },
+        {
+         "t": "a",
+         "v": "Brendan Gregg's page on flame graphs",
+         "href": "https://www.brendangregg.com/flamegraphs.html"
+        },
+        {
+         "t": "text",
+         "v": ", whose scripts the third command uses). Read it by looking for the widest plateau near the top: that is the code that owned the processor, with its whole call chain below it. Narrow spikes are noise. The picture earns its place on a program with deep call stacks, where a list of functions hides the fact that four callers all funnel into one expensive leaf."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What I could run here is GNU "
+        },
+        {
+         "t": "code",
+         "v": "gprof"
+        },
+        {
+         "t": "text",
+         "v": ", which works differently and is worth knowing for exactly that reason. It needs "
+        },
+        {
+         "t": "code",
+         "v": "-pg"
+        },
+        {
+         "t": "text",
+         "v": " at compile and link time, which makes the compiler add a counting call to the top of every function, and the program writes "
+        },
+        {
+         "t": "code",
+         "v": "gmon.out"
+        },
+        {
+         "t": "text",
+         "v": " as it exits:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -O2 -g -pg -Wall -Wextra -Werror scan_pipeline.cpp -o scan_pipeline\n./scan_pipeline\ngprof -b ./scan_pipeline gmon.out | head -6"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "Flat profile:\n\nEach sample counts as 0.01 seconds.\n  %   cumulative   self              self     total           \n time   seconds   seconds    calls  ms/call  ms/call  name    \n 77.78      0.14     0.14        1   140.00   140.00  classify(std::vector<float, std::allocator<float> > const&, long)\n 22.22      0.18     0.04                             _init"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The run took 0.70 s of wall clock and gprof accounted for 0.18 s of it. It names "
+        },
+        {
+         "t": "code",
+         "v": "classify"
+        },
+        {
+         "t": "text",
+         "v": " correctly, and then it says 22% of the time is in "
+        },
+        {
+         "t": "code",
+         "v": "_init"
+        },
+        {
+         "t": "text",
+         "v": ", which is not true and is the honest limitation of the tool: gprof only instruments functions compiled with "
+        },
+        {
+         "t": "code",
+         "v": "-pg"
+        },
+        {
+         "t": "text",
+         "v": ", so everything inside libc, including the "
+        },
+        {
+         "t": "code",
+         "v": "malloc"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "free"
+        },
+        {
+         "t": "text",
+         "v": " that this program does 72 million times, has nowhere to go and lands on whatever symbol precedes it. A sampling profiler with symbols for the C library shows those frames properly. That difference, not the format of the output, is why perf replaced gprof for this kind of work; gprof is still useful when you want exact call counts, which sampling cannot give you: on another program here it reported 72000000 calls to one function at 3.61 ns each, which no sampling profiler could have told me."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Whatever the tool, the reading procedure is the same. Find the largest self time. Ask what that function is doing that costs: arithmetic, memory, allocation, a system call. Check the call count, because a cheap function called a hundred million times and an expensive one called twice need opposite fixes. Then form one hypothesis, and change one thing."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fix",
+   "title": "Measure, find the hotspot, fix one cause, measure again",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Here is the loop the profile pointed at. For every beam of every scan it builds a label, then tests it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "for (const float range : ranges) {\n  const std::string label = label_by_value(range);  // one std::string per beam\n  if (label.starts_with(\"obstacle\")) ++counts.near_beams;\n  else if (label.starts_with(\"clear\")) ++counts.mid_beams;\n  else ++counts.far_beams;\n}"
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the program: "
+         },
+         {
+          "t": "code",
+          "v": "label_by_value"
+         },
+         {
+          "t": "text",
+          "v": " returning one of three 25-character strings by range, a "
+         },
+         {
+          "t": "code",
+          "v": "classify_slow"
+         },
+         {
+          "t": "text",
+          "v": " that loops it over 3600 beams and 200 scans, and a "
+         },
+         {
+          "t": "code",
+          "v": "Counts"
+         },
+         {
+          "t": "text",
+          "v": " of three "
+         },
+         {
+          "t": "code",
+          "v": "std::int64_t"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "operator=="
+         },
+         {
+          "t": "text",
+          "v": " defaulted."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Measure it two ways before changing anything: count allocations with a replacement "
+         },
+         {
+          "t": "code",
+          "v": "operator new"
+         },
+         {
+          "t": "text",
+          "v": ", and time the loop with "
+         },
+         {
+          "t": "code",
+          "v": "std::chrono::steady_clock"
+         },
+         {
+          "t": "text",
+          "v": ". Write down the build you used."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Fix one cause. Keep the three answers identical, and prove it by comparing the "
+         },
+         {
+          "t": "code",
+          "v": "Counts"
+         },
+         {
+          "t": "text",
+          "v": " from both versions."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Measure again, the same two ways, and print the allocation counts on standard output and the times on standard error. Say in a comment why the times do not belong in the output."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions. Why is the allocation count better evidence than the time? And what did you not fix, and how would you know whether it was worth fixing?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <cstdlib>\n#include <format>\n#include <iostream>\n#include <new>\n#include <string>\n#include <string_view>\n#include <vector>\n\nstd::int64_t allocations = 0;  // global only because a replacement operator new has to be global\n\nvoid* operator new(std::size_t size) {\n  ++allocations;\n  if (void* p = std::malloc(size)) return p;\n  throw std::bad_alloc();\n}\nvoid operator delete(void* p) noexcept { std::free(p); }\nvoid operator delete(void* p, std::size_t) noexcept { std::free(p); }\n\nstruct Counts {\n  std::int64_t near_beams = 0;\n  std::int64_t mid_beams = 0;\n  std::int64_t far_beams = 0;\n\n  [[nodiscard]] bool operator==(const Counts&) const = default;\n};\n\n// Before: a fresh std::string for every beam, 25 characters, past the 15 a string holds inside itself.\n[[nodiscard]] std::string label_by_value(float range) {\n  if (range < 1.0F) return std::string(\"obstacle within one metre\");\n  if (range < 5.0F) return std::string(\"clear for the next metres\");\n  return std::string(\"nothing within five metres\");\n}\n\n[[nodiscard]] Counts classify_slow(const std::vector<float>& ranges, std::ptrdiff_t scans) {\n  Counts counts;\n  for (std::ptrdiff_t scan = 0; scan < scans; ++scan) {\n    for (const float range : ranges) {\n      const std::string label = label_by_value(range);\n      if (label.starts_with(\"obstacle\")) ++counts.near_beams;\n      else if (label.starts_with(\"clear\")) ++counts.mid_beams;\n      else ++counts.far_beams;\n    }\n  }\n  return counts;\n}\n\n// After: the same three answers as an enumeration, with no storage to own.\nenum class Band { near_obstacle, clear_ahead, nothing_near };\n\n[[nodiscard]] Band band_of(float range) {\n  if (range < 1.0F) return Band::near_obstacle;\n  if (range < 5.0F) return Band::clear_ahead;\n  return Band::nothing_near;\n}\n\n[[nodiscard]] Counts classify_fast(const std::vector<float>& ranges, std::ptrdiff_t scans) {\n  Counts counts;\n  for (std::ptrdiff_t scan = 0; scan < scans; ++scan) {\n    for (const float range : ranges) {\n      switch (band_of(range)) {\n        case Band::near_obstacle: ++counts.near_beams; break;\n        case Band::clear_ahead: ++counts.mid_beams; break;\n        case Band::nothing_near: ++counts.far_beams; break;\n      }\n    }\n  }\n  return counts;\n}\n\nint main() {\n  constexpr std::ptrdiff_t kBeams = 3600;\n  constexpr std::ptrdiff_t kScans = 200;\n  std::vector<float> ranges(kBeams);\n  for (std::ptrdiff_t i = 0; i < kBeams; ++i) ranges[i] = 0.2F + static_cast<float>((i * 37) % 900) / 100.0F;\n\n  const std::int64_t before_slow = allocations;\n  const auto slow_start = std::chrono::steady_clock::now();\n  const Counts slow = classify_slow(ranges, kScans);\n  const double slow_ms =\n      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - slow_start).count();\n  const std::int64_t slow_allocations = allocations - before_slow;\n\n  const std::int64_t before_fast = allocations;\n  const auto fast_start = std::chrono::steady_clock::now();\n  const Counts fast = classify_fast(ranges, kScans);\n  const double fast_ms =\n      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - fast_start).count();\n  const std::int64_t fast_allocations = allocations - before_fast;\n\n  // The times go to standard error: they differ per machine and per run, so they are not part of the result.\n  std::cerr << std::format(\"slow {:.1f} ms, fast {:.1f} ms, ratio {:.1f}\\n\", slow_ms, fast_ms, slow_ms / fast_ms);\n  std::cout << std::format(\"{} beams x {} scans\\n\", kBeams, kScans);\n  std::cout << std::format(\"same answer both ways: {}, near {}, mid {}, far {}\\n\", slow == fast, fast.near_beams,\n                           fast.mid_beams, fast.far_beams);\n  std::cout << std::format(\"allocations before the fix: {}\\n\", slow_allocations);\n  std::cout << std::format(\"allocations after the fix: {}\\n\", fast_allocations);\n}"
+      },
+      {
+       "t": "output",
+       "text": "3600 beams x 200 scans\nsame answer both ways: true, near 64000, mid 320000, far 336000\nallocations before the fix: 720000\nallocations after the fix: 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The numbers I measured, with the method beside each. Built at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " without sanitizers, five runs: the slow version took 4.8 to 5.1 ms and the fast one 0.5 ms every time, a ratio of 9.9 to 10.4. Built with the flags these pages use, "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": " with AddressSanitizer and UndefinedBehaviorSanitizer, three runs: 479 to 484 ms against 9.1 to 9.4 ms, a ratio of 50.9 to 53.0. Same source, same machine, same minute; the build changed the answer by a factor of five, because the sanitizer charges far more for an allocation than for arithmetic. Report a speed-up without naming the build and you have reported nothing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The allocation count is better evidence than either of those times for three reasons. It is exact, it is the same on every machine and in every build, and it is causally connected to the change: 720000 allocations became 0 because the function stopped owning storage. A time tells you how much that mattered here, on this processor, with this allocator, which is a different question and a less portable answer."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What the fix did not touch: "
+        },
+        {
+         "t": "code",
+         "v": "classify_fast"
+        },
+        {
+         "t": "text",
+         "v": " still walks 720000 floats and still branches three ways on each. If that mattered, the next measurement would be the branch behaviour from the theory step, and the next fix might be counting into three counters without a "
+        },
+        {
+         "t": "code",
+         "v": "switch"
+        },
+        {
+         "t": "text",
+         "v": ". It did not matter here, because after the change the loop takes half a millisecond for 720000 beams, which is seven tenths of a nanosecond each, and the budget was milliseconds. Knowing when to stop is part of the method: the loop is no longer the largest thing in the profile, so the profile now points somewhere else, and that is where the next hour goes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two details about the shape of the solution. The two versions live in one program so that the comparison uses the same data, the same binary and the same machine state, which removes three ways of being wrong. And "
+        },
+        {
+         "t": "code",
+         "v": "slow == fast"
+        },
+        {
+         "t": "text",
+         "v": " on a defaulted "
+        },
+        {
+         "t": "code",
+         "v": "operator=="
+        },
+        {
+         "t": "text",
+         "v": " is the regression test: a fix that changes the answer is not a fix, and comparing whole structs catches what comparing one field would miss."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Benchmark traps: the optimiser removing work, warm-up, noise",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first trap is a benchmark that measures nothing. This one times a hundred million iterations of a modulo and an addition:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <cstdint>\n#include <format>\n#include <iostream>\n\nconstexpr std::int64_t kSteps = 100'000'000;\n\n// The result goes nowhere, so at -O2 there is nothing here to time.\n[[gnu::noinline]] double time_unused() {\n  const auto start = std::chrono::steady_clock::now();\n  std::int64_t total = 0;\n  for (std::int64_t k = 0; k < kSteps; ++k) total += k % 7;\n  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();\n}\n\n// The same loop, with its result handed to the caller, so the work has to happen.\n[[gnu::noinline]] double time_used(std::int64_t& sink) {\n  const auto start = std::chrono::steady_clock::now();\n  std::int64_t total = 0;\n  for (std::int64_t k = 0; k < kSteps; ++k) total += k % 7;\n  sink += total;\n  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();\n}\n\nint main() {\n  std::int64_t sink = 0;\n  std::cout << std::format(\"result unused: {:.1f} ms for {} steps\\n\", time_unused(), kSteps);\n  const double used = time_used(sink);\n  std::cout << std::format(\"result used:   {:.1f} ms for {} steps, sink {}\\n\", used, kSteps, sink);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "At "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ", two runs printed "
+        },
+        {
+         "t": "code",
+         "v": "result unused: 0.0 ms"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "result used: 54.5 ms"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "54.7 ms"
+        },
+        {
+         "t": "text",
+         "v": ". A hundred million iterations in no measurable time is not a fast loop, it is no loop, and "
+        },
+        {
+         "t": "code",
+         "v": "objdump -d"
+        },
+        {
+         "t": "text",
+         "v": " shows the whole function, with only the encodings, the symbol comment on the constant and the trailing padding taken out:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "0000000000002a60 <time_unused()>:\n    2a60:  endbr64\n    2a64:  push   %rbx\n    2a65:  call   2540 <std::chrono::_V2::steady_clock::now()@plt>\n    2a6a:  mov    %rax,%rbx\n    2a6d:  call   2540 <std::chrono::_V2::steady_clock::now()@plt>\n    2a72:  pxor   %xmm0,%xmm0\n    2a76:  sub    %rbx,%rax\n    2a79:  pop    %rbx\n    2a7a:  cvtsi2sd %rax,%xmm0\n    2a7f:  divsd  0xf0d9(%rip),%xmm0\n    2a87:  ret"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two clock calls and the arithmetic that turns their difference into milliseconds. "
+        },
+        {
+         "t": "code",
+         "v": "total"
+        },
+        {
+         "t": "text",
+         "v": " is never read, so the loop that computes it is dead code and the compiler is right to delete it. The function beside it keeps its loop, including the multiply-and-shift that GCC uses instead of a division by seven, because "
+        },
+        {
+         "t": "code",
+         "v": "sink"
+        },
+        {
+         "t": "text",
+         "v": " is a reference the caller can see. That is the general fix: make the result escape. A benchmark library does it with a "
+        },
+        {
+         "t": "code",
+         "v": "DoNotOptimize"
+        },
+        {
+         "t": "text",
+         "v": " helper, and by hand the reliable version is to return the value or store it somewhere the compiler cannot prove is unread. Check by disassembling, not by believing the number."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second trap is warm-up. The first pass over data pays for page faults, an empty cache and a branch predictor that has learnt nothing, and the first call to a function may pay for the dynamic linker to resolve it. In the cache experiment above, the in-order pass took 4.2 ms in the first round and 4.0 ms by the third within one process, while a second process started at 3.3 ms and reached 2.9 ms. The shuffled pass, which is bound on memory the whole way, moved by less than 4%. So warm-up matters most to the part of your program that would otherwise be fast, which is exactly the part a micro-benchmark is usually measuring. Run the workload once before you start timing, and time several rounds rather than one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third trap is noise, and the method that handles it is not complicated. Run the thing many times, report the spread, and compare distributions rather than single numbers. Of the summary statistics, the minimum is the most useful for a micro-benchmark, because noise only ever makes a run slower: the fastest run is the closest to what the machine can do. The mean and the spread matter when you care about the tail, which on a robot you usually do, because a control loop that misses one deadline in a thousand has missed it. Say which you are reporting. On a laptop, also know what is moving underneath you: frequency scaling, other processes, and the scheduler putting your threads on different cores between runs, which is what made the false-sharing measurement in the atomics topic range from 4.5 to 9.9 across two runs of one binary."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth trap is measuring the wrong build, and it is the one that wastes whole afternoons. The exercise above ran ten times faster after the fix at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " and fifty times faster with sanitizers on. Neither number is wrong; they answer different questions, and only one of them is the question about the program you ship. Measure the build you ship, with the flags you ship, on data that looks like real data. A benchmark on a 100-element vector says nothing about the 3600-beam scan, and a benchmark with sanitizers on says nothing about anything except where the sanitizer spends its time."
+        }
+       ]
+      },
+      {
+       "t": "note",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every number in this topic came from one laptop with an Intel i7-14700HX under WSL 2, on a day when other things were running. Ratios between two arrangements on one machine travel; absolute milliseconds do not."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write six to ten lines from memory and keep them as this topic's proof. Name the three measurements you take before changing code, and what each is for. Give the three mechanisms and the evidence each one wants: a time for cache behaviour, a count for allocations, an instruction listing for branches, with the ratios you measured. Write the three perf commands and say what each prints, and what a flame graph's width means. Say what gprof cannot see and why that is a reason to prefer sampling. Finish with the four traps, and the sentence that covers all of them: name the build, the input and the number of runs beside every number you report."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What three things do you measure before changing a line of code for speed?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why did the same additions take 8 to 11 times longer in a shuffled order at "
+     },
+     {
+      "t": "code",
+      "v": "-O2"
+     },
+     {
+      "t": "text",
+      "v": ", and what is a cache line?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is an allocation count better evidence than a millisecond count?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The sorted-array branch benchmark showed no effect. How did you find out why, and what did the disassembly say?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What do "
+     },
+     {
+      "t": "code",
+      "v": "perf stat"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "perf record"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "perf report"
+     },
+     {
+      "t": "text",
+      "v": " each tell you?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In a flame graph, what does the width of a box mean, and what does the left-to-right order mean?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What can gprof not attribute, and why did 22% of a run land on "
+     },
+     {
+      "t": "code",
+      "v": "_init"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A loop of a hundred million iterations reports 0.0 ms. What happened, and how do you prove it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does the same fix measure 10 times faster in one build and 50 times faster in another?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "For a micro-benchmark, why is the minimum of many runs the most useful number, and when is it the wrong one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a before-and-after measurement of one function that reports an exact count and a timed ratio, with its method written beside it."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines on performance: "
+     },
+     {
+      "t": "a",
+      "v": "Per.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-reason"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Per.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-knuth"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Per.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-critical"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Per.6",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-measure"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Per.14",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-alloc"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Per.15",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-alloc0"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "Per.16",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-compact"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Per.19",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-access"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "perf wiki tutorial",
+      "href": "https://perfwiki.github.io/main/tutorial/"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "perf stat"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "perf record"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "perf report"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "GNU gprof's manual",
+      "href": "https://sourceware.org/binutils/docs/gprof/"
+     },
+     {
+      "t": "text",
+      "v": " for what instrumentation can and cannot attribute."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Brendan Gregg on "
+     },
+     {
+      "t": "a",
+      "v": "flame graphs",
+      "href": "https://www.brendangregg.com/flamegraphs.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "scripts that draw them",
+      "href": "https://github.com/brendangregg/FlameGraph"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Chandler Carruth, "
+     },
+     {
+      "t": "a",
+      "v": "Tuning C++: benchmarks, CPUs and compilers",
+      "href": "https://www.youtube.com/watch?v=nXaxk27zwlk"
+     },
+     {
+      "t": "text",
+      "v": ", CppCon 2015: how a benchmark loses its work to the optimiser, and what to do instead."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Kevin Carpenter, Back to Basics: Almost Always Vector, CppCon 2024: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2024/blob/main/Presentations/Back_to_Basics_Almost_Always_Vector.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=VRGRTvfOxb4"
+     },
+     {
+      "t": "text",
+      "v": ". Why contiguous memory wins by the numbers above."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "Google Benchmark",
+      "href": "https://github.com/google/benchmark"
+     },
+     {
+      "t": "text",
+      "v": ", for the "
+     },
+     {
+      "t": "code",
+      "v": "DoNotOptimize"
+     },
+     {
+      "t": "text",
+      "v": " helper and for running a measurement enough times to know its spread."
+     }
+    ]
+   ]
+  }
+ ]
+}

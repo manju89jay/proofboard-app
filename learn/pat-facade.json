@@ -1,0 +1,1041 @@
+{
+ "id": "pat-facade",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A test bench turns a raw run log into one report line: load the numbers out of the text, add them up, and format the total. From memory, name the three subsystems a facade over this pipeline would coordinate, each doing exactly one of those jobs and knowing nothing about the other two, then write the facade's own single entry point, calling all three in order. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <sstream>\n#include <string>\n#include <vector>\n\n// Subsystem 1: turns raw text into numbers. Knows nothing about totals or reports.\nclass Loader {\n public:\n  [[nodiscard]] std::vector<std::int32_t> load(std::string_view raw) const {\n    std::vector<std::int32_t> values;\n    std::istringstream stream{std::string(raw)};\n    std::string field;\n    while (std::getline(stream, field, ',')) values.push_back(std::stoi(field));\n    return values;\n  }\n};\n\n// Subsystem 2: turns numbers into one total. Knows nothing about text or reports.\nclass Processor {\n public:\n  [[nodiscard]] std::int64_t total(const std::vector<std::int32_t>& values) const {\n    std::int64_t sum = 0;\n    for (const std::int32_t value : values) sum += value;\n    return sum;\n  }\n};\n\n// Subsystem 3: turns a total into a report line. Knows nothing about text or numbers.\nclass Saver {\n public:\n  [[nodiscard]] std::string save(std::int64_t total) const { return std::format(\"total: {}\", total); }\n};\n\n// The facade: one call, three subsystems coordinated in order.\nclass PipelineFacade {\n public:\n  [[nodiscard]] std::string run(std::string_view raw) const { return saver_.save(processor_.total(loader_.load(raw))); }\n\n private:\n  Loader loader_;\n  Processor processor_;\n  Saver saver_;\n};\n\nint main() {\n  const PipelineFacade facade;\n  std::cout << facade.run(\"10,20,30,40\") << '\\n';\n}"
+   },
+   {
+    "t": "output",
+    "text": "total: 100"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "Loader"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "Processor"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "Saver"
+     },
+     {
+      "t": "text",
+      "v": " each take one shape of data in and hand a different shape out, and none of the three calls the other two. "
+     },
+     {
+      "t": "code",
+      "v": "PipelineFacade::run"
+     },
+     {
+      "t": "text",
+      "v": " is the only function that knows the order they run in, load, then total, then save, and it is the only thing a caller ever calls."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if you named three subsystems along those lines, one for reading, one for computing, one for producing output, and wrote one facade function that calls all three in that order without exposing the order to its caller. Naming only one subsystem that does all three jobs is a fail: that is a class with one job, not several subsystems for a facade to coordinate. Naming the three correctly but calling them from "
+     },
+     {
+      "t": "code",
+      "v": "main"
+     },
+     {
+      "t": "text",
+      "v": " instead of from one facade function is a partial pass."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Facade is a structural pattern that puts one simple entry point in front of several subsystems a caller would otherwise have to coordinate for itself. The subsystems it hides can be anything with its own interface and its own rules: a parser, a set of calculations, a hardware bus that has to start in a fixed order. The facade calls each of them in the right order and hides that order, and every one of the calls, behind a single function."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is a sequence of calls that has to happen the same way everywhere it is needed, with the same checks and the same order, repeated at every call site that needs it. Bring up a robot's power, then its sensors, then its motion controller, and every place that starts the robot has to remember that order and handle a failure at each step, or copy code that already got it right somewhere else."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a class holding the subsystems, offering one function that does what all those call sites used to do by hand: call each subsystem, in order, stopping on the first failure. Nothing about the subsystems changes, and nothing about their interfaces is translated the way an adapter would; a facade calls several interfaces, it does not stand in for any one of them."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that the subsystems stay reachable directly unless the facade goes out of its way to hide them, so a caller can still call one out of order and reproduce the exact bug the facade exists to prevent. It also grows past its purpose the moment every feature that touches any of its subsystems gets its own method on the facade, until the facade depends on the whole system and nothing depends on less than all of it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this the moment start-up, shutdown or a whole pipeline needs to be one call, and the interview question is exactly what a facade hides, and where that stops being enough."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "A simple interface over several subsystems",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot's bring-up needs three subsystems started in one fixed order: power before sensors, sensors before motion, because each one depends on the last:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n\n// Three subsystems, each with one job and its own order to be started in.\nclass PowerBus {\n public:\n  [[nodiscard]] bool energize() {\n    energized_ = true;\n    return true;\n  }\n  [[nodiscard]] bool energized() const { return energized_; }\n\n private:\n  bool energized_ = false;\n};\n\nclass SensorBus {\n public:\n  explicit SensorBus(const PowerBus& power) : power_(power) {}\n  [[nodiscard]] bool start() {\n    if (!power_.energized()) return false;  // needs power first\n    started_ = true;\n    return true;\n  }\n  [[nodiscard]] bool started() const { return started_; }\n\n private:\n  const PowerBus& power_;\n  bool started_ = false;\n};\n\nclass MotionController {\n public:\n  explicit MotionController(const SensorBus& sensors) : sensors_(sensors) {}\n  [[nodiscard]] bool arm() {\n    if (!sensors_.started()) return false;  // needs sensors reporting first\n    armed_ = true;\n    return true;\n  }\n  [[nodiscard]] bool armed() const { return armed_; }\n\n private:\n  const SensorBus& sensors_;\n  bool armed_ = false;\n};\n\n// Without a facade: every caller repeats the order and the failure handling.\n[[nodiscard]] bool bring_up_by_hand(PowerBus& power, SensorBus& sensors, MotionController& motion) {\n  if (!power.energize()) return false;\n  if (!sensors.start()) return false;\n  return motion.arm();\n}\n\n// The facade: one call, the same three subsystems, coordinated once.\nclass RobotFacade {\n public:\n  RobotFacade() : sensors_(power_), motion_(sensors_) {}\n  [[nodiscard]] bool bring_up() {\n    if (!power_.energize()) return false;\n    if (!sensors_.start()) return false;\n    return motion_.arm();\n  }\n\n private:\n  PowerBus power_;\n  SensorBus sensors_;\n  MotionController motion_;\n};\n\nint main() {\n  PowerBus power;\n  SensorBus sensors(power);\n  MotionController motion(sensors);\n  std::cout << std::format(\"bring-up by hand:    {}\\n\", bring_up_by_hand(power, sensors, motion));\n\n  RobotFacade facade;\n  std::cout << std::format(\"bring-up via facade: {}\\n\", facade.bring_up());\n}"
+      },
+      {
+       "t": "output",
+       "text": "bring-up by hand:    true\nbring-up via facade: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "bring_up_by_hand"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "RobotFacade::bring_up"
+        },
+        {
+         "t": "text",
+         "v": " do the same three calls in the same order, and that is the point being made twice: the free function needs three references passed to it and has to be copied, correctly, into every place that starts a robot, while the facade needs nothing from its caller beyond the one call. Gamma, Helm, Johnson and Vlissides define Facade in the structural chapter of the 1994 catalogue ("
+        },
+        {
+         "t": "a",
+         "v": "Design Patterns",
+         "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch04.html"
+        },
+        {
+         "t": "text",
+         "v": ") as an object that offers one interface to a set of interfaces in a subsystem, chosen for whatever a typical caller needs most of the time, not for completeness."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That is worth pausing on: a facade is not required to expose everything the subsystems can do, and it does not have to be the only way to reach them. "
+        },
+        {
+         "t": "code",
+         "v": "RobotFacade"
+        },
+        {
+         "t": "text",
+         "v": " exposes exactly one operation, "
+        },
+        {
+         "t": "code",
+         "v": "bring_up"
+        },
+        {
+         "t": "text",
+         "v": ", because that is the one sequence every caller in this project needs; a diagnostic tool that needs to read "
+        },
+        {
+         "t": "code",
+         "v": "PowerBus::energized()"
+        },
+        {
+         "t": "text",
+         "v": " on its own, without starting anything, is not a case the facade has to serve. The pattern this creates is often confused with Adapter, which the previous topic covered, so it is worth stating the difference in one line: an adapter takes one adaptee and reshapes it to match one interface a caller already has, a one-to-one translation that changes nothing about what the adaptee computes; a facade takes several unrelated subsystems and offers one new interface that matches none of them individually, a many-to-one coordination that adds behaviour of its own, the order and the failure handling, that no single subsystem had."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A facade can hold an adapter as one of its subsystems, and often does: if "
+        },
+        {
+         "t": "code",
+         "v": "SensorBus"
+        },
+        {
+         "t": "text",
+         "v": " were a vendor SDK with its own vocabulary, the adapter topic's wrapper would sit between it and "
+        },
+        {
+         "t": "code",
+         "v": "RobotFacade"
+        },
+        {
+         "t": "text",
+         "v": " exactly the way "
+        },
+        {
+         "t": "code",
+         "v": "PowerBus"
+        },
+        {
+         "t": "text",
+         "v": " sits there now, and "
+        },
+        {
+         "t": "code",
+         "v": "RobotFacade"
+        },
+        {
+         "t": "text",
+         "v": " would be none the wiser. The two patterns answer different questions, one interface reshaped to fit another, or several interfaces coordinated behind a new one, and a real system uses both at once far more often than it uses either alone."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pipeline",
+   "title": "Facade coordinating loading, processing and output",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. A test bench's run log is one line per sample, "
+        },
+        {
+         "t": "code",
+         "v": "timestamp_ms,distance_mm"
+        },
+        {
+         "t": "text",
+         "v": ", and a caller wants one line of text summarising a whole run."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "Sample{std::int64_t timestamp_ms; std::int32_t distance_mm;}"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "Report{std::int64_t duration_ms; std::int32_t min_distance_mm; std::int32_t max_distance_mm; std::int64_t sample_count;}"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "RunParser"
+         },
+         {
+          "t": "text",
+          "v": ", loading: "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::vector<Sample> parse(std::string_view raw_log) const"
+         },
+         {
+          "t": "text",
+          "v": ", splitting the text on newlines and each line on its comma."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "RunStats"
+         },
+         {
+          "t": "text",
+          "v": ", processing: "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::optional<Report> analyze(std::span<const Sample> samples) const"
+         },
+         {
+          "t": "text",
+          "v": ", returning "
+         },
+         {
+          "t": "code",
+          "v": "std::nullopt"
+         },
+         {
+          "t": "text",
+          "v": " when "
+         },
+         {
+          "t": "code",
+          "v": "samples"
+         },
+         {
+          "t": "text",
+          "v": " is empty rather than reading a first or last element that is not there; otherwise "
+         },
+         {
+          "t": "code",
+          "v": "duration_ms"
+         },
+         {
+          "t": "text",
+          "v": " is the last sample's timestamp minus the first's, and "
+         },
+         {
+          "t": "code",
+          "v": "min_distance_mm"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "max_distance_mm"
+         },
+         {
+          "t": "text",
+          "v": " come from one pass over the samples."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "ReportWriter"
+         },
+         {
+          "t": "text",
+          "v": ", output: "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::string format(const std::optional<Report>& report) const"
+         },
+         {
+          "t": "text",
+          "v": ", returning "
+         },
+         {
+          "t": "code",
+          "v": "\"no samples\""
+         },
+         {
+          "t": "text",
+          "v": " for "
+         },
+         {
+          "t": "code",
+          "v": "std::nullopt"
+         },
+         {
+          "t": "text",
+          "v": " and otherwise one line with the sample count, the duration and the range of distances."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "BenchRunFacade"
+         },
+         {
+          "t": "text",
+          "v": ", holding all three, with the single entry point "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::string summarize(std::string_view raw_log) const"
+         },
+         {
+          "t": "text",
+          "v": " that calls "
+         },
+         {
+          "t": "code",
+          "v": "parse"
+         },
+         {
+          "t": "text",
+          "v": ", then "
+         },
+         {
+          "t": "code",
+          "v": "analyze"
+         },
+         {
+          "t": "text",
+          "v": ", then "
+         },
+         {
+          "t": "code",
+          "v": "format"
+         },
+         {
+          "t": "text",
+          "v": ", in that order."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run this raw log through the facade and print the result: "
+        },
+        {
+         "t": "code",
+         "v": "\"0,1200\\n1000,1180\\n2000,1150\\n3000,1205\\n4000,1140\""
+        },
+        {
+         "t": "text",
+         "v": ". Then summarize an empty log and print that result too. Finally, parse the first log with a "
+        },
+        {
+         "t": "code",
+         "v": "RunParser"
+        },
+        {
+         "t": "text",
+         "v": " and analyze it with a "
+        },
+        {
+         "t": "code",
+         "v": "RunStats"
+        },
+        {
+         "t": "text",
+         "v": " directly, without going through the facade, and print the sample count and the maximum distance from that path."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer three questions in writing. Which three calls does a caller no longer make directly once they call "
+        },
+        {
+         "t": "code",
+         "v": "summarize"
+        },
+        {
+         "t": "text",
+         "v": ", and in what order does the facade make them? "
+        },
+        {
+         "t": "code",
+         "v": "RunParser"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "RunStats"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "ReportWriter"
+        },
+        {
+         "t": "text",
+         "v": " are all still public classes: what does a caller gain, and what do they take on, by calling "
+        },
+        {
+         "t": "code",
+         "v": "RunStats::analyze"
+        },
+        {
+         "t": "text",
+         "v": " directly on samples they parsed themselves? If a second call site needs the "
+        },
+        {
+         "t": "code",
+         "v": "Report"
+        },
+        {
+         "t": "text",
+         "v": " values rather than the formatted line, should "
+        },
+        {
+         "t": "code",
+         "v": "BenchRunFacade"
+        },
+        {
+         "t": "text",
+         "v": " grow a second method, or should its one method change what it returns?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <sstream>\n#include <string>\n#include <vector>\n\nstruct Sample {\n  std::int64_t timestamp_ms;\n  std::int32_t distance_mm;\n};\n\nstruct Report {\n  std::int64_t duration_ms;\n  std::int32_t min_distance_mm;\n  std::int32_t max_distance_mm;\n  std::int64_t sample_count;\n};\n\n// Subsystem 1, loading: text in, samples out. Knows nothing about statistics or formatting.\nclass RunParser {\n public:\n  [[nodiscard]] std::vector<Sample> parse(std::string_view raw_log) const {\n    std::vector<Sample> samples;\n    std::istringstream stream{std::string(raw_log)};\n    std::string line;\n    while (std::getline(stream, line)) {\n      std::istringstream fields{line};\n      std::string timestamp_text;\n      std::string distance_text;\n      std::getline(fields, timestamp_text, ',');\n      std::getline(fields, distance_text, ',');\n      samples.push_back(Sample{.timestamp_ms = std::stoll(timestamp_text), .distance_mm = std::stoi(distance_text)});\n    }\n    return samples;\n  }\n};\n\n// Subsystem 2, processing: samples in, one report out, or nothing when there are no samples.\nclass RunStats {\n public:\n  [[nodiscard]] std::optional<Report> analyze(std::span<const Sample> samples) const {\n    if (samples.empty()) return std::nullopt;\n    std::int32_t min_mm = samples.front().distance_mm;\n    std::int32_t max_mm = samples.front().distance_mm;\n    for (const Sample& sample : samples) {\n      min_mm = std::min(min_mm, sample.distance_mm);\n      max_mm = std::max(max_mm, sample.distance_mm);\n    }\n    return Report{.duration_ms = samples.back().timestamp_ms - samples.front().timestamp_ms,\n                  .min_distance_mm = min_mm,\n                  .max_distance_mm = max_mm,\n                  .sample_count = std::ssize(samples)};\n  }\n};\n\n// Subsystem 3, output: one report in, or nothing, one line out either way.\nclass ReportWriter {\n public:\n  [[nodiscard]] std::string format(const std::optional<Report>& report) const {\n    if (!report) return \"no samples\";\n    return std::format(\"{} samples over {} ms, {} to {} mm\", report->sample_count, report->duration_ms,\n                       report->min_distance_mm, report->max_distance_mm);\n  }\n};\n\n// The facade: one call, three subsystems coordinated in order.\nclass BenchRunFacade {\n public:\n  [[nodiscard]] std::string summarize(std::string_view raw_log) const {\n    const std::vector<Sample> samples = parser_.parse(raw_log);\n    const std::optional<Report> report = stats_.analyze(samples);\n    return writer_.format(report);\n  }\n\n private:\n  RunParser parser_;\n  RunStats stats_;\n  ReportWriter writer_;\n};\n\nint main() {\n  constexpr std::string_view raw_log = \"0,1200\\n1000,1180\\n2000,1150\\n3000,1205\\n4000,1140\";\n\n  const BenchRunFacade facade;\n  std::cout << facade.summarize(raw_log) << '\\n';\n  std::cout << facade.summarize(\"\") << '\\n';\n\n  // A caller who wants the samples themselves, not the formatted line, calls the subsystems directly.\n  const RunParser parser;\n  const RunStats stats;\n  const std::vector<Sample> samples = parser.parse(raw_log);\n  const std::optional<Report> report = stats.analyze(samples);\n  std::cout << std::format(\"parsed {} samples directly, max distance {} mm\\n\", samples.size(),\n                           report->max_distance_mm);\n}"
+      },
+      {
+       "t": "output",
+       "text": "5 samples over 4000 ms, 1140 to 1205 mm\nno samples\nparsed 5 samples directly, max distance 1205 mm"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three answers. A caller who calls "
+        },
+        {
+         "t": "code",
+         "v": "summarize"
+        },
+        {
+         "t": "text",
+         "v": " no longer calls "
+        },
+        {
+         "t": "code",
+         "v": "parse"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "analyze"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "format"
+        },
+        {
+         "t": "text",
+         "v": " themselves, and the facade makes them in exactly that order, load, then process, then write, because each one needs the last one's output, including the empty log, where "
+        },
+        {
+         "t": "code",
+         "v": "analyze"
+        },
+        {
+         "t": "text",
+         "v": " hands "
+        },
+        {
+         "t": "code",
+         "v": "format"
+        },
+        {
+         "t": "text",
+         "v": " nothing to work with rather than a report built from data that was never there. Calling "
+        },
+        {
+         "t": "code",
+         "v": "RunStats::analyze"
+        },
+        {
+         "t": "text",
+         "v": " directly, as the second half of "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " does, gains the "
+        },
+        {
+         "t": "code",
+         "v": "Report"
+        },
+        {
+         "t": "text",
+         "v": " values themselves rather than a formatted string, and takes on the job the facade was doing for free: parsing the log correctly first, calling the two subsystems in the right order, and checking the "
+        },
+        {
+         "t": "code",
+         "v": "std::optional"
+        },
+        {
+         "t": "text",
+         "v": " before reading it, all of which is now the caller's responsibility instead of the facade's. A second call site needing "
+        },
+        {
+         "t": "code",
+         "v": "Report"
+        },
+        {
+         "t": "text",
+         "v": " values should change what "
+        },
+        {
+         "t": "code",
+         "v": "summarize"
+        },
+        {
+         "t": "text",
+         "v": " returns, or add a second method returning the "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<Report>"
+        },
+        {
+         "t": "text",
+         "v": " before formatting, rather than reach around the facade to call "
+        },
+        {
+         "t": "code",
+         "v": "RunStats"
+        },
+        {
+         "t": "text",
+         "v": " directly everywhere it is needed; the facade coordinating fewer steps for one caller is still one method away from the coordination every other caller relies on, while calling the subsystems piecemeal from two places is the same duplication the facade exists to avoid."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "limits",
+   "title": "God-object risk; Facade versus Adapter",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Gamma, Helm, Johnson and Vlissides say plainly, in the same chapter that defines the pattern, that a facade does not stop an application from using the subsystem classes directly if it needs to: hiding them completely is a choice a facade can make, not a guarantee it comes with. Left unmade, that choice lets a caller skip the order the facade exists to enforce:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n\nclass PowerBus {\n public:\n  [[nodiscard]] bool energize() {\n    energized_ = true;\n    return true;\n  }\n  [[nodiscard]] bool energized() const { return energized_; }\n\n private:\n  bool energized_ = false;\n};\n\nclass SensorBus {\n public:\n  explicit SensorBus(const PowerBus& power) : power_(power) {}\n  [[nodiscard]] bool start() {\n    if (!power_.energized()) return false;\n    started_ = true;\n    return true;\n  }\n  [[nodiscard]] bool started() const { return started_; }\n\n private:\n  const PowerBus& power_;\n  bool started_ = false;\n};\n\nclass MotionController {\n public:\n  explicit MotionController(const SensorBus& sensors) : sensors_(sensors) {}\n  [[nodiscard]] bool arm() {\n    if (!sensors_.started()) return false;\n    armed_ = true;\n    return true;\n  }\n  [[nodiscard]] bool armed() const { return armed_; }\n\n private:\n  const SensorBus& sensors_;\n  bool armed_ = false;\n};\n\n// A later sprint added a getter so a calibration tool could reach one subsystem. The order the\n// facade exists to enforce is now something every caller has to remember on their own.\nclass RobotFacade {\n public:\n  RobotFacade() : sensors_(power_), motion_(sensors_) {}\n  [[nodiscard]] bool bring_up() {\n    if (!power_.energize()) return false;\n    if (!sensors_.start()) return false;\n    return motion_.arm();\n  }\n  [[nodiscard]] MotionController& motion() { return motion_; }\n\n private:\n  PowerBus power_;\n  SensorBus sensors_;\n  MotionController motion_;\n};\n\nint main() {\n  RobotFacade facade;\n  std::cout << std::format(\"calibration tool arms the motion controller directly: {}\\n\", facade.motion().arm());\n  std::cout << std::format(\"bring_up(), asked for afterward:                     {}\\n\", facade.bring_up());\n}"
+      },
+      {
+       "t": "output",
+       "text": "calibration tool arms the motion controller directly: false\nbring_up(), asked for afterward:                     true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nothing here is undefined behaviour and nothing warns: "
+        },
+        {
+         "t": "code",
+         "v": "motion()"
+        },
+        {
+         "t": "text",
+         "v": " is a public function returning a public reference, and "
+        },
+        {
+         "t": "code",
+         "v": "arm()"
+        },
+        {
+         "t": "text",
+         "v": " on that reference is exactly as callable as it was before "
+        },
+        {
+         "t": "code",
+         "v": "RobotFacade"
+        },
+        {
+         "t": "text",
+         "v": " existed. The calibration tool's direct call fails, silently, because it skipped power and sensors, and the same call would have failed equally silently in whatever order a future caller tries it in. The getter did not break the facade; it reopened the exact question the facade was written to close."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is slower and never looks like one line doing the damage. "
+        },
+        {
+         "t": "code",
+         "v": "bring_up"
+        },
+        {
+         "t": "text",
+         "v": " is a real need, and so, later, is "
+        },
+        {
+         "t": "code",
+         "v": "shutdown"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "diagnose"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "calibrate"
+        },
+        {
+         "t": "text",
+         "v": ", each added to "
+        },
+        {
+         "t": "code",
+         "v": "RobotFacade"
+        },
+        {
+         "t": "text",
+         "v": " because it already sits in front of the subsystems a new feature happens to need. Every one of those methods is reasonable on its own, and the class that results depends on every subsystem in the process, coordinating everything, doing everything, one method call away from a change in any part of the system. Brown, Malveau, Mowbray and McCormick catalogued this shape in 1998 as the Blob antipattern ("
+        },
+        {
+         "t": "a",
+         "v": "the book",
+         "href": "https://openlibrary.org/books/OL691858M/AntiPatterns"
+        },
+        {
+         "t": "text",
+         "v": "): one class that has taken on so much that everything else around it becomes a passive holder of data the Blob reaches into. The dependency injection topic's own heuristic still applies here without changing a word: a class that needs eight dependencies is a class doing eight things, and a facade is no more exempt from that count than any other class, only slower to notice, because each dependency arrived with a feature that looked like it belonged."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Facade and Adapter answer different questions, and confusing them produces the wrong fix in both directions. Reaching for a facade to solve an adapter's problem gives a coordinating class in front of one object, a wrapper that calls one thing and adds nothing. Reaching for an adapter to solve a facade's problem gives one class inheriting four unrelated interfaces at once, which still compiles, but the moment two of them declare a function with the same name, the two meanings collapse into whatever single override that class provides, or, left unoverridden, an unqualified call to that name is refused as ambiguous until every call site names which interface it means. The question worth asking before writing either is how many things are being wrapped, one adaptee reshaped to fit, or several subsystems coordinated into a sequence a caller should not have to write out by hand."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a facade hides and what it does not have to hide. Give the one-line difference between Facade and Adapter: one-to-one translation against many-to-one coordination. Name the bug a subsystem getter reopens, and why nothing warns about it. Say what turns a facade into a god object, and the heuristic from the dependency injection topic that catches it early. Finish with one sentence on when a facade and an adapter sit in the same design at once."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does a facade coordinate that a single subsystem, on its own, does not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is "
+     },
+     {
+      "t": "code",
+      "v": "RobotFacade::bring_up"
+     },
+     {
+      "t": "text",
+      "v": " shorter to call than "
+     },
+     {
+      "t": "code",
+      "v": "bring_up_by_hand"
+     },
+     {
+      "t": "text",
+      "v": ", and what does the free function need that the facade does not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In one sentence, what is the difference between what Adapter changes and what Facade adds?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does the 1994 catalogue say a facade does not prevent, and what bug does that produce once a subsystem getter exists?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What did the compiler and the sanitizers say about the calibration tool's direct call to "
+     },
+     {
+      "t": "code",
+      "v": "motion().arm()"
+     },
+     {
+      "t": "text",
+      "v": "? Why did nothing warn?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the antipattern a facade turns into once every feature that touches any of its subsystems gets its own method on it, and who catalogued it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which heuristic from an earlier topic also catches a facade that has grown too many dependencies?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give one example of a facade holding an adapter as one of its own subsystems."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: three subsystems with one job each, and a facade whose only public function calls all three in order."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Gamma, Helm, Johnson and Vlissides, Design Patterns, Addison-Wesley 1994: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "structural chapter",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch04.html"
+     },
+     {
+      "t": "text",
+      "v": ", where Facade is defined and its consequences state that it does not prevent an application from using the subsystem classes directly."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Brown, Malveau, Mowbray and McCormick, AntiPatterns, John Wiley and Sons 1998: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://openlibrary.org/books/OL691858M/AntiPatterns"
+     },
+     {
+      "t": "text",
+      "v": ". The Blob, a class that has taken on so much of a system's behaviour that everything around it becomes a passive holder of data."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "I.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-global"
+     },
+     {
+      "t": "text",
+      "v": " on global mutable state and "
+     },
+     {
+      "t": "a",
+      "v": "F.60",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-ptr-ref"
+     },
+     {
+      "t": "text",
+      "v": " on a non-owning reference, both already used by the subsystems above."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::span",
+      "href": "https://en.cppreference.com/cpp/container/span"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::format",
+      "href": "https://en.cppreference.com/cpp/utility/format/format"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

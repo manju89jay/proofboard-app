@@ -1,0 +1,1960 @@
+{
+ "id": "cpp-shutdown-cancellation",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Take 10 minutes, on paper, closed book."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Write the shape of a worker loop that "
+      },
+      {
+       "t": "code",
+       "v": "std::jthread"
+      },
+      {
+       "t": "text",
+       "v": " can stop, and say what the destructor does, in order."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Three threads are asked to stop. One is spinning on a counter, one is blocked in "
+      },
+      {
+       "t": "code",
+       "v": "std::condition_variable::wait"
+      },
+      {
+       "t": "text",
+       "v": ", and one is blocked reading from a socket. Say what happens to each."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A class holds a "
+      },
+      {
+       "t": "code",
+       "v": "std::jthread"
+      },
+      {
+       "t": "text",
+       "v": " that reads a "
+      },
+      {
+       "t": "code",
+       "v": "std::vector"
+      },
+      {
+       "t": "text",
+       "v": " member. Where do you declare the thread, and what goes wrong at the other end of the list?"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Name two things a shutdown has to decide before it can be called clean."
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "The function takes a "
+      },
+      {
+       "t": "code",
+       "v": "std::stop_token"
+      },
+      {
+       "t": "text",
+       "v": " as its first parameter, and every wait in it is a wait the token can end:"
+      }
+     ]
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "void run(std::stop_token stop) {\n  while (!stop.stop_requested()) {\n    // one unit of work, and every blocking call inside takes the token too\n  }\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The destructor calls "
+     },
+     {
+      "t": "code",
+      "v": "request_stop()"
+     },
+     {
+      "t": "text",
+      "v": " and then "
+     },
+     {
+      "t": "code",
+      "v": "join()"
+     },
+     {
+      "t": "text",
+      "v": ", in that order, so it asks and then waits. That is the whole contract: cooperative, which means a worker that never looks at its token is never stopped."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "start": 2,
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "The spinner sees "
+      },
+      {
+       "t": "code",
+       "v": "stop_requested()"
+      },
+      {
+       "t": "text",
+       "v": " on its next turn round the loop and leaves. The one in "
+      },
+      {
+       "t": "code",
+       "v": "std::condition_variable::wait"
+      },
+      {
+       "t": "text",
+       "v": " does not wake at all, because a plain condition variable knows nothing about stop tokens, and the destructor's "
+      },
+      {
+       "t": "code",
+       "v": "join()"
+      },
+      {
+       "t": "text",
+       "v": " then waits for ever; it needs "
+      },
+      {
+       "t": "code",
+       "v": "std::condition_variable_any"
+      },
+      {
+       "t": "text",
+       "v": " with the token-taking overload of "
+      },
+      {
+       "t": "code",
+       "v": "wait"
+      },
+      {
+       "t": "text",
+       "v": ". The one in a socket read does not wake either, and no C++ facility will wake it: cancellation of a blocking system call is the operating system's business, through a timeout on the socket, a self-pipe, or closing the descriptor."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Declare the "
+      },
+      {
+       "t": "code",
+       "v": "std::jthread"
+      },
+      {
+       "t": "text",
+       "v": " last, so that it is the first member destroyed, which stops and joins the thread while everything it reads is still alive. Declared first, it is destroyed last: the vector goes first and the still-running thread reads freed memory."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Any two of: what happens to work already accepted but not started, drain it or drop it; how long the shutdown may take before it gives up; whether a job that is half done is rolled back or left; and who calls stop, given that a worker cannot join itself."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with the loop shape, the destructor's two steps in order, and the three different fates in 2. Missing the condition variable case is a partial pass. Saying that "
+     },
+     {
+      "t": "code",
+      "v": "request_stop"
+     },
+     {
+      "t": "text",
+      "v": " interrupts a blocked thread is a fail: cooperative is the word the whole design turns on."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Cancellation in C++20 is cooperative, and it has three types. A "
+    },
+    {
+     "t": "code",
+     "v": "std::stop_source"
+    },
+    {
+     "t": "text",
+     "v": " owns the request. A "
+    },
+    {
+     "t": "code",
+     "v": "std::stop_token"
+    },
+    {
+     "t": "text",
+     "v": " is a cheap handle on that same shared state, which any number of threads can copy and ask "
+    },
+    {
+     "t": "code",
+     "v": "stop_requested()"
+    },
+    {
+     "t": "text",
+     "v": ". A "
+    },
+    {
+     "t": "code",
+     "v": "std::stop_callback"
+    },
+    {
+     "t": "text",
+     "v": " registers a function that runs the moment the stop is requested, on whichever thread requests it. "
+    },
+    {
+     "t": "code",
+     "v": "std::jthread"
+    },
+    {
+     "t": "text",
+     "v": " has a source built in: its constructor passes a token to a thread function whose first parameter takes one, its "
+    },
+    {
+     "t": "code",
+     "v": "request_stop()"
+    },
+    {
+     "t": "text",
+     "v": " sets it, and its destructor calls "
+    },
+    {
+     "t": "code",
+     "v": "request_stop()"
+    },
+    {
+     "t": "text",
+     "v": " and then "
+    },
+    {
+     "t": "code",
+     "v": "join()"
+    },
+    {
+     "t": "text",
+     "v": "."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is that a thread cannot be killed safely. There is no portable way to stop another thread where it stands, and killing one that holds a mutex or is halfway through a file leaves the program broken. So the standard makes stopping a request the worker agrees to look at, and gives everybody one shared way to express it, instead of the flag each of us used to write."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a shared state with an atomic flag and a list of callbacks. A worker either polls "
+    },
+    {
+     "t": "code",
+     "v": "stop_requested()"
+    },
+    {
+     "t": "text",
+     "v": " between units of work, or it waits on "
+    },
+    {
+     "t": "code",
+     "v": "std::condition_variable_any"
+    },
+    {
+     "t": "text",
+     "v": " with the overload that takes a token, which ends the wait when the request arrives. A plain "
+    },
+    {
+     "t": "code",
+     "v": "std::condition_variable"
+    },
+    {
+     "t": "text",
+     "v": " has no such overload, so a worker blocked in it ignores the request and the "
+    },
+    {
+     "t": "code",
+     "v": "jthread"
+    },
+    {
+     "t": "text",
+     "v": " destructor waits for it for ever; I measured exactly that, and the program had to be killed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that cooperative means what it says. A worker that never checks is never stopped, a blocking system call is not interrupted, and the destructor blocks until the function returns. It also puts the shutdown order in your hands. Because members are destroyed in reverse declaration order, a "
+    },
+    {
+     "t": "code",
+     "v": "jthread"
+    },
+    {
+     "t": "text",
+     "v": " member declared before the data it reads is joined after that data is gone, which is a use-after-free, and AddressSanitizer names it as soon as a test exercises the shutdown. Declare the thread last."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "In the robot this is every node's shutdown: a sensor loop that must finish its current frame, a worker pool that should drain what it has accepted, and a logger that must close its file before the process leaves."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "tokens",
+   "title": "stop_source, stop_token, jthread, condition_variable_any",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A worker, its token, and a callback that fires when somebody asks it to stop:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <latch>\n#include <stop_token>\n#include <thread>\n\nint main() {\n  std::latch running(1);\n  std::int64_t noticed = 0;  // written only by the stop callback, on the thread that requests the stop\n  std::int64_t rounds = 0;   // written only by the worker\n  std::int64_t left_on_request = 0;\n  {\n    std::jthread worker([&running, &noticed, &rounds, &left_on_request](std::stop_token stop) {\n      const std::stop_callback note(stop, [&noticed] { noticed = 1; });\n      running.count_down();\n      for (int k = 0; k < 1000; ++k) ++rounds;  // work that happens whatever the scheduler does\n      while (!stop.stop_requested()) ++rounds;  // then poll until somebody asks it to finish\n      left_on_request = stop.stop_requested() ? 1 : 0;\n    });\n    running.wait();\n    std::cout << std::format(\"worker running, stop possible: {}\\n\", worker.get_stop_token().stop_possible());\n  }  // the jthread destructor calls request_stop() and then join()\n\n  std::cout << std::format(\"the callback ran: {}\\n\", noticed == 1);\n  std::cout << std::format(\"the worker did its first 1000 rounds: {}\\n\", rounds >= 1000);\n  std::cout << std::format(\"it left the loop because the stop was requested: {}\\n\", left_on_request == 1);\n}"
+      },
+      {
+       "t": "output",
+       "text": "worker running, stop possible: true\nthe callback ran: true\nthe worker did its first 1000 rounds: true\nit left the loop because the stop was requested: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every line is a boolean or a count that does not depend on timing, which is the only way a threaded example can carry an output block. "
+        },
+        {
+         "t": "code",
+         "v": "rounds"
+        },
+        {
+         "t": "text",
+         "v": " is printed as \"at least 1000\" because the loop after it runs for as long as the scheduler gives it: the first thousand are guaranteed, the rest are not, and printing the exact total would make the page wrong on a faster machine."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three types divide one job. "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_source"
+        },
+        {
+         "t": "text",
+         "v": " owns the shared state and is the only one that can set it, with "
+        },
+        {
+         "t": "code",
+         "v": "request_stop()"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_token"
+        },
+        {
+         "t": "text",
+         "v": ", which "
+        },
+        {
+         "t": "code",
+         "v": "get_token()"
+        },
+        {
+         "t": "text",
+         "v": " hands out, can be copied freely and can only ask: "
+        },
+        {
+         "t": "code",
+         "v": "stop_requested()"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "stop_possible()"
+        },
+        {
+         "t": "text",
+         "v": ", which is false when no source exists any more so the answer can never change. "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_callback"
+        },
+        {
+         "t": "text",
+         "v": " is a registration: construct one with a token and a function, and the function runs when the request is made. If the request has already happened, it runs in the constructor, on your thread, which means a callback can never be missed. A "
+        },
+        {
+         "t": "code",
+         "v": "stop_callback"
+        },
+        {
+         "t": "text",
+         "v": " unregisters in its destructor, so it must not outlive the work it refers to, and it must not block, because it runs inside "
+        },
+        {
+         "t": "code",
+         "v": "request_stop()"
+        },
+        {
+         "t": "text",
+         "v": " and delays whoever called it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": " ties the knot. It owns a "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_source"
+        },
+        {
+         "t": "text",
+         "v": "; when the callable's first parameter is a "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_token"
+        },
+        {
+         "t": "text",
+         "v": " it passes the token in; "
+        },
+        {
+         "t": "code",
+         "v": "get_stop_token()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "request_stop()"
+        },
+        {
+         "t": "text",
+         "v": " reach the source from outside; and the destructor calls "
+        },
+        {
+         "t": "code",
+         "v": "request_stop()"
+        },
+        {
+         "t": "text",
+         "v": " and then "
+        },
+        {
+         "t": "code",
+         "v": "join()"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/thread/jthread"
+        },
+        {
+         "t": "text",
+         "v": "). The threads topic used that destructor for joining alone. This is the other half of it: the request comes first, so a worker written as a loop over its token ends by itself and the join returns at once."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Cooperative is the word to keep. Nothing here interrupts anything. A worker that never reads its token runs to its own end, and the destructor waits for it. A worker blocked in a call that does not know about tokens stays blocked. Three shapes cover most code:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Between units of work, poll: "
+         },
+         {
+          "t": "code",
+          "v": "while (!stop.stop_requested()) { one_unit(); }"
+         },
+         {
+          "t": "text",
+          "v": ". The granularity of the check is the latency of the shutdown, so a unit of work that takes a second means a shutdown that takes a second."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Waiting on a condition, take the token into the wait: "
+         },
+         {
+          "t": "code",
+          "v": "std::condition_variable_any::wait(lock, stop, pred)"
+         },
+         {
+          "t": "text",
+          "v": ", which the worked example uses, and which returns "
+         },
+         {
+          "t": "code",
+          "v": "pred()"
+         },
+         {
+          "t": "text",
+          "v": " so a queue drains before it stops."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Waiting on something the standard does not cover, a socket or a device, register a "
+         },
+         {
+          "t": "code",
+          "v": "std::stop_callback"
+         },
+         {
+          "t": "text",
+          "v": " that makes that call return: close the descriptor, write a byte into a self-pipe, set a timeout. The callback is the bridge between the C++ request and the operating system's way of waking a blocked call."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two smaller facts. A "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_token"
+        },
+        {
+         "t": "text",
+         "v": " costs an atomic increment to copy and a load to test, which is nothing next to the work it guards. And "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_source"
+        },
+        {
+         "t": "text",
+         "v": " is independent of threads: pass tokens into an algorithm, a state machine or a timer, and they can all be told to wind down by the same request. That is the reason the C++20 design separates the source from the thread rather than putting a flag inside "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " alone."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A driver waits for commands that arrive from another thread. The wait is where a shutdown usually goes wrong, because there is no command to wake it. "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable_any"
+        },
+        {
+         "t": "text",
+         "v": " takes the token into the wait itself:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <condition_variable>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <optional>\n#include <stop_token>\n#include <thread>\n#include <utility>\n\nstruct Command {\n  std::int64_t id = 0;\n};\n\n// One waiting room that a stop token can empty, without a flag of its own.\nclass Inbox {\n public:\n  void send(Command command) {\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      items_.push_back(command);\n    }\n    arrived_.notify_one();\n  }\n\n  // No value only when the stop was requested and nothing is left: the queue drains first.\n  [[nodiscard]] std::optional<Command> take(std::stop_token stop) {\n    std::unique_lock<std::mutex> lock(mutex_);\n    if (!arrived_.wait(lock, stop, [this] { return !items_.empty(); })) return std::nullopt;\n    const Command command = items_.front();\n    items_.pop_front();\n    return command;\n  }\n\n private:\n  std::mutex mutex_;\n  std::condition_variable_any arrived_;  // _any, because only this one takes a stop token\n  std::deque<Command> items_;\n};\n\nint main() {\n  Inbox inbox;\n  std::int64_t received = 0;\n  std::int64_t sum = 0;\n  {\n    std::jthread driver([&inbox, &received, &sum](std::stop_token stop) {\n      while (const std::optional<Command> command = inbox.take(stop)) {\n        ++received;\n        sum += command.value().id;\n      }\n    });\n    inbox.send({.id = 10});\n    inbox.send({.id = 32});\n  }  // ~jthread requests the stop, which ends the wait once the inbox is empty\n\n  std::cout << std::format(\"commands received {}, sum {}\\n\", received, sum);\n}"
+      },
+      {
+       "t": "output",
+       "text": "commands received 2, sum 42"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Both commands arrive even though the stop is requested straight after they are sent, and that is not luck. The standard defines the token-taking wait as a loop that tests the predicate before it tests the token and returns "
+         },
+         {
+          "t": "code",
+          "v": "pred()"
+         },
+         {
+          "t": "text",
+          "v": " at the end, so a stopped wait with items still queued returns true and hands one over ("
+         },
+         {
+          "t": "a",
+          "v": "cppreference",
+          "href": "https://en.cppreference.com/cpp/thread/condition_variable_any/wait"
+         },
+         {
+          "t": "text",
+          "v": "). Draining first is the default, and it is what a command queue wants."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The output is exact rather than a boolean, because the count cannot move: "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " sends exactly two commands before the scope ends, and the loop ends only when the inbox is empty and the stop is set."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "take"
+         },
+         {
+          "t": "text",
+          "v": " returns "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<Command>"
+         },
+         {
+          "t": "text",
+          "v": ", so \"the shop is closed\" is a value the caller can test, and the whole worker is "
+         },
+         {
+          "t": "code",
+          "v": "while (const auto command = inbox.take(stop))"
+         },
+         {
+          "t": "text",
+          "v": ". No flag of the driver's own, no second channel for the shutdown."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "std::condition_variable_any"
+         },
+         {
+          "t": "text",
+          "v": " is a different type from "
+         },
+         {
+          "t": "code",
+          "v": "std::condition_variable"
+         },
+         {
+          "t": "text",
+          "v": ", and it is the one with the overload. It works with any lockable, keeps an internal mutex of its own to make the token integration safe, and costs a little more per wait. Pay it where a wait has to be cancellable."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "Inbox"
+         },
+         {
+          "t": "text",
+          "v": " has no "
+         },
+         {
+          "t": "code",
+          "v": "closed_"
+         },
+         {
+          "t": "text",
+          "v": " flag, unlike the bounded queue two topics ago. The token is the flag, which is the point: one shutdown signal for the whole program, rather than one per data structure."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pool",
+   "title": "Worker pool with clean shutdown",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Build the thing every robot process has: a small pool of threads that run submitted jobs, with two ways to end."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "class WorkerPool"
+         },
+         {
+          "t": "text",
+          "v": ", constructed with a number of workers, a queue capacity and a "
+         },
+         {
+          "t": "code",
+          "v": "std::function<void(Job)>"
+         },
+         {
+          "t": "text",
+          "v": " handler, where "
+         },
+         {
+          "t": "code",
+          "v": "struct Job { std::int64_t id = 0; };"
+         },
+         {
+          "t": "text",
+          "v": ". Start the workers in the constructor, each running a loop over its own "
+         },
+         {
+          "t": "code",
+          "v": "std::stop_token"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] bool submit(Job job)"
+         },
+         {
+          "t": "text",
+          "v": " waits for room and returns false once the pool is closed, exactly as the bounded queue did."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "void close_and_drain()"
+         },
+         {
+          "t": "text",
+          "v": " stops accepting, lets the workers finish everything already queued, and joins them."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "void cancel()"
+         },
+         {
+          "t": "text",
+          "v": " requests a stop on every worker, discards what is still queued and counts it, and joins. The destructor calls it, and calling it twice must be harmless."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::int64_t done() const"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::int64_t dropped() const"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then prove both endings in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", with four workers and a capacity of eight. Submit 2000 jobs and "
+        },
+        {
+         "t": "code",
+         "v": "close_and_drain()"
+        },
+        {
+         "t": "text",
+         "v": ": print the totals and check that every job ran exactly once, by collecting the ids the handler saw and comparing the sorted list against 0 to 1999. Then submit 2000 jobs to a second pool and "
+        },
+        {
+         "t": "code",
+         "v": "cancel()"
+        },
+        {
+         "t": "text",
+         "v": " it: print how many were accepted and check that every accepted job either ran or was dropped, with nothing unaccounted for."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Print only totals and invariants, never a per-worker count. Use "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable_any"
+        },
+        {
+         "t": "text",
+         "v": " so a waiting worker can be stopped, and declare the workers last."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <condition_variable>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <mutex>\n#include <numeric>\n#include <optional>\n#include <ranges>\n#include <stop_token>\n#include <thread>\n#include <utility>\n#include <vector>\n\nstruct Job {\n  std::int64_t id = 0;\n};\n\n// A bounded queue of jobs and the threads that run them. Shutdown comes in two flavours:\n// close_and_drain() finishes what was accepted, and cancel() stops and discards the rest.\nclass WorkerPool {\n public:\n  using Handler = std::function<void(Job)>;\n\n  WorkerPool(std::ptrdiff_t workers, std::ptrdiff_t capacity, Handler handler)\n      : capacity_(capacity), handler_(std::move(handler)) {\n    workers_.reserve(workers);\n    for (std::ptrdiff_t i = 0; i < workers; ++i) {\n      workers_.emplace_back([this](std::stop_token stop) { run(stop); });\n    }\n  }\n\n  WorkerPool(const WorkerPool&) = delete;\n  WorkerPool& operator=(const WorkerPool&) = delete;\n  WorkerPool(WorkerPool&&) = delete;\n  WorkerPool& operator=(WorkerPool&&) = delete;\n\n  ~WorkerPool() { cancel(); }\n\n  // Stop the workers where they are, discard what nobody will run, and join. Calling it twice is harmless.\n  void cancel() {\n    for (std::jthread& worker : workers_) worker.request_stop();\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      closed_ = true;\n      dropped_ += std::ssize(jobs_);\n      jobs_.clear();\n    }\n    has_job_.notify_all();\n    has_room_.notify_all();\n    for (std::jthread& worker : workers_) {\n      if (worker.joinable()) worker.join();\n    }\n  }\n\n  // False once the pool is closed; otherwise it waits for room.\n  [[nodiscard]] bool submit(Job job) {\n    {\n      std::unique_lock<std::mutex> lock(mutex_);\n      has_room_.wait(lock, [this] { return closed_ || std::ssize(jobs_) < capacity_; });\n      if (closed_) return false;\n      jobs_.push_back(job);\n    }\n    has_job_.notify_one();\n    return true;\n  }\n\n  // Stop accepting, let the workers finish the queue, then join them.\n  void close_and_drain() {\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      closed_ = true;\n    }\n    has_job_.notify_all();\n    has_room_.notify_all();\n    for (std::jthread& worker : workers_) {\n      if (worker.joinable()) worker.join();\n    }\n  }\n\n  [[nodiscard]] std::int64_t done() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return done_;\n  }\n  [[nodiscard]] std::int64_t dropped() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return dropped_;\n  }\n\n private:\n  void run(std::stop_token stop) {\n    while (true) {\n      std::optional<Job> job;\n      {\n        std::unique_lock<std::mutex> lock(mutex_);\n        has_job_.wait(lock, stop, [this] { return closed_ || !jobs_.empty(); });\n        if (jobs_.empty()) return;          // closed and drained, or stopped with nothing left\n        if (stop.stop_requested()) return;  // stopped with work left: cancel() counts it as dropped\n        job = jobs_.front();\n        jobs_.pop_front();\n      }\n      has_room_.notify_one();\n      handler_(job.value());\n      const std::lock_guard<std::mutex> lock(mutex_);\n      ++done_;\n    }\n  }\n\n  mutable std::mutex mutex_;\n  std::condition_variable_any has_job_;  // _any: this one waits with a stop token\n  std::condition_variable_any has_room_;\n  std::deque<Job> jobs_;\n  std::ptrdiff_t capacity_ = 0;\n  bool closed_ = false;\n  std::int64_t done_ = 0;\n  std::int64_t dropped_ = 0;\n  Handler handler_;\n  std::vector<std::jthread> workers_;  // declared last: stopped and joined before anything above it goes\n};\n\nint main() {\n  constexpr std::ptrdiff_t kWorkers = 4;\n  constexpr std::ptrdiff_t kCapacity = 8;\n  constexpr std::int64_t kJobs = 2000;\n\n  // Draining: every accepted job runs.\n  std::mutex seen_mutex;\n  std::vector<std::int64_t> seen;\n  {\n    WorkerPool pool(kWorkers, kCapacity, [&seen_mutex, &seen](Job job) {\n      const std::lock_guard<std::mutex> lock(seen_mutex);\n      seen.push_back(job.id);\n    });\n    for (std::int64_t id = 0; id < kJobs; ++id) {\n      if (!pool.submit({.id = id})) break;\n    }\n    pool.close_and_drain();\n    std::cout << std::format(\"drain: {} submitted, {} done, {} dropped\\n\", kJobs, pool.done(), pool.dropped());\n  }\n  std::ranges::sort(seen);\n  std::vector<std::int64_t> wanted(kJobs);\n  std::iota(wanted.begin(), wanted.end(), 0);\n  std::cout << std::format(\"drain: every job ran exactly once: {}\\n\", seen == wanted);\n\n  // Discarding: the pool is cancelled, and nothing is left unaccounted for.\n  std::int64_t accepted = 0;\n  std::int64_t ran = 0;\n  std::int64_t dropped = 0;\n  {\n    WorkerPool pool(kWorkers, kCapacity, [](Job) {});\n    for (std::int64_t id = 0; id < kJobs; ++id) {\n      if (pool.submit({.id = id})) ++accepted;\n    }\n    pool.cancel();  // what the destructor does, called here so the counters can be read afterwards\n    ran = pool.done();\n    dropped = pool.dropped();\n  }\n  std::cout << std::format(\"discard: {} accepted, every one of them either ran or was dropped: {}\\n\", accepted,\n                           accepted == ran + dropped);\n}"
+      },
+      {
+       "t": "output",
+       "text": "drain: 2000 submitted, 2000 done, 0 dropped\ndrain: every job ran exactly once: true\ndiscard: 2000 accepted, every one of them either ran or was dropped: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two endings differ in one line each, and both are exact. "
+        },
+        {
+         "t": "code",
+         "v": "close_and_drain"
+        },
+        {
+         "t": "text",
+         "v": " sets the flag and joins: the workers' predicate is "
+        },
+        {
+         "t": "code",
+         "v": "closed_ || !jobs_.empty()"
+        },
+        {
+         "t": "text",
+         "v": ", so they keep taking jobs while any are left and return when the queue is empty, which is why 2000 submitted gives 2000 done and nothing dropped. "
+        },
+        {
+         "t": "code",
+         "v": "cancel"
+        },
+        {
+         "t": "text",
+         "v": " requests a stop first, so a worker that reaches the token check with work still queued returns, and the count of what it left behind is taken under the same lock that clears the queue."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "accepted == ran + dropped"
+        },
+        {
+         "t": "text",
+         "v": " is the invariant worth testing, and it holds because of where the token check sits. The worker tests "
+        },
+        {
+         "t": "code",
+         "v": "stop_requested()"
+        },
+        {
+         "t": "text",
+         "v": " after it knows the queue is not empty and before it takes a job, both under the lock, so there is no instant in which a job has been taken off the queue and is neither counted as done nor still there to be dropped. Move that check one line down, after the "
+        },
+        {
+         "t": "code",
+         "v": "pop_front"
+        },
+        {
+         "t": "text",
+         "v": ", and the invariant breaks in a way no run in a hundred would show you."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The order in "
+        },
+        {
+         "t": "code",
+         "v": "cancel"
+        },
+        {
+         "t": "text",
+         "v": " matters as much. Requesting the stop first wakes the workers waiting in "
+        },
+        {
+         "t": "code",
+         "v": "has_job_.wait"
+        },
+        {
+         "t": "text",
+         "v": ", and clearing the queue under the lock happens before the joins, so a worker cannot pick up a job that is about to be counted as dropped. "
+        },
+        {
+         "t": "code",
+         "v": "notify_all"
+        },
+        {
+         "t": "text",
+         "v": " on both condition variables covers a producer blocked in "
+        },
+        {
+         "t": "code",
+         "v": "submit"
+        },
+        {
+         "t": "text",
+         "v": " on a full queue: its predicate mentions "
+        },
+        {
+         "t": "code",
+         "v": "closed_"
+        },
+        {
+         "t": "text",
+         "v": ", so it wakes and returns false."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What the pool does not do is bound the shutdown. "
+        },
+        {
+         "t": "code",
+         "v": "close_and_drain"
+        },
+        {
+         "t": "text",
+         "v": " waits as long as the queue takes, and a handler that blocks for a minute makes a shutdown that takes a minute. The usual production shape is both: call "
+        },
+        {
+         "t": "code",
+         "v": "close_and_drain"
+        },
+        {
+         "t": "text",
+         "v": " from a thread that also starts a timer, and if the timer fires first, call "
+        },
+        {
+         "t": "code",
+         "v": "cancel"
+        },
+        {
+         "t": "text",
+         "v": ". Say that in an interview and you have answered the question behind the question."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four small decisions in the code are worth copying. "
+        },
+        {
+         "t": "code",
+         "v": "submit"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]]"
+        },
+        {
+         "t": "text",
+         "v": ", because ignoring \"the pool is closed\" loses work silently. The handler is a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " given at construction, so the pool knows nothing about the job, and a test can count calls. The copy and move operations are deleted, because the workers hold "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": ". And "
+        },
+        {
+         "t": "code",
+         "v": "workers_"
+        },
+        {
+         "t": "text",
+         "v": " is declared last, which the failure step is about."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pitfalls",
+   "title": "Destruction order; detached threads outliving their data",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first failure is a wait that no stop can reach. This worker takes a token, and blocks in a "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable"
+        },
+        {
+         "t": "text",
+         "v": " that has never heard of one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "std::jthread worker([&mutex, &cv, &ready](std::stop_token stop) {\n  std::unique_lock<std::mutex> lock(mutex);\n  // std::condition_variable has no overload that takes a token, so no stop can reach this wait.\n  cv.wait(lock, [&ready] { return ready; });\n  std::cout << std::format(\"worker woke, stop requested {}\n\", stop.stop_requested());\n});"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In a program whose "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " starts that worker, prints a line and lets the scope end, it compiles cleanly, takes a stop token, and hangs. The destructor sets the flag and then joins a thread that will never look at it, because it is asleep in a wait that only a notification can end:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-sanitize-recover=all \\\n    stuck_worker.cpp -o stuck_worker\ntimeout 5 ./stuck_worker; echo \"exit code: $?\""
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "main is done, the jthread destructor will ask it to stop\nexit code: 124"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three runs, three kills by "
+        },
+        {
+         "t": "code",
+         "v": "timeout"
+        },
+        {
+         "t": "text",
+         "v": " at five seconds. The fix is one word in the type, "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable_any"
+        },
+        {
+         "t": "text",
+         "v": ", plus the token in the wait, as the worked example has it. This is the failure that makes people think stop tokens do not work: everything about the code looks cancellable, and the one line that matters is the type of the condition variable."
+        }
+       ]
+      },
+      {
+       "t": "note",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run it under a terminal rather than a pipe to see that first line. "
+        },
+        {
+         "t": "code",
+         "v": "std::cout"
+        },
+        {
+         "t": "text",
+         "v": " is fully buffered to a pipe, and "
+        },
+        {
+         "t": "code",
+         "v": "timeout"
+        },
+        {
+         "t": "text",
+         "v": " kills the process without flushing it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is the one this topic exists for. Members are destroyed in reverse declaration order, so a "
+        },
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": " declared first is destroyed last, after every member it reads:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <latch>\n#include <stop_token>\n#include <thread>\n#include <vector>\n\n// Releases the worker as it is destroyed, and waits for it to touch the samples one last time.\nstruct Gate {\n  std::latch go{1};\n  std::latch done{1};\n  ~Gate() {\n    go.count_down();\n    done.wait();\n  }\n};\n\nclass Monitor {\n public:\n  Monitor() {\n    worker_ = std::jthread([this](std::stop_token stop) { run(stop); });\n  }\n\n private:\n  void run(std::stop_token stop) {\n    gate_.go.wait();  // pinned to the moment the members are being destroyed\n    if (!stop.stop_requested()) total_ += static_cast<std::int64_t>(samples_.front());\n    gate_.done.count_down();\n  }\n\n  std::jthread worker_;  // wrong: declared first, so it is destroyed last, after the data it reads\n  Gate gate_;\n  std::vector<int> samples_ = std::vector<int>(1000, 7);\n  std::int64_t total_ = 0;\n};\n\nint main() {\n  { Monitor monitor; }\n  std::cout << \"monitor gone\\n\";\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports "
+        },
+        {
+         "t": "code",
+         "v": "heap-use-after-free"
+        },
+        {
+         "t": "text",
+         "v": " on a "
+        },
+        {
+         "t": "code",
+         "v": "READ of size 4"
+        },
+        {
+         "t": "text",
+         "v": " inside "
+        },
+        {
+         "t": "code",
+         "v": "Monitor::run"
+        },
+        {
+         "t": "text",
+         "v": ", on every run. The "
+        },
+        {
+         "t": "code",
+         "v": "Gate"
+        },
+        {
+         "t": "text",
+         "v": " is a teaching device and not something to copy: its destructor releases the worker and waits for it, which pins the bug to the instant between "
+        },
+        {
+         "t": "code",
+         "v": "samples_"
+        },
+        {
+         "t": "text",
+         "v": " being destroyed and "
+        },
+        {
+         "t": "code",
+         "v": "worker_"
+        },
+        {
+         "t": "text",
+         "v": " being joined. Take the gate out and the same bug is a race that fires once in a thousand runs, on the customer's machine, in the shutdown path nobody tests."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the destruction order out of the declarations. "
+        },
+        {
+         "t": "code",
+         "v": "total_"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "samples_"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "gate_"
+        },
+        {
+         "t": "text",
+         "v": ", then "
+        },
+        {
+         "t": "code",
+         "v": "worker_"
+        },
+        {
+         "t": "text",
+         "v": ": the thread is joined last, so it is alive while three members it can reach are destroyed. The stop token does not save it, because the request is part of destroying "
+        },
+        {
+         "t": "code",
+         "v": "worker_"
+        },
+        {
+         "t": "text",
+         "v": ", which happens after the data is gone. That is why the guard "
+        },
+        {
+         "t": "code",
+         "v": "if (!stop.stop_requested())"
+        },
+        {
+         "t": "text",
+         "v": " is still true when the worker reads."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fix is the declaration order, and it costs nothing:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <latch>\n#include <stop_token>\n#include <thread>\n#include <vector>\n\nclass Monitor {\n public:\n  Monitor() {\n    worker_ = std::jthread([this](std::stop_token stop) { run(stop); });\n    running_.wait();  // the constructor returns with the worker already in its loop\n  }\n\n  [[nodiscard]] std::int64_t total() const { return total_; }  // call it after the worker has joined\n\n private:\n  void run(std::stop_token stop) {\n    running_.count_down();\n    while (!stop.stop_requested()) total_ += static_cast<std::int64_t>(samples_.front());\n  }\n\n  std::vector<int> samples_ = std::vector<int>(1000, 7);\n  std::latch running_{1};\n  std::int64_t total_ = 0;\n  std::jthread worker_;  // declared last, so it is stopped and joined before anything it reads is destroyed\n};\n\nint main() {\n  Monitor monitor;\n  // ~Monitor stops and joins the worker first, then destroys samples_.\n  std::cout << \"monitor built and running\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "monitor built and running"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rule is worth stating in one line, because it is the answer to an interview question: a thread member goes last in the class, so it is joined first in the destructor. The same logic explains why the constructor starts the thread in its body rather than in the member initialiser list. Members are constructed in declaration order, so a "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " initialised in the list of a class that declares it last is started after everything else exists, which is also correct; started in the list of a class that declares it first, it would run while the members below it were still uninitialised. Starting it in the body, after all members are built, works whatever the order and says what it means."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third failure gives up on ownership altogether. A detached thread has nothing that can stop it, nothing that can wait for it, and no relationship to the lifetime of anything it touches:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <format>\n#include <iostream>\n#include <thread>\n\nint main() {\n  std::thread logger([] {\n    std::this_thread::sleep_for(std::chrono::seconds(1));\n    std::cout << \"the detached logger finished writing\\n\";  // never reached\n  });\n  logger.detach();\n  std::cout << \"main is leaving while the logger still has a second of work\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "main is leaving while the logger still has a second of work"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second line never appears, because returning from "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " ends the program and takes the detached thread with it, wherever it was. The margin here is a whole second against a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that prints one line and returns, measured at 0.00 seconds of wall clock over three runs, so the output does not depend on how busy the machine is. Had the logger held a lock or been halfway through a file, it would have been stopped there. And had it captured anything by reference from "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", it would have been reading destroyed objects for that whole second, which is the same use-after-free as above with no destructor to blame."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two more shapes to recognise, without a program each. A "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_callback"
+        },
+        {
+         "t": "text",
+         "v": " that blocks, or that takes a mutex the requesting thread already holds, deadlocks inside "
+        },
+        {
+         "t": "code",
+         "v": "request_stop()"
+        },
+        {
+         "t": "text",
+         "v": ", because callbacks run on the requesting thread before the call returns: keep them to setting a flag, closing a descriptor or notifying a condition variable. And a worker that calls "
+        },
+        {
+         "t": "code",
+         "v": "request_stop()"
+        },
+        {
+         "t": "text",
+         "v": " on its own "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " and then waits for itself to join cannot, because a thread cannot join itself; "
+        },
+        {
+         "t": "code",
+         "v": "std::system_error"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "Resource deadlock avoided"
+        },
+        {
+         "t": "text",
+         "v": " is what that mistake reports. Shutdown is always requested from outside the worker."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write six to ten lines from memory and keep them as this topic's proof. Give the three types and what each one does, and say what "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": "'s destructor does in order. Write the worker loop shape, and the three ways to make a wait cancellable: poll between units, "
+        },
+        {
+         "t": "code",
+         "v": "condition_variable_any"
+        },
+        {
+         "t": "text",
+         "v": " with the token, or a "
+        },
+        {
+         "t": "code",
+         "v": "stop_callback"
+        },
+        {
+         "t": "text",
+         "v": " that wakes the operating system's call. Say what cooperative cancellation does not do. Give the two endings a pool needs, drain and discard, and the invariant that proves the second one is honest. Finish with the destruction order rule in one line, and why a detached thread has no shutdown at all."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What are "
+     },
+     {
+      "t": "code",
+      "v": "std::stop_source"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "std::stop_token"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "std::stop_callback"
+     },
+     {
+      "t": "text",
+      "v": ", and which of them can request a stop?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::jthread"
+     },
+     {
+      "t": "text",
+      "v": "'s destructor do, in order, and what does that mean for a worker that ignores its token?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "On which thread does a "
+     },
+     {
+      "t": "code",
+      "v": "std::stop_callback"
+     },
+     {
+      "t": "text",
+      "v": " run, and what must it never do?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Three threads are asked to stop: one polling, one in "
+     },
+     {
+      "t": "code",
+      "v": "std::condition_variable::wait"
+     },
+     {
+      "t": "text",
+      "v": ", one in a socket read. What happens to each?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which overload of which condition variable takes a stop token, and what does it return?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a queue drain before it stops when the wait takes a token?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Where do you declare a "
+     },
+     {
+      "t": "code",
+      "v": "std::jthread"
+     },
+     {
+      "t": "text",
+      "v": " member, and what exactly goes wrong at the other end?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why did the stop token not save the "
+     },
+     {
+      "t": "code",
+      "v": "Monitor"
+     },
+     {
+      "t": "text",
+      "v": " whose thread was declared first?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between "
+     },
+     {
+      "t": "code",
+      "v": "close_and_drain"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "cancel"
+     },
+     {
+      "t": "text",
+      "v": ", and which invariant proves the second one lost nothing?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why can a worker not shut itself down, and what does the library say if it tries?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a worker pool of four threads with both endings and a test that every job ran exactly once."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: Concurrency, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B-Concurrency.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=8rEGu20Uw4g"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "jthread"
+     },
+     {
+      "t": "text",
+      "v": ", stop tokens and what the destructor does."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Concurrency, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_concurrency/back_to_basics_concurrency__arthur_odwyer__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=F6Ipn7gCOsY"
+     },
+     {
+      "t": "text",
+      "v": ". Why a thread must be joined by somebody, and what detaching costs."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "CP.23",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-join"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.24",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detach"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.25",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-joining_thread"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.26",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detached_thread"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "CP.42",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-wait"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "C.47",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-order"
+     },
+     {
+      "t": "text",
+      "v": " on member declaration order."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "stop_token",
+      "href": "https://en.cppreference.com/cpp/thread/stop_token"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "stop_source",
+      "href": "https://en.cppreference.com/cpp/thread/stop_source"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "stop_callback",
+      "href": "https://en.cppreference.com/cpp/thread/stop_callback"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "jthread",
+      "href": "https://en.cppreference.com/cpp/thread/jthread"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "a",
+      "v": "condition_variable_any wait that takes a token",
+      "href": "https://en.cppreference.com/cpp/thread/condition_variable_any/wait"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

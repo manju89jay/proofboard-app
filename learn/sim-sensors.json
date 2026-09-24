@@ -1,0 +1,885 @@
+{
+ "id": "sim-sensors",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The bench's TurtleBot carries a simulated lidar. Name four ways its output differs from the real HLS-LFCD lidar on a real TurtleBot, and for each say whether the difference makes the simulation optimistic or pessimistic about code that consumes the scans. Then say what the pattern across your four answers is. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Four that matter, and there are more:"
+     }
+    ]
+   },
+   {
+    "t": "ul",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Every beam returns a number. A real lidar gets nothing back from a black surface, a wet floor, a mirror, glass, anything past its range, or a wall at a grazing angle, and it reports those as infinity or as a value outside the range limits. The simulated one answers every beam of every scan. Optimistic: code that has never seen a missing return has never handled one."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The noise is zero-mean Gaussian, drawn independently per beam, and does not depend on the range, the angle, the surface or the temperature. A real sensor's error grows with distance, jumps at an edge where one beam straddles two surfaces, and drifts as the device warms up. Optimistic."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The timestamp and the mounting pose are exact. The stamp is the simulated time of the step that produced the scan, with no exposure window, no delay inside the device and no clock offset; the transform from the robot's body to the sensor is whatever the model file says, to the last decimal. On a real robot that transform is a calibration estimate, wrong by millimetres and milliradians, and the stamp's meaning is a question you have to read the datasheet for. Optimistic."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The rate is what the configuration asked for and the sensor never skips a scan for reasons of its own. A real device drops frames when its bus is busy, when it overheats, or when the cable is marginal. Optimistic."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Also worth full marks: no dirt on the lens, no direct sunlight, no interference between two lidars in one room, and no skew from the sensor rotating while the robot moves."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The pattern is the answer. Almost every difference runs the same way: the simulated sensor is cleaner, more complete and more punctual than the real one. A simulation is where code is proven to work under the best conditions it will ever meet, so a pass there is a statement about the code's logic and not about the robot."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with four differences, the right direction for at least three, and the pattern named. Four differences without the pattern is a partial pass. Naming a difference that makes the simulation pessimistic, without being able to say which, is a fail, because the belief that simulation is the hard case is what stops people writing the handling that reality needs."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A simulated sensor is a piece of code that reads the state of the simulated world at some rate and publishes a message shaped like the one a real device would send. For a lidar that means casting a ray for each beam against the collision shapes in the scene, taking the distance to the first thing each ray hits, adding a random error, and publishing the result stamped with the simulator's own time."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is that you cannot develop against a robot you do not have, and you cannot test a failure you are unwilling to cause. The problem it creates is that the model is a small, clean subset of the device. The simulated lidar has no lens to get dirty, no surface it cannot see, no bus that gets busy and no calibration to be wrong, so code that works against it has only been shown to work under conditions better than any it will meet."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism to understand is the rate and the noise. The rate is a period in the configuration, which the simulator turns into whole milliseconds and then rounds again to a step boundary, so asking for 60 Hz can give you 62.5. The noise is Gaussian: a mean, a standard deviation, and optionally a bias drawn once at start-up and a slowly drifting one. Adjacent beams are independent, and the error does not grow with distance, which is the two ways a real lidar's error is not Gaussian at all."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is a false sense of coverage. The usual failure is not that the simulation is wrong but that the question was never asked: nobody wrote the branch for a beam that returns nothing, because in simulation none ever does."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Where you meet it is the scenario that passes every night and the robot that stops dead in a room with a glass partition. The defence is to know which mechanisms your claim depends on, to inject the failure deliberately rather than waiting for it, and to keep the simulator's ground truth for judging the run and never as an input to the robot's own code."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "sensors",
+   "title": "Rate, timestamps, latency, noise, dropouts, calibration, ground truth",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the whole of the bench robot's lidar, line for line from "
+        },
+        {
+         "t": "code",
+         "v": "gz_waffle.sdf.xacro"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "a",
+         "v": "nav2_minimal_turtlebot_simulation 1.3.0",
+         "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/1.3.0/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+        },
+        {
+         "t": "text",
+         "v": ", with the angles, the angular resolution and the always-on and visualize flags cut. The bench's launch leaves the "
+        },
+        {
+         "t": "code",
+         "v": "namespace"
+        },
+        {
+         "t": "text",
+         "v": " argument empty, so the topic comes out as "
+        },
+        {
+         "t": "code",
+         "v": "/scan"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "xml",
+       "tag": "",
+       "expect": "",
+       "text": "<sensor name=\"hls_lfcd_lds\" type=\"gpu_lidar\">\n  <pose>-0.064 0 0.15 0 0 0</pose>\n  <update_rate>5</update_rate>\n  <topic>$(arg namespace)/scan</topic>\n  <frame_id>base_scan</frame_id>\n  <ray>\n    <scan><horizontal><samples>360</samples></horizontal></scan>\n    <range><min>0.00001</min><max>20.0</max><resolution>0.015000</resolution></range>\n    <noise><type>gaussian</type><mean>0.0</mean><stddev>0.01</stddev></noise>\n  </ray>\n</sensor>"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Six numbers, and each of them is a place where the simulation and the device part company."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "The rate"
+        },
+        {
+         "t": "text",
+         "v": " is not the one you asked for. gz-sensors turns the update rate into a period with "
+        },
+        {
+         "t": "code",
+         "v": "duration_cast<std::chrono::milliseconds>(duration<double>(1.0 / rate))"
+        },
+        {
+         "t": "text",
+         "v": " and fires on the first simulation step at or after that period, then advances the period and catches up without queueing anything it missed ("
+        },
+        {
+         "t": "a",
+         "v": "Sensor.cc",
+         "href": "https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/Sensor.cc"
+        },
+        {
+         "t": "text",
+         "v": "). The cast truncates, and the step quantises. This program runs that arithmetic over ten seconds of simulated time for two step sizes:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <vector>\n\n// What gz-sensors does with an update rate, from Sensor.cc: the period between updates is\n// 1 / rate seconds cast to whole milliseconds, which truncates, and a sensor fires on the first\n// simulation step at or after that period, then catches up without queueing what it missed.\nstruct Delivery {\n  std::int64_t period_ms;    // the whole milliseconds the cast leaves\n  std::int64_t gaps;         // how many gaps between firings the window held\n  std::int64_t spanned_ms;   // from the first firing to the last\n  std::int64_t shortest_ms;  // the shortest gap between two firings\n  std::int64_t longest_ms;   // the longest\n};\n\n[[nodiscard]] Delivery deliver(double requested_hz, std::int64_t step_ms, std::int64_t window_ms) {\n  const std::int64_t period_ms = static_cast<std::int64_t>(1000.0 / requested_hz);  // the truncating cast\n  Delivery result{\n      .period_ms = period_ms, .gaps = 0, .spanned_ms = 0, .shortest_ms = window_ms, .longest_ms = 0};\n  std::int64_t next_ms = 0;\n  std::int64_t first_fire_ms = -1;\n  std::int64_t last_fire_ms = -1;\n  for (std::int64_t now_ms = 0; now_ms < window_ms; now_ms += step_ms) {\n    if (now_ms < next_ms) continue;\n    if (last_fire_ms >= 0) {\n      const std::int64_t gap = now_ms - last_fire_ms;\n      result.shortest_ms = std::min(result.shortest_ms, gap);\n      result.longest_ms = std::max(result.longest_ms, gap);\n      ++result.gaps;\n    } else {\n      first_fire_ms = now_ms;\n    }\n    last_fire_ms = now_ms;\n    next_ms += period_ms;\n    while (next_ms <= now_ms) next_ms += period_ms;  // catch up, as Sensor.cc does\n  }\n  result.spanned_ms = last_fire_ms - first_fire_ms;\n  return result;\n}\n\nint main() {\n  constexpr std::int64_t window_ms = 10'000;  // ten seconds of simulated time\n  std::cout << std::format(\"{:>9} {:>4} {:>8} {:>10} {:>8} {:>8} {:>8}\\n\", \"asked Hz\", \"step\", \"period\",\n                           \"delivered\", \"error\", \"shortest\", \"longest\");\n  for (const std::int64_t step_ms : std::vector<std::int64_t>{1, 4}) {\n    for (const double asked_hz : {5.0, 10.0, 15.0, 30.0, 50.0, 60.0, 300.0}) {\n      const Delivery got = deliver(asked_hz, step_ms, window_ms);\n      const double mean_gap_ms = static_cast<double>(got.spanned_ms) / static_cast<double>(got.gaps);\n      const double delivered_hz = 1000.0 / mean_gap_ms;\n      const double error = 100.0 * (delivered_hz - asked_hz) / asked_hz;\n      std::cout << std::format(\"{:>9.0f} {:>3}ms {:>6}ms {:>8.2f}Hz {:>+7.1f}% {:>6}ms {:>6}ms\\n\", asked_hz,\n                               step_ms, got.period_ms, delivered_hz, error, got.shortest_ms, got.longest_ms);\n    }\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": " asked Hz step   period  delivered    error shortest  longest\n        5   1ms    200ms     5.00Hz    +0.0%    200ms    200ms\n       10   1ms    100ms    10.00Hz    +0.0%    100ms    100ms\n       15   1ms     66ms    15.15Hz    +1.0%     66ms     66ms\n       30   1ms     33ms    30.30Hz    +1.0%     33ms     33ms\n       50   1ms     20ms    50.00Hz    +0.0%     20ms     20ms\n       60   1ms     16ms    62.50Hz    +4.2%     16ms     16ms\n      300   1ms      3ms   333.33Hz   +11.1%      3ms      3ms\n        5   4ms    200ms     5.00Hz    +0.0%    200ms    200ms\n       10   4ms    100ms    10.00Hz    +0.0%    100ms    100ms\n       15   4ms     66ms    15.15Hz    +1.0%     64ms     68ms\n       30   4ms     33ms    30.30Hz    +1.0%     32ms     36ms\n       50   4ms     20ms    50.00Hz    +0.0%     20ms     20ms\n       60   4ms     16ms    62.50Hz    +4.2%     16ms     16ms\n      300   4ms      3ms   250.00Hz   -16.7%      4ms      4ms"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three readings. A rate that divides 1000 exactly, which is 5, 10, 20, 25, 50, 100 and so on, is delivered exactly, and every rate the bench uses is one of those, which is why nobody has noticed. A rate that does not is delivered too fast, by 1% at 30 Hz and by 4.2% at 60: over an hour of simulated time a 60 Hz sensor produces 9,000 scans more than you asked for, and any calculation that multiplies a count by a nominal period is wrong by that much. And asking for a rate faster than the step gives you the step: 300 Hz at a 4 ms step is 250 Hz, because the sensor cannot fire between steps. The rate you get is a property of the step size as much as of the sensor."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "The timestamp"
+        },
+        {
+         "t": "text",
+         "v": " is the simulated time of the step that produced the reading, and that is cleaner than any real device. A real lidar's stamp is the device's own clock, offset from yours by whatever your time synchronisation leaves, and it refers to a moment you have to look up: the start of the sweep, the end, or the middle. The simulated one has no sweep at all, because every beam is cast at the same instant, so a simulated scan taken while the robot turns has no skew and a real one does. Anything that corrects for skew is untested in simulation."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Latency"
+        },
+        {
+         "t": "text",
+         "v": " in simulation is short and has two hops you can name: the sensor publishes inside the simulator's update, and "
+        },
+        {
+         "t": "code",
+         "v": "ros_gz_bridge"
+        },
+        {
+         "t": "text",
+         "v": " subscribes and republishes onto DDS. Neither hop is zero and neither is the device's own pipeline. This machine has no Gazebo, so the page cannot give you the number: measure it yourself as the gap between a message's header stamp and the moment your node receives it, on the node's clock, which is exactly what the bench's "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " node does with a transform. The number matters because every freshness limit in the system has to sit above it, and the bench's own demonstration of getting that wrong is "
+        },
+        {
+         "t": "code",
+         "v": "frame_watch"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "max_age_ms:=5"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "The noise"
+        },
+        {
+         "t": "text",
+         "v": " is more than one number. "
+        },
+        {
+         "t": "code",
+         "v": "GaussianNoiseModel"
+        },
+        {
+         "t": "text",
+         "v": " carries a mean and a standard deviation, a static bias drawn once when the model is loaded, from a normal distribution with its own mean and deviation and then negated with probability one half, and a dynamic bias driven by its own deviation and correlation time ("
+        },
+        {
+         "t": "a",
+         "v": "GaussianNoiseModel.cc",
+         "href": "https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/GaussianNoiseModel.cc"
+        },
+        {
+         "t": "text",
+         "v": "). The lidar creates a noise model at all only when one of those five numbers is non-zero ("
+        },
+        {
+         "t": "a",
+         "v": "Lidar.cc",
+         "href": "https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/Lidar.cc"
+        },
+        {
+         "t": "text",
+         "v": "), so a model file with all zeros gets a perfect sensor rather than a slow one. The bench's lidar sets the deviation to 0.01 m and leaves the biases at zero, so its beams are independent and unbiased."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That static bias is worth one more sentence, because it connects to the previous topic. It is drawn once per run from the simulator's own generator, so two runs of a world with a biased sensor differ from the first reading unless "
+        },
+        {
+         "t": "code",
+         "v": "--seed"
+        },
+        {
+         "t": "text",
+         "v": " is fixed, which is the reproducibility topic's point arriving from a new direction."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What the noise model does not capture is most of what a real sensor's error is made of. The error does not grow with range. Adjacent beams are independent, where a real sensor's neighbouring beams share whatever is wrong with the optics. There is no mixed pixel, the reading a real device produces when one beam straddles the edge of a table and returns a range that is on neither surface. There is no dependence on the surface's colour or angle, no multipath, and no interference between two devices. Adding a larger standard deviation does not stand in for any of these, because they are not random in that shape: a mixed pixel is a systematic error at every edge in the scene."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Dropouts"
+        },
+        {
+         "t": "text",
+         "v": " in simulation come from somewhere other than the sensor. The sensor itself publishes on every period it reaches. What looks like a dropout is one of three things, and they need different fixes: the rendering thread falling behind so that a step finds the previous render unfinished, which the time-stepping topic covered; the middleware discarding messages because a subscription's depth was too small or its reliability was best effort, which the QoS topic covered; or the bridge process not keeping up. None of those is a sensor failure, so none of them exercises the code path a real dropout needs. If you want that path tested, inject it: the bench does this for odometry with "
+        },
+        {
+         "t": "code",
+         "v": "odom_relay"
+        },
+        {
+         "t": "text",
+         "v": "'s "
+        },
+        {
+         "t": "code",
+         "v": "~/drop"
+        },
+        {
+         "t": "text",
+         "v": " service rather than hoping the simulator produces a gap."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Calibration"
+        },
+        {
+         "t": "text",
+         "v": " does not exist here, and its absence is the difference most likely to embarrass you. The transform from "
+        },
+        {
+         "t": "code",
+         "v": "base_link"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "base_scan"
+        },
+        {
+         "t": "text",
+         "v": " is the "
+        },
+        {
+         "t": "code",
+         "v": "<pose>"
+        },
+        {
+         "t": "text",
+         "v": " in the model file, exact to the last digit, and every consumer gets the truth for free. On a real robot that transform is estimated, and a one-degree error in a lidar's mounting puts a wall 35 cm out of place at 20 m. Code that never sees a calibration error never grows the checks that catch one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Ground truth"
+        },
+        {
+         "t": "text",
+         "v": " is the one advantage simulation gives you that is genuinely worth having, and the rule for it is short: ground truth belongs in the judge, never in the robot. Gazebo publishes the true pose of every model, and the temptation is to feed it to the controller so that a test can get past the part that does not work yet. Do that and the scenario stops testing the estimator entirely, and nothing in the verdict says so. The bench keeps the line on the right side: the scenario runner measures what the robot did from "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", upstream of the relay it cuts, so the check sees the robot's motion even when the robot's own input has been taken away, and the controller only ever sees "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "configure",
+   "title": "Configure a sensor's rate and noise and measure it",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes, with Gazebo and ROS 2 Jazzy installed."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Copy the TurtleBot model into a world of your own, change the lidar's "
+         },
+         {
+          "t": "code",
+          "v": "update_rate"
+         },
+         {
+          "t": "text",
+          "v": " to 15 and the noise's "
+         },
+         {
+          "t": "code",
+          "v": "stddev"
+         },
+         {
+          "t": "text",
+          "v": " to 0.05, and start the world headless with "
+         },
+         {
+          "t": "code",
+          "v": "gz sim -s -r --seed 1"
+         },
+         {
+          "t": "text",
+          "v": " and the "
+         },
+         {
+          "t": "code",
+          "v": "/scan"
+         },
+         {
+          "t": "text",
+          "v": " topic bridged."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Before you measure anything, predict the delivered rate from the arithmetic above, for a 1 ms step. Then measure it two ways: "
+         },
+         {
+          "t": "code",
+          "v": "ros2 topic hz /scan"
+         },
+         {
+          "t": "text",
+          "v": " on the ROS side, and, after adding "
+         },
+         {
+          "t": "code",
+          "v": "<enable_metrics>true</enable_metrics>"
+         },
+         {
+          "t": "text",
+          "v": " to the sensor, "
+         },
+         {
+          "t": "code",
+          "v": "gz topic -e -t /scan/performance_metrics"
+         },
+         {
+          "t": "text",
+          "v": ", which reports the nominal, simulated and real update rates. Say why the two numbers can differ."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Measure the noise. Park the robot facing a flat wall, record 200 scans, take one beam near the middle, and compute the standard deviation of its range across the 200. Compare it with the 0.05 you asked for, and say how many samples you would need for the estimate to be worth quoting."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Set the update rate to 300 and predict the delivered rate at a 1 ms step and at a 4 ms step. Then change "
+         },
+         {
+          "t": "code",
+          "v": "max_step_size"
+         },
+         {
+          "t": "text",
+          "v": " to 0.004 and check both."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Answer one question in writing: which of the things you measured could be measured the same way on the real sensor, and which could not, and what that says about what this exercise has told you."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 2. At 15 Hz the period is 1000 / 15 = 66.67 ms, which the cast to whole milliseconds turns into 66, so the sensor fires every 66 ms of simulated time and delivers 15.15 Hz, 1% fast. The two measurements differ because they measure different things. "
+        },
+        {
+         "t": "code",
+         "v": "performance_metrics"
+        },
+        {
+         "t": "text",
+         "v": " reports "
+        },
+        {
+         "t": "code",
+         "v": "sim_update_rate"
+        },
+        {
+         "t": "text",
+         "v": ", computed from the simulated time between two updates inside the sensor, which is the 15.15. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 topic hz"
+        },
+        {
+         "t": "text",
+         "v": " measures arrivals at a subscription in wall time, so it reports 15.15 multiplied by the achieved real-time factor, and it also sees anything the bridge or the QoS dropped. A disagreement between the two is information: the first is what the sensor produced, the second is what your node received, and the gap between them is the transport."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 3. Two hundred samples of a normal distribution give a standard deviation estimate with a relative standard error of about 1 / sqrt(2 × 199), which is 5%, so 0.05 measured as anything from 0.045 to 0.055 is consistent with the setting and you cannot conclude anything finer. If you want 1%, you need about 5,000 samples, which at 15 Hz is five and a half minutes of simulated time. Quoting three decimal places from 200 samples is the mistake to avoid. Two other things will bite: the wall must be far enough away that the beam does not hit the range minimum, and you must take one beam rather than pooling all 360, because beams at different angles hit the wall at different distances and pooling them measures the geometry rather than the noise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4. At 300 Hz the period is 1000 / 300 = 3.33 ms, truncated to 3, so at a 1 ms step the sensor fires every 3 ms and delivers 333.33 Hz, 11% fast. At a 4 ms step it cannot fire more often than once a step, so it fires every step and delivers 250 Hz, 17% slow. The same configuration line produces a 33% spread in rate depending on a number in the world file that has nothing to do with the sensor. Anything that assumes the nominal rate, a buffer sized as rate times seconds, a filter designed for a sample interval, is wrong by that much in one direction or the other."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5. The rate can be measured the same way on the real device, and should be, because a real sensor's rate is also not what the datasheet says. The noise can be measured the same way in form and not in meaning: the procedure of staring at a wall and taking a standard deviation works on both, but on the real sensor the number you get depends on the wall's colour, the distance, the angle and how long the device has been on, so one number does not characterise it. The timestamp accuracy and the mounting transform cannot be measured this way at all on a real robot: both need external equipment, a known target or a motion-capture reference. So the exercise has told you that your pipeline moves data at the right rate with the right shape, and it has told you nothing about whether your robot can see a wall."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give four ways a simulated sensor differs from a real one and say which way each difference runs. Say how gz-sensors turns an update rate into a period, and give one rate that comes out wrong and one that comes out right. Name the four parts of the Gaussian noise model, and say which of a real sensor's errors none of them captures. Say where an apparent dropout in simulation actually comes from, and how the bench injects a real one instead. Give the rule for ground truth in one sentence, and say what the bench does to keep to it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Name four differences between a simulated and a real lidar, and say which direction each one biases your testing."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How does gz-sensors turn an update rate into an update period, and why does 60 Hz come out at 62.5?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a simulated sensor deliver when you ask for 300 Hz at a 4 ms step, and why?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the four parts of the Gaussian noise model, and which one changes between two runs with no seed?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name three errors of a real lidar that no value of the standard deviation reproduces."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A scan goes missing in simulation. Name the three places it can have gone, and say which of them is the sensor."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is the mounting transform exact in simulation, and what does a one-degree error cost at 20 m on a real robot?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "State the rule for ground truth, and say how the bench's scenario runner keeps to it while still measuring the robot."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which two commands give you a simulated sensor's rate, what does each actually measure, and what does a disagreement between them tell you?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page: the procedure for measuring a simulated sensor's noise, with the number of samples your answer needs."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "gz-sensors on the gz-sensors8 branch: "
+     },
+     {
+      "t": "a",
+      "v": "Sensor.cc",
+      "href": "https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/Sensor.cc"
+     },
+     {
+      "t": "text",
+      "v": " for the update period, the cast to whole milliseconds, the catch-up loop and the per-sensor "
+     },
+     {
+      "t": "code",
+      "v": "performance_metrics"
+     },
+     {
+      "t": "text",
+      "v": " topic with its nominal, simulated and real rates; "
+     },
+     {
+      "t": "a",
+      "v": "GaussianNoiseModel.cc",
+      "href": "https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/GaussianNoiseModel.cc"
+     },
+     {
+      "t": "text",
+      "v": " for the mean, the deviation, the static bias drawn once and the dynamic bias; "
+     },
+     {
+      "t": "a",
+      "v": "Lidar.cc",
+      "href": "https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/Lidar.cc"
+     },
+     {
+      "t": "text",
+      "v": " for the one intensity per beam and for the rule that a noise model is built only when one of its five numbers is non-zero."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "gz-sim on the gz-sim8 branch, "
+     },
+     {
+      "t": "a",
+      "v": "Sensors.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/sensors/Sensors.cc"
+     },
+     {
+      "t": "text",
+      "v": ": the rendering thread the sensor updates run on."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot model in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_turtlebot_simulation 1.3.0",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/1.3.0/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+     },
+     {
+      "t": "text",
+      "v": ": the lidar block this page quotes, its 5 Hz rate, its 360 samples and its noise deviation of 0.01 m."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "SDF specification for the sensor element",
+      "href": "https://sdformat.org/spec?ver=1.11&elem=sensor"
+     },
+     {
+      "t": "text",
+      "v": ", for "
+     },
+     {
+      "t": "code",
+      "v": "update_rate"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "enable_metrics"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "code",
+      "v": "noise"
+     },
+     {
+      "t": "text",
+      "v": " element's fields."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "quality of service",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Quality-of-Service-Settings.html"
+     },
+     {
+      "t": "text",
+      "v": ", for the second place a scan can be lost, and "
+     },
+     {
+      "t": "a",
+      "v": "ros_gz_bridge",
+      "href": "https://github.com/gazebosim/ros_gz/tree/jazzy/ros_gz_bridge"
+     },
+     {
+      "t": "text",
+      "v": " for the third."
+     }
+    ]
+   ]
+  }
+ ]
+}

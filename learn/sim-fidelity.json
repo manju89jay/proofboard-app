@@ -1,0 +1,550 @@
+{
+ "id": "sim-fidelity",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The bench's simulation is used for one claim: the supervisor stops the robot within 0.25 m of losing its odometry. Two more questions arrive. How long will the robot's battery last on a shift? And will its lidar see a glass partition? On paper, say for each whether this simulation can answer it and why, then state the general rule in one sentence. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The stopping claim is inside the intended use. It depends on the odometry timeout, the rate the supervisor's loop runs at, the speed the robot was driving and how hard it can brake, and all four are in the model: the first two are parameters of a node the bench wrote, and the last two are in the vehicle's description."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The battery question is outside it, and safely so. Nothing in the world file models current draw, motor efficiency, a battery's capacity or how any of those change with temperature. Ask the simulation and it cannot answer at all, which is the good kind of failure: you notice."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The glass partition is the dangerous one, because the simulation answers confidently and wrongly. The lidar model casts a ray and returns the distance to the first collision surface it meets, so a pane of glass with a collision shape is a wall and a pane without one is not there. Neither is what a real lidar does, which is to return the far surface, or nothing, or a ghost at half the distance. The simulation will report a clean detection or a clean miss, and either way the number is invented."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The rule: a model is valid for a use, not in general, and it is valid for that use when every mechanism the claim depends on is in the model and has been compared with a measurement."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the stopping claim is inside, the battery is outside, and the glass case is identified as answering wrongly rather than not answering. Treating the battery and the glass as the same kind of problem is a partial pass, and it is the one that matters: a question the simulation cannot answer costs you an afternoon, and a question it answers wrongly costs you the robot."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Fidelity is how closely a simulation reproduces the part of reality a particular claim depends on. It is not one number and not a property of the simulator: the same simulation can be high fidelity for one question and worthless for the next, so fidelity is always stated against an intended use."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is knowing when to stop improving a model. Without an intended use, \"is the simulation realistic enough\" has no answer, and teams either polish it forever or ship on a passing test that never exercised the mechanism they cared about. The failure arrives as a scenario that passes every night while the robot fails in a way the model could not represent."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The method has three steps. Write down the claim. List the mechanisms it depends on, and check each one is in the model. Then measure the sensitivity: change each input by a fixed fraction and see how far the answer moves. An input the answer barely moves with does not need an accurate value, and one it moves with a lot must be measured on the real robot before the claim means anything. That turns an argument about realism into a short list of numbers to go and measure."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that the last step needs reality. Sensitivity alone tells you which parameters matter, not whether the model is right, so at least one comparison with a real measurement is what separates a calibrated model from a confident one. Where a comparison is impossible, the honest output is a claim with its limits attached rather than a claim."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Where you meet it is the question of what a passing scenario has proved. On this robot the stopping scenario turns out to be sensitive to the timeout and the drive speed, and barely sensitive to the braking limit, which means it is a test of the supervisor's logic and not of the vehicle's dynamics. That is a useful test and a small one, and saying which it is out loud is the whole skill."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "fidelity",
+   "title": "Intended use, model limits, sensitivity, comparison with measurements",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A simulation is a machine for answering questions, and the first thing to write down is the question. The bench's is one sentence: when odometry stops arriving, the robot comes to rest within 0.25 m and within 1.50 s. Everything about fidelity follows from that sentence and from nothing else."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The method has four parts, and the order matters."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Name the claim, then the mechanisms it rests on."
+        },
+        {
+         "t": "text",
+         "v": " For the stopping claim there are four: the supervisor notices the absence after its odometry timeout, it acts on the next tick of its 20 Hz loop, the robot was travelling at some speed, and it decelerates at some limit. Four mechanisms, four numbers. Anything not on that list is not part of this claim, which is how you decide that the lighting model does not matter here and the wheel-ground friction might."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Check each mechanism against the model."
+        },
+        {
+         "t": "text",
+         "v": " The timeout and the tick are parameters of a node the bench wrote, so they are exactly right by construction: the simulation is not modelling them, it is running them. The drive speed is commanded by the follower and realised by the DiffDrive system, which applies the wheel velocities the kinematics ask for. The deceleration comes from the vehicle's limits in its description. Two of the four mechanisms are the real code and two are model parameters, and that split is worth noticing, because it says most of this claim is not about physics at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Measure the sensitivity."
+        },
+        {
+         "t": "text",
+         "v": " This is the part that converts an argument into work. Move each input and see how far the answer moves. If the answer barely moves, the model's accuracy in that parameter does not matter and you can stop arguing about it. If it moves a lot, that parameter has to be measured on the real robot before the claim means anything. The exercise below does this for all three of the bench's numbers, and the result is more interesting than the method suggests."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Compare with a measurement."
+        },
+        {
+         "t": "text",
+         "v": " Sensitivity tells you which parameters matter; only a real number tells you whether the model is right. For the stopping claim the comparison is a real robot driven at 0.2 m/s with its odometry cable pulled, and a tape measure. One such measurement is worth more than any amount of tuning, because it is the only step in the list that can tell you the model is wrong rather than merely imprecise. This machine has no robot and no simulator, so this page can give you the procedure and not the number, and a page that gave you the number would be the exact failure it is warning about."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is worth being explicit about what is in the bench's model and what is not, because the list is shorter than people assume. In: rigid-body dynamics, contact between the wheels and the ground through a friction model, the differential-drive kinematics, ranges cast against collision geometry, and Gaussian noise on those ranges. Not in: wheel slip on a real floor covering, motor current, thermal limits, a battery, tyre wear, the compliance of the chassis, lens dirt, glass, deformable objects, the real controller's compute time, and the network between two machines. A claim that depends on anything in the second list cannot be answered here at whatever level of detail."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two failure modes sit either side of that boundary. A question the model cannot represent at all usually announces itself: the number is missing, the topic does not exist, nobody can say where the answer would come from. A question the model represents badly does not announce itself, because the simulation produces a plausible number with no marking to say it is uninformed. The lidar and the glass partition from the cold check is the canonical case, and its general form is worth memorising: the dangerous simulations are the ones that answer."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When the simulation and a real measurement disagree, there are exactly three explanations and they should be checked in one order. The scenario differed: the real robot was on a different surface, at a different speed, with a different payload, or the run was not the run you thought. The measurement is wrong: a tape measure has a reading error, a stopwatch has a human in it. The model is wrong. Check them in that order, because the first is the usual answer and the cheapest to rule out, and because rushing to change the model when the scenario differed leaves you with a model tuned to a mistake."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Finally, what fidelity is not. It is not photorealism. A better render changes nothing about a stopping distance, and a world full of beautiful meshes costs you the real-time factor that the performance topic is about. Detail that no claim depends on is detail you are paying for twice."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sensitivity",
+   "title": "Sensitivity of a scenario to one parameter",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bench's missing-odometry scenario asserts that after odometry stops the robot creeps at most 0.25 m and is at rest within 1.50 s. The prediction behind those limits is three inputs: the robot was driving at 0.20 m/s, the supervisor notices after its 250 ms odometry timeout plus one tick of its 20 Hz loop, and the vehicle decelerates at 1 m/s²."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the stopping model in plain C++: distance and time, from those three inputs."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Sweep each input by minus and plus 20% and report, for each, the creep at both ends and the elasticity, which is the fractional change in the creep divided by the fractional change in the input."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "For each input, find the multiple of its nominal value at which the creep reaches the 0.25 m limit. Use bisection so the model needs no algebra."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Say which of the three inputs has to be measured on a real robot before the claim means anything, and which does not."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Say, in two sentences, what the table tells you about what this scenario actually tests."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cmath>\n#include <format>\n#include <iostream>\n#include <string_view>\n#include <vector>\n\n// The arithmetic the bench predicts its stop with: the supervisor notices nothing for the\n// odometry timeout plus one tick of its 20 Hz loop, and the robot then decelerates at the\n// vehicle's braking limit.\nstruct Inputs {\n  double speed_mps;     // what the follower was driving at\n  double detect_s;      // odometry timeout plus one supervisor tick\n  double brake_mps2;    // the vehicle's deceleration limit\n};\n\n[[nodiscard]] double stop_distance_m(Inputs in) {\n  return in.speed_mps * in.detect_s + in.speed_mps * in.speed_mps / (2.0 * in.brake_mps2);\n}\n\n[[nodiscard]] double stop_time_s(Inputs in) { return in.detect_s + in.speed_mps / in.brake_mps2; }\n\n// How far this input has to move, as a multiple of itself, before the stop distance reaches the\n// scenario's creep limit. Found by bisection, so the model needs no algebra to be swept.\n[[nodiscard]] double breaking_multiple(Inputs nominal, int which, double limit_m) {\n  const auto with = [nominal, which](double factor) {\n    Inputs changed = nominal;\n    if (which == 0) changed.speed_mps *= factor;\n    if (which == 1) changed.detect_s *= factor;\n    if (which == 2) changed.brake_mps2 *= factor;\n    return changed;\n  };\n  const bool grows = which != 2;  // a weaker brake means a smaller factor, not a larger one\n  double lo = grows ? 1.0 : 0.0001;\n  double hi = grows ? 1000.0 : 1.0;\n  for (int step = 0; step < 200; ++step) {\n    const double mid = 0.5 * (lo + hi);\n    if ((stop_distance_m(with(mid)) < limit_m) == grows) {\n      lo = mid;\n    } else {\n      hi = mid;\n    }\n  }\n  return 0.5 * (lo + hi);\n}\n\nstruct Row {\n  std::string_view name;\n  int which;\n};\n\nint main() {\n  constexpr Inputs nominal{.speed_mps = 0.20, .detect_s = 0.30, .brake_mps2 = 1.0};\n  constexpr double creep_limit_m = 0.25;   // the scenario's limit on how far it may creep\n  constexpr double rest_limit_s = 1.50;    // and on how long it may take to come to rest\n\n  std::cout << std::format(\"nominal: {:.3f} m of creep and {:.2f} s to rest, against limits of {:.2f} m and {:.2f} s\\n\\n\",\n                           stop_distance_m(nominal), stop_time_s(nominal), creep_limit_m, rest_limit_s);\n\n  std::cout << std::format(\"{:<14} {:>10} {:>10} {:>12} {:>16}\\n\", \"input -20/+20%\", \"creep low\", \"creep high\",\n                           \"elasticity\", \"limit reached at\");\n  for (const Row& row : std::vector<Row>{{.name = \"drive speed\", .which = 0},\n                                         {.name = \"detect time\", .which = 1},\n                                         {.name = \"brake limit\", .which = 2}}) {\n    const auto with = [&row, nominal](double factor) {\n      Inputs changed = nominal;\n      if (row.which == 0) changed.speed_mps *= factor;\n      if (row.which == 1) changed.detect_s *= factor;\n      if (row.which == 2) changed.brake_mps2 *= factor;\n      return changed;\n    };\n    const double low = stop_distance_m(with(0.8));\n    const double high = stop_distance_m(with(1.2));\n    const double base = stop_distance_m(nominal);\n    const double elasticity = ((high - low) / base) / 0.4;  // percent out per percent in\n    std::cout << std::format(\"{:<14} {:>9.4f}m {:>9.4f}m {:>12.2f} {:>15.2f}x\\n\", row.name, low, high, elasticity,\n                             breaking_multiple(nominal, row.which, creep_limit_m));\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "nominal: 0.080 m of creep and 0.50 s to rest, against limits of 0.25 m and 1.50 s\n\ninput -20/+20%  creep low creep high   elasticity limit reached at\ndrive speed       0.0608m    0.1008m         1.25            2.34x\ndetect time       0.0680m    0.0920m         0.75            3.83x\nbrake limit       0.0850m    0.0767m        -0.26            0.11x"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One line of that output is worth reconciling before anything else. The project page for this scenario predicts about 0.53 s, and this model says 0.50, because the two stop at different moments: this one ends when the robot does, and the project page adds up to one odometry period, 33 ms at 30 Hz, for the stop to become visible in "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": ", which is where the check reads it. The creep is the same 8 cm in both, because the robot travels nothing more while the news is in transit."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the elasticity column first. A 1% change in the drive speed moves the creep by 1.25%, a 1% change in the detection time moves it by 0.75%, and a 1% change in the braking limit moves it by 0.26% in the other direction. The braking limit is the one people would have guessed matters most, and it matters least, because at 0.2 m/s the robot only has 0.02 m of braking distance to give: three quarters of the creep is the 0.06 m it travels before anything notices."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now the last column, which is the one to quote in a review. The speed would have to be 2.34 times its nominal value, 0.47 m/s, to reach the limit. The detection time would have to be 3.83 times, which is 1.15 s, or an odometry timeout of about 1.1 s instead of 0.25. And the braking limit would have to fall to 0.11 of its value, 0.11 m/s², a robot that needs nearly two seconds to stop from 0.2 m/s. Those are the three ways this scenario can fail, in order of how plausible they are."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4. The braking limit is the one input in the list that describes the physical robot, and the table says the claim barely depends on it: it would have to be wrong by a factor of nine before the scenario noticed. So it does not need measuring for this claim, which is a useful thing to be able to say, because measuring a deceleration limit properly is a day's work. The drive speed and the detection time both need checking on the real robot, but not by measuring physics: the speed is what the controller commands and can be read from the command topic, and the detection time is the timeout plus a scheduling delay, which is measured the way the executors topic measures lateness. Neither needs a test track."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5. This scenario tests the supervisor's timeout and the plumbing that carries the stop command, and it does not test the vehicle's dynamics. That is worth saying out loud in two directions. It is a good test, because the supervisor is the thing the bench built and the thing most likely to be wrong. And it is a small test, so a passing run is not evidence that the robot stops in 0.25 m: it is evidence that this robot model, driven at this speed, with this timeout, stops in 0.08 m, and that the number has three times the margin the limit allows. The real claim needs one measurement on a real robot, and until somebody makes it, the scenario's honest description is a regression test on the supervisor rather than a statement about stopping distance."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what fidelity is stated against and why it is not a property of the simulator. Give the four steps of the method in order, and say which one needs reality. Name three things in the bench's model and three things that are not in it. Give the two failure modes either side of the model's boundary and say which one is dangerous. Give the three explanations for a disagreement with a measurement, in the order to check them. Finish with what a sensitivity table tells you that a passing run does not."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Why is fidelity stated against an intended use rather than as a property of a simulator?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the four steps of the method, and say which one a sensitivity sweep cannot replace."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A simulation cannot answer a question, and another simulation answers it wrongly. Which is the dangerous one, and why?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "List three mechanisms that are in the bench's model and three that are not."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does an elasticity near zero tell you about a parameter, and what does it let you stop doing?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which of the bench's three stopping inputs matters most, which matters least, and why is that the other way round from most people's guess?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The measured stop is 0.30 m and the simulation predicted 0.08 m. Give the three explanations and the order to check them."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a prettier render not improve a stopping-distance claim, and what does it cost?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the honest one-sentence description of what the bench's missing-odometry scenario proves?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page in 10 minutes: the intended use, the mechanisms and the sensitivity plan for a claim that a robot's lidar detects a 10 cm obstacle at 2 m."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Robert Sargent, "
+     },
+     {
+      "t": "a",
+      "v": "verification and validation of simulation models",
+      "href": "https://www.informs-sim.org/wsc11papers/016.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", Winter Simulation Conference: validity as a property of a model together with its intended use, and the place of a comparison with the real system."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Naomi Oreskes, Kristin Shrader-Frechette and Kenneth Belitz, "
+     },
+     {
+      "t": "a",
+      "v": "verification, validation and confirmation of numerical models",
+      "href": "https://people.exeter.ac.uk/twd203/simulation/OreskesEtAl1994.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", Science 1994: why a model of an open system can be confirmed and not verified, which is the reason a claim carries its limits."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Andrea Saltelli and colleagues, "
+     },
+     {
+      "t": "a",
+      "v": "the primer on global sensitivity analysis",
+      "href": "https://www.andreasaltelli.eu/file/repository/A_Saltelli_Marco_Ratto_Terry_Andres_Francesca_Campolongo_Jessica_Cariboni_Debora_Gatelli_Michaela_Saisana_Stefano_Tarantola_Global_Sensitivity_Analysis_The_Primer_Wiley_Interscience_2008_.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", Wiley 2008: one-at-a-time sweeps, their limits when inputs interact, and what an elasticity does and does not tell you."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The TurtleBot model in "
+     },
+     {
+      "t": "a",
+      "v": "nav2_minimal_turtlebot_simulation 1.3.0",
+      "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/1.3.0/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+     },
+     {
+      "t": "text",
+      "v": ": the DiffDrive limits this page's braking number comes from, and the odometry rate the supervisor's timeout is a multiple of."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "gz-sim on the gz-sim8 branch, "
+     },
+     {
+      "t": "a",
+      "v": "DiffDrive.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/diff_drive/DiffDrive.cc"
+     },
+     {
+      "t": "text",
+      "v": ": what the model does with a velocity command, which is the mechanism behind the drive speed in the sweep."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The Gazebo documentation on "
+     },
+     {
+      "t": "a",
+      "v": "physics",
+      "href": "https://gazebosim.org/api/sim/8/physics.html"
+     },
+     {
+      "t": "text",
+      "v": ", for what the engine does and does not represent."
+     }
+    ]
+   ]
+  }
+ ]
+}

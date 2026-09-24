@@ -1,0 +1,1635 @@
+{
+ "id": "cpp-build-link",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A declared function that is never defined, and a non-"
+     },
+     {
+      "t": "code",
+      "v": "inline"
+     },
+     {
+      "t": "text",
+      "v": " function defined in a header that two "
+     },
+     {
+      "t": "code",
+      "v": ".cpp"
+     },
+     {
+      "t": "text",
+      "v": " files both include, fail at the same stage, for opposite reasons. From memory, write the first as a complete program and let it fail to build, and then explain in writing what the second looks like and why it needs two translation units to happen at all. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "compile-fail",
+    "expect": "undefined reference to",
+    "text": "#include <cstdint>\n\n// Declared, never defined anywhere in this program.\nstd::int32_t battery_percent();\n\nint main() {\n  return battery_percent() > 0 ? 0 : 1;\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "GCC compiles this without a word of complaint, because a declaration is all a call needs to be well formed, and fails only at the link step, where "
+     },
+     {
+      "t": "code",
+      "v": "ld"
+     },
+     {
+      "t": "text",
+      "v": " reports "
+     },
+     {
+      "t": "code",
+      "v": "undefined reference to 'battery_percent()'"
+     },
+     {
+      "t": "text",
+      "v": ": it searched every object file it was given and found no definition to attach that call to."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A multiple definition is the opposite shape and cannot happen in one file. "
+     },
+     {
+      "t": "code",
+      "v": "battery_percent"
+     },
+     {
+      "t": "text",
+      "v": " defined directly in a header, "
+     },
+     {
+      "t": "code",
+      "v": "int32_t battery_percent() { return 87; }"
+     },
+     {
+      "t": "text",
+      "v": ", compiles cleanly on its own. Included into two different "
+     },
+     {
+      "t": "code",
+      "v": ".cpp"
+     },
+     {
+      "t": "text",
+      "v": " files, each one pastes a full copy of that definition into its own translation unit, and each translation unit compiles to an object file that exports its own "
+     },
+     {
+      "t": "code",
+      "v": "battery_percent"
+     },
+     {
+      "t": "text",
+      "v": ". Linking the two together gives the linker two definitions of the same non-"
+     },
+     {
+      "t": "code",
+      "v": "inline"
+     },
+     {
+      "t": "text",
+      "v": " external symbol, and it refuses to guess which one is real."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the program you wrote fails at the link step with exactly this message, not a compiler error, and if the explanation names two separate translation units as the reason a multiple definition needs more than one file. Saying only \"there are two of the same function\" without saying they come from separate "
+     },
+     {
+      "t": "code",
+      "v": ".cpp"
+     },
+     {
+      "t": "text",
+      "v": " files compiling the same header is a partial pass. Confusing either error for a compile error, one that stops before an object file exists, is a fail."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Building a C++ program has two jobs split across two tools. The compiler turns one "
+    },
+    {
+     "t": "code",
+     "v": ".cpp"
+    },
+    {
+     "t": "text",
+     "v": " file, after the preprocessor has pasted in every header it "
+    },
+    {
+     "t": "code",
+     "v": "#include"
+    },
+    {
+     "t": "text",
+     "v": "s, into one object file: this expanded, self-contained unit of source is a "
+    },
+    {
+     "t": "i",
+     "v": "translation unit"
+    },
+    {
+     "t": "text",
+     "v": ", and the compiler only ever sees one at a time. The linker then takes every object file the program needs and produces one executable, resolving every name one translation unit merely declared against the one place some translation unit defined it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem this split creates is that a translation unit calling a function only needs to see its "
+    },
+    {
+     "t": "i",
+     "v": "declaration"
+    },
+    {
+     "t": "text",
+     "v": ", the name and its type; it does not need the "
+    },
+    {
+     "t": "i",
+     "v": "definition"
+    },
+    {
+     "t": "text",
+     "v": ", the body, which may live in another file entirely. That is what makes separate compilation possible at all: change one "
+    },
+    {
+     "t": "code",
+     "v": ".cpp"
+    },
+    {
+     "t": "text",
+     "v": " file and only it needs recompiling, as long as the declarations everyone else saw have not changed. It is also where both of this topic's errors live. A name declared and called but never defined anywhere the linker looks is an "
+    },
+    {
+     "t": "i",
+     "v": "undefined reference"
+    },
+    {
+     "t": "text",
+     "v": ". A name given an ordinary definition in more than one translation unit, most often because that definition sat in a header two "
+    },
+    {
+     "t": "code",
+     "v": ".cpp"
+    },
+    {
+     "t": "text",
+     "v": " files both included, is a "
+    },
+    {
+     "t": "i",
+     "v": "multiple definition"
+    },
+    {
+     "t": "text",
+     "v": ": the one-definition rule allows exactly one, and the linker enforces it for anything without internal or "
+    },
+    {
+     "t": "code",
+     "v": "inline"
+    },
+    {
+     "t": "text",
+     "v": " linkage."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism behind both is the object file's symbol table: every name a translation unit defines is exported from it, and every name it uses but does not define is left for the linker to find, undefined, in some other object file or library. "
+    },
+    {
+     "t": "code",
+     "v": "inline"
+    },
+    {
+     "t": "text",
+     "v": " changes what counts as one definition: the same inline function may be defined in every translation unit that includes its header, because the standard allows it, as long as every copy is token-for-token identical, and the linker keeps exactly one of them."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that a violation the compiler and linker cannot see does not stop the build at all: two translation units defining the same "
+    },
+    {
+     "t": "code",
+     "v": "inline"
+    },
+    {
+     "t": "text",
+     "v": " function differently both compile and link without complaint, and the program runs anyway, wrong in a way that shifts with how hard the compiler was told to optimise."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in every project split across more than one "
+    },
+    {
+     "t": "code",
+     "v": ".cpp"
+    },
+    {
+     "t": "text",
+     "v": " file, and the interview question is exactly the pair a linker actually reports: too few definitions, or too many."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "stages",
+   "title": "Preprocess, compile, link; translation units",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Five lines of source, and four commands, one per stage, on the same tiny program:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <iostream>\n\nint main() {\n  std::cout << \"hi\\n\";\n}"
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "wc -l tiny.cpp                          # 5\ng++ -std=c++20 -E tiny.cpp -o tiny.i    # preprocess only\nwc -l tiny.i                            # 43171\ng++ -std=c++20 -S tiny.cpp -o tiny.s    # compile to assembly\nwc -l tiny.s                            # 63\ng++ -std=c++20 -c tiny.cpp -o tiny.o    # assemble to an object file\nls -la tiny.o                           # 1888 bytes\nnm tiny.o\ng++ -std=c++20 tiny.o -o tiny && ./tiny # link the object file into a program, then run it"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "0000000000000004 r _ZNSt8__detail30__integer_to_chars_is_unsignedIjEE\n0000000000000005 r _ZNSt8__detail30__integer_to_chars_is_unsignedImEE\n0000000000000006 r _ZNSt8__detail30__integer_to_chars_is_unsignedIyEE\n                 U _ZSt21ios_base_library_initv\n                 U _ZSt4cout\n                 U _ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc\n0000000000000000 T main\nhi"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Five lines of source became 43171 lines once the preprocessor finished, almost all of it the transitive contents of "
+        },
+        {
+         "t": "code",
+         "v": "<iostream>"
+        },
+        {
+         "t": "text",
+         "v": " and everything it itself includes, pasted in in full: that expanded text, not the five lines in the file, is the "
+        },
+        {
+         "t": "i",
+         "v": "translation unit"
+        },
+        {
+         "t": "text",
+         "v": " the compiler actually compiles ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference on translation units",
+         "href": "https://en.cppreference.com/cpp/language/translation_phases"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "code",
+         "v": "-E"
+        },
+        {
+         "t": "text",
+         "v": " stops right there and writes it out. "
+        },
+        {
+         "t": "code",
+         "v": "-S"
+        },
+        {
+         "t": "text",
+         "v": " compiles that unit down to 63 lines of assembly, human-readable and specific to one CPU architecture. "
+        },
+        {
+         "t": "code",
+         "v": "-c"
+        },
+        {
+         "t": "text",
+         "v": " assembles the same unit into 1888 bytes of machine code and a symbol table, "
+        },
+        {
+         "t": "code",
+         "v": "tiny.o"
+        },
+        {
+         "t": "text",
+         "v": ", and stops before linking."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "nm"
+        },
+        {
+         "t": "text",
+         "v": " reads that symbol table, and it names exactly the two kinds of entry a translation unit can leave behind. "
+        },
+        {
+         "t": "code",
+         "v": "T main"
+        },
+        {
+         "t": "text",
+         "v": " is "
+        },
+        {
+         "t": "i",
+         "v": "defined"
+        },
+        {
+         "t": "text",
+         "v": " here, in the text section, at a fixed address in this object file. The lines marked "
+        },
+        {
+         "t": "code",
+         "v": "U"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "_ZSt4cout"
+        },
+        {
+         "t": "text",
+         "v": " and the rest, mangled names for "
+        },
+        {
+         "t": "code",
+         "v": "std::cout"
+        },
+        {
+         "t": "text",
+         "v": " and the stream insertion operator, are "
+        },
+        {
+         "t": "i",
+         "v": "declared and used"
+        },
+        {
+         "t": "text",
+         "v": " here but not defined here: this translation unit knows their names and their types well enough to call them, and leaves the question of where their bodies live for later. The last command runs the fourth stage on that object file alone: the linker finds those "
+        },
+        {
+         "t": "code",
+         "v": "U"
+        },
+        {
+         "t": "text",
+         "v": " symbols already built into "
+        },
+        {
+         "t": "code",
+         "v": "libstdc++"
+        },
+        {
+         "t": "text",
+         "v": ", which every "
+        },
+        {
+         "t": "code",
+         "v": "g++"
+        },
+        {
+         "t": "text",
+         "v": " invocation links against by default, produces the executable, and running it prints "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That is the whole shape. A "
+        },
+        {
+         "t": "i",
+         "v": "declaration"
+        },
+        {
+         "t": "text",
+         "v": " introduces a name and its type and may appear as many times as you like, in as many translation units as you like, as long as every one agrees. A "
+        },
+        {
+         "t": "i",
+         "v": "definition"
+        },
+        {
+         "t": "text",
+         "v": " is the one declaration that also supplies the body or the storage, and Ben Saks's "
+        },
+        {
+         "t": "a",
+         "v": "CppCon talk on compiling and linking",
+         "href": "https://www.youtube.com/watch?v=cpkDQaYttR4"
+        },
+        {
+         "t": "text",
+         "v": " walks through exactly this pipeline, one file at a time, to make the point that the compiler's job ends at the object file and the linker's job is only ever to match a "
+        },
+        {
+         "t": "code",
+         "v": "U"
+        },
+        {
+         "t": "text",
+         "v": " in one object file to a "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " in another. Bob Steagall's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on the structure of a program",
+         "href": "https://www.youtube.com/watch?v=3KoXeegncrs"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2020) covers the same ground from the translation unit outward: one program is one or more translation units, compiled independently and linked together, and nothing about that process lets one translation unit see inside another's definitions, only its declarations."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "errors",
+   "title": "Undefined reference and multiple definition; inline and headers",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Build both link errors named in this topic's title, and fix both."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write a program with a function declared, called, and never defined, exactly as the cold check did, and confirm it fails to build with "
+         },
+         {
+          "t": "code",
+          "v": "undefined reference to"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Fix it by adding the definition, and confirm the same program now builds and runs."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "In a scratch directory, write a header "
+         },
+         {
+          "t": "code",
+          "v": "battery.h"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "#pragma once"
+         },
+         {
+          "t": "text",
+          "v": " and a plain, non-"
+         },
+         {
+          "t": "code",
+          "v": "inline"
+         },
+         {
+          "t": "text",
+          "v": " function definition inside it, such as "
+         },
+         {
+          "t": "code",
+          "v": "std::int32_t battery_percent() { return 87; }"
+         },
+         {
+          "t": "text",
+          "v": ". Write two "
+         },
+         {
+          "t": "code",
+          "v": ".cpp"
+         },
+         {
+          "t": "text",
+          "v": " files that both "
+         },
+         {
+          "t": "code",
+          "v": "#include \"battery.h\""
+         },
+         {
+          "t": "text",
+          "v": ": one defining a second function that calls it, the other with "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", also calling it directly. Compile both together in one "
+         },
+         {
+          "t": "code",
+          "v": "g++"
+         },
+         {
+          "t": "text",
+          "v": " command and confirm the link fails with "
+         },
+         {
+          "t": "code",
+          "v": "multiple definition of"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Fix it by marking the header's function "
+         },
+         {
+          "t": "code",
+          "v": "inline"
+         },
+         {
+          "t": "text",
+          "v": ", and confirm the same two files now link and run."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions in writing. Why does step 1's error name only the object file with the call in it, while step 3's error names two object files? Why does adding "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " fix step 3 without moving the definition out of the header at all?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "undefined reference to",
+       "text": "#include <cstdint>\n\nstd::int32_t battery_percent();\n\nint main() {\n  return battery_percent() > 0 ? 0 : 1;\n}"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n\nstd::int32_t battery_percent() { return 87; }  // step 2: the missing definition\n\nint main() {\n  std::cout << std::format(\"{}\\n\", battery_percent());\n}"
+      },
+      {
+       "t": "output",
+       "text": "87"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 3's three files, and the commands that build them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// battery.h\n#pragma once\n#include <cstdint>\nstd::int32_t battery_percent() { return 87; }  // the mistake: a definition, not just a declaration"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// sensor.cpp\n#include \"battery.h\"\nstd::int32_t read_sensor() { return battery_percent(); }"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// main.cpp\n#include <iostream>\n#include \"battery.h\"\nstd::int32_t read_sensor();\nint main() { std::cout << battery_percent() << \" \" << read_sensor() << \"\\n\"; }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Compiling each file to an object first, then linking them explicitly, keeps the transcript free of the compiler's own temporary file names:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -c main.cpp sensor.cpp\ng++ main.o sensor.o -o prog"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is that message, trimmed only of the directory each file's path was compiled from:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "/usr/bin/ld: sensor.o: in function `battery_percent()':\nsensor.cpp:4: multiple definition of `battery_percent()'; main.o:main.cpp:4: first defined here\ncollect2: error: ld returned 1 exit status"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Marking the header's function "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": ", changing nothing else, builds and runs both files:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g main.cpp sensor.cpp -o prog && ./prog"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "87 87"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two answers. Step 1's error names one object file because there is only one: a single "
+        },
+        {
+         "t": "code",
+         "v": ".cpp"
+        },
+        {
+         "t": "text",
+         "v": " file that declares, calls and never defines the function produces one translation unit with one unresolved "
+        },
+        {
+         "t": "code",
+         "v": "U"
+        },
+        {
+         "t": "text",
+         "v": " symbol, and the linker's message is about that one search failing. Step 3's error names two object files because the same non-"
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " definition was compiled twice, once inside "
+        },
+        {
+         "t": "code",
+         "v": "sensor.cpp"
+        },
+        {
+         "t": "text",
+         "v": "'s translation unit and once inside "
+        },
+        {
+         "t": "code",
+         "v": "main.cpp"
+        },
+        {
+         "t": "text",
+         "v": "'s, and both are named because the linker is reporting a conflict between two things it did find, not the absence of one. Adding "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " fixes it without moving anything because "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " changes what the one-definition rule permits, not where the code lives: an inline function may have one identical definition per translation unit that uses it, and the linker, seeing the "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " marker in each object file, keeps exactly one of the (identical) copies instead of treating the second as a conflicting definition of an ordinary external symbol. Core Guidelines "
+        },
+        {
+         "t": "a",
+         "v": "SF.2",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rs-inline"
+        },
+        {
+         "t": "text",
+         "v": " states the rule the mistake broke: a header must not contain object definitions or non-"
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " function definitions, precisely because a header has no way to control how many translation units will paste it in."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "odr",
+   "title": "ODR violations; ABI breaks when a header changes",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The one-definition rule allows an "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " function to be defined once per translation unit, on the condition every copy is identical. Nothing checks that condition, and two headers giving the same inline function two different bodies compile and link without one word of warning:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// battery_a.h\n#pragma once\ninline std::int32_t battery_percent() { return 50; }"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// battery_b.h\n#pragma once\ninline std::int32_t battery_percent() { return 99; }"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// odr_sensor.cpp\n#include \"battery_a.h\"\nstd::int32_t read_sensor() { return battery_percent(); }"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// odr_main.cpp\n#include \"battery_b.h\"\nstd::int32_t read_sensor();\nint main() { std::cout << battery_percent() << \" \" << read_sensor() << \"\\n\"; }"
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -O0 odr_main.cpp odr_sensor.cpp -o odr_prog && ./odr_prog"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "99 99"
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -O0 odr_sensor.cpp odr_main.cpp -o odr_prog && ./odr_prog"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "50 50"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same two files, rebuilt with "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " and nothing else changed, in either order:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -O2 odr_main.cpp odr_sensor.cpp -o odr_prog && ./odr_prog\ng++ -std=c++20 -Wall -Wextra -Werror -g -O2 odr_sensor.cpp odr_main.cpp -o odr_prog && ./odr_prog"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "99 50\n99 50"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every one of these four builds compiles cleanly, links cleanly, and runs without a sanitizer or a warning saying anything: this is undefined behaviour by the standard's own definition of the one-definition rule ("
+        },
+        {
+         "t": "a",
+         "v": "basic.def.odr",
+         "href": "https://eel.is/c++draft/basic.def.odr"
+        },
+        {
+         "t": "text",
+         "v": "), and undefined behaviour is not required to look wrong, or to look the same way twice. At "
+        },
+        {
+         "t": "code",
+         "v": "-O0"
+        },
+        {
+         "t": "text",
+         "v": ", GCC still emits a real, callable, out-of-line copy of "
+        },
+        {
+         "t": "code",
+         "v": "battery_percent"
+        },
+        {
+         "t": "text",
+         "v": " in each object file, marked weak because it came from an "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " function, and the linker's ordinary weak-symbol rule keeps the first one it sees and discards the rest for the whole link: both calls in the program end up reaching that one kept copy, which is why they agree with each other, and why the number that survives is whichever object file was named first on the command line. From "
+        },
+        {
+         "t": "code",
+         "v": "-O1"
+        },
+        {
+         "t": "text",
+         "v": " up, the optimiser inlines the call directly at each call site before a separate copy of the function is ever a question the linker has to settle, so "
+        },
+        {
+         "t": "code",
+         "v": "odr_sensor.cpp"
+        },
+        {
+         "t": "text",
+         "v": "'s call is replaced by the body it saw, "
+        },
+        {
+         "t": "code",
+         "v": "battery_a.h"
+        },
+        {
+         "t": "text",
+         "v": "'s 50, and "
+        },
+        {
+         "t": "code",
+         "v": "odr_main.cpp"
+        },
+        {
+         "t": "text",
+         "v": "'s call by the body it saw, "
+        },
+        {
+         "t": "code",
+         "v": "battery_b.h"
+        },
+        {
+         "t": "text",
+         "v": "'s 99, permanently, and no order of object files on the command line changes either one. Name the optimisation level next to any number this program prints: the exact way the violation shows up, agreeing with itself and swapping with link order, or disagreeing with itself and ignoring link order entirely, is not part of what "
+        },
+        {
+         "t": "code",
+         "v": "-O"
+        },
+        {
+         "t": "text",
+         "v": " is supposed to change, and it changes here because the program was never valid to begin with."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure needs no conflicting text at all, only a header that changed between two builds that were never redone together. A library compiled once, and a caller recompiled later against a header the library never saw:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// point.h, as lib.cpp was built against it\nstruct Point { std::int32_t x_mm; std::int32_t y_mm; };\nstd::int32_t sum_point(Point p);"
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -c lib.cpp -o lib.o   # built once, against the header above"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Widen one field, and rebuild only the caller against the new header, linking against the same "
+        },
+        {
+         "t": "code",
+         "v": "lib.o"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// point.h, after widening y_mm; lib.o was never rebuilt against this\nstruct Point { std::int32_t x_mm; std::int64_t y_mm; };\nstd::int32_t sum_point(Point p);"
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g main.cpp lib.o -o prog && ./prog   # main.cpp: Point{.x_mm=100, .y_mm=200}, prints sum_point(p)"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "100"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Rebuilt together, "
+        },
+        {
+         "t": "code",
+         "v": "100 + 200"
+        },
+        {
+         "t": "text",
+         "v": " prints "
+        },
+        {
+         "t": "code",
+         "v": "300"
+        },
+        {
+         "t": "text",
+         "v": ". Linked against the stale "
+        },
+        {
+         "t": "code",
+         "v": "lib.o"
+        },
+        {
+         "t": "text",
+         "v": ", it prints "
+        },
+        {
+         "t": "code",
+         "v": "100"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "y_mm"
+        },
+        {
+         "t": "text",
+         "v": " moved from byte 4 to byte 8 once it grew from "
+        },
+        {
+         "t": "code",
+         "v": "int32_t"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "int64_t"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "lib.o"
+        },
+        {
+         "t": "text",
+         "v": "'s compiled code still reads four bytes from the old offset, and on this machine's calling convention those bytes are no longer "
+        },
+        {
+         "t": "code",
+         "v": "y_mm"
+        },
+        {
+         "t": "text",
+         "v": " at all. Nothing here is a link error, because the symbol "
+        },
+        {
+         "t": "code",
+         "v": "sum_point"
+        },
+        {
+         "t": "text",
+         "v": " exists on both sides and its mangled name did not change; the "
+        },
+        {
+         "t": "i",
+         "v": "layout"
+        },
+        {
+         "t": "text",
+         "v": " the two sides agree the argument has did change, silently, which is what an "
+        },
+        {
+         "t": "i",
+         "v": "ABI break"
+        },
+        {
+         "t": "text",
+         "v": " is: two separately compiled pieces that still link because their names match, disagreeing about what those names mean in memory. The Itanium C++ ABI ("
+        },
+        {
+         "t": "a",
+         "v": "itanium-cxx-abi.github.io",
+         "href": "https://itanium-cxx-abi.github.io/cxx-abi/abi.html"
+        },
+        {
+         "t": "text",
+         "v": "), which GCC and Clang both implement on Linux, is the specification that fixes struct layout, name mangling and calling convention well enough that separately compiled object files can be linked at all; it says nothing about whether two versions of your own header still agree, because that promise is yours to keep, not the compiler's. A header shipped to other translation units, or across a shared library boundary, keeps that promise only if every consumer is rebuilt whenever it changes, which is why a public C++ library that must stay binary-compatible hides layout changes behind a pointer that never changes size, and recompiles everything else from source."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the four stages from source file to running program and what each one produces. Give the exact difference between a declaration and a definition, and say which one a call needs to compile. Say what an undefined reference means about how many definitions the linker found, and what a multiple definition means about the same count. Explain what "
+        },
+        {
+         "t": "code",
+         "v": "inline"
+        },
+        {
+         "t": "text",
+         "v": " changes about the one-definition rule and why that fixes a multiple definition without moving any code. Finish with the two silent failures: an ODR violation across translation units, and an ABI break from a header that changed without every consumer being rebuilt, and say what a sanitizer or the linker reports for each, which is nothing."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Name the four stages between a "
+     },
+     {
+      "t": "code",
+      "v": ".cpp"
+     },
+     {
+      "t": "text",
+      "v": " file and a running program, and which tool performs which."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is a translation unit, and why is it bigger than the file you wrote?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What must a translation unit see to compile a call to a function it does not define?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "nm"
+     },
+     {
+      "t": "text",
+      "v": " show for a symbol a translation unit defines, and for one it only calls?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What exactly does an undefined-reference error say the linker could not find, and what does a multiple-definition error say it found too many of?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "inline"
+     },
+     {
+      "t": "text",
+      "v": " change about the one-definition rule, and why does that fix the header mistake in this topic without deleting a line?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Two headers give the same inline function two different bodies. What happens at compile time, at link time, and at run time?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why do the two calls in that program agree with each other at "
+     },
+     {
+      "t": "code",
+      "v": "-O0"
+     },
+     {
+      "t": "text",
+      "v": " but disagree with each other at "
+     },
+     {
+      "t": "code",
+      "v": "-O2"
+     },
+     {
+      "t": "text",
+      "v": ", and why does link order matter at one level and not the other?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is an ABI break, and why does a symbol whose name has not changed still let one happen?"
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Ben Saks, Back to Basics: Compiling and Linking, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=cpkDQaYttR4"
+     },
+     {
+      "t": "text",
+      "v": ". The compiler's job ending at the object file, and the linker matching every undefined symbol to exactly one definition."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Bob Steagall, Back to Basics: The Structure of a Program, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_the_structure_of_a_program/back_to_basics_the_structure_of_a_program__bob_steagall__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=3KoXeegncrs"
+     },
+     {
+      "t": "text",
+      "v": ". Translation units, and a program as one or more of them linked together."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "SF.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rs-file-suffix"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "SF.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rs-inline"
+     },
+     {
+      "t": "text",
+      "v": " on a header never holding a non-"
+     },
+     {
+      "t": "code",
+      "v": "inline"
+     },
+     {
+      "t": "text",
+      "v": " definition, "
+     },
+     {
+      "t": "a",
+      "v": "SF.5",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rs-consistency"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "SF.8",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rs-guards"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "SF.11",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rs-contained"
+     },
+     {
+      "t": "text",
+      "v": " on self-contained headers."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The C++ standard on the one-definition rule, "
+     },
+     {
+      "t": "a",
+      "v": "basic.def.odr",
+      "href": "https://eel.is/c++draft/basic.def.odr"
+     },
+     {
+      "t": "text",
+      "v": ", and on "
+     },
+     {
+      "t": "a",
+      "v": "translation phases",
+      "href": "https://eel.is/c++draft/lex.phases"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The Itanium C++ ABI: "
+     },
+     {
+      "t": "a",
+      "v": "itanium-cxx-abi.github.io",
+      "href": "https://itanium-cxx-abi.github.io/cxx-abi/abi.html"
+     },
+     {
+      "t": "text",
+      "v": ", which fixes the struct layout, name mangling and calling convention that let independently compiled object files link at all."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "translation phases",
+      "href": "https://en.cppreference.com/cpp/language/translation_phases"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "definitions and ODR",
+      "href": "https://en.cppreference.com/cpp/language/definition"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "inline specifier",
+      "href": "https://en.cppreference.com/cpp/language/inline"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "GCC 13, "
+     },
+     {
+      "t": "a",
+      "v": "invoking GCC",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc-13.3.0/gcc/Overall-Options.html"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "-E"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "-S"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "-c"
+     },
+     {
+      "t": "text",
+      "v": " for stopping the pipeline after each stage."
+     }
+    ]
+   ]
+  }
+ ]
+}

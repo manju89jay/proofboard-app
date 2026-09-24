@@ -1,0 +1,2508 @@
+{
+ "id": "cpp-atomics-futures",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Take 10 minutes, on paper, closed book. For each of these five, say whether a "
+     },
+     {
+      "t": "code",
+      "v": "std::atomic"
+     },
+     {
+      "t": "text",
+      "v": " is enough, whether you need a mutex, or whether neither is right, with one sentence of reason."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "A counter of messages received, incremented by four subscriber threads and printed once a second by a fifth."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A "
+      },
+      {
+       "t": "code",
+       "v": "bool stop_now"
+      },
+      {
+       "t": "text",
+       "v": " written by a signal handler and read by a control loop."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A pose, "
+      },
+      {
+       "t": "code",
+       "v": "{double x; double y;}"
+      },
+      {
+       "t": "text",
+       "v": ", written by the odometry thread and read whole by the planner."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A cache of loaded maps, read by three threads and added to by any of them."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A pointer to the newest scan, replaced by the sensor thread and read by the planner, where the planner must keep the scan it got for as long as it needs it."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Then define a data race and a race condition in one sentence each, and say which of the two an atomic removes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "An atomic is enough. One "
+      },
+      {
+       "t": "code",
+       "v": "std::atomic<std::int64_t>"
+      },
+      {
+       "t": "text",
+       "v": " with "
+      },
+      {
+       "t": "code",
+       "v": "fetch_add"
+      },
+      {
+       "t": "text",
+       "v": " gives an exact total, because an atomic read-modify-write is indivisible: no two threads can read the same value and both write back the same successor. The reader's "
+      },
+      {
+       "t": "code",
+       "v": "load"
+      },
+      {
+       "t": "text",
+       "v": " sees some value the counter really had."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "An atomic. The standard names two things a handler may touch ("
+      },
+      {
+       "t": "a",
+       "v": "support.signal",
+       "href": "https://eel.is/c++draft/support.signal"
+      },
+      {
+       "t": "text",
+       "v": "): a "
+      },
+      {
+       "t": "code",
+       "v": "volatile std::sig_atomic_t"
+      },
+      {
+       "t": "text",
+       "v": " object, and any atomic operation that is lock-free, which is every type in the table below with "
+      },
+      {
+       "t": "code",
+       "v": "is_always_lock_free"
+      },
+      {
+       "t": "text",
+       "v": " true, "
+      },
+      {
+       "t": "code",
+       "v": "std::atomic<bool>"
+      },
+      {
+       "t": "text",
+       "v": " and "
+      },
+      {
+       "t": "code",
+       "v": "std::atomic<std::int64_t>"
+      },
+      {
+       "t": "text",
+       "v": " alike. "
+      },
+      {
+       "t": "code",
+       "v": "std::atomic_flag"
+      },
+      {
+       "t": "text",
+       "v": " is always lock-free and needs no checking. A plain "
+      },
+      {
+       "t": "code",
+       "v": "bool"
+      },
+      {
+       "t": "text",
+       "v": " is a data race between the handler and the loop."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A mutex, or an atomic of the whole struct if it is lock-free, which on this machine 16 bytes is not. Two atomic "
+      },
+      {
+       "t": "code",
+       "v": "double"
+      },
+      {
+       "t": "text",
+       "v": "s are wrong: each read is exact, but the planner can read "
+      },
+      {
+       "t": "code",
+       "v": "x"
+      },
+      {
+       "t": "text",
+       "v": " from one pose and "
+      },
+      {
+       "t": "code",
+       "v": "y"
+      },
+      {
+       "t": "text",
+       "v": " from the next, which is a pose the robot was never in."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A mutex. The invariant covers a whole container, and inserting rehashes or rebalances it; there is nothing here for one atomic word to protect."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "A mutex around a "
+      },
+      {
+       "t": "code",
+       "v": "std::shared_ptr<const Scan>"
+      },
+      {
+       "t": "text",
+       "v": ", or C++20's "
+      },
+      {
+       "t": "code",
+       "v": "std::atomic<std::shared_ptr<const Scan>>"
+      },
+      {
+       "t": "text",
+       "v": ", which is 16 bytes and not lock-free here but is correct. A raw "
+      },
+      {
+       "t": "code",
+       "v": "std::atomic<Scan*>"
+      },
+      {
+       "t": "text",
+       "v": " is a use-after-free waiting to happen: the planner holds the pointer while the sensor thread frees what it points to."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A "
+     },
+     {
+      "t": "i",
+      "v": "data race"
+     },
+     {
+      "t": "text",
+      "v": " is two threads touching the same memory location with at least one writing and nothing ordering them, which is undefined behaviour. A "
+     },
+     {
+      "t": "i",
+      "v": "race condition"
+     },
+     {
+      "t": "text",
+      "v": " is a program whose result depends on the order two threads happen to run in, which may be perfectly defined and still wrong. Atomics remove data races on the object they cover. They remove no race condition by themselves: the check-then-act at the end of this topic is all atomic and all wrong."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with 1, 2 and 3 right and both definitions. Answering 3 with two atomic doubles is a partial pass if you name the torn pair; without that it is a fail, because it is the mistake this topic is about."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "An atomic is an object the hardware updates in one indivisible step, so no other thread can see it half written and no two threads can lose an update to each other. "
+    },
+    {
+     "t": "code",
+     "v": "std::atomic<T>"
+    },
+    {
+     "t": "text",
+     "v": " gives you "
+    },
+    {
+     "t": "code",
+     "v": "load"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "store"
+    },
+    {
+     "t": "text",
+     "v": " and read-modify-write operations such as "
+    },
+    {
+     "t": "code",
+     "v": "fetch_add"
+    },
+    {
+     "t": "text",
+     "v": ", "
+    },
+    {
+     "t": "code",
+     "v": "exchange"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "compare_exchange_strong"
+    },
+    {
+     "t": "text",
+     "v": ", and "
+    },
+    {
+     "t": "code",
+     "v": "++"
+    },
+    {
+     "t": "text",
+     "v": " on it is one indivisible operation, not the read, add and write a plain "
+    },
+    {
+     "t": "code",
+     "v": "int"
+    },
+    {
+     "t": "text",
+     "v": " compiles to."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is the cost and the reach of a mutex. A mutex protects any invariant of any size, and it costs a system call when contended and blocks whoever loses. An atomic covers one object of one word, needs no waiting at all, and on x86-64 an increment is one instruction, "
+    },
+    {
+     "t": "code",
+     "v": "lock addq"
+    },
+    {
+     "t": "text",
+     "v": ". So a counter, a shutdown flag or a pointer swap wants an atomic; anything that keeps two values in step wants a mutex, because two atomics read one after the other give a pair that never existed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism has two halves, and interviews ask about the second. Atomicity is indivisibility. The "
+    },
+    {
+     "t": "i",
+     "v": "memory order"
+    },
+    {
+     "t": "text",
+     "v": " is what the operation promises about everything else the thread wrote: the default, "
+    },
+    {
+     "t": "code",
+     "v": "seq_cst"
+    },
+    {
+     "t": "text",
+     "v": ", makes every atomic operation in the program agree on one order, while "
+    },
+    {
+     "t": "code",
+     "v": "release"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "acquire"
+    },
+    {
+     "t": "text",
+     "v": " pair one store with one load, so everything written before the store is visible to whoever reads it after the load. On x86-64 with GCC 13 at "
+    },
+    {
+     "t": "code",
+     "v": "-O2"
+    },
+    {
+     "t": "text",
+     "v": " I measured what each order compiles to, and a relaxed store, a release store and every load are one "
+    },
+    {
+     "t": "code",
+     "v": "mov"
+    },
+    {
+     "t": "text",
+     "v": "; only the sequentially consistent store costs an extra instruction, "
+    },
+    {
+     "t": "code",
+     "v": "xchg"
+    },
+    {
+     "t": "text",
+     "v": "."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that atomics are hard to combine. Two atomic steps are not one atomic step, so "
+    },
+    {
+     "t": "code",
+     "v": "if (!claimed) claimed = true;"
+    },
+    {
+     "t": "text",
+     "v": " lets several threads through; the fix is one operation, "
+    },
+    {
+     "t": "code",
+     "v": "exchange"
+    },
+    {
+     "t": "text",
+     "v": " or "
+    },
+    {
+     "t": "code",
+     "v": "compare_exchange_strong"
+    },
+    {
+     "t": "text",
+     "v": ". And an atomic is still a cache line: four counters in one line took 4.5 to 9.9 times longer than the same four given a line each."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "For a result rather than a counter, the one-shot handover is "
+    },
+    {
+     "t": "code",
+     "v": "std::future"
+    },
+    {
+     "t": "text",
+     "v": ": "
+    },
+    {
+     "t": "code",
+     "v": "std::async"
+    },
+    {
+     "t": "text",
+     "v": " or a "
+    },
+    {
+     "t": "code",
+     "v": "std::promise"
+    },
+    {
+     "t": "text",
+     "v": " fills it in, "
+    },
+    {
+     "t": "code",
+     "v": "get()"
+    },
+    {
+     "t": "text",
+     "v": " waits for it and rethrows whatever the worker threw. You meet all of this in the robot: the dropped-message counter, the stop flag, and the calibration a worker computes while the caller waits."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "atomics",
+   "title": "Atomics versus locks; atomic counters",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An atomic is not a keyword that makes a type safe. Whether the hardware can do it in one step depends on the type's size, and the library will tell you:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <atomic>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n\nstruct Pose {\n  double x = 0.0;\n  double y = 0.0;\n};\n\nstruct Reading {\n  std::int32_t value = 0;\n  std::int32_t age = 0;\n};\n\nint main() {\n  std::cout << std::format(\"{:<28} {:>5} {:>6}\\n\", \"type\", \"bytes\", \"free\");\n  std::cout << std::format(\"{:<28} {:>5} {:>6}\\n\", \"atomic_flag\", sizeof(std::atomic_flag), true);\n  std::cout << std::format(\"{:<28} {:>5} {:>6}\\n\", \"atomic<bool>\", sizeof(std::atomic<bool>),\n                           std::atomic<bool>::is_always_lock_free);\n  std::cout << std::format(\"{:<28} {:>5} {:>6}\\n\", \"atomic<int>\", sizeof(std::atomic<int>),\n                           std::atomic<int>::is_always_lock_free);\n  std::cout << std::format(\"{:<28} {:>5} {:>6}\\n\", \"atomic<int64_t>\", sizeof(std::atomic<std::int64_t>),\n                           std::atomic<std::int64_t>::is_always_lock_free);\n  std::cout << std::format(\"{:<28} {:>5} {:>6}\\n\", \"atomic<double>\", sizeof(std::atomic<double>),\n                           std::atomic<double>::is_always_lock_free);\n  std::cout << std::format(\"{:<28} {:>5} {:>6}\\n\", \"atomic<Reading> (two int32)\", sizeof(std::atomic<Reading>),\n                           std::atomic<Reading>::is_always_lock_free);\n  std::cout << std::format(\"{:<28} {:>5} {:>6}\\n\", \"atomic<Pose> (two double)\", sizeof(std::atomic<Pose>),\n                           std::atomic<Pose>::is_always_lock_free);\n  std::cout << std::format(\"{:<28} {:>5} {:>6}\\n\", \"atomic<shared_ptr<Pose>>\",\n                           sizeof(std::atomic<std::shared_ptr<Pose>>),\n                           std::atomic<std::shared_ptr<Pose>>::is_always_lock_free);\n}"
+      },
+      {
+       "t": "output",
+       "text": "type                         bytes   free\natomic_flag                      1   true\natomic<bool>                     1   true\natomic<int>                      4   true\natomic<int64_t>                  8   true\natomic<double>                   8   true\natomic<Reading> (two int32)      8   true\natomic<Pose> (two double)       16  false\natomic<shared_ptr<Pose>>        16  false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Lock-free"
+        },
+        {
+         "t": "text",
+         "v": " means the operation is one hardware instruction sequence that cannot block. Up to eight bytes on this target it is, whatever is inside: two "
+        },
+        {
+         "t": "code",
+         "v": "std::int32_t"
+        },
+        {
+         "t": "text",
+         "v": " in a struct are lock-free because the pair fits in one 64-bit word. At sixteen bytes it is not, and "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic<Pose>"
+        },
+        {
+         "t": "text",
+         "v": " quietly grows a lock inside the library instead. You can tell from outside the program, because the run-time query then needs libatomic, and linking without it fails with "
+        },
+        {
+         "t": "code",
+         "v": "undefined reference to '__atomic_is_lock_free'"
+        },
+        {
+         "t": "text",
+         "v": ". Adding "
+        },
+        {
+         "t": "code",
+         "v": "-latomic"
+        },
+        {
+         "t": "text",
+         "v": " links, and the answer is what "
+        },
+        {
+         "t": "code",
+         "v": "is_always_lock_free"
+        },
+        {
+         "t": "text",
+         "v": " already said: false. "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic<std::shared_ptr<T>>"
+        },
+        {
+         "t": "text",
+         "v": ", new in C++20, is in the same class, and it is still the right way to publish a pointer that readers must keep alive, because it updates the pointer and the count together."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Atomicity is one of two promises. The other is "
+        },
+        {
+         "t": "i",
+         "v": "memory order"
+        },
+        {
+         "t": "text",
+         "v": ", the rule about what the rest of your writes look like to another thread. The default, "
+        },
+        {
+         "t": "code",
+         "v": "std::memory_order_seq_cst"
+        },
+        {
+         "t": "text",
+         "v": ", puts every atomic operation in the program into one order that all threads agree on. "
+        },
+        {
+         "t": "code",
+         "v": "release"
+        },
+        {
+         "t": "text",
+         "v": " on a store and "
+        },
+        {
+         "t": "code",
+         "v": "acquire"
+        },
+        {
+         "t": "text",
+         "v": " on a load make a weaker pair: everything the writer did before the release is visible to whoever reads that value with an acquire, and nothing is promised about unrelated variables. "
+        },
+        {
+         "t": "code",
+         "v": "relaxed"
+        },
+        {
+         "t": "text",
+         "v": " promises atomicity and nothing else, which is right for a counter that nobody synchronises through."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What those words cost depends on the machine, and here is this one. Each of these compiled with GCC 13 at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " on x86-64 and disassembled with "
+        },
+        {
+         "t": "code",
+         "v": "objdump -d"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Operation"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Order"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Instruction"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "flag.store(v, relaxed)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "relaxed"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "mov %rdi,flag(%rip)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "flag.store(v, release)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "release"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "mov %rdi,flag(%rip)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "flag.store(v)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "seq_cst"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "xchg %rdi,flag(%rip)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "flag.load(relaxed)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "relaxed"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "mov flag(%rip),%rax"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "flag.load(acquire)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "acquire"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "mov flag(%rip),%rax"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "flag.load()"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "seq_cst"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "mov flag(%rip),%rax"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "counter.fetch_add(1, relaxed)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "relaxed"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "lock addq $0x1,counter(%rip)"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "counter.fetch_add(1)"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "seq_cst"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "lock addq $0x1,counter(%rip)"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the table twice. Every load is the same instruction whatever you ask for, and so is every read-modify-write: on this processor the ordering you get for free is already almost sequential consistency. The single difference is the sequentially consistent store, which becomes a locked exchange instead of a plain move. So on x86-64 the memory order argument is nearly free, and writing "
+        },
+        {
+         "t": "code",
+         "v": "relaxed"
+        },
+        {
+         "t": "text",
+         "v": " everywhere buys you one instruction on stores while costing you the guarantee that makes your reasoning simple. On ARM, where the hardware reorders more, the same table has a fence in most rows and the choice is worth making. This is why "
+        },
+        {
+         "t": "a",
+         "v": "CP.101",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-distrust"
+        },
+        {
+         "t": "text",
+         "v": " says to distrust your hardware and compiler combination: code that is correct by accident on x86 breaks on the robot's ARM board."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "When is an atomic enough? When the shared thing is one object and every operation on it is one of the atomic operations. A message counter, a sequence number, a shutdown flag, a pointer swapped for another. When is it not? When the invariant spans more than one object, which is the odometry accumulator from the threads topic: three fields that have to move together. Two atomics cannot do that, because between your two loads another thread can change both. "
+        },
+        {
+         "t": "a",
+         "v": "CP.100",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-lockfree"
+        },
+        {
+         "t": "text",
+         "v": " puts it plainly: don't reach for lock-free programming unless you have to, and the reason is that the reasoning gets hard long before the performance gets good."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One more cost, which surprises people who think an atomic is free. An atomic lives in a cache line of 64 bytes, and a line belongs to one core at a time when it is being written. Four counters declared next to each other share one line, so four threads incrementing their own counter still fight over one line, a phenomenon called "
+        },
+        {
+         "t": "i",
+         "v": "false sharing"
+        },
+        {
+         "t": "text",
+         "v": ". The same four, each padded to its own line with "
+        },
+        {
+         "t": "code",
+         "v": "alignas(64)"
+        },
+        {
+         "t": "text",
+         "v": ", do not. Four threads, two million increments each, measured at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "one line 38.2 ms, a line each 8.5 ms, ratio 4.5\none line 90.8 ms, a line each 9.2 ms, ratio 9.9"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Those are two runs of the same binary, and the spread between them is thread placement: which cores the scheduler picks changes how far the line has to travel. The padded version was 8.5 to 9.2 ms in every run, so the variation is all on the shared side. "
+        },
+        {
+         "t": "code",
+         "v": "std::hardware_destructive_interference_size"
+        },
+        {
+         "t": "text",
+         "v": ", which reports 64 here, is the standard's name for the number to pad to ("
+        },
+        {
+         "t": "a",
+         "v": "Per.19",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-access"
+        },
+        {
+         "t": "text",
+         "v": " and the profiling topic have more on cache lines)."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes. Four sensor threads keep statistics that a reporting thread prints. Write a "
+        },
+        {
+         "t": "code",
+         "v": "ScanStats"
+        },
+        {
+         "t": "text",
+         "v": " with no mutex in it at all:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "void record(Scan scan)"
+         },
+         {
+          "t": "text",
+          "v": " counts one received scan and adds its beams, with "
+         },
+         {
+          "t": "code",
+          "v": "struct Scan { std::int64_t beams = 0; };"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "void record_drop()"
+         },
+         {
+          "t": "text",
+          "v": " counts one dropped scan."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] Totals read() const"
+         },
+         {
+          "t": "text",
+          "v": " returns all three numbers, with "
+         },
+         {
+          "t": "code",
+          "v": "struct Totals { std::int64_t received, dropped, beams; };"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Use "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic<std::int64_t>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "fetch_add"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "std::memory_order_relaxed"
+        },
+        {
+         "t": "text",
+         "v": ", and say in a comment why relaxed is the right order here. In "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", run four threads, each recording 5000 scans of which every tenth is a drop, join them, then print the totals and check two invariants: received plus dropped is what was offered, and the beam count matches the received count."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions. Why is the "
+        },
+        {
+         "t": "code",
+         "v": "read()"
+        },
+        {
+         "t": "text",
+         "v": " above not a consistent snapshot, even though every one of the three loads is exact? And what would you use if you needed one?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <atomic>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <thread>\n#include <vector>\n\nstruct Scan {\n  std::int64_t beams = 0;\n};\n\nstruct Totals {\n  std::int64_t received = 0;\n  std::int64_t dropped = 0;\n  std::int64_t beams = 0;\n};\n\n// Three counters that any number of sensor threads may update at once.\nclass ScanStats {\n public:\n  // Relaxed: nothing is published through these counters, so only the count has to be exact.\n  void record(Scan scan) {\n    received_.fetch_add(1, std::memory_order_relaxed);\n    beams_.fetch_add(scan.beams, std::memory_order_relaxed);\n  }\n\n  void record_drop() { dropped_.fetch_add(1, std::memory_order_relaxed); }\n\n  // Three separate reads: each one is exact, and the three together are not one moment.\n  [[nodiscard]] Totals read() const {\n    return {.received = received_.load(std::memory_order_relaxed),\n            .dropped = dropped_.load(std::memory_order_relaxed),\n            .beams = beams_.load(std::memory_order_relaxed)};\n  }\n\n private:\n  std::atomic<std::int64_t> received_{0};\n  std::atomic<std::int64_t> dropped_{0};\n  std::atomic<std::int64_t> beams_{0};\n};\n\nint main() {\n  constexpr int kSensors = 4;\n  constexpr std::int64_t kPerSensor = 5'000;\n  ScanStats stats;\n  {\n    std::vector<std::jthread> sensors;\n    sensors.reserve(kSensors);\n    for (int i = 0; i < kSensors; ++i) {\n      sensors.emplace_back([&stats] {\n        for (std::int64_t k = 0; k < kPerSensor; ++k) {\n          if (k % 10 == 0) {\n            stats.record_drop();\n          } else {\n            stats.record({.beams = 360});\n          }\n        }\n      });\n    }\n  }\n  const Totals totals = stats.read();  // every sensor has been joined, so this one is consistent\n  std::cout << std::format(\"received {}, dropped {}, beams {}\\n\", totals.received, totals.dropped, totals.beams);\n  std::cout << std::format(\"received plus dropped is what was offered: {}\\n\",\n                           totals.received + totals.dropped == kSensors * kPerSensor);\n  std::cout << std::format(\"every received scan counted its beams: {}\\n\", totals.beams == totals.received * 360);\n}"
+      },
+      {
+       "t": "output",
+       "text": "received 18000, dropped 2000, beams 6480000\nreceived plus dropped is what was offered: true\nevery received scan counted its beams: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The totals are exact because every update is one "
+        },
+        {
+         "t": "code",
+         "v": "fetch_add"
+        },
+        {
+         "t": "text",
+         "v": ", and exact is all a counter has to be. The relaxed order is right because nothing is published through these counters: no thread reads "
+        },
+        {
+         "t": "code",
+         "v": "received_"
+        },
+        {
+         "t": "text",
+         "v": " and then expects to see data another thread wrote before incrementing it. The moment you add \"and the scan itself is in "
+        },
+        {
+         "t": "code",
+         "v": "latest_"
+        },
+        {
+         "t": "text",
+         "v": "\", relaxed stops being enough, and the counter needs a release store paired with an acquire load."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "read()"
+        },
+        {
+         "t": "text",
+         "v": " is not a snapshot because it is three loads with gaps between them. Between the load of "
+        },
+        {
+         "t": "code",
+         "v": "received_"
+        },
+        {
+         "t": "text",
+         "v": " and the load of "
+        },
+        {
+         "t": "code",
+         "v": "beams_"
+        },
+        {
+         "t": "text",
+         "v": ", another sensor can record a scan, so the pair you print can show a beam count that belongs to one more scan than the received count you printed. The final "
+        },
+        {
+         "t": "code",
+         "v": "read()"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " is safe only because every sensor thread has been joined by then, which is an ordering the language gives you for free."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "If you need a real snapshot there are three honest answers. Put the three numbers in a struct under one mutex, and accept the lock. Put them in one atomic struct if they fit in the lock-free size, which two "
+        },
+        {
+         "t": "code",
+         "v": "std::int32_t"
+        },
+        {
+         "t": "text",
+         "v": " counters would and three 64-bit ones would not. Or keep a version number that a reader checks before and after reading the fields, which is the "
+        },
+        {
+         "t": "i",
+         "v": "seqlock"
+        },
+        {
+         "t": "text",
+         "v": " pattern and is exactly the kind of lock-free code "
+        },
+        {
+         "t": "a",
+         "v": "CP.100",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-lockfree"
+        },
+        {
+         "t": "text",
+         "v": " tells you not to write yourself. For a statistics page that is redrawn every second, the inconsistency is a scan or two and nobody minds; say that out loud in the interview, because knowing which errors matter is the answer they are listening for."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "futures",
+   "title": "async, future and promise; exceptions through futures",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "std::future<T>"
+        },
+        {
+         "t": "text",
+         "v": " is a handle on a result that does not exist yet. Something on another thread will put a "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " in it, or an exception, and "
+        },
+        {
+         "t": "code",
+         "v": "get()"
+        },
+        {
+         "t": "text",
+         "v": " waits for whichever arrives:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <future>\n#include <iostream>\n#include <stdexcept>\n#include <string>\n\nstruct Scan {\n  int beams = 0;\n};\n\n[[nodiscard]] Scan read_sensor(int beams) {\n  if (beams <= 0) throw std::runtime_error(\"sensor offline\");\n  return Scan{.beams = beams};\n}\n\nint main() {\n  std::future<Scan> good = std::async(std::launch::async, read_sensor, 3600);\n  std::future<Scan> bad = std::async(std::launch::async, read_sensor, 0);\n\n  std::cout << std::format(\"the good scan has {} beams\\n\", good.get().beams);\n  std::cout << std::format(\"after get, the future still holds a result: {}\\n\", good.valid());\n\n  try {\n    const Scan scan = bad.get();\n    std::cout << std::format(\"unreachable {}\\n\", scan.beams);\n  } catch (const std::runtime_error& e) {\n    std::cout << std::format(\"the failed scan threw on get: {}\\n\", e.what());\n  }\n\n  try {\n    const Scan again = good.get();  // the result was taken by the first get\n    std::cout << std::format(\"unreachable {}\\n\", again.beams);\n  } catch (const std::future_error& e) {\n    std::cout << std::format(\"a second get: {}\\n\", e.code().message());\n  }\n\n  std::future<Scan> orphan;\n  {\n    std::promise<Scan> promise;\n    orphan = promise.get_future();\n  }  // the promise is destroyed without a value\n  try {\n    const Scan never = orphan.get();\n    std::cout << std::format(\"unreachable {}\\n\", never.beams);\n  } catch (const std::future_error& e) {\n    std::cout << std::format(\"a promise that never answered: {}\\n\", e.code().message());\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "the good scan has 3600 beams\nafter get, the future still holds a result: false\nthe failed scan threw on get: sensor offline\na second get: No associated state\na promise that never answered: Broken promise"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four facts in one run. An exception thrown inside the task is caught by the library, stored, and thrown again out of "
+        },
+        {
+         "t": "code",
+         "v": "get()"
+        },
+        {
+         "t": "text",
+         "v": " on the calling thread, which is the whole reason "
+        },
+        {
+         "t": "a",
+         "v": "CP.60",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-future"
+        },
+        {
+         "t": "text",
+         "v": " prefers a future to a thread plus a shared variable: a thread has no way to return an error, and an exception that escapes a thread function calls "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "get()"
+        },
+        {
+         "t": "text",
+         "v": " moves the result out, so the future is empty afterwards and a second "
+        },
+        {
+         "t": "code",
+         "v": "get()"
+        },
+        {
+         "t": "text",
+         "v": " throws "
+        },
+        {
+         "t": "code",
+         "v": "std::future_error"
+        },
+        {
+         "t": "text",
+         "v": " with \"No associated state\"; use "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_future"
+        },
+        {
+         "t": "text",
+         "v": " when several readers each need the value. And a promise destroyed without setting anything gives its future a \"Broken promise\", which is the library telling you the producer died before answering rather than leaving you blocked for ever."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two ways to fill a future divide the work. "
+        },
+        {
+         "t": "code",
+         "v": "std::async(std::launch::async, f, args...)"
+        },
+        {
+         "t": "text",
+         "v": " runs "
+        },
+        {
+         "t": "code",
+         "v": "f"
+        },
+        {
+         "t": "text",
+         "v": " on a new thread and hands you the future in one line; that is "
+        },
+        {
+         "t": "a",
+         "v": "CP.61",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-async"
+        },
+        {
+         "t": "text",
+         "v": ", and it is the right default. Always pass the policy: the default is "
+        },
+        {
+         "t": "code",
+         "v": "async | deferred"
+        },
+        {
+         "t": "text",
+         "v": ", which lets the library decide, and "
+        },
+        {
+         "t": "code",
+         "v": "deferred"
+        },
+        {
+         "t": "text",
+         "v": " means the function does not run at all until somebody calls "
+        },
+        {
+         "t": "code",
+         "v": "get()"
+        },
+        {
+         "t": "text",
+         "v": ", on the calling thread. A future from a deferred task that nobody gets never runs, and a program whose parallelism silently became laziness is hard to see."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::promise<T>"
+        },
+        {
+         "t": "text",
+         "v": " is the other half, for when the producer is not a function you can hand over. You keep the promise on the producing side, its future on the consuming side, and call "
+        },
+        {
+         "t": "code",
+         "v": "set_value"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "set_exception"
+        },
+        {
+         "t": "text",
+         "v": " when you know. That is the exercise below."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::async"
+        },
+        {
+         "t": "text",
+         "v": " has one edge that catches everybody, and libstdc++ now catches it for you at compile time. The future that "
+        },
+        {
+         "t": "code",
+         "v": "async"
+        },
+        {
+         "t": "text",
+         "v": " returns blocks in its destructor until the task is done, which is unlike every other future. Discard it and the call is not asynchronous at all:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "ignoring return value of",
+       "text": "#include <chrono>\n#include <future>\n#include <thread>\n\nvoid slow_step() { std::this_thread::sleep_for(std::chrono::milliseconds(200)); }\n\nint main() {\n  std::async(std::launch::async, slow_step);  // the future is a temporary that blocks at the semicolon\n  std::async(std::launch::async, slow_step);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 refuses that under "
+        },
+        {
+         "t": "code",
+         "v": "-Werror"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "ignoring return value of ... declared with attribute 'nodiscard'"
+        },
+        {
+         "t": "text",
+         "v": ". The blocking destructor is still there when you do keep the future, though, and the scope you keep it in decides whether two tasks overlap:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <format>\n#include <future>\n#include <iostream>\n#include <thread>\n\nconstexpr auto kWork = std::chrono::milliseconds(200);\n\nvoid slow_step() { std::this_thread::sleep_for(kWork); }\n\nint main() {\n  // Two futures that are kept: the calls overlap.\n  const auto kept_start = std::chrono::steady_clock::now();\n  {\n    std::future<void> first = std::async(std::launch::async, slow_step);\n    std::future<void> second = std::async(std::launch::async, slow_step);\n    first.get();\n    second.get();\n  }\n  const auto kept = std::chrono::steady_clock::now() - kept_start;\n\n  // Two futures whose scopes do not overlap: each destructor waits for its own call to finish.\n  const auto dropped_start = std::chrono::steady_clock::now();\n  {\n    const std::future<void> first = std::async(std::launch::async, slow_step);\n  }\n  {\n    const std::future<void> second = std::async(std::launch::async, slow_step);\n  }\n  const auto dropped = std::chrono::steady_clock::now() - dropped_start;\n\n  std::cout << std::format(\"two steps of {} ms each\\n\", kWork.count());\n  std::cout << std::format(\"futures kept, both under 150% of one step: {}\\n\", kept < kWork * 3 / 2);\n  std::cout << std::format(\"futures dropped, at least two steps: {}\\n\", dropped >= kWork * 2);\n}"
+      },
+      {
+       "t": "output",
+       "text": "two steps of 200 ms each\nfutures kept, both under 150% of one step: true\nfutures dropped, at least two steps: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two lines are booleans rather than times so that the output is the same on every machine, and the margins are wide on purpose. The overlapping pair measured 209 to 211 ms over five runs against a limit of 300, which leaves 90 ms for two thread starts that cost tens of microseconds each. The sequential pair measured 412 to 422 ms against a lower limit of 400, and that side needs no margin at all, because "
+        },
+        {
+         "t": "code",
+         "v": "sleep_for"
+        },
+        {
+         "t": "text",
+         "v": " may only ever sleep longer than asked, so two disjoint scopes cannot come in under two sleeps. Write a timed test that way and it does not become flaky on a busy machine."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes. A calibration runs on a worker thread, and the caller needs either its result or the reason it failed."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] Calibration calibrate(std::span<const float> samples)"
+         },
+         {
+          "t": "text",
+          "v": " as plain logic with no threads in it, returning "
+         },
+         {
+          "t": "code",
+          "v": "struct Calibration { double offset; std::int64_t samples; };"
+         },
+         {
+          "t": "text",
+          "v": " with the mean of the samples, and throwing "
+         },
+         {
+          "t": "code",
+          "v": "std::runtime_error"
+         },
+         {
+          "t": "text",
+          "v": " when the span is empty."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "calibrate_async"
+         },
+         {
+          "t": "text",
+          "v": " that takes the samples and a "
+         },
+         {
+          "t": "code",
+          "v": "std::jthread&"
+         },
+         {
+          "t": "text",
+          "v": " to run on, creates a "
+         },
+         {
+          "t": "code",
+          "v": "std::promise<Calibration>"
+         },
+         {
+          "t": "text",
+          "v": ", takes its future first, moves the promise into the thread, and returns the future. In the thread, call "
+         },
+         {
+          "t": "code",
+          "v": "calibrate"
+         },
+         {
+          "t": "text",
+          "v": " inside a "
+         },
+         {
+          "t": "code",
+          "v": "try"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "set_value"
+         },
+         {
+          "t": "text",
+          "v": " on success and "
+         },
+         {
+          "t": "code",
+          "v": "set_exception(std::current_exception())"
+         },
+         {
+          "t": "text",
+          "v": " on failure."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "In "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", run it twice: once with four samples, printing the offset to two decimals and the count; once with an empty span, catching the exception from "
+         },
+         {
+          "t": "code",
+          "v": "get()"
+         },
+         {
+          "t": "text",
+          "v": " and printing its message."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions. What does "
+        },
+        {
+         "t": "code",
+         "v": "std::async"
+        },
+        {
+         "t": "text",
+         "v": " do for you that this code does by hand, and when would you still write the promise yourself?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <exception>\n#include <format>\n#include <future>\n#include <iostream>\n#include <span>\n#include <stdexcept>\n#include <thread>\n#include <vector>\n\nstruct Calibration {\n  double offset = 0.0;\n  std::int64_t samples = 0;\n};\n\n// Plain logic: no threads, no futures, so a test can call it directly.\n[[nodiscard]] Calibration calibrate(std::span<const float> samples) {\n  if (samples.empty()) throw std::runtime_error(\"no samples to calibrate from\");\n  double total = 0.0;\n  for (const float sample : samples) total += static_cast<double>(sample);\n  return {.offset = total / static_cast<double>(std::ssize(samples)), .samples = std::ssize(samples)};\n}\n\n// The handover: whatever the work does, the caller learns about it through the future.\n[[nodiscard]] std::future<Calibration> calibrate_async(std::span<const float> samples, std::jthread& worker) {\n  std::promise<Calibration> promise;\n  std::future<Calibration> future = promise.get_future();  // taken before the promise moves away\n  worker = std::jthread([samples, promise = std::move(promise)]() mutable {\n    try {\n      promise.set_value(calibrate(samples));\n    } catch (...) {\n      promise.set_exception(std::current_exception());  // the same exception, on the caller's side\n    }\n  });\n  return future;\n}\n\nint main() {\n  const std::vector<float> samples{1.0F, 2.0F, 3.0F, 4.0F};\n  {\n    std::jthread worker;\n    std::future<Calibration> future = calibrate_async(samples, worker);\n    const Calibration result = future.get();\n    std::cout << std::format(\"offset {:.2f} from {} samples\\n\", result.offset, result.samples);\n  }\n  {\n    std::jthread worker;\n    std::future<Calibration> future = calibrate_async({}, worker);\n    try {\n      const Calibration result = future.get();\n      std::cout << std::format(\"unreachable {:.2f}\\n\", result.offset);\n    } catch (const std::runtime_error& e) {\n      std::cout << std::format(\"the worker's exception arrived here: {}\\n\", e.what());\n    }\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "offset 2.50 from 4 samples\nthe worker's exception arrived here: no samples to calibrate from"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three details decide whether this works. The future is taken from the promise before the promise is moved into the thread, because a moved-from promise has nothing to give a future. The lambda is "
+        },
+        {
+         "t": "code",
+         "v": "mutable"
+        },
+        {
+         "t": "text",
+         "v": " and captures the promise by move, because "
+        },
+        {
+         "t": "code",
+         "v": "set_value"
+        },
+        {
+         "t": "text",
+         "v": " is not a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " operation and a promise cannot be copied. And the "
+        },
+        {
+         "t": "code",
+         "v": "catch (...)"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "set_exception(std::current_exception())"
+        },
+        {
+         "t": "text",
+         "v": " is the whole error path: without it, an exception escapes the thread function and "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": " ends the program, taking the caller's chance to handle it with it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::async"
+        },
+        {
+         "t": "text",
+         "v": " writes all of that for you, including the "
+        },
+        {
+         "t": "code",
+         "v": "try"
+        },
+        {
+         "t": "text",
+         "v": " and the "
+        },
+        {
+         "t": "code",
+         "v": "set_exception"
+        },
+        {
+         "t": "text",
+         "v": ", which is why it is the default answer. Keep the promise by hand when the value does not come from a function you can call: a reply that arrives in a callback, a result that a hardware interrupt hands over, an operation that another library completes. Then the promise lives where the answer appears and the future lives where somebody waits. The pattern has one rule: exactly one of "
+        },
+        {
+         "t": "code",
+         "v": "set_value"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "set_exception"
+        },
+        {
+         "t": "text",
+         "v": ", exactly once, on every path out, or the caller waits for ever or gets a broken promise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The samples travel as a "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const float>"
+        },
+        {
+         "t": "text",
+         "v": " copied into the lambda, and the vector they point into outlives the thread, because "
+        },
+        {
+         "t": "code",
+         "v": "worker"
+        },
+        {
+         "t": "text",
+         "v": " is declared before "
+        },
+        {
+         "t": "code",
+         "v": "future"
+        },
+        {
+         "t": "text",
+         "v": " and joined at the closing brace while "
+        },
+        {
+         "t": "code",
+         "v": "samples"
+        },
+        {
+         "t": "text",
+         "v": " is still alive. The shutdown topic is about what happens when that ordering is wrong."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "races",
+   "title": "Check-then-act on atomics",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every access in this program is atomic. It has no data race, ThreadSanitizer says nothing about it, and it is still wrong:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <atomic>\n#include <chrono>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <latch>\n#include <thread>\n#include <vector>\n\nconstexpr int kThreads = 8;\n\nint main() {\n  std::atomic<bool> claimed{false};\n  std::atomic<int> winners{0};\n  std::latch start(kThreads);\n  {\n    std::vector<std::jthread> racers;\n    racers.reserve(kThreads);\n    for (int i = 0; i < kThreads; ++i) {\n      racers.emplace_back([&claimed, &winners, &start] {\n        start.arrive_and_wait();  // every thread arrives at the test together\n        if (!claimed.load()) {    // step one: read\n          // Whatever a real claimant does before it records the claim: open the file, build the map.\n          std::this_thread::sleep_for(std::chrono::milliseconds(5));\n          claimed.store(true);  // step two: write, long after the read\n          winners.fetch_add(1);\n        }\n      });\n    }\n  }\n  std::cout << std::format(\"{} of {} threads believed they were the first\\n\", winners.load(), kThreads);\n}"
+      },
+      {
+       "t": "output",
+       "text": "8 of 8 threads believed they were the first"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The 5 millisecond sleep stands for the work a real claimant does between deciding it is first and recording that it was: opening the log file, loading the map, connecting to the driver. It also makes the output the same on every run, and the margin is measured rather than assumed: a program that records when each of the eight threads gets past the latch reports 86 to 197 microseconds between the first and the last over eight runs, so the 5 millisecond window is 25 to 60 times the spread. A busier machine that stretched that spread to half a millisecond would still leave the window ten times over. Shorten the window and the bug gets rarer, not smaller: with no sleep at all this same program printed 1 of 8 on every one of ten runs, which is what a bug looks like the week before it reaches a customer."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The defect is not in either operation. It is that there are two of them. Between the "
+        },
+        {
+         "t": "code",
+         "v": "load"
+        },
+        {
+         "t": "text",
+         "v": " and the "
+        },
+        {
+         "t": "code",
+         "v": "store"
+        },
+        {
+         "t": "text",
+         "v": " any number of threads can run the same "
+        },
+        {
+         "t": "code",
+         "v": "load"
+        },
+        {
+         "t": "text",
+         "v": ", and an atomic promises nothing about what happens between two of its operations. This is a "
+        },
+        {
+         "t": "i",
+         "v": "race condition"
+        },
+        {
+         "t": "text",
+         "v": " without a data race, which is why the tool that found the threads topic's bugs is silent: ThreadSanitizer looks for unordered accesses to the same location, and here every access is ordered and atomic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fix is to make the test and the claim one operation:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <atomic>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <latch>\n#include <thread>\n#include <vector>\n\nconstexpr int kThreads = 8;\n\nint main() {\n  std::atomic<bool> claimed{false};\n  std::atomic<int> winners{0};\n  std::atomic<int> late{0};\n  std::latch start(kThreads);\n  {\n    std::vector<std::jthread> racers;\n    racers.reserve(kThreads);\n    for (int i = 0; i < kThreads; ++i) {\n      racers.emplace_back([&claimed, &winners, &late, &start] {\n        start.arrive_and_wait();\n        // One operation: it writes true and returns what was there before.\n        if (!claimed.exchange(true)) {\n          winners.fetch_add(1);\n        } else {\n          late.fetch_add(1);\n        }\n      });\n    }\n  }\n  std::cout << std::format(\"{} winner, {} late, out of {} threads\\n\", winners.load(), late.load(), kThreads);\n}"
+      },
+      {
+       "t": "output",
+       "text": "1 winner, 7 late, out of 8 threads"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "exchange"
+        },
+        {
+         "t": "text",
+         "v": " writes the new value and returns the old one, in one indivisible step, so exactly one thread can see "
+        },
+        {
+         "t": "code",
+         "v": "false"
+        },
+        {
+         "t": "text",
+         "v": ". When the new value depends on the old one, "
+        },
+        {
+         "t": "code",
+         "v": "compare_exchange_strong(expected, desired)"
+        },
+        {
+         "t": "text",
+         "v": " is the general form: it writes only if the object still holds "
+        },
+        {
+         "t": "code",
+         "v": "expected"
+        },
+        {
+         "t": "text",
+         "v": ", and otherwise updates "
+        },
+        {
+         "t": "code",
+         "v": "expected"
+        },
+        {
+         "t": "text",
+         "v": " with what it found, which is why it is always used in a loop. "
+        },
+        {
+         "t": "code",
+         "v": "compare_exchange_weak"
+        },
+        {
+         "t": "text",
+         "v": " may fail even when the comparison held, which costs less on some hardware and is fine inside a loop that retries anyway."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three more shapes of the same mistake are worth recognising by sight:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "counter = counter + 1"
+         },
+         {
+          "t": "text",
+          "v": " on an atomic is a load, an add and a store, and loses updates exactly like a plain "
+         },
+         {
+          "t": "code",
+          "v": "int"
+         },
+         {
+          "t": "text",
+          "v": ". "
+         },
+         {
+          "t": "code",
+          "v": "++counter"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "fetch_add"
+         },
+         {
+          "t": "text",
+          "v": " are one operation. The syntax hides the difference, which is the argument for writing "
+         },
+         {
+          "t": "code",
+          "v": "fetch_add"
+         },
+         {
+          "t": "text",
+          "v": " where the atomicity matters."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "if (queue_size.load() < limit) queue_size.fetch_add(1);"
+         },
+         {
+          "t": "text",
+          "v": " lets the size go past the limit, because the test and the increment are apart. A bounded queue needs the mutex from the previous topic or a compare-exchange loop that refuses to go past the limit."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Double-checked locking written by hand, the pattern where a thread tests a pointer, takes a lock, tests again and initialises. "
+         },
+         {
+          "t": "a",
+          "v": "CP.110",
+          "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-double"
+         },
+         {
+          "t": "text",
+          "v": " says not to write it: a function-local "
+         },
+         {
+          "t": "code",
+          "v": "static"
+         },
+         {
+          "t": "text",
+          "v": ", which the standard guarantees is initialised exactly once and safely, does the same job in one line, and "
+         },
+         {
+          "t": "code",
+          "v": "std::call_once"
+         },
+         {
+          "t": "text",
+          "v": " with a "
+         },
+         {
+          "t": "code",
+          "v": "std::once_flag"
+         },
+         {
+          "t": "text",
+          "v": " does it for anything that is not a static."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rule to carry out of this topic: an atomic makes one operation indivisible, and a sequence of atomic operations is not one operation. Before you write two of them in a row, ask what another thread may do in between, and if the answer matters, reach for one operation that does both, or for a mutex."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write six to ten lines from memory and keep them as this topic's proof. Say what an atomic guarantees and what it costs, including which types are lock-free on your target and how you checked. Give the three memory orders and what each promises, and say what they compile to on x86-64. Say when a counter is enough and when the invariant needs a mutex. Explain false sharing in one sentence with the number you measured. Write the four future facts: an exception crosses on "
+        },
+        {
+         "t": "code",
+         "v": "get"
+        },
+        {
+         "t": "text",
+         "v": ", a second "
+        },
+        {
+         "t": "code",
+         "v": "get"
+        },
+        {
+         "t": "text",
+         "v": " throws, a broken promise, and the "
+        },
+        {
+         "t": "code",
+         "v": "async"
+        },
+        {
+         "t": "text",
+         "v": " future that blocks in its destructor. Finish with check-then-act: why eight threads all won, why the sanitizer is silent, and the one-operation fix."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::atomic"
+     },
+     {
+      "t": "text",
+      "v": " promise, and what does "
+     },
+     {
+      "t": "code",
+      "v": "is_always_lock_free"
+     },
+     {
+      "t": "text",
+      "v": " tell you that "
+     },
+     {
+      "t": "code",
+      "v": "is_lock_free()"
+     },
+     {
+      "t": "text",
+      "v": " does not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which types were lock-free on your machine, and what happens to a 16-byte one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the three memory orders you would use, and say what each one promises."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What do a relaxed store, a release store and a sequentially consistent store compile to on x86-64?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When is an atomic counter enough, and what is the first situation that needs a mutex instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is false sharing, how did you measure it, and what do you pad to?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How does an exception get from a task to the thread that calls "
+     },
+     {
+      "t": "code",
+      "v": "get()"
+     },
+     {
+      "t": "text",
+      "v": ", and what happens without a future?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the two things "
+     },
+     {
+      "t": "code",
+      "v": "std::async"
+     },
+     {
+      "t": "text",
+      "v": "'s default launch policy can do, and why do you always pass one?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a future from "
+     },
+     {
+      "t": "code",
+      "v": "std::async"
+     },
+     {
+      "t": "text",
+      "v": " block in its destructor, and how does that make two calls sequential?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is check-then-act on an atomic still a bug, and why does ThreadSanitizer not report it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a claim that exactly one of eight threads can win, with the counters to prove it."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Atomics, Locks and Tasks, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_atomics_locks_and_tasks/back_to_basics_atomics_locks_and_tasks__rainer_grimm__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": ". Atomics before locks before tasks, and futures as the way to return a value."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: Concurrency, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B-Concurrency.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=8rEGu20Uw4g"
+     },
+     {
+      "t": "text",
+      "v": ". The memory model behind the orders, and what an atomic does not give you."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Concurrency, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_concurrency/back_to_basics_concurrency__arthur_odwyer__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=F6Ipn7gCOsY"
+     },
+     {
+      "t": "text",
+      "v": ". Promises and futures as one-shot channels."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "CP.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-task"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.60",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-future"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.61",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-async"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.100",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-lockfree"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.101",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-distrust"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.102",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-literature"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.110",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-double"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "Per.19",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rper-access"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "atomic",
+      "href": "https://en.cppreference.com/cpp/atomic/atomic"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "memory_order",
+      "href": "https://en.cppreference.com/cpp/atomic/memory_order"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "compare_exchange",
+      "href": "https://en.cppreference.com/cpp/atomic/atomic/compare_exchange"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "the atomic shared_ptr specialisation",
+      "href": "https://en.cppreference.com/cpp/memory/shared_ptr/atomic2"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "future",
+      "href": "https://en.cppreference.com/cpp/thread/future"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "async",
+      "href": "https://en.cppreference.com/cpp/thread/async"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "promise",
+      "href": "https://en.cppreference.com/cpp/thread/promise"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "call_once",
+      "href": "https://en.cppreference.com/cpp/thread/call_once"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

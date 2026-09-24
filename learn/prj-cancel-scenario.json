@@ -1,0 +1,1352 @@
+{
+ "id": "prj-cancel-scenario",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage gives the bench its third scenario: a mission cancelled while it is running. The route the follower drives stops being a set of parameters read at startup and becomes an action goal, so something outside the node can ask for a route, watch how far along it is, and take it back."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is writing our own action rather than bending one that exists. "
+    },
+    {
+     "t": "code",
+     "v": "example_interfaces"
+    },
+    {
+     "t": "text",
+     "v": " ships a single action, Fibonacci, whose goal is one integer, and forcing a route through it would cost every later reader an explanation. A package of our own costs a fourth package, a build-order dependency, and generated code that every consumer rebuilds when the file changes. What it buys is a goal that carries the route, feedback that says how far along the robot is, and a result that says how far it got, all visible from "
+    },
+    {
+     "t": "code",
+     "v": "ros2 action"
+    },
+    {
+     "t": "text",
+     "v": " without writing code."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: the scenario cancels the mission partway through, the robot comes to rest within 1.5 seconds and stays where it stopped, no further goal is reached, and the run leaves no process behind. A follower that never checks "
+    },
+    {
+     "t": "code",
+     "v": "is_canceling()"
+    },
+    {
+     "t": "text",
+     "v": " fails three of those five lines."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "scenario",
+   "title": "Cancellation scenario and clean-up checks",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the workspace has a "
+        },
+        {
+         "t": "code",
+         "v": "bench_interfaces"
+        },
+        {
+         "t": "text",
+         "v": " package with a "
+        },
+        {
+         "t": "code",
+         "v": "DriveRoute"
+        },
+        {
+         "t": "text",
+         "v": " action in it, and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 interface show"
+        },
+        {
+         "t": "text",
+         "v": " prints the three parts of it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Cancellation is the first thing the bench asks for that a topic cannot carry. A topic is fire and forget: the follower reads its goals from parameters at startup, and nothing can ask it to stop that is not a stop command aimed at the robot. What this scenario needs is a request with an identity, so that it can be taken back, and progress that belongs to that request rather than to the node. That is what an action is, and the topic on services and actions built one end to end."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The interface is the part with a real cost, so decide it deliberately. "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces"
+        },
+        {
+         "t": "text",
+         "v": " has exactly one action, "
+        },
+        {
+         "t": "code",
+         "v": "Fibonacci"
+        },
+        {
+         "t": "text",
+         "v": ", whose goal is an "
+        },
+        {
+         "t": "code",
+         "v": "int32"
+        },
+        {
+         "t": "text",
+         "v": " order. You could send a route through it by agreeing that the order means something else, and every person who read the code afterwards would need that agreement explained. The alternative is a package of your own, and here is the bill."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It costs a fourth package in the workspace, which colcon has to build before "
+        },
+        {
+         "t": "code",
+         "v": "bench_nodes"
+        },
+        {
+         "t": "text",
+         "v": " because the generated headers come out of it. It costs generated code in three languages whether or not you want them. It costs a rebuild of every consumer each time the "
+        },
+        {
+         "t": "code",
+         "v": ".action"
+        },
+        {
+         "t": "text",
+         "v": " file changes, which is the reason interface packages are kept small and separate rather than living inside the node package. And once anything outside your repository uses it, a change to a field is a change to an interface that somebody else has compiled against."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It buys a goal that says what it is, feedback that arrives while the work runs, a result that says what was achieved, and a cancel path with rules the client library already implements. It also buys the command line: "
+        },
+        {
+         "t": "code",
+         "v": "ros2 action list"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "ros2 action info"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "ros2 action send_goal --feedback"
+        },
+        {
+         "t": "text",
+         "v": " work on it with no code from you, which is worth more during a failed scenario than it sounds now."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Create the package:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/test_bench/src\nros2 pkg create --build-type ament_cmake bench_interfaces\nmkdir bench_interfaces/action\nrm -rf bench_interfaces/src bench_interfaces/include"
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "bench_interfaces/action/DriveRoute.action"
+         },
+         {
+          "t": "text",
+          "v": ". The three parts are separated by "
+         },
+         {
+          "t": "code",
+          "v": "---"
+         },
+         {
+          "t": "text",
+          "v": ", in the order goal, result, feedback:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "# Goal: the route to drive, in the odometry frame.\nfloat64[] goals_x\nfloat64[] goals_y\nfloat64 tolerance_m\n---\n# Result: how far the robot got, whatever ended the goal.\nint32 goals_reached\n---\n# Feedback: where it is now, one message per odometry message.\nint32 goals_reached\nfloat64 range_to_goal_m"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The result carries one number on purpose. Whether the goal succeeded, was cancelled or was aborted is already in the action's own status, which the client gets with the result, so a "
+        },
+        {
+         "t": "code",
+         "v": "bool canceled"
+        },
+        {
+         "t": "text",
+         "v": " field beside it would be a second copy of a fact that can now disagree with the first. Put in a result what the status cannot say, and nothing else."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two parallel arrays are the same shape the route parameters had, and for the same reason: an interface field can hold a list of numbers but not a list of pairs. "
+        },
+        {
+         "t": "code",
+         "v": "bench::goals_from"
+        },
+        {
+         "t": "text",
+         "v": " already refuses a mismatched pair, so the server has the check it needs and the failure is a rejected goal rather than a short route."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Wire it up. In "
+         },
+         {
+          "t": "code",
+          "v": "bench_interfaces/CMakeLists.txt"
+         },
+         {
+          "t": "text",
+          "v": ", keep the top of the generated file and replace the middle:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cmake",
+       "tag": "",
+       "expect": "",
+       "text": "find_package(ament_cmake REQUIRED)\nfind_package(rosidl_default_generators REQUIRED)\n\nrosidl_generate_interfaces(${PROJECT_NAME} \"action/DriveRoute.action\")\n\nament_export_dependencies(rosidl_default_runtime)\nament_package()"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In its "
+        },
+        {
+         "t": "code",
+         "v": "package.xml"
+        },
+        {
+         "t": "text",
+         "v": ", add "
+        },
+        {
+         "t": "code",
+         "v": "<buildtool_depend>rosidl_default_generators</buildtool_depend>"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "<exec_depend>rosidl_default_runtime</exec_depend>"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "<member_of_group>rosidl_interface_packages</member_of_group>"
+        },
+        {
+         "t": "text",
+         "v": ", and one depend tag each for "
+        },
+        {
+         "t": "code",
+         "v": "action_msgs"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "service_msgs"
+        },
+        {
+         "t": "text",
+         "v": ". The group line is the one people leave out, and without it the generators do not run for the package. The other two are the ones that leave a package building on your machine and failing on somebody else's: generating an action makes "
+        },
+        {
+         "t": "code",
+         "v": "rosidl_generate_interfaces"
+        },
+        {
+         "t": "text",
+         "v": " look for both packages and stop with a message naming the tag it wants, and a desktop install already has them, so the manifest can be wrong for months while "
+        },
+        {
+         "t": "code",
+         "v": "rosdep"
+        },
+        {
+         "t": "text",
+         "v": " promises a fresh machine nothing."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Build and look at what came out:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "cd ~/test_bench && ./check.sh\nsource install/setup.bash\nros2 interface show bench_interfaces/action/DriveRoute\nros2 interface list | grep bench"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ros2 interface show"
+        },
+        {
+         "t": "text",
+         "v": " prints the three parts with the "
+        },
+        {
+         "t": "code",
+         "v": "---"
+        },
+        {
+         "t": "text",
+         "v": " separators, which is the shape you wrote. Then add "
+        },
+        {
+         "t": "code",
+         "v": "<depend>bench_interfaces</depend>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "<depend>rclcpp_action</depend>"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_nodes/package.xml"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "find_package(bench_interfaces REQUIRED)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "find_package(rclcpp_action REQUIRED)"
+        },
+        {
+         "t": "text",
+         "v": " to its "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", so the next session has them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " builds four packages, "
+        },
+        {
+         "t": "code",
+         "v": "ros2 interface show bench_interfaces/action/DriveRoute"
+        },
+        {
+         "t": "text",
+         "v": " prints the definition, and you have written down in one line each what the package cost and what it bought."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "route_follower"
+        },
+        {
+         "t": "text",
+         "v": " is an action server, the runner can send it a route and take it back, and you have cancelled a mission by hand from the command line and watched the robot stop."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The pattern is the one the services and actions topic built: the work runs on a callback of the node rather than on a thread of its own, the goal handle is kept in a member because the action server holds only a weak pointer to it, and "
+        },
+        {
+         "t": "code",
+         "v": "is_canceling()"
+        },
+        {
+         "t": "text",
+         "v": " is checked on every tick of that work. The follower already has the right heartbeat for it. It does its work in the odometry callback, one command per message, so the cancel is checked once per odometry message and the answer comes back within one period."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The code below is given as the changes rather than as a whole program, because a whole program needs "
+        },
+        {
+         "t": "code",
+         "v": "bench_interfaces"
+        },
+        {
+         "t": "text",
+         "v": " on the include path and this page cannot build one for you. The services and actions topic has the same pattern end to end, against "
+        },
+        {
+         "t": "code",
+         "v": "example_interfaces/action/Fibonacci"
+        },
+        {
+         "t": "text",
+         "v": ", and that one compiles; read it beside this if any of the four callbacks is unfamiliar."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Make the follower a server. The goals stop being parameters and arrive in the goal:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In RouteFollower's constructor, in place of the route built from parameters.\nusing DriveRoute = bench_interfaces::action::DriveRoute;\nusing GoalHandle = rclcpp_action::ServerGoalHandle<DriveRoute>;\n\nserver_ = rclcpp_action::create_server<DriveRoute>(\n    this, \"~/drive_route\",  // under the node's own name, as the relay's ~/drop is\n    [this](const rclcpp_action::GoalUUID&, std::shared_ptr<const DriveRoute::Goal> goal) {\n      return on_goal(*goal);\n    },\n    [this](std::shared_ptr<GoalHandle>) { return rclcpp_action::CancelResponse::ACCEPT; },\n    [this](std::shared_ptr<GoalHandle> handle) { on_accepted(std::move(handle)); });"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// A route is refused before it starts rather than abandoned halfway through.\nrclcpp_action::GoalResponse on_goal(const DriveRoute::Goal& goal) {\n  if (running_) return rclcpp_action::GoalResponse::REJECT;\n  if (!bench::goals_from(goal.goals_x, goal.goals_y, goal.tolerance_m)) {\n    RCLCPP_WARN(get_logger(), \"goals_x and goals_y must be the same non-empty length\");\n    return rclcpp_action::GoalResponse::REJECT;\n  }\n  return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;\n}"
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Check the cancel where the work is. The odometry callback gains one branch, and it comes first:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// First thing in on_odometry, once a goal is running. One stop command, then the supervisor's\n// own timeout holds the robot: the follower does not keep publishing zeros after it has finished.\nif (running_->handle->is_canceling()) {\n  commands_->publish(stop_command(stamp));\n  auto result = std::make_shared<DriveRoute::Result>();\n  result->goals_reached = static_cast<std::int32_t>(running_->route.reached());\n  running_->handle->canceled(result);\n  running_.reset();\n  return;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The "
+        },
+        {
+         "t": "code",
+         "v": "running_.reset()"
+        },
+        {
+         "t": "text",
+         "v": " is the clean-up half of this topic. The action server keeps a weak pointer to the goal handle, so the only owner is your member; a handle left in it after the goal has ended keeps the goal alive and keeps the server refusing every new goal, because "
+        },
+        {
+         "t": "code",
+         "v": "running_"
+        },
+        {
+         "t": "text",
+         "v": " is what "
+        },
+        {
+         "t": "code",
+         "v": "on_goal"
+        },
+        {
+         "t": "text",
+         "v": " tests to decide whether it is busy. Do the same after "
+        },
+        {
+         "t": "code",
+         "v": "succeed"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Give the runner a client. It sends the route once the server is there, and cancels it at the cue, using the "
+         },
+         {
+          "t": "code",
+          "v": "bench::Cue"
+         },
+         {
+          "t": "text",
+          "v": " the missing-input topic added:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In ScenarioRunner. The client spells the server's node out, because ~ here would expand\n// against scenario_runner rather than route_follower, as the relay's client already does.\ndrive_client_ = rclcpp_action::create_client<DriveRoute>(this, \"/route_follower/drive_route\");\n\n// Once the goal is accepted, send the route the scenario file describes.\nauto goal = DriveRoute::Goal();\ngoal.goals_x = goals_x_;\ngoal.goals_y = goals_y_;\ngoal.tolerance_m = tolerance_m_;\nauto options = rclcpp_action::Client<DriveRoute>::SendGoalOptions();\noptions.goal_response_callback = [this](ClientGoalHandle::SharedPtr handle) { goal_ = handle; };\ndrive_client_->async_send_goal(goal, options);"
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In on_tick(), beside the drop cue: the cancel, once, at its moment, and only once the goal\n// is accepted, so a cue is never spent on a goal the server has not answered for yet.\nif (cancel_cue_ && goal_ && cancel_cue_->due(now_time.since_epoch - started_->since_epoch)) {\n  cancel_at_ = now_time;\n  drive_client_->async_cancel_goal(goal_);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every one of those calls is asynchronous, for the reason the services and actions topic gave: waiting for a reply inside a callback blocks the executor that has to deliver it."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Build and drive a cancel by hand, which is worth doing before any scenario runs it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh\nros2 launch bench_sim bench.launch.py headless:=False              # terminal 1\nros2 run bench_nodes odom_relay --ros-args -p use_sim_time:=true    # terminal 2\nros2 run bench_nodes route_follower --ros-args -p use_sim_time:=true   # terminal 3\nros2 action list                                                    # terminal 4\nros2 action send_goal --feedback /route_follower/drive_route bench_interfaces/action/DriveRoute \\\n  \"{goals_x: [0.8, 0.8], goals_y: [0.0, 0.5], tolerance_m: 0.1}\"    # terminal 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Feedback lines arrive while the robot drives. Press Ctrl+C in terminal 4: "
+        },
+        {
+         "t": "code",
+         "v": "ros2 action send_goal"
+        },
+        {
+         "t": "text",
+         "v": " asks the server to cancel, the server accepts, and the robot stops. Watch "
+        },
+        {
+         "t": "code",
+         "v": "/odom_raw"
+        },
+        {
+         "t": "text",
+         "v": " in a fifth terminal rather than the log, because a cancelled goal and a stopped robot are two different claims and only one of them is about the robot."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when a goal sent from the command line drives the route, feedback arrives while it runs, Ctrl+C brings the robot to rest, and a second "
+        },
+        {
+         "t": "code",
+         "v": "ros2 action send_goal"
+        },
+        {
+         "t": "text",
+         "v": " after that is accepted rather than rejected, which is what says the server let the finished goal go."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 3",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "./run_scenario.sh cancel"
+        },
+        {
+         "t": "text",
+         "v": " cancels the mission partway through and judges what the robot did, and you have watched it fail against a follower that ignores the cancel."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Cancellation and a lost input ask the robot for the same thing, so three of the five checks are the missing-odometry ones with the cue renamed. The two that are new are what makes cancellation different: the robot must not carry on afterwards, and no goal may be reached after the request."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the checks to "
+         },
+         {
+          "t": "code",
+          "v": "bench/scenario.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", tests first. Here they are with a "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " that judges two made-up runs:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <chrono>\n#include <cmath>\n#include <compare>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nnamespace bench {\n\n// From bench/time.hpp, bench/drive.hpp and bench/scenario.hpp, as the earlier topics left them.\nstruct Time {\n  std::chrono::nanoseconds since_epoch;\n  auto operator<=>(const Time&) const = default;\n};\n\nstruct Goal {\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double tolerance_m = 0.10;\n};\n\nstruct Sample {\n  Time at;\n  double x_m = 0.0;\n  double y_m = 0.0;\n  double speed_mps = 0.0;\n};\n\nenum class Compare { at_least, at_most };\n\nstruct Check {\n  std::string what;\n  std::string unit;\n  Compare compare;\n  double limit;\n  std::optional<double> measured;\n};\n\n[[nodiscard]] bool met(const Check& check) {\n  if (!check.measured) return false;\n  return check.compare == Compare::at_least ? *check.measured >= check.limit : *check.measured <= check.limit;\n}\n\nstruct Verdict {\n  std::string scenario;\n  std::int64_t samples;\n  bool passed;\n  std::vector<Check> checks;\n};\n\n[[nodiscard]] Verdict judge(std::string scenario, std::int64_t samples, std::vector<Check> checks) {\n  const bool passed = std::ranges::all_of(checks, met);\n  return {.scenario = std::move(scenario), .samples = samples, .passed = passed, .checks = std::move(checks)};\n}\n\nnamespace {\n\n[[nodiscard]] double seconds(std::chrono::nanoseconds d) { return std::chrono::duration<double>(d).count(); }\n\n[[nodiscard]] std::string with_unit(double value, std::string_view unit) {\n  return unit.empty() ? std::format(\"{:.2f}\", value) : std::format(\"{:.2f} {}\", value, unit);\n}\n\n[[nodiscard]] std::string line(const Check& check) {\n  const std::string measured = check.measured ? with_unit(*check.measured, check.unit) : std::string(\"not measured\");\n  return std::format(\"{:<6} {}: {}, {} {}\\n\", met(check) ? \"ok\" : \"failed\", check.what, measured,\n                     check.compare == Compare::at_least ? \"at least\" : \"at most\", with_unit(check.limit, check.unit));\n}\n\n}  // namespace\n\n[[nodiscard]] std::string describe(const Verdict& verdict) {\n  std::string text = std::format(\"{}\\nscenario: {}\\nsamples: {}\\n\", verdict.passed ? \"pass\" : \"fail\",\n                                 verdict.scenario, verdict.samples);\n  for (const Check& check : verdict.checks) text += line(check);\n  return text;\n}\n\n[[nodiscard]] double range_m(const Sample& sample, const Goal& goal) {\n  return std::hypot(goal.x_m - sample.x_m, goal.y_m - sample.y_m);\n}\n\n[[nodiscard]] std::optional<double> top_speed_mps(std::span<const Sample> run) {\n  if (run.empty()) return std::nullopt;\n  return std::ranges::max(run | std::views::transform([](const Sample& s) { return std::abs(s.speed_mps); }));\n}\n\n[[nodiscard]] std::span<const Sample> since(std::span<const Sample> run, Time from) {\n  return {std::ranges::lower_bound(run, from, {}, &Sample::at), run.end()};\n}\n\n[[nodiscard]] std::span<const Sample> between(std::span<const Sample> run, Time from, Time to) {\n  const auto first = std::ranges::lower_bound(run, from, {}, &Sample::at);\n  const auto last = std::ranges::upper_bound(run, to, {}, &Sample::at);\n  if (first >= last) return {};\n  return {first, last};\n}\n\n[[nodiscard]] std::optional<Time> reached_at(std::span<const Sample> run, const Goal& goal) {\n  const auto inside =\n      std::ranges::find_if(run, [&goal](const Sample& s) { return range_m(s, goal) <= goal.tolerance_m; });\n  if (inside == run.end()) return std::nullopt;\n  return inside->at;\n}\n\n[[nodiscard]] std::vector<Time> goal_times(std::span<const Sample> run, std::span<const Goal> goals) {\n  std::vector<Time> times;\n  std::span<const Sample> rest = run;\n  for (const Goal& goal : goals) {\n    const std::optional<Time> at = reached_at(rest, goal);\n    if (!at) break;\n    times.push_back(*at);\n    rest = since(rest, *at);\n  }\n  return times;\n}\n\n[[nodiscard]] std::optional<Time> first_rest(std::span<const Sample> run, double speed_limit_mps,\n                                             std::chrono::nanoseconds for_at_least) {\n  std::optional<Time> start;\n  for (const Sample& sample : run) {\n    if (std::abs(sample.speed_mps) > speed_limit_mps) {\n      start.reset();\n      continue;\n    }\n    if (!start) start = sample.at;\n    if (sample.at.since_epoch - start->since_epoch >= for_at_least) return start;\n  }\n  return std::nullopt;\n}\n\n[[nodiscard]] std::optional<double> wandered_m(std::span<const Sample> run) {\n  if (run.empty()) return std::nullopt;\n  const Sample& start = run.front();\n  return std::ranges::max(run | std::views::transform([&start](const Sample& s) {\n                            return std::hypot(s.x_m - start.x_m, s.y_m - start.y_m);\n                          }));\n}\n\n// New in this topic.\n\n// What a cancelled mission has to do. The first three limits are the missing-odometry ones under\n// another name, because a cancel and a lost input ask the robot for the same thing.\nstruct CancelLimits {\n  std::chrono::nanoseconds before;   // the window before the cancel in which the robot must be driving\n  double driving_mps;                // the speed that proves it was driving when the cancel arrived\n  std::chrono::nanoseconds to_rest;  // from the cancel until the robot is at rest\n  double creep_m;                    // from the cancel to the end of the run, not only to rest\n};\n\n[[nodiscard]] std::vector<Check> cancel_checks(std::span<const Sample> run, std::span<const Goal> goals,\n                                               std::optional<Time> cancel, const CancelLimits& limits) {\n  using namespace std::chrono_literals;\n  const std::optional<Time> rest = cancel ? first_rest(since(run, *cancel), 0.01, 300ms) : std::nullopt;\n  const auto to_rest = [&]() -> std::optional<double> {\n    if (!rest || !cancel) return std::nullopt;\n    return seconds(rest->since_epoch - cancel->since_epoch);\n  };\n  const auto was_driving = [&]() -> std::optional<double> {\n    if (!cancel) return std::nullopt;\n    return top_speed_mps(between(run, {cancel->since_epoch - limits.before}, *cancel));\n  };\n  // From the cancel to the end of the run, so a robot that stopped and then carried on is caught\n  // by the same number as one that never stopped.\n  const auto after = [&]() -> std::optional<double> {\n    if (!cancel) return std::nullopt;\n    return wandered_m(since(run, *cancel));\n  };\n  const auto more_goals = [&]() -> std::optional<double> {\n    if (!cancel) return std::nullopt;\n    return static_cast<double>(std::ssize(goal_times(since(run, *cancel), goals)));\n  };\n  return {{.what = \"the cancel went out at\",\n           .unit = \"s\",\n           .compare = Compare::at_least,\n           .limit = 0.0,\n           .measured = cancel ? std::optional<double>(seconds(cancel->since_epoch)) : std::nullopt},\n          {.what = \"top speed in the second before the cancel\",\n           .unit = \"m/s\",\n           .compare = Compare::at_least,\n           .limit = limits.driving_mps,\n           .measured = was_driving()},\n          {.what = \"time from the cancel to the robot at rest\",\n           .unit = \"s\",\n           .compare = Compare::at_most,\n           .limit = seconds(limits.to_rest),\n           .measured = to_rest()},\n          {.what = \"distance from the cancel point to the end of the run\",\n           .unit = \"m\",\n           .compare = Compare::at_most,\n           .limit = limits.creep_m,\n           .measured = after()},\n          {.what = \"goals reached after the cancel\",\n           .unit = \"\",\n           .compare = Compare::at_most,\n           .limit = 0.0,\n           .measured = more_goals()}};\n}\n\n}  // namespace bench\n\n// One odometry message of a made-up run, half a second of simulated time apart.\nstruct Moment {\n  std::chrono::milliseconds t;\n  double x_m;\n  double y_m;\n  double speed_mps;\n};\n\n[[nodiscard]] std::vector<bench::Sample> samples(std::span<const Moment> moments) {\n  std::vector<bench::Sample> run;\n  for (const Moment& moment : moments) {\n    run.push_back({.at = {moment.t}, .x_m = moment.x_m, .y_m = moment.y_m, .speed_mps = moment.speed_mps});\n  }\n  return run;\n}\n\nint main() {\n  using namespace std::chrono_literals;\n  constexpr std::array<bench::Goal, 2> goals{{{.x_m = 0.80, .y_m = 0.00, .tolerance_m = 0.10},\n                                              {.x_m = 0.80, .y_m = 0.50, .tolerance_m = 0.10}}};\n  constexpr bench::CancelLimits limits{\n      .before = 1000ms, .driving_mps = 0.10, .to_rest = 1500ms, .creep_m = 0.25};\n  const std::optional<bench::Time> cancel{bench::Time{4000ms}};\n\n  // The server obeying: the cancel arrives at 4.0 s, the robot brakes and stays where it stopped.\n  constexpr std::array<Moment, 11> obeyed{{{.t = 3000ms, .x_m = 0.30, .y_m = 0.00, .speed_mps = 0.20},\n                                           {.t = 3500ms, .x_m = 0.40, .y_m = 0.00, .speed_mps = 0.20},\n                                           {.t = 4000ms, .x_m = 0.50, .y_m = 0.00, .speed_mps = 0.20},\n                                           {.t = 4500ms, .x_m = 0.57, .y_m = 0.00, .speed_mps = 0.08},\n                                           {.t = 5000ms, .x_m = 0.58, .y_m = 0.00, .speed_mps = 0.00},\n                                           {.t = 5500ms, .x_m = 0.58, .y_m = 0.00, .speed_mps = 0.00},\n                                           {.t = 6000ms, .x_m = 0.58, .y_m = 0.00, .speed_mps = 0.00},\n                                           {.t = 6500ms, .x_m = 0.58, .y_m = 0.00, .speed_mps = 0.00},\n                                           {.t = 7000ms, .x_m = 0.58, .y_m = 0.00, .speed_mps = 0.00},\n                                           {.t = 7500ms, .x_m = 0.58, .y_m = 0.00, .speed_mps = 0.00},\n                                           {.t = 8000ms, .x_m = 0.58, .y_m = 0.00, .speed_mps = 0.00}}};\n  const auto stopped = samples(obeyed);\n  std::cout << bench::describe(\n      bench::judge(\"cancel\", std::ssize(stopped), bench::cancel_checks(stopped, goals, cancel, limits)));\n  std::cout << '\\n';\n\n  // A server that never looks at is_canceling(): the route runs to the end as though nothing\n  // had been asked of it.\n  constexpr std::array<Moment, 11> ignored{{{.t = 3000ms, .x_m = 0.30, .y_m = 0.00, .speed_mps = 0.20},\n                                            {.t = 3500ms, .x_m = 0.40, .y_m = 0.00, .speed_mps = 0.20},\n                                            {.t = 4000ms, .x_m = 0.50, .y_m = 0.00, .speed_mps = 0.20},\n                                            {.t = 4500ms, .x_m = 0.60, .y_m = 0.00, .speed_mps = 0.20},\n                                            {.t = 5000ms, .x_m = 0.70, .y_m = 0.00, .speed_mps = 0.20},\n                                            {.t = 5500ms, .x_m = 0.72, .y_m = 0.05, .speed_mps = 0.20},\n                                            {.t = 6000ms, .x_m = 0.75, .y_m = 0.20, .speed_mps = 0.20},\n                                            {.t = 6500ms, .x_m = 0.78, .y_m = 0.35, .speed_mps = 0.20},\n                                            {.t = 7000ms, .x_m = 0.79, .y_m = 0.45, .speed_mps = 0.05},\n                                            {.t = 7500ms, .x_m = 0.79, .y_m = 0.45, .speed_mps = 0.00},\n                                            {.t = 8000ms, .x_m = 0.79, .y_m = 0.45, .speed_mps = 0.00}}};\n  const auto drove_on = samples(ignored);\n  std::cout << bench::describe(\n      bench::judge(\"cancel\", std::ssize(drove_on), bench::cancel_checks(drove_on, goals, cancel, limits)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "pass\nscenario: cancel\nsamples: 11\nok     the cancel went out at: 4.00 s, at least 0.00 s\nok     top speed in the second before the cancel: 0.20 m/s, at least 0.10 m/s\nok     time from the cancel to the robot at rest: 1.00 s, at most 1.50 s\nok     distance from the cancel point to the end of the run: 0.08 m, at most 0.25 m\nok     goals reached after the cancel: 0.00, at most 0.00\n\nfail\nscenario: cancel\nsamples: 11\nok     the cancel went out at: 4.00 s, at least 0.00 s\nok     top speed in the second before the cancel: 0.20 m/s, at least 0.10 m/s\nfailed time from the cancel to the robot at rest: 3.50 s, at most 1.50 s\nfailed distance from the cancel point to the end of the run: 0.54 m, at most 0.25 m\nfailed goals reached after the cancel: 2.00, at most 0.00"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth check is the one that does the work. It measures from the cancel to the end of the run rather than to the moment the robot first came to rest, so a follower that stops politely and then carries on, which is what a cancel handled in the wrong place looks like, produces the same 0.54 m as one that never stopped at all. The fifth is the requirement a person would state first and a test would leave out: a cancelled mission does not get to finish."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add tests for both verdicts, one for a cancel that never went out, and one for a robot already standing still when the cancel arrived, which must fail on the second check rather than pass on the third."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_sim/config/cancel.yaml"
+         },
+         {
+          "t": "text",
+          "v": ". It is "
+         },
+         {
+          "t": "code",
+          "v": "normal.yaml"
+         },
+         {
+          "t": "text",
+          "v": " with the cue and the limits added, and no drop:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "/**:\n  ros__parameters:\n    use_sim_time: true\n    goals_x: [0.8, 0.8]\n    goals_y: [0.0, 0.5]\n    tolerance_m: 0.1\nroute_follower:\n  ros__parameters:\n    start_after_ms: 2000\n    speed_mps: 0.2\nscenario_runner:\n  ros__parameters:\n    warmup_ms: 1000\n    drive_ms: 30000\n    settle_ms: 3000\n    cancel_at_ms: 6000\n    before_ms: 1000\n    driving_mps: 0.1\n    to_rest_ms: 1500\n    creep_m: 0.25"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Choose "
+        },
+        {
+         "t": "code",
+         "v": "cancel_at_ms"
+        },
+        {
+         "t": "text",
+         "v": " so that the cancel lands while the robot is driving straight and away from a goal circle. At 6 s the follower has been driving for four seconds and is partway along the first leg. Run it once and read two lines: if the speed before the cancel is under the limit the cue landed during a turn, and if a goal was reached after the cancel it landed on top of one. Move it and write down where you put it and why."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it and judge it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh\n./run_scenario.sh cancel; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then check the clean-up the pass line asks for, which cancellation makes more likely to go wrong than any scenario so far:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "pgrep -af \"gz sim\"      # nothing\nros2 node list          # nothing\nros2 action list        # nothing"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A goal handle left in a member is the failure to look for here. The run ends, the launch shuts everything down, and the symptom appears on the next run instead: a server that rejects the first goal because it still thinks one is running. If that happens, the "
+        },
+        {
+         "t": "code",
+         "v": "running_.reset()"
+        },
+        {
+         "t": "text",
+         "v": " after "
+        },
+        {
+         "t": "code",
+         "v": "canceled"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "succeed"
+        },
+        {
+         "t": "text",
+         "v": " is missing."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it five times, and write down the range of the time to rest and of the distance after the cancel. Hold them against the arithmetic: the follower stops publishing at the first odometry message after the cancel, which is up to 33 ms, the DiffDrive system brakes at 1 m/s² which takes 0.2 s from 0.2 m/s, and the supervisor's own stop would have arrived 500 ms later if the follower had said nothing at all. So expect a few tenths of a second, well under the 1.5 s limit, and a distance of a few centimetres."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove that the scenario catches a follower that ignores the cancel. Comment out the "
+         },
+         {
+          "t": "code",
+          "v": "is_canceling()"
+         },
+         {
+          "t": "text",
+          "v": " branch from Build 2, rebuild, and run it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./run_scenario.sh cancel; echo \"exit $?\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three of the five lines fail, exactly as the second verdict in the fence predicts, and the first two still pass, which is the report telling you that the cancel went out and the robot was driving when it did. Put the branch back, and add the case to "
+        },
+        {
+         "t": "code",
+         "v": "cases.txt"
+        },
+        {
+         "t": "text",
+         "v": " so the suite keeps it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "cancel            | cancel             | pass   |                                        |"
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "./run_scenario.sh cancel"
+         },
+         {
+          "t": "text",
+          "v": " passes five times in a row, with the time to rest and the distance written down;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the run leaves no Gazebo server, no node and no action behind;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a follower with the cancel branch removed fails the last three lines and passes the first two;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the case is in "
+         },
+         {
+          "t": "code",
+          "v": "cases.txt"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "./run_regressions.sh"
+         },
+         {
+          "t": "text",
+          "v": " still ends green."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add the cancellation scenario to the \"Scenarios\" section of "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ", and a short section called \"The drive action\". Together they are the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For the action, give the three parts of "
+        },
+        {
+         "t": "code",
+         "v": "DriveRoute"
+        },
+        {
+         "t": "text",
+         "v": " and one line on why the result carries only "
+        },
+        {
+         "t": "code",
+         "v": "goals_reached"
+        },
+        {
+         "t": "text",
+         "v": ". Then the bill, in two lines: what the interface package costs, and what it buys, in the words you used in Build 1. Then the rule the server follows, which is the one worth repeating in an interview: the work runs on the callback that already exists, the goal handle lives in a member because the server keeps only a weak pointer, "
+        },
+        {
+         "t": "code",
+         "v": "is_canceling()"
+        },
+        {
+         "t": "text",
+         "v": " is checked every time the work ticks, and the member is cleared the moment the goal ends."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For the scenario, give the cue's moment with the reason you chose it, the five checks with their limits, and the measured range of each over five runs next to the arithmetic that predicts it. Finish with the failure you produced: which three lines went red, which two stayed green, and what those two told you that a bare "
+        },
+        {
+         "t": "code",
+         "v": "fail"
+        },
+        {
+         "t": "text",
+         "v": " would not have."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "writing an action server and client in C++",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Writing-an-Action-Server-Client/Cpp.html"
+     },
+     {
+      "t": "text",
+      "v": ", on "
+     },
+     {
+      "t": "a",
+      "v": "creating an action",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Creating-an-Action.html"
+     },
+     {
+      "t": "text",
+      "v": " and on "
+     },
+     {
+      "t": "a",
+      "v": "custom interfaces",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-Client-Libraries/Custom-ROS2-Interfaces.html"
+     },
+     {
+      "t": "text",
+      "v": ", which is where "
+     },
+     {
+      "t": "code",
+      "v": "rosidl_generate_interfaces"
+     },
+     {
+      "t": "text",
+      "v": " and the interface package group come from."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "actions design article",
+      "href": "https://design.ros2.org/articles/actions.html"
+     },
+     {
+      "t": "text",
+      "v": ", for the goal, feedback, result and cancel path, and for why the status belongs to the action rather than to the result message."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "rclcpp_action on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "server.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_action/include/rclcpp_action/server.hpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "server_goal_handle.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_action/include/rclcpp_action/server_goal_handle.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "is_canceling"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "canceled"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "succeed"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "client.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp_action/include/rclcpp_action/client.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "async_send_goal"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "async_cancel_goal"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ros2/examples repository, jazzy branch: the "
+     },
+     {
+      "t": "a",
+      "v": "action server",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/actions/minimal_action_server/member_functions.cpp"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "action client",
+      "href": "https://github.com/ros2/examples/blob/jazzy/rclcpp/actions/minimal_action_client/member_functions.cpp"
+     },
+     {
+      "t": "text",
+      "v": ", which are the shape the follower's four callbacks follow."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": ", which is how a check whose cue never went out stays apart from one that measured zero."
+     }
+    ]
+   ]
+  }
+ ]
+}

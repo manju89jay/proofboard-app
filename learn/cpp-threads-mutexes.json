@@ -1,0 +1,3317 @@
+{
+ "id": "cpp-threads-mutexes",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Take 10 minutes, on paper, closed book."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Define a data race exactly. What must two threads do to the same object, and what does the standard say about a program that contains one?"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Two encoder threads share this counter. Say what it prints and why."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "int ticks = 0;\nstd::vector<std::jthread> encoders;\nfor (int i = 0; i < 2; ++i) {\n  encoders.emplace_back([&ticks] {\n    for (int k = 0; k < 200'000; ++k) ++ticks;\n  });\n}"
+   },
+   {
+    "t": "ol",
+    "start": 3,
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Fix it in two ways, and say what each fix costs."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Which of these four is a data race: two threads writing different elements of one "
+      },
+      {
+       "t": "code",
+       "v": "std::vector<int>"
+      },
+      {
+       "t": "text",
+       "v": "; two threads writing two different "
+      },
+      {
+       "t": "code",
+       "v": "bool"
+      },
+      {
+       "t": "text",
+       "v": " members of one struct; two threads calling "
+      },
+      {
+       "t": "code",
+       "v": "push_back"
+      },
+      {
+       "t": "text",
+       "v": " on one "
+      },
+      {
+       "t": "code",
+       "v": "std::vector<int>"
+      },
+      {
+       "t": "text",
+       "v": "; one thread copying a "
+      },
+      {
+       "t": "code",
+       "v": "std::shared_ptr"
+      },
+      {
+       "t": "text",
+       "v": " while another thread copies the same "
+      },
+      {
+       "t": "code",
+       "v": "std::shared_ptr"
+      },
+      {
+       "t": "text",
+       "v": " object?"
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Two threads access the same memory location, at least one of the accesses writes, and nothing in the program orders one before the other. \"Orders\" is the technical part: a mutex, an atomic, starting or joining a thread all create that order, and plain code in two threads does not. A program with a data race has undefined behaviour for its whole execution, and not merely at that line ("
+      },
+      {
+       "t": "a",
+       "v": "intro.races",
+       "href": "https://eel.is/c++draft/intro.races"
+      },
+      {
+       "t": "text",
+       "v": ")."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "It prints a number below 400000 that changes from run to run. "
+      },
+      {
+       "t": "code",
+       "v": "++ticks"
+      },
+      {
+       "t": "text",
+       "v": " is three steps, a read, an add and a write, and when both threads read 41 before either writes 42, one increment is gone. Ten runs on my machine printed between 200000 and 257328. Any answer that names one specific number is wrong: the behaviour is undefined, and what you see is what the hardware and the optimiser happened to do."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Two of the three fixes below, with the cost of each. A "
+      },
+      {
+       "t": "code",
+       "v": "std::mutex"
+      },
+      {
+       "t": "text",
+       "v": " locked with a "
+      },
+      {
+       "t": "code",
+       "v": "std::lock_guard"
+      },
+      {
+       "t": "text",
+       "v": " around the increment, which costs a lock and a release per increment and lets one thread at a time through. A "
+      },
+      {
+       "t": "code",
+       "v": "std::atomic<int>"
+      },
+      {
+       "t": "text",
+       "v": " with "
+      },
+      {
+       "t": "code",
+       "v": "fetch_add"
+      },
+      {
+       "t": "text",
+       "v": ", which costs one atomic read-modify-write per increment and no blocking. Or, best of all, a local counter per thread, added into the shared total once at the end. I measured 1000000 increments over four threads at 53 ms with one mutex, 12 ms with one atomic and 1 ms with locals."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Different elements of a vector: no race. Each element is its own "
+      },
+      {
+       "t": "i",
+       "v": "memory location"
+      },
+      {
+       "t": "text",
+       "v": ", and distinct memory locations never race with each other. Two different "
+      },
+      {
+       "t": "code",
+       "v": "bool"
+      },
+      {
+       "t": "text",
+       "v": " members: no race either, for the same reason, and this is the point of the term. Two adjacent bit-fields would share one memory location and would race. Two "
+      },
+      {
+       "t": "code",
+       "v": "push_back"
+      },
+      {
+       "t": "text",
+       "v": " calls: a race, and the worst kind, because both threads write the size, the capacity and possibly the same new element. Two threads copying the same "
+      },
+      {
+       "t": "code",
+       "v": "shared_ptr"
+      },
+      {
+       "t": "text",
+       "v": " object: no race. Both only read the pointer, and the use count is updated atomically. One thread "
+      },
+      {
+       "t": "i",
+       "v": "assigning"
+      },
+      {
+       "t": "text",
+       "v": " to that "
+      },
+      {
+       "t": "code",
+       "v": "shared_ptr"
+      },
+      {
+       "t": "text",
+       "v": " while another copies it is a race, which is what "
+      },
+      {
+       "t": "code",
+       "v": "std::atomic<std::shared_ptr<T>>"
+      },
+      {
+       "t": "text",
+       "v": " is for."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with the definition including the word \"ordered\", the right prediction for the counter, two fixes with their costs, and three of the four cases in 4. Calling the counter \"a bug that shows up under load\" without naming undefined behaviour is a partial pass. Saying that two threads writing different elements of a vector race is a fail, because it would push you towards locking things that need no lock."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A thread is a flow of execution inside a process that runs its own function while sharing the process's memory with every other thread. In C++20 you start one with "
+    },
+    {
+     "t": "code",
+     "v": "std::jthread"
+    },
+    {
+     "t": "text",
+     "v": ", which takes a callable and its arguments, runs it, and in its destructor asks it to stop and waits for it to finish, which is called joining."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Sharing memory is what makes threads fast and what makes them dangerous. A data race is two threads reaching the same memory location, at least one of them writing, with nothing ordering the two accesses; a program containing one has undefined behaviour. The everyday symptom is a lost update. "
+    },
+    {
+     "t": "code",
+     "v": "++ticks"
+    },
+    {
+     "t": "text",
+     "v": " reads, adds and writes, so when both threads read 41, both write 42 and one count is gone. I ran a two-thread counter with 400000 increments ten times and it finished between 200000 and 257328, never at 400000."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism that fixes it is a mutex, short for mutual exclusion: an object that one thread at a time can own. A thread that asks for a locked mutex waits until the owner releases it, and the release also publishes everything that thread wrote, so the next owner sees it. You never call "
+    },
+    {
+     "t": "code",
+     "v": "lock()"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "unlock()"
+    },
+    {
+     "t": "text",
+     "v": " by hand. You declare a "
+    },
+    {
+     "t": "code",
+     "v": "std::lock_guard"
+    },
+    {
+     "t": "text",
+     "v": ", which locks in its constructor and unlocks in its destructor, so every return and every exception unlocks. The mutex lives in the same class as the data it protects, and every access to that data, reads included, holds it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is throughput and a new failure mode. Those same 1000000 increments took 53 ms through one mutex and 1 ms when each thread counted into a local and merged once at the end, so the cheapest concurrency is the kind that shares nothing. The failure mode is deadlock: two threads that take two mutexes in opposite orders wait for each other forever, which "
+    },
+    {
+     "t": "code",
+     "v": "std::scoped_lock(a, b)"
+    },
+    {
+     "t": "text",
+     "v": " prevents by taking both in one step."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "In the robot you meet this wherever a callback thread and a control loop share state: the newest scan, an odometry accumulator, a queue of commands."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "threads",
+   "title": "std::thread and jthread: join, detach, passing arguments",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three sensors are read at once, each on its own thread, and the results are printed after all three are done:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <thread>\n#include <vector>\n\nstruct Reading {\n  std::string sensor;\n  int samples = 0;\n};\n\n// name and samples are copied into the thread; slot is shared, so the caller passes std::ref.\nvoid collect(std::string_view name, int samples, Reading& slot) {\n  slot.sensor = std::string(name);\n  slot.samples = samples;\n}\n\nint main() {\n  const std::array<std::string_view, 3> sensors{\"front_laser\", \"rear_laser\", \"imu\"};\n  std::vector<Reading> readings(sensors.size());\n  {\n    std::vector<std::jthread> workers;\n    workers.reserve(sensors.size());\n    for (std::ptrdiff_t i = 0; i < std::ssize(sensors); ++i) {\n      workers.emplace_back(collect, sensors[i], 100 + static_cast<int>(i), std::ref(readings[i]));\n    }\n    std::cout << std::format(\"{} workers started; the scope ends and every jthread joins\\n\", workers.size());\n  }\n  for (const Reading& r : readings) std::cout << std::format(\"{}: {} samples\\n\", r.sensor, r.samples);\n  std::cout << std::format(\"hardware_concurrency reports a positive number: {}\\n\",\n                           std::thread::hardware_concurrency() > 0);\n}"
+      },
+      {
+       "t": "output",
+       "text": "3 workers started; the scope ends and every jthread joins\nfront_laser: 100 samples\nrear_laser: 101 samples\nimu: 102 samples\nhardware_concurrency reports a positive number: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The output is in sensor order although the threads ran in whatever order the scheduler chose, because nothing is printed until every thread has finished. The three lines after the first are printed by "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", from data the workers left behind. That is the shape to reach for: threads compute, the joiner prints."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": ", C++20's joining thread, starts running its callable as soon as it is constructed. Its destructor calls "
+        },
+        {
+         "t": "code",
+         "v": "request_stop()"
+        },
+        {
+         "t": "text",
+         "v": " and then "
+        },
+        {
+         "t": "code",
+         "v": "join()"
+        },
+        {
+         "t": "text",
+         "v": ", which blocks until the thread's function has returned ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/thread/jthread"
+        },
+        {
+         "t": "text",
+         "v": "). The closing brace of the inner scope is therefore a barrier: after it, every worker is finished and everything a worker wrote is visible to "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ". The Core Guidelines call this thinking of a joining thread as a scoped container ("
+        },
+        {
+         "t": "a",
+         "v": "CP.23",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-join"
+        },
+        {
+         "t": "text",
+         "v": "): the threads live inside a scope, so the objects that scope owns outlive them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::thread"
+        },
+        {
+         "t": "text",
+         "v": " does not join. If a "
+        },
+        {
+         "t": "code",
+         "v": "std::thread"
+        },
+        {
+         "t": "text",
+         "v": " object is destroyed while it is still joinable, its destructor calls "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": " and the program dies. The worker below shares nothing with "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", so the missing join is the only thing wrong with it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "int main() {\n  std::thread worker([] { std::this_thread::sleep_for(std::chrono::milliseconds(10)); });\n  std::cout << std::format(\"worker started, joinable {}\\n\", worker.joinable());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Built with the page's flags, that program exits with status 134 whatever you do with it, and what you see depends on where standard output goes. Piped into a file, the formatted line never arrives and only standard error has anything in it:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "terminate called without an active exception"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Run on a terminal, the same binary prints both lines, the formatted one first:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "worker started, joinable true\nterminate called without an active exception"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The difference is buffering, not the bug. "
+        },
+        {
+         "t": "code",
+         "v": "std::cout"
+        },
+        {
+         "t": "text",
+         "v": " is line-buffered to a terminal, so the newline has already pushed the line out by the time the destructor runs, and fully buffered to a pipe, where the line is still sitting in the buffer when "
+        },
+        {
+         "t": "code",
+         "v": "abort"
+        },
+        {
+         "t": "text",
+         "v": " ends the process without flushing it. That is worth knowing beyond this example: a crash swallows whatever your last few lines of logging were still holding, which is why a program that dies without printing what it was doing may have printed it into a buffer nobody flushed. The rule that follows is the one the Guidelines wrote before C++20 had "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "CP.25",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-joining_thread"
+        },
+        {
+         "t": "text",
+         "v": "): use the joining thread type, so that forgetting to join is not a thing you can do. Reach for "
+        },
+        {
+         "t": "code",
+         "v": "std::thread"
+        },
+        {
+         "t": "text",
+         "v": " only when you have to detach, which the next paragraph argues against, or when you must hand the native handle to an operating system call."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "detach()"
+        },
+        {
+         "t": "text",
+         "v": " cuts the thread loose: the "
+        },
+        {
+         "t": "code",
+         "v": "std::thread"
+        },
+        {
+         "t": "text",
+         "v": " object stops being joinable, and the running thread carries on with no way to wait for it. A detached thread is a global container ("
+        },
+        {
+         "t": "a",
+         "v": "CP.24",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detach"
+        },
+        {
+         "t": "text",
+         "v": "), so every object it touches has to outlive the whole program, and at exit it is stopped wherever it happens to be, possibly holding a lock or halfway through writing a file. "
+        },
+        {
+         "t": "a",
+         "v": "CP.26",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detached_thread"
+        },
+        {
+         "t": "text",
+         "v": " is blunt about it: don't. If you want work that outlives its caller, give it an owner that can wait for it, which is what the bounded queue and a worker pool do two topics from here."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Arguments are copied, not referred to. "
+        },
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": "'s constructor takes the callable and the arguments, decay-copies each one into storage that belongs to the new thread, and calls the function with those copies. That default is deliberate ("
+        },
+        {
+         "t": "a",
+         "v": "CP.31",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-data-by-value"
+        },
+        {
+         "t": "text",
+         "v": "): a copy cannot dangle. The consequence is that a function parameter of reference type does not bind, and the error arrives at compile time rather than at run time:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "std::jthread arguments must be invocable after conversion to rvalues",
+       "text": "#include <thread>\n\nstruct Reading {\n  int samples = 0;\n};\n\nvoid collect(Reading& slot) { slot.samples = 100; }\n\nint main() {\n  Reading reading;\n  const std::jthread worker(collect, reading);  // the thread gets a copy, so the reference cannot bind\n  return reading.samples;\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::ref(readings[i])"
+        },
+        {
+         "t": "text",
+         "v": " in the first program is the way to say \"I meant the object itself\". It wraps a pointer in a "
+        },
+        {
+         "t": "code",
+         "v": "std::reference_wrapper"
+        },
+        {
+         "t": "text",
+         "v": ", which is copyable and converts back to "
+        },
+        {
+         "t": "code",
+         "v": "Reading&"
+        },
+        {
+         "t": "text",
+         "v": " at the call. It also hands you back the lifetime problem: "
+        },
+        {
+         "t": "code",
+         "v": "readings"
+        },
+        {
+         "t": "text",
+         "v": " has to outlive the thread. In the program above it does, because "
+        },
+        {
+         "t": "code",
+         "v": "readings"
+        },
+        {
+         "t": "text",
+         "v": " is declared before the scope that holds the workers and is therefore destroyed after them. Declare the shared objects first and the workers last, and the destruction order does that check for you."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A lambda capture is the same choice in different syntax. "
+        },
+        {
+         "t": "code",
+         "v": "[&ticks]"
+        },
+        {
+         "t": "text",
+         "v": " captures by reference and dangles if the thread outlives the captured object; "
+        },
+        {
+         "t": "code",
+         "v": "[ticks]"
+        },
+        {
+         "t": "text",
+         "v": " copies. With "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " the danger is smaller, because the destructor joins before the enclosing scope's objects are destroyed, which is why a capture by reference into a "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " declared in the same scope is sound."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two numbers for scale, measured in WSL with GCC 13.3 and averaged over ten thousand create-and-join pairs in one process. One "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " that adds two numbers cost 39 to 45 microseconds at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " over five runs, and 106 to 123 microseconds in the page's sanitizer build. Those are the warm figures, and the method matters more here than the machine does: timed one at a time in a fresh process, that first thread took 108 to 177 microseconds at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " and 338 to 425 sanitized, about three times as much, while the runtime pays for its first stack and its first system call. Another machine came out higher again on both methods. One locked increment, from the next section, took 38 nanoseconds. Starting a thread is therefore three to four orders of magnitude more expensive than taking a lock, depending on how cold that thread is, and that band is what survives a change of method and of machine, which is why real systems create a few threads at start-up and feed them work ("
+        },
+        {
+         "t": "a",
+         "v": "CP.41",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-create"
+        },
+        {
+         "t": "text",
+         "v": "), rather than starting one per message. "
+        },
+        {
+         "t": "code",
+         "v": "std::thread::hardware_concurrency()"
+        },
+        {
+         "t": "text",
+         "v": " is a hint at how many threads can truly run at once, and it may return 0 when the answer is unknown, so treat it as advice and not as a promise."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last part of "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " is its stop token. Every "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " owns a "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_source"
+        },
+        {
+         "t": "text",
+         "v": ", its destructor calls "
+        },
+        {
+         "t": "code",
+         "v": "request_stop()"
+        },
+        {
+         "t": "text",
+         "v": " before joining, and a thread function whose first parameter is a "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_token"
+        },
+        {
+         "t": "text",
+         "v": " can ask "
+        },
+        {
+         "t": "code",
+         "v": "stop_requested()"
+        },
+        {
+         "t": "text",
+         "v": " and wind itself down. That is how a loop-until-told-to-stop thread ends without a flag of your own. The cancellation topic later in this track builds a shutdown path out of it; here the part that matters is that the destructor blocks until the function returns, so a thread that ignores its stop token makes the destructor hang forever."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes. A laser scan arrives as a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<float>"
+        },
+        {
+         "t": "text",
+         "v": " of 3600 ranges in metres, and the robot needs the nearest one. Compute it on four threads:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::optional<float> nearest(std::span<const float> ranges)"
+         },
+         {
+          "t": "text",
+          "v": ", returning the smallest range, or no value for an empty span. Call a standard algorithm in its "
+         },
+         {
+          "t": "code",
+          "v": "std::ranges"
+         },
+         {
+          "t": "text",
+          "v": " form rather than writing the loop."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write a "
+         },
+         {
+          "t": "code",
+          "v": "split"
+         },
+         {
+          "t": "text",
+          "v": " that cuts a "
+         },
+         {
+          "t": "code",
+          "v": "std::span<const float>"
+         },
+         {
+          "t": "text",
+          "v": " into a given number of spans, the last one taking the remainder."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "In "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", fill 3600 ranges from a formula so that every run gives the same scan, then put one closer obstacle in each quarter. Run one "
+         },
+         {
+          "t": "code",
+          "v": "std::jthread"
+         },
+         {
+          "t": "text",
+          "v": " per part, each writing its result into its own slot of a "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::optional<float>>"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Print, for each part, its beam count and its nearest range to two decimals; then the nearest over the whole scan; then what "
+         },
+         {
+          "t": "code",
+          "v": "nearest"
+         },
+         {
+          "t": "text",
+          "v": " says about an empty scan."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Use signed indices and "
+        },
+        {
+         "t": "code",
+         "v": "std::ssize"
+        },
+        {
+         "t": "text",
+         "v": ". Do not use a mutex: the design must not need one. Then answer two questions. Why does no slot need a lock? And what breaks if the workers "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " their results into one shared vector instead?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <thread>\n#include <vector>\n\n// The work itself: no threads and no shared state, so a test can call it on its own.\n[[nodiscard]] std::optional<float> nearest(std::span<const float> ranges) {\n  const auto it = std::ranges::min_element(ranges);\n  if (it == ranges.end()) return std::nullopt;\n  return *it;\n}\n\n[[nodiscard]] std::vector<std::span<const float>> split(std::span<const float> all, std::ptrdiff_t parts) {\n  std::vector<std::span<const float>> pieces;\n  pieces.reserve(parts);\n  const std::ptrdiff_t each = std::ssize(all) / parts;\n  for (std::ptrdiff_t i = 0; i < parts; ++i) {\n    const std::ptrdiff_t first = i * each;\n    const std::ptrdiff_t count = i + 1 == parts ? std::ssize(all) - first : each;\n    pieces.push_back(all.subspan(first, count));\n  }\n  return pieces;\n}\n\nint main() {\n  constexpr std::ptrdiff_t kBeams = 3600;\n  constexpr std::ptrdiff_t kWorkers = 4;\n  std::vector<float> ranges(kBeams);\n  for (std::ptrdiff_t i = 0; i < kBeams; ++i) {\n    ranges[i] = 5.0F + static_cast<float>((i * 37) % 500) / 100.0F;\n  }\n  ranges[150] = 0.80F;  // one obstacle in each quarter of the scan\n  ranges[1234] = 0.42F;\n  ranges[2500] = 1.10F;\n  ranges[3300] = 0.63F;\n\n  const std::vector<std::span<const float>> parts = split(ranges, kWorkers);\n  std::vector<std::optional<float>> found(parts.size());  // one slot per worker: nothing is shared\n  {\n    std::vector<std::jthread> workers;\n    workers.reserve(parts.size());\n    for (std::ptrdiff_t i = 0; i < std::ssize(parts); ++i) {\n      workers.emplace_back([part = parts[i], slot = &found[i]] { *slot = nearest(part); });\n    }\n  }\n\n  for (std::ptrdiff_t i = 0; i < std::ssize(found); ++i) {\n    std::cout << std::format(\"chunk {}: {} beams, nearest {:.2f} m\\n\", i, std::ssize(parts[i]), found[i].value());\n  }\n  const auto best = std::ranges::min_element(found, {}, [](const std::optional<float>& v) { return v.value(); });\n  std::cout << std::format(\"nearest over all {} beams: {:.2f} m\\n\", kBeams, best->value());\n  std::cout << std::format(\"an empty scan has a nearest beam: {}\\n\", nearest({}).has_value());\n}"
+      },
+      {
+       "t": "output",
+       "text": "chunk 0: 900 beams, nearest 0.80 m\nchunk 1: 900 beams, nearest 0.42 m\nchunk 2: 900 beams, nearest 1.10 m\nchunk 3: 900 beams, nearest 0.63 m\nnearest over all 3600 beams: 0.42 m\nan empty scan has a nearest beam: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "No slot needs a lock because no two threads touch the same memory location. Each worker writes "
+        },
+        {
+         "t": "code",
+         "v": "found[i]"
+        },
+        {
+         "t": "text",
+         "v": " for its own "
+        },
+        {
+         "t": "code",
+         "v": "i"
+        },
+        {
+         "t": "text",
+         "v": ", and distinct elements of a vector are distinct memory locations, so there is no conflict to order. "
+        },
+        {
+         "t": "code",
+         "v": "found"
+        },
+        {
+         "t": "text",
+         "v": " is sized before the threads start, which matters as much as the indices: a "
+        },
+        {
+         "t": "code",
+         "v": "resize"
+        },
+        {
+         "t": "text",
+         "v": " during the run would move every element and leave the other workers writing into freed memory. "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " reads the slots only after the scope has joined the workers, and joining is one of the operations that orders what a thread wrote before what the joiner reads."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " from several threads breaks all of that at once. The threads write the same size, the same capacity and the same buffer pointer, a reallocation moves elements while another thread is writing them, and the order of results would stop matching the order of the parts. If the results have to go into one container, the container needs a mutex, and the exercise in the next section builds one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The lambda captures "
+        },
+        {
+         "t": "code",
+         "v": "parts[i]"
+        },
+        {
+         "t": "text",
+         "v": " by value: a "
+        },
+        {
+         "t": "code",
+         "v": "std::span"
+        },
+        {
+         "t": "text",
+         "v": " is a pointer and a length, copying it is two words, and it refers to "
+        },
+        {
+         "t": "code",
+         "v": "ranges"
+        },
+        {
+         "t": "text",
+         "v": ", which outlives the workers. Capturing "
+        },
+        {
+         "t": "code",
+         "v": "slot = &found[i]"
+        },
+        {
+         "t": "text",
+         "v": " rather than "
+        },
+        {
+         "t": "code",
+         "v": "&found"
+        },
+        {
+         "t": "text",
+         "v": " and an index keeps each worker's reach down to one element, which is the clearest way of saying that the workers do not overlap."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "races",
+   "title": "Data races; mutex, lock_guard, scoped_lock, unique_lock",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the counter from the cold check, as a complete program:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <thread>\n#include <vector>\n\nint main() {\n  int ticks = 0;  // shared by both encoders, with nothing protecting it\n  {\n    std::vector<std::jthread> encoders;\n    encoders.reserve(2);\n    for (int i = 0; i < 2; ++i) {\n      encoders.emplace_back([&ticks] {\n        for (int k = 0; k < 200'000; ++k) ++ticks;\n      });\n    }\n  }\n  std::cout << std::format(\"400000 increments left ticks at {}\\n\", ticks);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It has no output block, because it has no fixed output. Five of the runs I made in WSL:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "400000 increments left ticks at 200000\n400000 increments left ticks at 223801\n400000 increments left ticks at 213297\n400000 increments left ticks at 244143\n400000 increments left ticks at 257328"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Data race"
+        },
+        {
+         "t": "text",
+         "v": " is a term of art, and the definition is worth having word for word, because it tells you what to look for. A program contains a data race when two accesses to the same memory location happen in different threads, at least one of them is a write, neither is atomic, and neither happens before the other ("
+        },
+        {
+         "t": "a",
+         "v": "intro.races",
+         "href": "https://eel.is/c++draft/intro.races"
+        },
+        {
+         "t": "text",
+         "v": "). A program with a data race has undefined behaviour. Not a wrong number: undefined behaviour, which is why the results above are evidence about my machine and not a specification."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two words in that definition carry the weight. A "
+        },
+        {
+         "t": "i",
+         "v": "memory location"
+        },
+        {
+         "t": "text",
+         "v": " is one scalar object, or one maximal sequence of adjacent bit-fields. Two threads writing "
+        },
+        {
+         "t": "code",
+         "v": "readings[0]"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "readings[1]"
+        },
+        {
+         "t": "text",
+         "v": ", or two different members of a struct, use different memory locations and do not race, which is what made the exercise above lock-free. Two threads writing two adjacent bit-fields of one struct share a memory location and do race, even though the code looks like two separate variables ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference on the memory model",
+         "href": "https://en.cppreference.com/cpp/language/memory_model"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "i",
+         "v": "Happens before"
+        },
+        {
+         "t": "text",
+         "v": " is the ordering relation the standard builds out of a handful of operations: everything before you start a thread happens before that thread's first line, everything a thread does happens before the join returns, and unlocking a mutex happens before the next lock of it. Plain reads and writes in two threads create no order at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "++ticks"
+        },
+        {
+         "t": "text",
+         "v": " loses counts because it is a read, an add and a write with no order between the threads' steps, so two threads can read the same 41. The mutex version puts the three steps inside a region only one thread can be in at a time:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <mutex>\n#include <thread>\n#include <vector>\n\nclass TickCounter {\n public:\n  void add(int ticks) {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    total_ += ticks;\n  }\n  [[nodiscard]] int total() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return total_;\n  }\n\n private:\n  mutable std::mutex mutex_;\n  int total_ = 0;\n};\n\nint main() {\n  TickCounter counter;\n  {\n    std::vector<std::jthread> encoders;\n    encoders.reserve(2);\n    for (int i = 0; i < 2; ++i) {\n      encoders.emplace_back([&counter] {\n        for (int k = 0; k < 200'000; ++k) counter.add(1);\n      });\n    }\n  }\n  std::cout << std::format(\"400000 increments left the total at {}\\n\", counter.total());\n}"
+      },
+      {
+       "t": "output",
+       "text": "400000 increments left the total at 400000"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " has "
+        },
+        {
+         "t": "code",
+         "v": "lock()"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "try_lock()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "unlock()"
+        },
+        {
+         "t": "text",
+         "v": ", and you call none of them. A lock is a resource, so it is owned by an object whose destructor releases it, which is RAII applied to a lock ("
+        },
+        {
+         "t": "a",
+         "v": "CP.20",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-raii"
+        },
+        {
+         "t": "text",
+         "v": "). "
+        },
+        {
+         "t": "code",
+         "v": "std::lock_guard<std::mutex> lock(mutex_)"
+        },
+        {
+         "t": "text",
+         "v": " locks in its constructor and unlocks in its destructor, on the return path, on the early return you add next month and on the exception thrown by something you call. The class owns its mutex next to the data the mutex protects ("
+        },
+        {
+         "t": "a",
+         "v": "CP.50",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-mutex"
+        },
+        {
+         "t": "text",
+         "v": "), and the data is private, so \"every access takes the lock\" is a promise the class can keep rather than a rule for callers to remember."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "total()"
+        },
+        {
+         "t": "text",
+         "v": " locks too, although it only reads. A read that runs while another thread writes is a data race by the definition above, and on a wider type than "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " it can also return a value that never existed. The mutex is "
+        },
+        {
+         "t": "code",
+         "v": "mutable"
+        },
+        {
+         "t": "text",
+         "v": " so that a "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " member function can lock it: locking is not a change to the logical value of the counter. That pairing, "
+        },
+        {
+         "t": "code",
+         "v": "mutable std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " readers, is the shape of almost every guarded class you will write."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four lock types are worth keeping apart."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Type"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "What it does"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Reach for it when"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::lock_guard<M>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "locks one mutex in the constructor, unlocks in the destructor, cannot be moved or unlocked early"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the whole function body is the critical section"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::scoped_lock"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the same for zero, one or several mutexes, taken in an order that cannot deadlock"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "you need two or more mutexes at once"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::unique_lock<M>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the same for one mutex, plus "
+          },
+          {
+           "t": "code",
+           "v": "unlock()"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "lock()"
+          },
+          {
+           "t": "text",
+           "v": ", deferred and timed locking, and it can be moved"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "you release the mutex in the middle, or wait on a condition variable"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "code",
+           "v": "std::shared_lock<M>"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "shared ownership of a "
+          },
+          {
+           "t": "code",
+           "v": "std::shared_mutex"
+          },
+          {
+           "t": "text",
+           "v": ": many readers or one writer"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "reads outnumber writes by a lot and the critical sections are long"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::scoped_lock"
+        },
+        {
+         "t": "text",
+         "v": " with one mutex does what "
+        },
+        {
+         "t": "code",
+         "v": "lock_guard"
+        },
+        {
+         "t": "text",
+         "v": " does, and it deduces its template argument, so "
+        },
+        {
+         "t": "code",
+         "v": "std::scoped_lock lock(mutex_)"
+        },
+        {
+         "t": "text",
+         "v": " compiles without the angle brackets. "
+        },
+        {
+         "t": "code",
+         "v": "lock_guard"
+        },
+        {
+         "t": "text",
+         "v": " has done the same from C++17 on. Which of the two you write is a house style question; what matters is the second row of the table, and the next section is about the bug it prevents. "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_lock"
+        },
+        {
+         "t": "text",
+         "v": " costs one extra bool for \"do I own it\", and the condition variable topic needs it, because waiting means releasing the mutex and taking it again. "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_mutex"
+        },
+        {
+         "t": "text",
+         "v": " sounds like the answer for a map that is read often and written rarely, and it usually is not: taking a shared lock still writes to the mutex's own state, so readers contend with each other, and for short critical sections a plain mutex wins. Measure before you reach for it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What locking costs, measured with the page's flags and four threads doing 250000 increments each:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <atomic>\n#include <chrono>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <mutex>\n#include <string_view>\n#include <thread>\n#include <vector>\n\nconstexpr int kThreads = 4;\nconstexpr int kPerThread = 250'000;\n\n// Runs one counting strategy on kThreads threads and prints how long it took and what it counted.\nvoid measure(std::string_view label, const std::function<std::int64_t()>& strategy) {\n  const auto start = std::chrono::steady_clock::now();\n  const std::int64_t total = strategy();\n  const auto elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start);\n  std::cout << std::format(\"{:<22} {:>8.1f} ms  total {}\\n\", label, elapsed.count(), total);\n}\n\nint main() {\n  measure(\"one mutex\", [] {\n    std::mutex mutex;\n    std::int64_t total = 0;\n    {\n      std::vector<std::jthread> workers;\n      workers.reserve(kThreads);\n      for (int i = 0; i < kThreads; ++i) {\n        workers.emplace_back([&mutex, &total] {\n          for (int k = 0; k < kPerThread; ++k) {\n            const std::lock_guard<std::mutex> lock(mutex);\n            ++total;\n          }\n        });\n      }\n    }\n    return total;\n  });\n\n  measure(\"one atomic\", [] {\n    std::atomic<std::int64_t> total = 0;\n    {\n      std::vector<std::jthread> workers;\n      workers.reserve(kThreads);\n      for (int i = 0; i < kThreads; ++i) {\n        workers.emplace_back([&total] {\n          for (int k = 0; k < kPerThread; ++k) total.fetch_add(1, std::memory_order_relaxed);\n        });\n      }\n    }\n    return total.load();\n  });\n\n  measure(\"a local, then merge\", [] {\n    std::mutex mutex;\n    std::int64_t total = 0;\n    {\n      std::vector<std::jthread> workers;\n      workers.reserve(kThreads);\n      for (int i = 0; i < kThreads; ++i) {\n        workers.emplace_back([&mutex, &total] {\n          std::int64_t mine = 0;\n          for (int k = 0; k < kPerThread; ++k) ++mine;\n          const std::lock_guard<std::mutex> lock(mutex);\n          total += mine;\n        });\n      }\n    }\n    return total;\n  });\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The timings differ per machine and per run, so there is no output block here either. One run in WSL on 28 cores:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "one mutex                  53.3 ms  total 1000000\none atomic                 12.3 ms  total 1000000\na local, then merge         1.0 ms  total 1000000"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "All three print 1000000, which is the point: all three are correct. The mutex version is 53 times slower than the private-local version, and most of that is not the lock instruction but the contention, four threads taking turns on one cache line. At "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " without sanitizers the same three came out at 38.1 ms, 8.3 ms and 0.2 ms, so 38 nanoseconds per locked increment. "
+        },
+        {
+         "t": "a",
+         "v": "CP.43",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-time"
+        },
+        {
+         "t": "text",
+         "v": " asks you to keep the critical section short; the stronger version of that advice is to share less. Give each thread its own data, merge once, and the lock disappears from the inner loop."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A mutex protects an invariant, not a variable. The odometry below adds a left and a right tick count and a sample counter in one step, and any reader that takes the lock sees the three in step with each other. The reader thread checks that invariant 100000 times while the encoder writes:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <thread>\n\nstruct WheelTicks {\n  std::int64_t left = 0;\n  std::int64_t right = 0;\n};\n\nstruct Odometry {\n  std::int64_t left = 0;\n  std::int64_t right = 0;\n  std::int64_t samples = 0;\n};\n\nclass WheelOdometry {\n public:\n  void add(WheelTicks ticks) {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    state_.left += ticks.left;\n    state_.right += ticks.right;\n    state_.samples += 1;\n  }\n\n  // Returns a copy, so the caller reads it long after the lock has gone.\n  [[nodiscard]] Odometry snapshot() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return state_;\n  }\n\n private:\n  mutable std::mutex mutex_;\n  Odometry state_;\n};\n\nint main() {\n  constexpr std::int64_t kUpdates = 200'000;\n  constexpr std::int64_t kSamples = 100'000;\n  WheelOdometry odometry;\n  std::int64_t inconsistent = 0;\n  {\n    std::jthread encoder([&odometry] {\n      for (std::int64_t k = 0; k < kUpdates; ++k) odometry.add({.left = 1, .right = 3});\n    });\n    std::jthread reader([&odometry, &inconsistent] {\n      for (std::int64_t k = 0; k < kSamples; ++k) {\n        const Odometry seen = odometry.snapshot();\n        if (seen.left != seen.samples || seen.right != 3 * seen.samples) ++inconsistent;\n      }\n    });\n  }\n  const Odometry final_state = odometry.snapshot();\n  std::cout << std::format(\"{} updates: left {}, right {}, samples {}\\n\", kUpdates, final_state.left,\n                           final_state.right, final_state.samples);\n  std::cout << std::format(\"{} snapshots read while the encoder was writing, {} of them inconsistent\\n\", kSamples,\n                           inconsistent);\n}"
+      },
+      {
+       "t": "output",
+       "text": "200000 updates: left 200000, right 600000, samples 200000\n100000 snapshots read while the encoder was writing, 0 of them inconsistent"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The invariant is "
+         },
+         {
+          "t": "code",
+          "v": "left == samples"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "right == 3 * samples"
+         },
+         {
+          "t": "text",
+          "v": ", because every update adds one and three. It holds between updates and is false in the middle of one, after "
+         },
+         {
+          "t": "code",
+          "v": "left"
+         },
+         {
+          "t": "text",
+          "v": " has been raised and before "
+         },
+         {
+          "t": "code",
+          "v": "samples"
+         },
+         {
+          "t": "text",
+          "v": " has. The lock is what stops anyone seeing that middle. Delete the "
+         },
+         {
+          "t": "code",
+          "v": "lock_guard"
+         },
+         {
+          "t": "text",
+          "v": " from "
+         },
+         {
+          "t": "code",
+          "v": "snapshot"
+         },
+         {
+          "t": "text",
+          "v": " alone, and the program still compiles, still joins, still prints plausible totals. I ran that version thirteen times and the reader counted between 122 and 2421 inconsistent snapshots out of 100000, so between one and twenty-four reads in a thousand saw a robot that had travelled a distance it had not. The spread matters as much as the count: the same binary on the same machine gives a different answer every run, and a test that runs the reader once can come back with a number small enough to look like a rounding error."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "snapshot()"
+         },
+         {
+          "t": "text",
+          "v": " returns "
+         },
+         {
+          "t": "code",
+          "v": "Odometry"
+         },
+         {
+          "t": "text",
+          "v": " by value. The copy is made under the lock and belongs to the caller, so it cannot change while the caller uses it. A member returning "
+         },
+         {
+          "t": "code",
+          "v": "const Odometry&"
+         },
+         {
+          "t": "text",
+          "v": " would hand out guarded data with the guard already gone, which the failure step measures."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "add"
+         },
+         {
+          "t": "text",
+          "v": " takes one "
+         },
+         {
+          "t": "code",
+          "v": "WheelTicks"
+         },
+         {
+          "t": "text",
+          "v": " with designated initialisers at the call, "
+         },
+         {
+          "t": "code",
+          "v": "{.left = 1, .right = 3}"
+         },
+         {
+          "t": "text",
+          "v": ", rather than two "
+         },
+         {
+          "t": "code",
+          "v": "std::int64_t"
+         },
+         {
+          "t": "text",
+          "v": " parameters that a caller could swap. That is the same rule the bench core follows for encoder ticks."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The reader does a fixed 100000 snapshots rather than looping until the encoder stops, which keeps the printed numbers the same on every run. A real monitor would loop on a stop token instead, and then the count of snapshots would depend on timing."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The two threads are declared inside a scope and joined by its closing brace, so "
+         },
+         {
+          "t": "code",
+          "v": "odometry"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "inconsistent"
+         },
+         {
+          "t": "text",
+          "v": " are alive for the whole run. "
+         },
+         {
+          "t": "code",
+          "v": "inconsistent"
+         },
+         {
+          "t": "text",
+          "v": " is touched by one thread only, so it needs no lock of its own."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Several ROS 2 callbacks, each on its own thread, count the messages they see per topic. Write a "
+        },
+        {
+         "t": "code",
+         "v": "TopicTotals"
+        },
+        {
+         "t": "text",
+         "v": " that they can all call:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "void add(std::string_view topic, Ticks ticks)"
+         },
+         {
+          "t": "text",
+          "v": ", where "
+         },
+         {
+          "t": "code",
+          "v": "struct Ticks { std::int64_t count = 0; };"
+         },
+         {
+          "t": "text",
+          "v": ", adds to that topic's total and creates the entry on first use."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::optional<std::int64_t> total(std::string_view topic) const"
+         },
+         {
+          "t": "text",
+          "v": " gives the total, and no value for a topic nobody has published."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::vector<std::pair<std::string, std::int64_t>> snapshot() const"
+         },
+         {
+          "t": "text",
+          "v": " gives every topic and total, in topic order."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "In "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", run four "
+         },
+         {
+          "t": "code",
+          "v": "std::jthread"
+         },
+         {
+          "t": "text",
+          "v": "s, each calling "
+         },
+         {
+          "t": "code",
+          "v": "add(\"/scan\", {.count = 1})"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "add(\"/odom\", {.count = 2})"
+         },
+         {
+          "t": "text",
+          "v": " 5000 times. Print the snapshot, then "
+         },
+         {
+          "t": "code",
+          "v": "/scan"
+         },
+         {
+          "t": "text",
+          "v": "'s total, then whether "
+         },
+         {
+          "t": "code",
+          "v": "/imu"
+         },
+         {
+          "t": "text",
+          "v": " has one."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Guard the whole thing with one "
+        },
+        {
+         "t": "code",
+         "v": "mutable std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "std::lock_guard"
+        },
+        {
+         "t": "text",
+         "v": ". Then answer three questions. Why does "
+        },
+        {
+         "t": "code",
+         "v": "total"
+        },
+        {
+         "t": "text",
+         "v": " lock although it only reads? Why is the mutex "
+        },
+        {
+         "t": "code",
+         "v": "mutable"
+        },
+        {
+         "t": "text",
+         "v": "? And why does "
+        },
+        {
+         "t": "code",
+         "v": "snapshot"
+        },
+        {
+         "t": "text",
+         "v": " return a copy instead of a "
+        },
+        {
+         "t": "code",
+         "v": "const std::map&"
+        },
+        {
+         "t": "text",
+         "v": ", which would save an allocation?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <map>\n#include <mutex>\n#include <optional>\n#include <string>\n#include <string_view>\n#include <thread>\n#include <utility>\n#include <vector>\n\nstruct Ticks {\n  std::int64_t count = 0;\n};\n\nclass TopicTotals {\n public:\n  void add(std::string_view topic, Ticks ticks) {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    totals_[std::string(topic)] += ticks.count;\n  }\n\n  [[nodiscard]] std::optional<std::int64_t> total(std::string_view topic) const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    const auto it = totals_.find(std::string(topic));\n    if (it == totals_.end()) return std::nullopt;\n    return it->second;\n  }\n\n  // A copy, taken under the lock: the caller may read it for as long as it likes.\n  [[nodiscard]] std::vector<std::pair<std::string, std::int64_t>> snapshot() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return {totals_.begin(), totals_.end()};\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::map<std::string, std::int64_t> totals_;\n};\n\nint main() {\n  constexpr int kWorkers = 4;\n  constexpr int kPerWorker = 5'000;\n  TopicTotals totals;\n  {\n    std::vector<std::jthread> workers;\n    workers.reserve(kWorkers);\n    for (int i = 0; i < kWorkers; ++i) {\n      workers.emplace_back([&totals] {\n        for (int k = 0; k < kPerWorker; ++k) {\n          totals.add(\"/scan\", {.count = 1});\n          totals.add(\"/odom\", {.count = 2});\n        }\n      });\n    }\n  }\n  for (const auto& [topic, count] : totals.snapshot()) {\n    std::cout << std::format(\"{}: {} ticks\\n\", topic, count);\n  }\n  std::cout << std::format(\"/scan total {}\\n\", totals.total(\"/scan\").value());\n  std::cout << std::format(\"/imu has a total: {}\\n\", totals.total(\"/imu\").has_value());\n}"
+      },
+      {
+       "t": "output",
+       "text": "/odom: 40000 ticks\n/scan: 20000 ticks\n/scan total 20000\n/imu has a total: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "total"
+        },
+        {
+         "t": "text",
+         "v": " locks because a read that overlaps a write is a data race, and here the write is a "
+        },
+        {
+         "t": "code",
+         "v": "std::map"
+        },
+        {
+         "t": "text",
+         "v": " insertion, which relinks nodes. An unlocked "
+        },
+        {
+         "t": "code",
+         "v": "find"
+        },
+        {
+         "t": "text",
+         "v": " running during one can follow a pointer that is being changed. The rule has no exception for readers: the mutex orders every access to the data it guards."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The mutex is "
+        },
+        {
+         "t": "code",
+         "v": "mutable"
+        },
+        {
+         "t": "text",
+         "v": " because "
+        },
+        {
+         "t": "code",
+         "v": "total"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "snapshot"
+        },
+        {
+         "t": "text",
+         "v": " are "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ", and locking changes the mutex. "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " is about the logical value of the counter, which a reader does not change; "
+        },
+        {
+         "t": "code",
+         "v": "mutable"
+        },
+        {
+         "t": "text",
+         "v": " is the language's way of saying that this member is not part of that value. Without it the two readers would have to be non-"
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ", and then no caller holding a "
+        },
+        {
+         "t": "code",
+         "v": "const TopicTotals&"
+        },
+        {
+         "t": "text",
+         "v": " could read anything."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "snapshot"
+        },
+        {
+         "t": "text",
+         "v": " returns a copy for the reason the worked example gave: a reference to "
+        },
+        {
+         "t": "code",
+         "v": "totals_"
+        },
+        {
+         "t": "text",
+         "v": " is only usable while the lock is held, and the lock is gone before the caller sees it. The caller would then iterate a map another thread is inserting into, which is a data race and, when the insert rebalances the tree, a crash. If the copy is too expensive, the answer is not a reference but a different interface: pass a function in and run it under the lock, or hand back a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr<const Totals>"
+        },
+        {
+         "t": "text",
+         "v": " that a writer replaces rather than edits."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two details worth copying. "
+        },
+        {
+         "t": "code",
+         "v": "totals_[std::string(topic)] += ticks.count"
+        },
+        {
+         "t": "text",
+         "v": " builds a "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": " on every call. A name as short as "
+        },
+        {
+         "t": "code",
+         "v": "/scan"
+        },
+        {
+         "t": "text",
+         "v": " costs no allocation, because libstdc++ keeps up to 15 characters inside the string object itself, but a longer topic name would allocate once per message, which is the price of an interface that takes a view and has to own its key. And "
+        },
+        {
+         "t": "code",
+         "v": "add"
+        },
+        {
+         "t": "text",
+         "v": " creates missing entries by itself, because "
+        },
+        {
+         "t": "code",
+         "v": "operator[]"
+        },
+        {
+         "t": "text",
+         "v": " value-initialises, so the first "
+        },
+        {
+         "t": "code",
+         "v": "+="
+        },
+        {
+         "t": "text",
+         "v": " starts from 0."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "deadlock",
+   "title": "Deadlock and lock ordering; finding races with TSan",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first failure is a lock that is not a lock. "
+        },
+        {
+         "t": "a",
+         "v": "CP.44",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-name"
+        },
+        {
+         "t": "text",
+         "v": " says to name your "
+        },
+        {
+         "t": "code",
+         "v": "lock_guard"
+        },
+        {
+         "t": "text",
+         "v": "s, and here is what happens when you do not:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  void add(int ticks) {\n    std::lock_guard{mutex_};  // a temporary: it locks and unlocks on this line\n    total_ += ticks;\n  }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That compiles under "
+        },
+        {
+         "t": "code",
+         "v": "-Wall -Wextra -Werror"
+        },
+        {
+         "t": "text",
+         "v": " without a word of complaint. The temporary locks the mutex, is destroyed at the semicolon, and unlocks it, so "
+        },
+        {
+         "t": "code",
+         "v": "total_ += ticks"
+        },
+        {
+         "t": "text",
+         "v": " runs unprotected. The counter from the theory step with that "
+        },
+        {
+         "t": "code",
+         "v": "add"
+        },
+        {
+         "t": "text",
+         "v": " printed 396356, 392401 and 395901 on three runs instead of 400000. The number is close enough to the right one to survive a quick test and a code review by someone reading fast."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Writing it with parentheses instead of braces is refused, although the message takes a moment to decode:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "unnecessary parentheses in declaration of",
+       "text": "#include <mutex>\n\nclass TickCounter {\n public:\n  void add(int ticks) {\n    std::lock_guard<std::mutex>(mutex_);  // a declaration, not a lock\n    total_ += ticks;\n  }\n\n private:\n  std::mutex mutex_;\n  int total_ = 0;\n};\n\nint main() {\n  TickCounter counter;\n  counter.add(1);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 reads "
+        },
+        {
+         "t": "code",
+         "v": "std::lock_guard<std::mutex>(mutex_);"
+        },
+        {
+         "t": "text",
+         "v": " as declaring a variable called "
+        },
+        {
+         "t": "code",
+         "v": "mutex_"
+        },
+        {
+         "t": "text",
+         "v": " of type "
+        },
+        {
+         "t": "code",
+         "v": "std::lock_guard<std::mutex>"
+        },
+        {
+         "t": "text",
+         "v": ", default constructed, which is the most vexing parse in miniature. It says "
+        },
+        {
+         "t": "code",
+         "v": "unnecessary parentheses in declaration of 'mutex_'"
+        },
+        {
+         "t": "text",
+         "v": " and then "
+        },
+        {
+         "t": "code",
+         "v": "no matching function for call to 'std::lock_guard<std::mutex>::lock_guard()'"
+        },
+        {
+         "t": "text",
+         "v": ". Give every lock a name and the question never comes up."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure hands guarded data out through the lock. A getter takes the lock, returns a reference to something inside, and the lock is released before the caller reads:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <format>\n#include <iostream>\n#include <latch>\n#include <mutex>\n#include <thread>\n#include <vector>\n\nclass ScanLog {\n public:\n  void append(float range) {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    ranges_.push_back(range);\n  }\n\n  // Wrong: the lock ends with the function, and the caller is left holding guarded data.\n  [[nodiscard]] const float& newest() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return ranges_.back();\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::vector<float> ranges_;\n};\n\nint main() {\n  ScanLog log;\n  log.append(1.5F);\n  std::latch handed_out(2);\n  std::latch grown(2);\n  std::jthread reader([&log, &handed_out, &grown] {\n    const float& seen = log.newest();\n    handed_out.arrive_and_wait();\n    grown.arrive_and_wait();\n    std::cout << std::format(\"the reader sees {:.1f}\\n\", seen);\n  });\n  handed_out.arrive_and_wait();\n  for (int k = 0; k < 1000; ++k) log.append(2.5F);  // the vector reallocates and frees its old block\n  grown.arrive_and_wait();\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two "
+        },
+        {
+         "t": "code",
+         "v": "std::latch"
+        },
+        {
+         "t": "text",
+         "v": " objects pin the interleaving so the bug fires on every run rather than once a week: the reader takes its reference, both threads meet at "
+        },
+        {
+         "t": "code",
+         "v": "handed_out"
+        },
+        {
+         "t": "text",
+         "v": ", the writer grows the vector, both meet at "
+        },
+        {
+         "t": "code",
+         "v": "grown"
+        },
+        {
+         "t": "text",
+         "v": ", and only then does the reader look. AddressSanitizer reports "
+        },
+        {
+         "t": "code",
+         "v": "heap-use-after-free"
+        },
+        {
+         "t": "text",
+         "v": " on a "
+        },
+        {
+         "t": "code",
+         "v": "READ of size 4"
+        },
+        {
+         "t": "text",
+         "v": ", inside the "
+        },
+        {
+         "t": "code",
+         "v": "std::format"
+        },
+        {
+         "t": "text",
+         "v": " call that reads the float. Return a copy, as the odometry does, or run the caller's work under the lock. A "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_mutex"
+        },
+        {
+         "t": "text",
+         "v": " would not save this: the reference outlives the shared lock the same way."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third failure is deadlock. Two counters, and a "
+        },
+        {
+         "t": "code",
+         "v": "move_to"
+        },
+        {
+         "t": "text",
+         "v": " that takes its own mutex and then the other one:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  void move_to(Encoder& other, std::int64_t count) {\n    const std::lock_guard<std::mutex> mine(mutex_);\n    const std::lock_guard<std::mutex> theirs(other.mutex_);\n    ticks_ -= count;\n    other.ticks_ += count;\n  }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One thread moving ticks from "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " while another moves them from "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " gives two threads that each hold what the other one wants, and neither ever lets go. With a 50 microsecond sleep between the two locks to make it certain, the program never reaches its last line:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-sanitize-recover=all \\\n    deadlock.cpp -o deadlock\ntimeout 5 ./deadlock; echo \"exit code: $?\""
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "exit code: 124"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Exit code 124 is "
+        },
+        {
+         "t": "code",
+         "v": "timeout"
+        },
+        {
+         "t": "text",
+         "v": " reporting that it had to kill the program. Nothing was printed, no sanitizer said a word, and neither AddressSanitizer nor UndefinedBehaviorSanitizer has anything to say about deadlock: the program is doing exactly what it was told. This is the failure mode that reaches production, because a deadlock needs an interleaving that a short test rarely produces."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fix is one line, and the rule behind it is "
+        },
+        {
+         "t": "a",
+         "v": "CP.21",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-lock"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <thread>\n\nclass Encoder {\n public:\n  explicit Encoder(std::int64_t ticks) : ticks_(ticks) {}\n\n  // scoped_lock takes both mutexes in one step, in whichever order avoids a deadlock.\n  void move_to(Encoder& other, std::int64_t count) {\n    const std::scoped_lock lock(mutex_, other.mutex_);\n    ticks_ -= count;\n    other.ticks_ += count;\n  }\n\n  [[nodiscard]] std::int64_t ticks() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return ticks_;\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::int64_t ticks_ = 0;\n};\n\nint main() {\n  Encoder left(1000);\n  Encoder right(1000);\n  {\n    std::jthread one([&left, &right] {\n      for (int k = 0; k < 20'000; ++k) left.move_to(right, 1);\n    });\n    std::jthread two([&left, &right] {\n      for (int k = 0; k < 20'000; ++k) right.move_to(left, 1);\n    });\n  }\n  std::cout << std::format(\"40000 moves in both directions: left {}, right {}, sum {}\\n\", left.ticks(),\n                           right.ticks(), left.ticks() + right.ticks());\n}"
+      },
+      {
+       "t": "output",
+       "text": "40000 moves in both directions: left 1000, right 1000, sum 2000"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::scoped_lock"
+        },
+        {
+         "t": "text",
+         "v": " locks all of its mutexes with an algorithm that cannot deadlock: it takes one, tries the rest, and on a failure releases everything and starts again from the one that refused. Forty thousand moves in opposite directions finish in 20 milliseconds. The alternative, when the mutexes cannot be taken together, is a lock order that the whole program agrees on, written down and checked in review: always the sensor before the map, always the map before the log. The transfer function above could also order by address, taking the lower-addressed mutex first, which is what "
+        },
+        {
+         "t": "code",
+         "v": "std::scoped_lock"
+        },
+        {
+         "t": "text",
+         "v": " saves you from writing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth failure is a lock taken twice by the same thread. "
+        },
+        {
+         "t": "code",
+         "v": "std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " is not recursive, and locking one you already own is undefined behaviour ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/thread/mutex/lock"
+        },
+        {
+         "t": "text",
+         "v": "). It usually arrives through a callback, which is why "
+        },
+        {
+         "t": "a",
+         "v": "CP.22",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-unknown"
+        },
+        {
+         "t": "text",
+         "v": " says never to call unknown code while holding a lock:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  void report_gap(int missed) {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    gaps_ += missed;\n    if (handler_) handler_(*this);  // unknown code, called with the mutex held\n  }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Register a handler that calls the watchdog's own "
+        },
+        {
+         "t": "code",
+         "v": "gaps()"
+        },
+        {
+         "t": "text",
+         "v": ", which locks the same mutex, and the program stops dead on the first gap. I ran it under "
+        },
+        {
+         "t": "code",
+         "v": "timeout 5"
+        },
+        {
+         "t": "text",
+         "v": " and it printed nothing and exited with 124, the same signature as the deadlock above. "
+        },
+        {
+         "t": "code",
+         "v": "std::recursive_mutex"
+        },
+        {
+         "t": "text",
+         "v": " makes it work and is almost always the wrong answer, because it hides the real problem: a class that calls out while its invariant is halfway repaired. Take the data you need, release the lock, then call the handler."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That leaves the tool. ThreadSanitizer instruments every memory access and every synchronisation operation, builds the happens-before graph at run time, and reports accesses that are not ordered. It cannot be combined with AddressSanitizer, which this curriculum's flags use, and GCC refuses the pair outright: "
+        },
+        {
+         "t": "code",
+         "v": "cc1plus: error: '-fsanitize=thread' is incompatible with '-fsanitize=address'"
+        },
+        {
+         "t": "text",
+         "v": ". So a race hunt is its own build:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -fsanitize=thread racy_counter.cpp -o racy_counter\n# In WSL, ThreadSanitizer needs address space layout randomisation switched off:\nsetarch $(uname -m) -R ./racy_counter"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Without "
+        },
+        {
+         "t": "code",
+         "v": "setarch"
+        },
+        {
+         "t": "text",
+         "v": ", the run in WSL 2 ends at once with "
+        },
+        {
+         "t": "code",
+         "v": "FATAL: ThreadSanitizer: unexpected memory mapping"
+        },
+        {
+         "t": "text",
+         "v": ", because the kernel's randomisation puts a mapping where TSan wants its shadow memory. On the racy counter from the theory step, the report is this, with the standard library frames left out:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "WARNING: ThreadSanitizer: data race (pid=157379)\n  Read of size 4 at 0x7fffffffdf40 by thread T2:\n    #0 operator() /tmp/cw/racy_counter.cpp:13 (racy_counter+0x4c08)\n\n  Previous write of size 4 at 0x7fffffffdf40 by thread T1:\n    #0 operator() /tmp/cw/racy_counter.cpp:13 (racy_counter+0x4c16)\n\n  Location is stack of main thread.\n\nSUMMARY: ThreadSanitizer: data race /tmp/cw/racy_counter.cpp:13 in operator()\nThreadSanitizer: reported 2 warnings"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three things in that report are worth reading twice. It names both accesses, the read and the write that raced with it, with the thread that did each. It names the location, here a variable on the main thread's stack, which is "
+        },
+        {
+         "t": "code",
+         "v": "ticks"
+        },
+        {
+         "t": "text",
+         "v": ". And that particular run printed 400000, the correct answer: TSan slows every access down enough that the increments happened to interleave cleanly. The tool finds the race, not the wrong answer, and that is exactly why it is worth running. The same program built with the mutex runs clean under TSan and exits with 0."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "TSan's cost is a slowdown of roughly 5 to 15 times and 5 to 10 times the memory, so it goes in a nightly job or a targeted test rather than in every build ("
+        },
+        {
+         "t": "a",
+         "v": "the ThreadSanitizer manual",
+         "href": "https://clang.llvm.org/docs/ThreadSanitizer.html"
+        },
+        {
+         "t": "text",
+         "v": ", whose figures the GCC port shares). It reports only races on paths that actually run, so give it a test that starts several threads and exercises the shared object. And it understands "
+        },
+        {
+         "t": "code",
+         "v": "std::mutex"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::atomic"
+        },
+        {
+         "t": "text",
+         "v": " and thread creation, so correct locking silences it rather than needing suppressions."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write six to ten lines from memory and keep them as this topic's proof. Define a data race in the standard's words, including \"memory location\" and \"happens before\". Say what "
+        },
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": " does in its destructor and why "
+        },
+        {
+         "t": "code",
+         "v": "std::thread"
+        },
+        {
+         "t": "text",
+         "v": " calls "
+        },
+        {
+         "t": "code",
+         "v": "std::terminate"
+        },
+        {
+         "t": "text",
+         "v": ". Say how arguments reach a thread, and what "
+        },
+        {
+         "t": "code",
+         "v": "std::ref"
+        },
+        {
+         "t": "text",
+         "v": " changes. Name the four lock types and the one situation each is for. Say what a "
+        },
+        {
+         "t": "code",
+         "v": "mutable std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " next to its data buys you, and why readers lock. Describe the deadlock two mutexes in two orders produce, the one-line fix, and the lock order rule for when that fix does not apply. Finish with the TSan command, including that it cannot share a build with AddressSanitizer."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What exactly makes a program contain a data race, and what does the standard say about such a program?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Two threads write "
+     },
+     {
+      "t": "code",
+      "v": "readings[0]"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "readings[1]"
+     },
+     {
+      "t": "text",
+      "v": " of one vector. Race or no race, and what changes the answer?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::jthread"
+     },
+     {
+      "t": "text",
+      "v": "'s destructor do, in order, and what does "
+     },
+     {
+      "t": "code",
+      "v": "std::thread"
+     },
+     {
+      "t": "text",
+      "v": "'s do instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "std::jthread worker(collect, reading)"
+     },
+     {
+      "t": "text",
+      "v": " fail to compile when "
+     },
+     {
+      "t": "code",
+      "v": "collect"
+     },
+     {
+      "t": "text",
+      "v": " takes a "
+     },
+     {
+      "t": "code",
+      "v": "Reading&"
+     },
+     {
+      "t": "text",
+      "v": ", and what is the fix?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does a "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " reader function lock, and why is the mutex "
+     },
+     {
+      "t": "code",
+      "v": "mutable"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When do you need "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_lock"
+     },
+     {
+      "t": "text",
+      "v": " rather than "
+     },
+     {
+      "t": "code",
+      "v": "std::lock_guard"
+     },
+     {
+      "t": "text",
+      "v": ", and what does it cost?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A getter returns "
+     },
+     {
+      "t": "code",
+      "v": "const std::vector<float>&"
+     },
+     {
+      "t": "text",
+      "v": " from under a lock. What is the failure, and what does the caller see?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Two threads take two mutexes in opposite orders. What happens, what does the sanitizer say, and what are the two fixes?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is "
+     },
+     {
+      "t": "code",
+      "v": "std::recursive_mutex"
+     },
+     {
+      "t": "text",
+      "v": " usually the wrong answer to a callback that re-enters its own lock?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which build do you use for a race hunt, why can it not be the usual one, and what does the report name?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a class holding a map of counts, safe for four threads, with a "
+     },
+     {
+      "t": "code",
+      "v": "snapshot"
+     },
+     {
+      "t": "text",
+      "v": " a caller can hold."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: Concurrency, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B-Concurrency.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=8rEGu20Uw4g"
+     },
+     {
+      "t": "text",
+      "v": ". Threads, the memory model and what a mutex publishes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Concurrency, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Mike_Shah_CPPCON_2021_Concurrency_1.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=pfIC-kle4b0"
+     },
+     {
+      "t": "text",
+      "v": ". The racy counter and the lock that fixes it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Concurrency, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_concurrency/back_to_basics_concurrency__arthur_odwyer__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=F6Ipn7gCOsY"
+     },
+     {
+      "t": "text",
+      "v": ". Lock types, and the mutex that lives with its data."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Atomics, Locks and Tasks, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_atomics_locks_and_tasks/back_to_basics_atomics_locks_and_tasks__rainer_grimm__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": ". The cost of an atomic against a lock."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "CP.2",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-races"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-raii"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-lock"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.22",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-unknown"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.23",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-join"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.24",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detach"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.25",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-joining_thread"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.26",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-detached_thread"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.31",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-data-by-value"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.41",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-create"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.43",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-time"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.44",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-name"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "CP.50",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-mutex"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The standard on races: "
+     },
+     {
+      "t": "a",
+      "v": "intro.races",
+      "href": "https://eel.is/c++draft/intro.races"
+     },
+     {
+      "t": "text",
+      "v": ", and cppreference on the "
+     },
+     {
+      "t": "a",
+      "v": "memory model",
+      "href": "https://en.cppreference.com/cpp/language/memory_model"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "jthread",
+      "href": "https://en.cppreference.com/cpp/thread/jthread"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "mutex",
+      "href": "https://en.cppreference.com/cpp/thread/mutex"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "lock_guard",
+      "href": "https://en.cppreference.com/cpp/thread/lock_guard"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "scoped_lock",
+      "href": "https://en.cppreference.com/cpp/thread/scoped_lock"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "unique_lock",
+      "href": "https://en.cppreference.com/cpp/thread/unique_lock"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "shared_mutex",
+      "href": "https://en.cppreference.com/cpp/thread/shared_mutex"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "The ThreadSanitizer manual",
+      "href": "https://clang.llvm.org/docs/ThreadSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "GCC's instrumentation options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html"
+     },
+     {
+      "t": "text",
+      "v": ": what "
+     },
+     {
+      "t": "code",
+      "v": "-fsanitize=thread"
+     },
+     {
+      "t": "text",
+      "v": " costs and what it cannot share a build with."
+     }
+    ]
+   ]
+  }
+ ]
+}

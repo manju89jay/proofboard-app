@@ -1,0 +1,1138 @@
+{
+ "id": "ros-control",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Without looking anything up, say what the P, the I and the D term of a PID controller each do, in one sentence each, naming the error they act on. Then answer three questions about a velocity loop on a wheel: what a P term alone leaves behind, what the I term fixes and what it can do wrong, and what happens to all three when the loop runs at half the rate you designed for. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The P term is proportional to the current error, so it pushes harder the further you are from the target and does nothing at all once you arrive. The I term is proportional to the accumulated error over time, so it keeps pushing while any error persists and is the only one of the three that can remove a constant offset. The D term is proportional to the rate of change of the error, so it opposes fast movement and damps the approach."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A P term alone leaves a steady-state error, and the size of it is arithmetic rather than bad luck: the output is the gain times the error, so if the plant needs a non-zero command to hold the target, there must be a non-zero error to produce it. At a gain of 2 on a wheel whose speed settles at the command, the loop settles at two thirds of the target and stays there."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The I term removes it, by accumulating until its own contribution supplies the command the plant needs with no error left. What it does wrong is windup: while the actuator is saturated the error stays large and the integral keeps growing, and when the plant finally reaches the target the integral has to be unwound before the output comes down, which overshoots."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Halving the loop rate changes all three, and the D term worst. Every term is computed from a sample, so a slower loop reacts later; the integral approximates the same area with coarser rectangles; and the derivative divides a difference by a time step, so its estimate gets noisier as the step grows and jumpier as it shrinks. Gains tuned at one rate are not gains at another, which is why a control loop's rate belongs next to its gains in the configuration."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with the three terms right and two of the three answers. Describing the D term as predicting the future without naming the rate of change is a partial pass. Saying the I term fixes steady-state error without naming windup is a partial pass too, because windup is the failure it comes with."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A control loop turns a desired motion into commands and corrects itself from feedback. For a wheeled robot it is a velocity loop: a target speed goes in, the wheel's measured speed comes back, and the controller drives the difference to zero."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "PID is the standard way to do that. The controller works on the error, the target minus the measurement, and adds three terms. Proportional is the error times a gain, which pushes harder the further off you are. Integral is the accumulated error times a gain, which keeps pushing while any offset remains and is the only term that can remove a constant one. Derivative is the rate of change of the error times a gain, which resists fast movement and damps the approach."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is that no model of a motor is exact. Feed a wheel the command a perfect model says it needs and it will be wrong, because the battery sagged, the floor changed or the robot is carrying something. Feedback makes the loop correct for all of that without knowing which it was."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism to understand is the integral and what bounds it. Every actuator saturates, and while it is saturated the error stays large and the integral keeps accumulating even though more command is not available. That is windup, and it is why the accumulation has to be stopped or bounded when the output is against its limit. It is also why the loop rate is part of the design: every term is computed per sample, so gains tuned at 100 Hz are not gains at 20."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "On this robot the loop is not one you write. The simulated base gets a velocity and turns it into wheel speeds itself, and on real hardware that layer is usually "
+    },
+    {
+     "t": "code",
+     "v": "ros2_control"
+    },
+    {
+     "t": "text",
+     "v": ": a manager process that runs a fixed-rate loop, reads the hardware's state, runs the loaded controllers and writes commands back, with a differential-drive controller that takes a stamped velocity and publishes odometry."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Where you meet it is above that layer, deciding what velocity to ask for and checking the feedback is fresh enough to steer on, which is the same freshness question the supervisor answers."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "drive",
+   "title": "Differential drive and odometry",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A differential-drive robot has two driven wheels on one axle, and everything it can do comes from their two speeds. Write the left and right wheel speeds as "
+        },
+        {
+         "t": "code",
+         "v": "v_l"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "v_r"
+        },
+        {
+         "t": "text",
+         "v": " in metres a second and the distance between the wheels as "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": ". Then the body's forward speed is the average of the two, "
+        },
+        {
+         "t": "code",
+         "v": "(v_r + v_l) / 2"
+        },
+        {
+         "t": "text",
+         "v": ", and its turn rate is their difference over the wheel separation, "
+        },
+        {
+         "t": "code",
+         "v": "(v_r - v_l) / b"
+        },
+        {
+         "t": "text",
+         "v": ". Invert those two and you have what a base does with a velocity command: given a wanted forward speed "
+        },
+        {
+         "t": "code",
+         "v": "v"
+        },
+        {
+         "t": "text",
+         "v": " and turn rate "
+        },
+        {
+         "t": "code",
+         "v": "w"
+        },
+        {
+         "t": "text",
+         "v": ", the wheels must run at "
+        },
+        {
+         "t": "code",
+         "v": "v - w * b / 2"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "v + w * b / 2"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two consequences fall straight out and both matter on a real robot. The robot cannot move sideways, so a "
+        },
+        {
+         "t": "code",
+         "v": "Twist"
+        },
+        {
+         "t": "text",
+         "v": " with a non-zero "
+        },
+        {
+         "t": "code",
+         "v": "y"
+        },
+        {
+         "t": "text",
+         "v": " is not something it can do and the base will ignore it. And the wheel speeds saturate independently, so a command that asks for a forward speed near the wheel limit and a turn at the same time gets one of the two clipped, which turns a straight-ish arc into something else. A base that clips the wheel speeds without scaling both together changes the shape of the motion rather than its size, which is a common surprise when a robot at full speed refuses to turn."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Odometry"
+        },
+        {
+         "t": "text",
+         "v": " is the same arithmetic run backwards from the encoders, and the bench already has its first half: "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " turns a "
+        },
+        {
+         "t": "code",
+         "v": "WheelTicks"
+        },
+        {
+         "t": "text",
+         "v": " pair and a "
+        },
+        {
+         "t": "code",
+         "v": "Wheels"
+        },
+        {
+         "t": "text",
+         "v": " geometry into a "
+        },
+        {
+         "t": "code",
+         "v": "distance_m"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "heading_change_rad"
+        },
+        {
+         "t": "text",
+         "v": " for the step. What remains is integrating those into a pose, and there is a choice there that costs accuracy quietly."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The obvious version moves along the heading you had and then turns. The honest version notices that a step with a constant speed and a constant turn rate is an arc of a circle, and integrates the arc. The difference is a chord against an arc, so it grows with how far the robot turns within one step, which means it grows as the loop rate falls:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cmath>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <numbers>\n#include <vector>\n\n// A pose on the floor, in the odometry frame.\nstruct Pose {\n  double x_m;\n  double y_m;\n  double yaw_rad;\n};\n\n// One step of wheel motion, already turned into a distance and a heading change by the encoder\n// arithmetic bench_core does. Both travel together so they cannot be swapped.\nstruct Step {\n  double distance_m;\n  double turn_rad;\n};\n\n// The update almost everybody writes first: move along the heading you had, then turn.\n[[nodiscard]] Pose straight_line(Pose from, Step step) {\n  return Pose{.x_m = from.x_m + step.distance_m * std::cos(from.yaw_rad),\n              .y_m = from.y_m + step.distance_m * std::sin(from.yaw_rad),\n              .yaw_rad = from.yaw_rad + step.turn_rad};\n}\n\n// The arc the wheels actually drove: constant speed and constant turn rate over the step is a\n// circle, and integrating it exactly costs two more trigonometric calls.\n[[nodiscard]] Pose exact_arc(Pose from, Step step) {\n  if (std::abs(step.turn_rad) < 1e-12) return straight_line(from, step);\n  const double radius_m = step.distance_m / step.turn_rad;\n  const double to_yaw = from.yaw_rad + step.turn_rad;\n  return Pose{.x_m = from.x_m + radius_m * (std::sin(to_yaw) - std::sin(from.yaw_rad)),\n              .y_m = from.y_m - radius_m * (std::cos(to_yaw) - std::cos(from.yaw_rad)),\n              .yaw_rad = to_yaw};\n}\n\n[[nodiscard]] double distance_between(Pose a, Pose b) {\n  return std::hypot(a.x_m - b.x_m, a.y_m - b.y_m);\n}\n\nint main() {\n  // A quarter circle of radius 0.5 m, driven at 0.2 m/s: the arc is 0.7854 m and takes 3.93 s.\n  constexpr double radius_m = 0.5;\n  constexpr double quarter_turn_rad = std::numbers::pi / 2.0;\n  constexpr double arc_m = radius_m * quarter_turn_rad;\n  const Pose start{.x_m = 0.0, .y_m = 0.0, .yaw_rad = 0.0};\n  const Pose truth{.x_m = radius_m, .y_m = radius_m, .yaw_rad = quarter_turn_rad};\n\n  std::cout << std::format(\"a quarter circle of radius {:.2f} m, ending at ({:.4f}, {:.4f})\\n\\n\", radius_m,\n                           truth.x_m, truth.y_m);\n  std::cout << std::format(\"{:>6} {:>8} {:>26} {:>26}\\n\", \"rate\", \"step\", \"straight-line error\", \"exact-arc error\");\n  for (const std::int64_t rate_hz : std::vector<std::int64_t>{5, 10, 20, 30, 50}) {\n    const double seconds = arc_m / 0.2;\n    const auto steps = static_cast<std::int64_t>(std::llround(seconds * static_cast<double>(rate_hz)));\n    const Step step{.distance_m = arc_m / static_cast<double>(steps),\n                    .turn_rad = quarter_turn_rad / static_cast<double>(steps)};\n\n    Pose naive = start;\n    Pose exact = start;\n    for (std::int64_t i = 0; i < steps; ++i) {\n      naive = straight_line(naive, step);\n      exact = exact_arc(exact, step);\n    }\n    std::cout << std::format(\"{:>4}Hz {:>7.1f}ms {:>23.4f} m {:>23.6f} m\\n\", rate_hz, 1000.0 / static_cast<double>(rate_hz),\n                             distance_between(naive, truth), distance_between(exact, truth));\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "a quarter circle of radius 0.50 m, ending at (0.5000, 0.5000)\n\n  rate     step        straight-line error            exact-arc error\n   5Hz   200.0ms                  0.0278 m                0.000000 m\n  10Hz   100.0ms                  0.0142 m                0.000000 m\n  20Hz    50.0ms                  0.0070 m                0.000000 m\n  30Hz    33.3ms                  0.0047 m                0.000000 m\n  50Hz    20.0ms                  0.0028 m                0.000000 m"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One quarter circle of half a metre, and the straight-line update is 2.8 cm out at 5 Hz. Halving the step halves the error, which is what first-order convergence looks like and what tells you the error is the approximation rather than a bug. The exact arc is right at every rate, because the motion inside a step really is an arc when the wheel speeds are constant across it, and that is the only assumption the closed form needs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two things to take from the table. The error is per turn and it accumulates: a robot that drives a lap of ninety-degree corners collects it four times over, and odometry never forgets. And the cost of the exact version is two trigonometric calls per step, which at 30 Hz is nothing, so the reason to write the approximate one is not performance."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Odometry of either kind drifts, which the architecture topic established, and the drift has three sources worth separating because they have different fixes. The integration error above, fixed by integrating properly. Parameter error, a wheel radius or a wheel separation that is a per cent off, which shows as a consistent curve to one side or a heading that is always short and is fixed by calibration. And wheel slip, which no arithmetic can see, because the encoder reports a wheel that turned and the robot did not move. The third is the reason odometry is never trusted alone over long distances, and the reason for the "
+        },
+        {
+         "t": "code",
+         "v": "map"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "odom"
+        },
+        {
+         "t": "text",
+         "v": " correction the frames topic covers."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Now the loop that decides what to command. Here is a velocity loop on a wheel, with the plant, the controller and the actuator's limit all in one program that needs no robot:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cmath>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string_view>\n#include <vector>\n\n// A motor and a wheel, as a first-order lag: the speed chases the commanded speed with a time\n// constant. This is the simplest plant that behaves like the real one, and the point of a\n// simulated plant is that a test of the controller needs no robot and no clock.\nclass Motor {\n public:\n  Motor(double time_constant_s, double step_s) : time_constant_s_(time_constant_s), step_s_(step_s) {}\n\n  void apply(double command_mps) {\n    speed_mps_ += (step_s_ / time_constant_s_) * (command_mps - speed_mps_);\n  }\n\n  [[nodiscard]] double speed_mps() const { return speed_mps_; }\n\n private:\n  double time_constant_s_;\n  double step_s_;\n  double speed_mps_ = 0.0;\n};\n\n// What to do with the integral when the actuator is already at its limit. The names are the ones\n// control_toolbox uses for the same choice.\nenum class Antiwindup { None, ConditionalIntegration };\n\nstruct Gains {\n  double p;\n  double i;\n  double d;\n};\n\n// A PID with an output limit, because every real actuator has one and leaving it out is how the\n// integral term learns to lie. Time arrives as an argument, so a test replays any timeline.\nclass Pid {\n public:\n  Pid(Gains gains, double limit, Antiwindup antiwindup)\n      : gains_(gains), limit_(limit), antiwindup_(antiwindup) {}\n\n  [[nodiscard]] double command(double error, double step_s) {\n    const double derivative = (step_s > 0.0) ? (error - last_error_) / step_s : 0.0;\n    const double candidate_integral = integral_ + error * step_s;\n    const double unclamped =\n        gains_.p * error + gains_.i * candidate_integral + gains_.d * derivative;\n    const double clamped = std::clamp(unclamped, -limit_, limit_);\n\n    // Conditional integration: stop adding to the integral while the output is against its limit\n    // and the error would push it further that way.\n    const bool winding_up = antiwindup_ == Antiwindup::ConditionalIntegration && unclamped != clamped &&\n                            ((unclamped > 0.0) == (error > 0.0));\n    if (!winding_up) integral_ = candidate_integral;\n    last_error_ = error;\n    return clamped;\n  }\n\n  [[nodiscard]] double integral() const { return integral_; }\n\n private:\n  Gains gains_;\n  double limit_;\n  Antiwindup antiwindup_;\n  double integral_ = 0.0;\n  double last_error_ = 0.0;\n};\n\nstruct Run {\n  double final_error_mps;\n  double overshoot_percent;\n  std::optional<double> settled_s;  // first time it stayed within 2% to the end\n  double worst_integral;\n};\n\n[[nodiscard]] Run drive(Gains gains, double limit, Antiwindup antiwindup, double target_mps) {\n  constexpr double step_s = 0.05;   // a 20 Hz control loop, the rate the bench's supervisor runs at\n  constexpr std::int64_t steps = 200;  // ten seconds\n  Motor motor(0.30, step_s);\n  Pid pid(gains, limit, antiwindup);\n\n  double highest = 0.0;\n  double worst_integral = 0.0;\n  std::optional<double> settled_s;\n  for (std::int64_t k = 0; k < steps; ++k) {\n    const double command = pid.command(target_mps - motor.speed_mps(), step_s);\n    motor.apply(command);\n    highest = std::max(highest, motor.speed_mps());\n    worst_integral = std::max(worst_integral, std::abs(pid.integral()));\n    const bool within = std::abs(motor.speed_mps() - target_mps) <= 0.02 * target_mps;\n    if (!within) {\n      settled_s.reset();\n    } else if (!settled_s) {\n      settled_s = static_cast<double>(k + 1) * step_s;\n    }\n  }\n  return Run{.final_error_mps = motor.speed_mps() - target_mps,\n             .overshoot_percent = 100.0 * (highest - target_mps) / target_mps,\n             .settled_s = settled_s,\n             .worst_integral = worst_integral};\n}\n\nstruct Case {\n  std::string_view what;\n  Gains gains;\n  double limit;\n  Antiwindup antiwindup;\n};\n\nint main() {\n  constexpr double target_mps = 1.0;\n  std::cout << std::format(\"{:<38} {:>12} {:>15} {:>9} {:>10}\\n\", \"controller\", \"final error\",\n                           \"peak vs target\", \"settled\", \"integral\");\n  for (const Case& one : std::vector<Case>{\n           {.what = \"P only, Kp 2\", .gains = {.p = 2.0, .i = 0.0, .d = 0.0}, .limit = 10.0,\n            .antiwindup = Antiwindup::None},\n           {.what = \"PI, Kp 2 Ki 4\", .gains = {.p = 2.0, .i = 4.0, .d = 0.0}, .limit = 10.0,\n            .antiwindup = Antiwindup::None},\n           {.what = \"PI, Ki 20, output limited to 1.2\", .gains = {.p = 2.0, .i = 20.0, .d = 0.0},\n            .limit = 1.2, .antiwindup = Antiwindup::None},\n           {.what = \"the same, conditional integration\", .gains = {.p = 2.0, .i = 20.0, .d = 0.0},\n            .limit = 1.2, .antiwindup = Antiwindup::ConditionalIntegration},\n           {.what = \"the same, plus Kd 0.1\", .gains = {.p = 2.0, .i = 20.0, .d = 0.1},\n            .limit = 1.2, .antiwindup = Antiwindup::ConditionalIntegration}}) {\n    const Run run = drive(one.gains, one.limit, one.antiwindup, target_mps);\n    const std::string settled =\n        run.settled_s ? std::format(\"{:.2f}s\", *run.settled_s) : std::string{\"never\"};\n    std::cout << std::format(\"{:<38} {:>+11.4f} {:>+14.1f}% {:>9} {:>10.3f}\\n\", one.what, run.final_error_mps,\n                             run.overshoot_percent, settled, run.worst_integral);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "controller                              final error  peak vs target   settled   integral\nP only, Kp 2                               -0.3333          -33.3%     never      3.400\nPI, Kp 2 Ki 4                              -0.0000           -0.0%     1.70s      0.250\nPI, Ki 20, output limited to 1.2           +0.0000          +19.1%     1.65s      0.202\nthe same, conditional integration          +0.0000           +0.9%     0.55s      0.052\nthe same, plus Kd 0.1                      +0.0000           +1.7%     0.65s      0.055"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Five things in that table, in the order they teach."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The P-only row never arrives. It settles a third short of the target and stays there, and the arithmetic says why: the plant needs a command of 1.0 to hold 1.0, the controller produces 2 times the error, so the resting point is where 2 times the error equals the speed, which is two thirds. A larger gain shrinks the gap without closing it, and the way to close it is not a larger P."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Adding the integral closes it exactly. The final error is zero and the integral settles at 0.250, which is the 1.0 the plant needs divided by the gain of 4. That number is worth recognising in a log: a healthy integral term rests at whatever supplies the steady command, and one that rests near zero means the plant needs no bias and one that keeps climbing means it is not getting there."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third row is windup, and it is the one to be able to describe out loud. The gain of 20 makes the integral move fast, the output limit of 1.2 is reached during the rise, and the integral carries on accumulating while the actuator has nothing left to give. The result is 19% of overshoot on a plant that has no oscillation in it at all: the overshoot is entirely the controller's, not the robot's."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth row fixes it with one condition. Stop accumulating while the output is clamped and the error is pushing it further into the clamp, and the overshoot falls to 0.9% and the settling time from 1.65 s to 0.55 s. "
+        },
+        {
+         "t": "code",
+         "v": "control_toolbox"
+        },
+        {
+         "t": "text",
+         "v": ", which is where a ROS 2 controller gets its PID, offers the same choice by name: its antiwindup strategies are none, a legacy clamp on the integral, back-calculation and conditional integration, alongside plain limits "
+        },
+        {
+         "t": "code",
+         "v": "i_min"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "i_max"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "u_min"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "u_max"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "pid.hpp",
+         "href": "https://github.com/ros-controls/control_toolbox/blob/jazzy/control_toolbox/include/control_toolbox/pid.hpp"
+        },
+        {
+         "t": "text",
+         "v": ")."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fifth row is the one that does not do what the cold check promised. Adding a derivative term made the overshoot worse, from 0.9% to 1.7%, and the settling time longer. Sweeping the gain on the same run shows it is a trend rather than an accident: at gains of 0, 0.02, 0.05, 0.1 and 0.2 the peak goes 0.88%, 1.23%, 1.78%, 1.69% and 2.82%, so the trend is upward with one dip."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The mechanism is the integral, and the sweep measures it. The integral rests at 0.0500 at every gain, which is the 1.0 the plant needs divided by the gain of 20, and its peak during the transient rises from 0.0520 to 0.0565. Subtract the two and the excess the controller has to unwind goes 0.0020, 0.0030, 0.0045, 0.0046, 0.0065, and dividing each overshoot by its excess gives 440, 410, 396, 367 and 434: near enough constant that the overshoot is the excess integral coming back off, including at the gain of 0.1 where the peak dipped. The cause of the excess is the first half of the chain: the derivative term opposes the speed that is rising, so the error shrinks more slowly and stays positive longer, so the integral accumulates more before the plant arrives."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A second effect joins it above a gain of 0.05, and it is worth separating rather than folding in. The slower approach also holds the output against its limit for longer, and the moment it last leaves the clamp moves from 0.30 s to 0.40 and then 0.55. Below that gain the clamp ends at 0.30 s whatever the derivative gain is, and the frozen count stays at five, while the overshoot doubles from 0.88% to 1.78%: over that range all of the extra integral is accumulated after the clamp has ended, purely from the slower approach."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The general statement is worth keeping either way. A first-order lag has no oscillation of its own, so there is nothing here for a derivative term to damp and all it can do is delay the approach. D earns its place on plants that overshoot for physical reasons, an arm with compliance or a mass with momentum, and on a plant like this one it is a term to leave at zero."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That is also where "
+        },
+        {
+         "t": "code",
+         "v": "ros2_control"
+        },
+        {
+         "t": "text",
+         "v": " comes in, and it is worth knowing what it is before you meet it. It is a process, "
+        },
+        {
+         "t": "code",
+         "v": "ros2_control_node"
+        },
+        {
+         "t": "text",
+         "v": ", that runs a fixed-rate loop whose default rate is 100 Hz ("
+        },
+        {
+         "t": "a",
+         "v": "controller_manager_parameters.yaml",
+         "href": "https://github.com/ros-controls/ros2_control/blob/jazzy/controller_manager/src/controller_manager_parameters.yaml"
+        },
+        {
+         "t": "text",
+         "v": "). Each cycle it reads the state interfaces the hardware exposes, runs every loaded controller's update, and writes the command interfaces back. The hardware side is a plugin implementing one of three interfaces, for a whole system, a single actuator or a sensor; the controller side is a plugin too, loaded and activated at run time, so a differential-drive controller, a joint trajectory controller and a broadcaster that publishes joint states can share one loop. Reach for it when you have real hardware with joints, because it gives you the fixed-rate loop, the lifecycle and the switching between controllers without writing any of it. Do not reach for it to send a velocity to a simulated base that already accepts one: the bench's robot takes a stamped "
+        },
+        {
+         "t": "code",
+         "v": "Twist"
+        },
+        {
+         "t": "text",
+         "v": " and does the wheel arithmetic itself."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pid",
+   "title": "PID on a simulated one-dimensional system",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. Everything here runs with "
+        },
+        {
+         "t": "code",
+         "v": "g++"
+        },
+        {
+         "t": "text",
+         "v": " alone."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the plant: a first-order lag with a time constant of 0.3 s and a step of 0.05 s, so the speed moves a sixth of the way to the command each step. Its interface takes a command and exposes a speed, and it holds no clock."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write the controller: a PID with three gains and an output limit, whose "
+         },
+         {
+          "t": "code",
+          "v": "command(error, step)"
+         },
+         {
+          "t": "text",
+          "v": " returns the clamped output. Time arrives as an argument."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Reproduce the five rows of the table above, and check three of them against arithmetic you do by hand: the P-only resting point, the integral's resting value with the gain of 4, and the reason the peak in row three exceeds the target although the plant has no oscillation."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Add a fourth strategy, back-calculation: when the output is clamped, feed the difference between the clamped and the unclamped output back into the integral, scaled by a tracking gain. Compare it with conditional integration on the same case, and say which you would ship for a wheel and why."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Change the step from 0.05 to 0.1 and re-run every row without retuning. Write down what happens to each, and say which of the three terms suffers most."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Steps 1 to 3 are the program above. The three hand checks:"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The P-only resting point. At rest the plant's speed equals its command, and the command is "
+        },
+        {
+         "t": "code",
+         "v": "Kp"
+        },
+        {
+         "t": "text",
+         "v": " times the error, so "
+        },
+        {
+         "t": "code",
+         "v": "v = 2 (1 - v)"
+        },
+        {
+         "t": "text",
+         "v": ", which gives "
+        },
+        {
+         "t": "code",
+         "v": "v = 2/3"
+        },
+        {
+         "t": "text",
+         "v": " and an error of "
+        },
+        {
+         "t": "code",
+         "v": "-0.3333"
+        },
+        {
+         "t": "text",
+         "v": ". That matches the table to four decimals, and the general form is that a proportional controller leaves an error of "
+        },
+        {
+         "t": "code",
+         "v": "1 / (1 + Kp)"
+        },
+        {
+         "t": "text",
+         "v": " of the target on this plant. Doubling the gain to 4 would leave a fifth rather than a third, and the error only reaches zero as the gain reaches infinity, which is why the answer is the integral rather than a larger P."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The integral's resting value. At rest the error is zero, so the P and D terms contribute nothing and the whole command comes from the integral: "
+        },
+        {
+         "t": "code",
+         "v": "Ki * I = 1.0"
+        },
+        {
+         "t": "text",
+         "v": ", so "
+        },
+        {
+         "t": "code",
+         "v": "I = 0.25"
+        },
+        {
+         "t": "text",
+         "v": " at "
+        },
+        {
+         "t": "code",
+         "v": "Ki = 4"
+        },
+        {
+         "t": "text",
+         "v": ". The table shows 0.250. This is the check to reach for when a controller behaves oddly in the field: read the integral and see whether its resting value is the command the plant needs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The overshoot with no oscillation in the plant. A first-order lag cannot overshoot on its own, because its speed always moves toward the command and never past it. The peak of 19.1% is therefore entirely the controller's: while the output was clamped at 1.2 the integral kept accumulating past 0.05, and when the speed arrived the integral still held more than the 0.05 the plant needed, so the command stayed above 1.0 until the negative error had unwound it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4. Back-calculation adds "
+        },
+        {
+         "t": "code",
+         "v": "(clamped - unclamped) / tracking_time"
+        },
+        {
+         "t": "text",
+         "v": " to the integral's rate while the output is saturated, so instead of freezing the integral it pushes it back toward the value the clamp can actually deliver. It is smoother than conditional integration, because the integral is corrected continuously rather than switched off, and it costs one more constant to choose. For a wheel, conditional integration is the one to ship: it needs no extra tuning, it cannot be destabilised by a badly chosen tracking gain, and the difference between the two on a saturation that lasts a few hundred milliseconds is small. Back-calculation earns its extra parameter on plants that spend long periods saturated."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5, the loop rate. At a 0.1 s step the plant moves a third of the way to the command each step instead of a sixth, so it is the same physical motor sampled half as often. The P term is unchanged in kind and slower in effect. The integral approximates the same area with half as many rectangles, which at these gains changes little. The derivative suffers most and in two ways: its estimate is now a difference over twice the interval, so it lags further behind the real rate of change, and its gain against noise falls, which sounds good until you notice that the term it is damping has also moved. The general statement is the one from the cold check: gains belong next to the rate they were tuned at, and a controller whose rate can change at run time, which any controller on a busy executor can, needs to compute its terms from the measured step rather than from a constant, which is what passing "
+        },
+        {
+         "t": "code",
+         "v": "step_s"
+        },
+        {
+         "t": "text",
+         "v": " into "
+        },
+        {
+         "t": "code",
+         "v": "command"
+        },
+        {
+         "t": "text",
+         "v": " is for."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Saturation, integral windup, loop timing",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Saturation is the first, and it is a property of every real actuator: a motor has a maximum torque, a base has a maximum wheel speed, a "
+        },
+        {
+         "t": "code",
+         "v": "Twist"
+        },
+        {
+         "t": "text",
+         "v": " has whatever the base clips it to. The failure is not the limit, it is pretending it is not there. A controller whose output goes to the hardware unclamped is a controller whose internal state disagrees with what the robot did, and the integral is where that disagreement is stored. Clamp the output inside the controller, where the integral can see the clamp, rather than letting the hardware do it silently."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Windup is the consequence, measured in the worked example at 19% of overshoot on a plant with no overshoot in it. Two other shapes of the same fault are worth recognising. An integral that accumulates while the robot is not moving at all, because it is waiting for a service or the brakes are on, winds up to whatever the wait was long enough to produce and then lurches when the wait ends. And an integral that accumulates while a limit switch or a safety stop holds the actuator, which is the same thing with a worse ending. The general rule is that the integral must stop whenever the command is not reaching the plant, and that the controller has to be told, because it cannot tell from the error alone."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Loop timing is the third and it is where ROS 2 enters. A control loop assumes a fixed step, and every term is computed from it. Three things break that assumption. A timer whose callback runs late, which the executors topic measured and which "
+        },
+        {
+         "t": "code",
+         "v": "rclcpp::TimerInfo"
+        },
+        {
+         "t": "text",
+         "v": " reports as the gap between the expected and the actual call time. A callback that runs at all only when the executor reaches it, so a control timer sharing a callback group with something slow inherits its delays. And a loop driven by message arrivals rather than by a timer, which the bench's route follower deliberately is: it publishes one command per odometry message, so its rate is the sensor's rate and it goes quiet when the sensor does. That last is a design choice rather than a fault, and it is worth being able to argue: a controller that stops commanding when its feedback stops is safer than one that keeps commanding from a stale measurement, and the cost is that its rate is not yours to choose."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fix in all three cases is the same and it is cheap: compute the terms from the step you actually got, not from the one you configured, and refuse to compute at all when the step is absurd. A step of zero divides by zero in the derivative, and a step of two seconds after a scheduling gap produces an integral contribution that no gain survives. A controller that clamps its own step to a sane band and reports when it has to is a controller that degrades instead of exploding."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the two kinematic formulas of a differential drive in both directions, and say what the robot cannot do. Say what odometry integrates and name the three sources of its drift with a fix for each. Give the P, I and D terms and what each leaves behind or fixes. Give the arithmetic for a P-only controller's resting error and for the integral's resting value. Say what windup is, when it happens, and name two ways to stop it. Finish with what "
+        },
+        {
+         "t": "code",
+         "v": "ros2_control"
+        },
+        {
+         "t": "text",
+         "v": " is, its default loop rate, and when not to reach for it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Give the forward and inverse kinematics of a differential drive, and say what a "
+     },
+     {
+      "t": "code",
+      "v": "Twist"
+     },
+     {
+      "t": "text",
+      "v": " with a sideways component means to one."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A quarter circle of 0.5 m integrated with the straight-line update at 5 Hz: roughly how far out is the final position, and what happens to that at 10 Hz?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the three sources of odometry drift and the fix for each."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What resting error does a P-only controller with a gain of 2 leave on a plant whose speed equals its command, and why does a larger gain not fix it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A PI controller is holding a steady speed. What value does the integral rest at, and what does a climbing integral tell you?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A first-order plant cannot overshoot. The measured speed overshoots by 19%. Where did the overshoot come from?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name two ways to stop integral windup, and say which you would ship for a wheel and why."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is "
+     },
+     {
+      "t": "code",
+      "v": "ros2_control"
+     },
+     {
+      "t": "text",
+      "v": ", what does one cycle of its loop do, and what is its default rate?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A control timer shares a callback group with a slow service. What happens to the loop, and how do you see it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does the bench's route follower publish one command per odometry message rather than on a timer?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file in 15 minutes: a PID class with an output limit and conditional integration, taking the step as an argument, and three tests that need no robot."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "ros2_control on the jazzy branch: "
+     },
+     {
+      "t": "a",
+      "v": "controller_manager_parameters.yaml",
+      "href": "https://github.com/ros-controls/ros2_control/blob/jazzy/controller_manager/src/controller_manager_parameters.yaml"
+     },
+     {
+      "t": "text",
+      "v": " for the update rate, its default of 100 and what one cycle does; the "
+     },
+     {
+      "t": "a",
+      "v": "hardware_interface headers",
+      "href": "https://github.com/ros-controls/ros2_control/tree/jazzy/hardware_interface/include/hardware_interface"
+     },
+     {
+      "t": "text",
+      "v": " for the system, actuator and sensor interfaces and the loaned state and command handles."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "control_toolbox on the jazzy branch, "
+     },
+     {
+      "t": "a",
+      "v": "pid.hpp",
+      "href": "https://github.com/ros-controls/control_toolbox/blob/jazzy/control_toolbox/include/control_toolbox/pid.hpp"
+     },
+     {
+      "t": "text",
+      "v": ": the gains, the "
+     },
+     {
+      "t": "code",
+      "v": "i_min"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "i_max"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "u_min"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "u_max"
+     },
+     {
+      "t": "text",
+      "v": " limits, and the antiwindup strategies named none, legacy, back-calculation and conditional integration."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ros2_controllers on the jazzy branch, the "
+     },
+     {
+      "t": "a",
+      "v": "differential-drive controller",
+      "href": "https://github.com/ros-controls/ros2_controllers/tree/jazzy/diff_drive_controller"
+     },
+     {
+      "t": "text",
+      "v": ", and in particular its "
+     },
+     {
+      "t": "a",
+      "v": "odometry.cpp",
+      "href": "https://github.com/ros-controls/ros2_controllers/blob/jazzy/diff_drive_controller/src/odometry.cpp"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "integrateExact"
+     },
+     {
+      "t": "text",
+      "v": " is the closed form this page measures, and it falls back to a midpoint rule when the heading change is tiny, which is the guard the program above writes as an epsilon test."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "executors",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Executors.html"
+     },
+     {
+      "t": "text",
+      "v": ", for why a control timer's rate is not guaranteed, and rclcpp's "
+     },
+     {
+      "t": "a",
+      "v": "timer.hpp",
+      "href": "https://github.com/ros2/rclcpp/blob/jazzy/rclcpp/include/rclcpp/timer.hpp"
+     },
+     {
+      "t": "text",
+      "v": " for the expected and actual call times a callback can read."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Karl Åström and Tore Hägglund, "
+     },
+     {
+      "t": "a",
+      "v": "their book on PID control",
+      "href": "https://www.ucg.ac.me/skladiste/blog_609332/objava_105202/fajlovi/Astrom_Hagglund.pdf"
+     },
+     {
+      "t": "text",
+      "v": ": the three terms, actuator limits, and the antiwindup strategies including back-calculation with a tracking time constant."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The summaries of the "
+     },
+     {
+      "t": "a",
+      "v": "PID controller",
+      "href": "https://en.wikipedia.org/wiki/PID_controller"
+     },
+     {
+      "t": "text",
+      "v": " and of "
+     },
+     {
+      "t": "a",
+      "v": "integral windup",
+      "href": "https://en.wikipedia.org/wiki/Integral_windup"
+     },
+     {
+      "t": "text",
+      "v": ", for the same material in one page each with the standard names."
+     }
+    ]
+   ]
+  }
+ ]
+}

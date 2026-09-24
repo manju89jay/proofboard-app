@@ -1,0 +1,1260 @@
+{
+ "id": "sd-concurrency-design",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A recorder takes items from a queue with no bound. The producer puts in 50 items a second and the consumer takes out 45, and each item is 1.5 kB. On paper, give three numbers for one hour of this: how many items are in the queue at the end, how much memory that is, and how old the newest item is when the consumer finally reaches it. Then say which of the three the operator notices first, and what the system reports about its own health in the meantime. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The queue grows by 5 items a second, so after 3600 seconds it holds 18,000 items. At 1.5 kB each that is 27 MB. An item put in at the end of the hour waits for the 18,000 in front of it at 45 a second, so it is 400 seconds old when the consumer gets to it."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Latency is what the operator notices, and the three numbers say why: 27 MB is nothing on any machine built this decade, while the recording is already six and a half minutes behind the robot. That gap is the general shape of an unbounded queue. Memory is the failure people talk about and latency is the failure they meet, usually as \"the log does not match what I saw\" or \"the robot stopped two minutes before the recording says it did\"."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "In the meantime the system reports itself healthy, and that is the part worth writing down. The producer never blocks, so nothing upstream sees a problem. The consumer never idles, so it looks fully utilised. No call fails, no error is raised, no counter moves. The only evidence is the queue's own depth, and nobody is publishing it. Hours later the process is killed by the out-of-memory killer, and the log's last line is from whatever it was doing at the time."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the three numbers are right, latency is named as the first symptom, and the answer says the system looks healthy. Getting the memory arithmetic and missing the latency is a partial pass. Answering that the queue is fine because 27 MB is small is a fail: it is the reasoning that ships the bug."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Designing for concurrency is deciding who owns which data, before deciding where any lock goes. The unit that comes out of it is a worker pool: a queue with a maximum length, some number of worker threads taking items from it, a stated rule for what happens when the queue is full, a way to stop a worker that is sitting waiting, and counters that report how deep the queue got and how much was thrown away."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that a producer and a consumer run at different speeds. The obvious first attempt, a container the producer appends to and the consumer takes from, has no maximum, so when the producer is faster the queue grows by the difference for as long as the system runs. Memory is the failure people name and latency is the failure they meet. A producer at 50 items a second against a consumer at 45 leaves 18,000 items queued after an hour, which is 27 MB and nothing to worry about, while the newest item waits 400 seconds before anybody handles it. No call fails and nothing is logged."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is handing ownership over. Pushing an item into the queue moves it: the producer no longer has it, the worker now does, and nothing is left for two threads to share, so the lock covers the queue itself and nothing else. The maximum length forces the decision a plain container hides, which is what to do when there is no room: make the producer wait, throw away the oldest item, or refuse the new one and say so. How many workers is arithmetic rather than taste, because the items in flight at any moment are the arrival rate times the time each one takes: 65 messages a second at a millisecond each needs one worker, and the same rate at 200 milliseconds each needs thirteen."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that all of those decisions are now yours, written down and visible, and that stopping the pool takes care, because a worker waiting on a condition variable never notices a stop request unless it was waiting for one."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Where you meet it in this robot is the recorder, whose producer is a subscription callback running on the executor's only thread. Making that callback wait stops every other callback in the node, which is why a recorder throws data away rather than pushing back."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "design",
+   "title": "Worker pools, queue bounds, cancellation, shutdown",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first instinct when two things touch the same data is to reach for a mutex, and it is the wrong first instinct. A mutex is the answer to a question you should try not to have. The design question is who owns the data, and the tool that answers it is a queue, because pushing an item into one hands ownership over: the producer no longer has it, the consumer now does, and there is nothing left to protect."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The rule underneath is the "
+        },
+        {
+         "t": "i",
+         "v": "single-writer rule"
+        },
+        {
+         "t": "text",
+         "v": ": every piece of mutable state has exactly one writer, and everybody else gets a copy, a snapshot, or a message. It costs a copy of small things and saves you the whole category of bug that the C++ track spends chapters on. The data-flow topic worked out what a copy costs for camera frames; here the point is what it buys, which is that with one writer there is no race to reason about and no lock ordering to get wrong. Where the rule cannot hold, because the state is genuinely shared and large, you take a lock, and then you are in the part of the design that needs care rather than the part that needs typing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is worth being precise about what a lock buys, because it is less than people assume. A mutex gives you mutual exclusion over the region between taking it and releasing it. That is all. It does not bound how long a thread waits for it, so it gives you no latency guarantee. It does not compose: two correct functions that each take one lock can deadlock when one calls the other, and the fix is a global ordering that nothing in the language checks. And a lock held across a blocking call, a write to a slow disk, a service call, a "
+        },
+        {
+         "t": "code",
+         "v": "sleep"
+        },
+        {
+         "t": "text",
+         "v": ", is not a lock any more, it is an outage for everybody who wants it. The rule that follows is short: hold a lock for a few instructions over data in memory, and never across anything that can wait."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "i",
+         "v": "worker pool"
+        },
+        {
+         "t": "text",
+         "v": " is the shape this leads to, and it has five parts. A bounded queue. Some number of workers taking from it. A stated policy for what happens when the queue is full. A stop path that reaches a worker even when it is waiting. And counters: depth, high-water mark, drops. Leave out any of the five and you have not designed a pool, you have written one and left the missing decision to be made by accident. The full policy is the one people leave out most, and the data-flow topic gives the three choices, block the producer, drop the oldest, or refuse and report; what matters here is that in a robot the choice is usually forced by where the producer is. A sensor callback runs on the executor's thread, as the executors topic measured, so blocking it blocks every other callback of that node. That makes \"block the producer\" wrong for anything fed by a subscription, and right for a file converter reading from disk in its own thread."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "How many workers is arithmetic rather than taste. For work that is CPU-bound, the answer is the number of cores you are allowed to use, because a thread beyond that adds context switches and no throughput. For work that waits, which is most work in a robot, use Little's law: the number of items in the system is the arrival rate times the time each one spends there. A recorder handling 50 items a second whose disk write takes 200 ms has 50 × 0.2 = 10 items in flight at any moment, so ten workers keep up and one worker is behind by a factor of ten. That single number decides between \"add workers\" and \"drop data\", and it is cheaper to compute than to discover."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Cancellation"
+        },
+        {
+         "t": "text",
+         "v": " in C++20 is "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_token"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": " requests one in its destructor and then joins, which is why the code rules ask for it. The trap is that a stop request is not a signal: it does not interrupt anything. A worker sitting in "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable::wait"
+        },
+        {
+         "t": "text",
+         "v": " never sees it, and the program hangs at shutdown for ever. "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable_any"
+        },
+        {
+         "t": "text",
+         "v": " has an overload that takes the token and wakes on a stop request as well as on a notify, and that overload is what makes a queue's "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " safe to shut down. The same thought applies one layer out: a worker blocked in a system call needs that call to have a timeout, which is the networking topic's "
+        },
+        {
+         "t": "code",
+         "v": "SO_RCVTIMEO"
+        },
+        {
+         "t": "text",
+         "v": ", or the stop request reaches a thread that cannot act on it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Shutdown"
+        },
+        {
+         "t": "text",
+         "v": " is an order, and writing it down is part of the design. Stop accepting new work first, so the queue cannot grow while you are draining it. Decide what happens to what is already queued, drain it or discard it, and make that a documented property rather than whatever the code happens to do: a recorder drains, a telemetry sender discards. Then request the stop, then join, and only then destroy the queue. Destroying a queue that a worker still holds a reference to is the callback-lifetime bug from the callbacks topic wearing different clothes, and "
+        },
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": "'s destructor gets the order right for you only if the thread is declared after everything it uses."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Priority inversion"
+        },
+        {
+         "t": "text",
+         "v": " is the failure that makes all of this worse under a real-time scheduler. A low-priority thread holds a lock; a high-priority thread waits for it; a medium-priority thread, which needs neither, preempts the low-priority one and runs. The high-priority thread is now blocked by a thread with lower priority than itself, for as long as the medium one wants. Mars Pathfinder rebooted itself repeatedly on exactly this in 1997. Two fixes exist, and the first is better: do not share a lock across priorities, which the single-writer rule mostly gives you for free. The second is priority inheritance, "
+        },
+        {
+         "t": "code",
+         "v": "pthread_mutexattr_setprotocol"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "PTHREAD_PRIO_INHERIT"
+        },
+        {
+         "t": "text",
+         "v": ", which lifts the holder to the waiter's priority until it releases. Neither is needed while every thread is at the default priority, which on Linux means "
+        },
+        {
+         "t": "code",
+         "v": "SCHED_OTHER"
+        },
+        {
+         "t": "text",
+         "v": " and no inversion of this kind; it becomes urgent the day somebody puts the control loop on "
+        },
+        {
+         "t": "code",
+         "v": "SCHED_FIFO"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Last, measurement, because every number above is a guess until you publish it. A queue you cannot see the depth of is a queue you cannot size. Publish three numbers per queue: the current depth, the high-water mark since start, and the total drops. The high-water mark is the one that sizes the bound, the drop count is the one that tells you the policy is firing, and the depth is the one that shows the trend before either of the others moves."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Here is the hand-over point with all five parts present: a bound, a stated full policy, a worker, a stop path that reaches it, and counters. The producer pushes a thousand items into a queue of capacity eight and the worker cannot keep up, which is the point:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <condition_variable>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <optional>\n#include <stop_token>\n#include <thread>\n\n// The one place the producer and the worker meet. The full policy is part of the type, so nobody\n// can hand an item over without having decided what happens when there is no room, and what is\n// lost is counted rather than guessed at.\nclass Handover {\n public:\n  explicit Handover(std::ptrdiff_t capacity) : capacity_(capacity) {}\n\n  void push(std::int64_t item) {\n    {\n      const std::lock_guard guard(mutex_);\n      if (std::ssize(items_) == capacity_) {\n        dropped_sum_ += items_.front();\n        ++dropped_;\n        items_.pop_front();\n      }\n      items_.push_back(item);\n      high_water_ = std::max(high_water_, std::ssize(items_));\n    }\n    ready_.notify_one();\n  }\n\n  // Waits for an item or for the stop request. Waiting with the token is what lets shutdown work\n  // without a second signal and without a poison value in the queue.\n  [[nodiscard]] std::optional<std::int64_t> pop(std::stop_token stop) {\n    std::unique_lock lock(mutex_);\n    if (!ready_.wait(lock, stop, [this] { return !items_.empty(); })) return std::nullopt;\n    const std::int64_t item = items_.front();\n    items_.pop_front();\n    return item;\n  }\n\n  [[nodiscard]] bool empty() const {\n    const std::lock_guard guard(mutex_);\n    return items_.empty();\n  }\n\n  [[nodiscard]] std::int64_t dropped() const {\n    const std::lock_guard guard(mutex_);\n    return dropped_;\n  }\n\n  [[nodiscard]] std::int64_t dropped_sum() const {\n    const std::lock_guard guard(mutex_);\n    return dropped_sum_;\n  }\n\n  [[nodiscard]] std::ptrdiff_t high_water() const {\n    const std::lock_guard guard(mutex_);\n    return high_water_;\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::condition_variable_any ready_;\n  std::ptrdiff_t capacity_;\n  std::deque<std::int64_t> items_;\n  std::int64_t dropped_ = 0;\n  std::int64_t dropped_sum_ = 0;\n  std::ptrdiff_t high_water_ = 0;\n};\n\nint main() {\n  constexpr std::ptrdiff_t capacity = 8;\n  constexpr std::int64_t produced = 1000;\n\n  Handover queue(capacity);\n  std::int64_t done = 0;\n  std::int64_t done_sum = 0;\n  {\n    // The worker owns `done` and `done_sum` for as long as it runs, and the join at the end of\n    // this scope is what makes them safe to read afterwards.\n    const std::jthread worker([&queue, &done, &done_sum](std::stop_token stop) {\n      while (const std::optional<std::int64_t> item = queue.pop(stop)) {\n        ++done;\n        done_sum += *item;\n      }\n    });\n\n    for (std::int64_t item = 1; item <= produced; ++item) queue.push(item);\n    while (!queue.empty()) std::this_thread::yield();  // let the worker finish what survived\n  }  // the jthread destructor requests the stop and joins\n\n  const std::int64_t expected_sum = produced * (produced + 1) / 2;\n  std::cout << std::format(\"capacity {}, produced {}\\n\", capacity, produced);\n  std::cout << std::format(\"done + dropped = {}\\n\", done + queue.dropped());\n  std::cout << std::format(\"sum of done and dropped = {}, expected {}\\n\", done_sum + queue.dropped_sum(),\n                           expected_sum);\n  std::cout << std::format(\"the queue never held more than {} items: {}\\n\", capacity,\n                           queue.high_water() <= capacity ? \"yes\" : \"no\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "capacity 8, produced 1000\ndone + dropped = 1000\nsum of done and dropped = 500500, expected 500500\nthe queue never held more than 8 items: yes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Notice what the output does and does not say. It does not say how many items the worker got through, because that depends on how the operating system interleaved the two threads and changes between runs; a test that asserted a number there would be a test that fails on a busy machine. What it does say holds on every run and on every machine: every item was either done or counted as dropped, the sum of the two matches the sum of everything produced, and the queue never exceeded its bound. Those are the properties a bounded queue promises, and they are testable precisely because they do not depend on timing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three details carry the design. "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " waits with the stop token, so the "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " destructor's stop request wakes a worker that is sitting in "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": "; with a plain "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable"
+        },
+        {
+         "t": "text",
+         "v": " this program would hang at the closing brace, for ever, with no output. The worker is declared inside a scope that ends before the counters are read, so the join is what publishes its writes: reading "
+        },
+        {
+         "t": "code",
+         "v": "done"
+        },
+        {
+         "t": "text",
+         "v": " while the worker still ran would be a data race, and the scope is how the code says it is not. And "
+        },
+        {
+         "t": "code",
+         "v": "dropped_sum_"
+        },
+        {
+         "t": "text",
+         "v": " exists only so the program can prove it is not losing items silently, which is the smaller form of the rule that a drop you do not count is a drop you will not find."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pool",
+   "title": "Design a pool for a recording pipeline",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes, mostly on paper."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The bench gains a recorder. It subscribes to three of the simulated TurtleBot's topics, and the rates come from the model the bench runs, "
+        },
+        {
+         "t": "code",
+         "v": "gz_waffle.sdf.xacro"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "a",
+         "v": "nav2_minimal_turtlebot_simulation 1.3.0",
+         "href": "https://github.com/ros-navigation/nav2_minimal_turtlebot_simulation/blob/1.3.0/nav2_minimal_tb3_sim/urdf/gz_waffle.sdf.xacro"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "/scan"
+        },
+        {
+         "t": "text",
+         "v": " at 5 Hz, from the "
+        },
+        {
+         "t": "code",
+         "v": "update_rate"
+        },
+        {
+         "t": "text",
+         "v": " of the "
+        },
+        {
+         "t": "code",
+         "v": "hls_lfcd_lds"
+        },
+        {
+         "t": "text",
+         "v": " sensor, with "
+        },
+        {
+         "t": "code",
+         "v": "samples"
+        },
+        {
+         "t": "text",
+         "v": " of 360; "
+        },
+        {
+         "t": "code",
+         "v": "/odom"
+        },
+        {
+         "t": "text",
+         "v": " at 30 Hz, from "
+        },
+        {
+         "t": "code",
+         "v": "odom_publish_frequency"
+        },
+        {
+         "t": "text",
+         "v": " on the DiffDrive system, with about 720 bytes; and "
+        },
+        {
+         "t": "code",
+         "v": "/tf"
+        },
+        {
+         "t": "text",
+         "v": " at 30 Hz with about 200 bytes, because "
+        },
+        {
+         "t": "a",
+         "v": "DiffDrive.cc",
+         "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/diff_drive/DiffDrive.cc"
+        },
+        {
+         "t": "text",
+         "v": " publishes the transform and the odometry in the same block behind one period. A scan of 360 samples is 360 ranges and 360 intensities, because gz-sensors fills one intensity per beam in "
+        },
+        {
+         "t": "a",
+         "v": "Lidar.cc",
+         "href": "https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/Lidar.cc"
+        },
+        {
+         "t": "text",
+         "v": " and the bridge copies them in "
+        },
+        {
+         "t": "a",
+         "v": "convert/sensor_msgs.cpp",
+         "href": "https://github.com/gazebosim/ros_gz/blob/jazzy/ros_gz_bridge/src/convert/sensor_msgs.cpp"
+        },
+        {
+         "t": "text",
+         "v": ", so 720 floats of 4 bytes is 2880 bytes and about 2.9 kB with the header, which is the figure the requirements topic worked out for the same sensor. The recorder serialises each message and appends it to a file on the robot's SD card, which normally takes under a millisecond and occasionally stalls for 200 ms while the card does its own housekeeping. The node runs in the same process as the supervisor."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Decide how many queues and how many workers, and give the reason for each in one line. Say what crosses the boundary between the subscription callback and the worker, and who owns it on each side."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "For every queue give the bound and the full policy, each with a number derived from the rates above and the 200 ms stall, not from taste."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Write down the shutdown order for this node, including what happens on Ctrl+C to items still queued, and say which part of that is a promise to the user rather than an implementation detail."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Give the queue's interface, not its body, with the full policy visible in the types. Then give three numbered pass or fail checks for it that do not depend on thread timing."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Name the three numbers the recorder publishes so that somebody can size the bounds from evidence next month, and say what each one tells you that the other two do not."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 1. One queue and one worker. The reason for one queue is that all three streams end up in one file in arrival order, so a second queue would only create a merge problem that does not otherwise exist. The reason for one worker is Little's law: the arrival rate is 5 + 30 + 30 = 65 messages a second and the service time is under a millisecond in the normal case, so 65 × 0.001 is about 0.07 items in flight, and one worker is more than an order of magnitude beyond what the work needs. The 200 ms stall does not change that, because a stall is not throughput: it is a burst of backlog that the same worker clears at full speed afterwards. Adding workers would also break the file's ordering, which is the property the recording is for."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What crosses the boundary is a serialised buffer, moved. The subscription callback serialises the message into a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::byte>"
+        },
+        {
+         "t": "text",
+         "v": " and pushes it with "
+        },
+        {
+         "t": "code",
+         "v": "std::move"
+        },
+        {
+         "t": "text",
+         "v": ", so the callback owns it up to the push and the queue owns it afterwards; the worker takes ownership out again and the buffer dies when the write returns. Nothing is shared and nothing is referenced across the boundary, so the queue's mutex protects the deque and nothing else, which is the whole reason this design needs one small lock rather than a locking discipline."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 2, the bound and the policy. The data rate is 5 × 2.9 kB + 30 × 720 B + 30 × 200 B = 14.5 + 21.6 + 6.0 = 42.1 kB/s, at 65 messages a second, so the average message is about 648 bytes. A 200 ms stall therefore leaves 13 messages and about 8.4 kB behind it. A bound has to cover the longest stall you intend to survive with margin: at three stalls back to back, 600 ms, that is 39 messages, so a bound of 128 messages rides out 1.97 seconds of stalling, which is ten stalls. It costs about 83 kB of memory at the average message size and 371 kB in the worst case, where every one of the 128 is a scan. The number to write in the comment is the multiple, ten stalls, rather than the 128."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The policy is drop-oldest, and this is the row to argue about. Blocking the producer is wrong here for a reason that has nothing to do with recording: the producer is a subscription callback on the executor's thread, shared with the supervisor in the same process, so blocking it for 200 ms stops the supervisor's 20 Hz timer for 200 ms. Refusing and reporting is the same problem with extra steps, because the callback has nowhere to put the refusal. Drop-oldest keeps the newest data, which for a recording is the wrong preference in principle and the right one in practice: a recording missing its oldest few messages during a stall is still usable, and a robot that stopped supervising is not. The honest way to write that down is that the recorder is a best-effort consumer of a real-time system, and if losing a message is unacceptable then the recorder does not belong in this process."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 3, the shutdown order:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Unsubscribe, or set a flag the callbacks check, so nothing new enters the queue."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Drain what is queued, with a time limit of one second. A full queue of 128 records drains in about 0.13 seconds at the service time from step 1, so the limit is not there for the normal case: it is there for an SD card that has chosen this moment to stall, and one second is about five stalls of headroom before the shutdown gives up and says how many records it abandoned."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Request the worker's stop and join it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Flush and close the file, and write the trailing record that says the recording finished, which the recovery topic asked for."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Destroy the queue, which is now referenced by nothing."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Steps 2 and 4 are promises to the user and belong in the documentation: the recorder drains rather than discards, so a recording ended with Ctrl+C is complete up to the last message that arrived, and it carries a trailing record, so a reader can tell a finished recording from a killed one. Everything else on that list is implementation."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4, the interface with the policy in the types:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "enum class WhenFull { DropOldest, DropNewest, Block };\n\nclass RecordQueue {\n public:\n  RecordQueue(std::ptrdiff_t capacity, WhenFull policy);\n  void push(std::vector<std::byte> record);                     // never blocks under DropOldest\n  [[nodiscard]] std::optional<std::vector<std::byte>> pop(std::stop_token stop);\n  void stop_accepting();                                        // step 1 of the shutdown\n  [[nodiscard]] std::ptrdiff_t depth() const;\n  [[nodiscard]] std::ptrdiff_t high_water() const;\n  [[nodiscard]] std::int64_t dropped() const;\n};"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The policy is a constructor argument of an enumerated type rather than a "
+        },
+        {
+         "t": "code",
+         "v": "bool blocking"
+        },
+        {
+         "t": "text",
+         "v": ", so a reader of the call site sees which of the three it is, and adding a fourth later does not change any existing call. The three checks, and none of them starts a thread:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Push "
+         },
+         {
+          "t": "code",
+          "v": "capacity + 1"
+         },
+         {
+          "t": "text",
+          "v": " records into a "
+         },
+         {
+          "t": "code",
+          "v": "DropOldest"
+         },
+         {
+          "t": "text",
+          "v": " queue and pop them all with a stop token that is never requested. The records that come out are records 2 to "
+         },
+         {
+          "t": "code",
+          "v": "capacity + 1"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "dropped()"
+         },
+         {
+          "t": "text",
+          "v": " is 1 and "
+         },
+         {
+          "t": "code",
+          "v": "depth()"
+         },
+         {
+          "t": "text",
+          "v": " is 0. Repeat with "
+         },
+         {
+          "t": "code",
+          "v": "DropNewest"
+         },
+         {
+          "t": "text",
+          "v": " and expect records 1 to "
+         },
+         {
+          "t": "code",
+          "v": "capacity"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "After "
+         },
+         {
+          "t": "code",
+          "v": "stop_accepting"
+         },
+         {
+          "t": "text",
+          "v": ", a push adds nothing and increases neither "
+         },
+         {
+          "t": "code",
+          "v": "depth()"
+         },
+         {
+          "t": "text",
+          "v": " nor "
+         },
+         {
+          "t": "code",
+          "v": "dropped()"
+         },
+         {
+          "t": "text",
+          "v": ", and a "
+         },
+         {
+          "t": "code",
+          "v": "pop"
+         },
+         {
+          "t": "text",
+          "v": " still returns what was already there and then returns nothing."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "high_water()"
+         },
+         {
+          "t": "text",
+          "v": " equals the largest depth the sequence of pushes and pops reached, checked against a hand-computed value for a fixed sequence, and it never exceeds "
+         },
+         {
+          "t": "code",
+          "v": "capacity"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5, the three numbers. The depth, sampled at each publish, shows the trend: it is the only one of the three that moves before anything is lost, and a depth that has a floor above zero says the worker is behind on average rather than in bursts. The high-water mark shows the worst burst since start, which is the number the bound is set from: a high-water mark that never passes 30 says 128 is four times more than this robot needs, and one that touches 128 says the bound is now the thing deciding what gets recorded. The drop count shows the policy firing, and it is the only one of the three that says data was lost. Publish all three as a message on a diagnostics topic rather than logging them, so a scenario run records them with everything else."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "traps",
+   "title": "Unbounded queues and backpressure",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The unbounded queue is the failure this page opened with, and there is one thing left to say about it: it is almost never written on purpose. It appears when somebody uses a "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": " or a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " as a queue, and neither has a bound, so the decision that a bounded queue forces you to make is never made. The shape to recognise in a review is a container with a "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " in one thread and a "
+        },
+        {
+         "t": "code",
+         "v": "pop_front"
+        },
+        {
+         "t": "text",
+         "v": " in another and no capacity anywhere in the file."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Backpressure is the correct alternative and it has its own failure, which is applying it in a place that cannot absorb it. Backpressure works by making the producer wait, so it is only correct when the producer has something else to do, or nothing to lose by waiting. A file converter reading from disk can wait. A sensor cannot: the scene does not pause. And a subscription callback must not, because the thing that waits is the executor's thread and everything else in that node waits with it, which the executors topic measured at 90 dropped odometry messages for a two-second callback. The rule that comes out of this is worth keeping: backpressure must reach something that can slow down, and if the nearest such thing is outside your process, you are dropping data whether you planned to or not."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Dropping the wrong end is the next one. Drop-oldest and drop-newest are not interchangeable, and the choice follows from what the data is for. For anything that steers a robot, the newest value is the only useful one and the old ones are worthless, so drop the oldest. For a log or an audit trail, the first records of an incident are the ones that explain it and the later ones are repetition, so drop the newest and keep the beginning. Getting this backwards produces a recording that contains the last thirty seconds before the crash and none of what caused it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two smaller ones close the set. A queue can be bounded in items and unbounded in bytes: 128 records is 92 kB of odometry at 720 bytes a message, and 354 MB if somebody starts recording camera frames through the same queue, because one 1280 by 720 frame of three bytes a pixel is 2,764,800 bytes, as the data-flow topic counted. So bound whichever of the two actually matters, or both. And a drop that is not counted is a drop that will be argued about: the recording is short, the producer swears it sent everything, the consumer swears it wrote everything, and both are right. One counter ends that conversation, which is why it is in the five parts of a pool rather than in a list of nice extras."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. State the single-writer rule and say what a queue does to the question a mutex answers. Say exactly what a lock buys and name the two things it does not give you. List the five parts of a worker pool. Give the arithmetic that decides the number of workers, with the rule's name. Say what makes a stop request reach a waiting worker, and what happens with the plain condition variable instead. Give the shutdown order and which parts of it are promises rather than implementation. Name the three numbers a queue publishes and what each one alone tells you."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "State the single-writer rule, and say what a hand-over queue does to the ownership question."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does a mutex guarantee, and name two guarantees people assume it gives and it does not."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is a lock held across a disk write not really a lock any more?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "List the five parts of a worker pool, and say which one is left out most often."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "65 messages a second, 200 ms of service time each. How many workers keep up, and what is the rule called?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which full policy fits a subscription callback, and why is blocking wrong there specifically?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A worker waits in "
+     },
+     {
+      "t": "code",
+      "v": "std::condition_variable::wait"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "code",
+      "v": "jthread"
+     },
+     {
+      "t": "text",
+      "v": " destructor requests a stop. What happens, and what do you use instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Give the shutdown order for a node with a queue and a worker, and say which steps are promises to the user."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Describe priority inversion in three sentences, and give the two fixes in the order you would try them."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which queue metric moves first when the consumer starts falling behind, and which one proves data was lost?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page in 15 minutes: the queue interface, bound, policy and shutdown order for a pipeline whose consumer stalls for 200 ms at a time."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "cppreference: "
+     },
+     {
+      "t": "a",
+      "v": "jthread",
+      "href": "https://en.cppreference.com/cpp/thread/jthread"
+     },
+     {
+      "t": "text",
+      "v": ", which requests a stop and joins in its destructor, "
+     },
+     {
+      "t": "a",
+      "v": "stop_token",
+      "href": "https://en.cppreference.com/cpp/thread/stop_token"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "condition_variable_any wait taking a stop token",
+      "href": "https://en.cppreference.com/cpp/thread/condition_variable_any/wait"
+     },
+     {
+      "t": "text",
+      "v": ", which is the overload that makes a worker's wait cancellable."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "CP.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-data"
+     },
+     {
+      "t": "text",
+      "v": " on minimising shared writable data, "
+     },
+     {
+      "t": "a",
+      "v": "CP.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-raii"
+     },
+     {
+      "t": "text",
+      "v": " on taking a lock through a scoped guard, "
+     },
+     {
+      "t": "a",
+      "v": "CP.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-lock"
+     },
+     {
+      "t": "text",
+      "v": " on taking several locks together, "
+     },
+     {
+      "t": "a",
+      "v": "CP.22",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-unknown"
+     },
+     {
+      "t": "text",
+      "v": " against calling unknown code while holding a lock, and "
+     },
+     {
+      "t": "a",
+      "v": "CP.25",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-joining_thread"
+     },
+     {
+      "t": "text",
+      "v": " on a thread that joins in its destructor."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Anthony Williams, "
+     },
+     {
+      "t": "a",
+      "v": "his book on concurrency in C++",
+      "href": "https://www.manning.com/books/c-plus-plus-concurrency-in-action-second-edition"
+     },
+     {
+      "t": "text",
+      "v": ", 2nd edition: the bounded queue with a condition variable, and the chapter on designing concurrent data structures."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: Concurrency, CppCon 2023 ("
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B-Concurrency.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=8rEGu20Uw4g"
+     },
+     {
+      "t": "text",
+      "v": "), and Arthur O'Dwyer's 2020 talk on the same track ("
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_concurrency/back_to_basics_concurrency__arthur_odwyer__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=F6Ipn7gCOsY"
+     },
+     {
+      "t": "text",
+      "v": ")."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "pthread_mutexattr_setprotocol",
+      "href": "https://man7.org/linux/man-pages/man3/pthread_mutexattr_setprotocol.3p.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "PTHREAD_PRIO_INHERIT"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "sched(7)",
+      "href": "https://man7.org/linux/man-pages/man7/sched.7.html"
+     },
+     {
+      "t": "text",
+      "v": " for the Linux policies under which priority inversion becomes possible."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Glenn Reeves, "
+     },
+     {
+      "t": "a",
+      "v": "what really happened on Mars",
+      "href": "https://www.cs.cornell.edu/courses/cs614/1999sp/papers/pathfinder.html"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "RISKS digest thread",
+      "href": "https://catless.ncl.ac.uk/Risks/19.49.html"
+     },
+     {
+      "t": "text",
+      "v": ": the priority inversion that reset Pathfinder, and the priority inheritance that fixed it from Earth."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation, "
+     },
+     {
+      "t": "a",
+      "v": "Executors",
+      "href": "https://docs.ros.org/en/jazzy/Concepts/Intermediate/About-Executors.html"
+     },
+     {
+      "t": "text",
+      "v": ": whose thread a subscription callback runs on, and therefore what blocking in one costs."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,790 @@
+{
+ "id": "prj-repeat-measure",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage stops the bench answering with one run. Every scenario so far has been judged one run at a time, and a single pass says almost nothing: ten clean runs still leave room for a failure rate of one in four, so \"I ran it and it was fine\" is not evidence that it is fine. Each scenario now runs ten times, and the bench records what moved."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is measuring the margin rather than the verdict. A pass hides how close the run came, and the number that predicts tomorrow's flake is the smallest gap between a measured value and its limit, not the count of failures. So the tool reads the verdict files, gathers each check across the runs, and prints the range, the margin at the worst run and how many runs never produced the number at all. That last column is where an intermittent failure hides: a check with no value cannot be out of range."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: a table per scenario over ten runs, the wall time of each, and a written judgement on which checks are too loose and which are one bad run from failing."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "repeat",
+   "title": "Repeated runs and their spread",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " can read a set of verdict files and say what each check did across them, with GoogleTest tests you wrote first and saw fail."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The reproducibility topic did this with the numbers typed in by hand, which was the right way to see the argument and the wrong way to live. Its exercise showed three rows telling three different stories: a check with sixty per cent of its limit unused, which will pass whatever breaks; one passing ten times with less than one per cent of margin, which is a failure waiting for a slow afternoon; and one that had already failed once. This session makes the bench produce that table from its own files."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Parsing them is the work, and the format is the one the runner has been writing since the scenario runner topic:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "ok     distance travelled after the cue: 0.09 m, at most 0.25 m\nfailed time from the cue to the robot at rest: not measured, at most 1.50 s\nok     goals reached in order: 2.00, at least 2.00"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A line carries five facts: whether it was met, the check's name, the measured value or the words that say there was none, the direction of the comparison, and the limit. The unit appears twice and the parser takes it from the limit, because that side is always present."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the tests first, in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/test/spread_test.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". The first case is the line that has no number:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <gtest/gtest.h>\n\n#include \"bench/spread.hpp\"\n\nTEST(ParseMeasurement, KeepsTheLimitOfALineWithNoMeasuredValue) {\n  const auto one = bench::parse_measurement(\n      \"failed time from the cue to the robot at rest: not measured, at most 1.50 s\");\n  ASSERT_TRUE(one);\n  EXPECT_EQ(one->what, \"time from the cue to the robot at rest\");\n  EXPECT_FALSE(one->measured.has_value());\n  EXPECT_EQ(one->limit, 1.50);\n  EXPECT_EQ(one->unit, \"s\");\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add one case each for: an "
+        },
+        {
+         "t": "code",
+         "v": "at least"
+        },
+        {
+         "t": "text",
+         "v": " line; a line whose value has no unit, such as the goal count; a line that is not a check, such as "
+        },
+        {
+         "t": "code",
+         "v": "scenario: normal"
+        },
+        {
+         "t": "text",
+         "v": ", which parses to nothing; and a spread over three runs where one value is missing, which must count in the missing column and not in the range. Add "
+        },
+        {
+         "t": "code",
+         "v": "spread"
+        },
+        {
+         "t": "text",
+         "v": " to the test list in "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_core/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": " and watch "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " fail to compile."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/include/bench/spread.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", with the definitions in "
+         },
+         {
+          "t": "code",
+          "v": "src/spread.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". Here it is as one program, over three runs of the missing-odometry scenario:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <charconv>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <system_error>\n#include <vector>\n\nnamespace bench {\n\n// From bench/scenario.hpp.\nenum class Compare { at_least, at_most };\n\n// bench/spread.hpp: one check's line from a verdict file, reduced to what a comparison needs.\nstruct Measurement {\n  std::string what;\n  std::string unit;\n  Compare compare;\n  double limit;\n  std::optional<double> measured;  // nothing when the line says \"not measured\"\n};\n\nnamespace {\n\n// The number at the front of \"0.05 m\" or \"2.00\", with whatever follows it as the unit.\n[[nodiscard]] std::optional<std::pair<double, std::string_view>> value_and_unit(std::string_view text) {\n  double value = 0.0;\n  const char* const end = text.data() + text.size();\n  const auto [stop, error] = std::from_chars(text.data(), end, value);\n  if (error != std::errc{}) return std::nullopt;\n  std::string_view unit(stop, end);\n  while (!unit.empty() && unit.front() == ' ') unit.remove_prefix(1);\n  return std::pair{value, unit};\n}\n\n}  // namespace\n\n// One line of a verdict file. Nothing for a line that is not a check.\n[[nodiscard]] std::optional<Measurement> parse_measurement(std::string_view line) {\n  constexpr std::string_view most = \", at most \";\n  constexpr std::string_view least = \", at least \";\n  if (!line.starts_with(\"ok\") && !line.starts_with(\"failed\")) return std::nullopt;\n  const auto colon = line.find(\": \");\n  const auto after_status = line.find_first_not_of(' ', line.find(' '));\n  if (colon == std::string_view::npos || after_status == std::string_view::npos || after_status >= colon) {\n    return std::nullopt;\n  }\n  const std::string_view tail = line.substr(colon + 2);\n  const bool at_most = tail.find(most) != std::string_view::npos;\n  const auto separator = at_most ? tail.find(most) : tail.find(least);\n  if (separator == std::string_view::npos) return std::nullopt;\n\n  const auto limit = value_and_unit(tail.substr(separator + (at_most ? most.size() : least.size())));\n  if (!limit) return std::nullopt;\n  const auto measured = value_and_unit(tail.substr(0, separator));\n  return Measurement{.what = std::string(line.substr(after_status, colon - after_status)),\n                     .unit = std::string(limit->second),\n                     .compare = at_most ? Compare::at_most : Compare::at_least,\n                     .limit = limit->first,\n                     .measured = measured ? std::optional<double>(measured->first) : std::nullopt};\n}\n\n[[nodiscard]] std::vector<Measurement> parse_measurements(std::string_view verdict) {\n  std::vector<Measurement> found;\n  for (const auto part : std::views::split(verdict, '\\n')) {\n    const std::string_view line(part.begin(), part.end());\n    if (const auto one = parse_measurement(line)) found.push_back(*one);\n  }\n  return found;\n}\n\n// What one check did across the runs of a repeat.\nstruct Spread {\n  double lowest;\n  double highest;\n  std::int64_t measured;  // runs that produced a number, which lowest and highest describe\n  std::int64_t outside;   // runs that missed the limit\n  std::int64_t missing;   // runs where the number was never measured\n};\n\n[[nodiscard]] std::optional<Spread> spread_of(std::span<const Measurement> across_runs) {\n  if (across_runs.empty()) return std::nullopt;\n  std::int64_t outside = 0;\n  std::int64_t missing = 0;\n  std::optional<double> lowest;\n  std::optional<double> highest;\n  for (const Measurement& one : across_runs) {\n    if (!one.measured) {\n      ++missing;\n      continue;\n    }\n    lowest = lowest ? std::min(*lowest, *one.measured) : *one.measured;\n    highest = highest ? std::max(*highest, *one.measured) : *one.measured;\n    const bool met = one.compare == Compare::at_most ? *one.measured <= one.limit : *one.measured >= one.limit;\n    if (!met) ++outside;\n  }\n  return Spread{.lowest = lowest.value_or(0.0),\n                .highest = highest.value_or(0.0),\n                .measured = std::ssize(across_runs) - missing,\n                .outside = outside,\n                .missing = missing};\n}\n\n// How much of the limit the worst run left unused. Nothing when no run produced a number, and\n// nothing when the limit is zero, which the cancel scenario's \"goals reached after the cancel,\n// at most 0\" has. Both would otherwise print as the most comfortable row in the table.\n[[nodiscard]] std::optional<double> margin_percent(const Measurement& check, const Spread& spread) {\n  if (spread.measured == 0 || check.limit == 0.0) return std::nullopt;\n  const double slack =\n      check.compare == Compare::at_most ? check.limit - spread.highest : spread.lowest - check.limit;\n  return 100.0 * slack / check.limit;\n}\n\n// The table for a repeat: one row per check of the first run, gathered across every run.\n[[nodiscard]] std::string spread_table(std::span<const std::vector<Measurement>> runs) {\n  std::string text = std::format(\"{:<44} {:>10} {:>8} {:>8} {:>8} {:>8} {:>8}\\n\", \"check\", \"limit\", \"lowest\",\n                                 \"highest\", \"margin\", \"outside\", \"missing\");\n  if (runs.empty()) return text;\n  for (const Measurement& first : runs.front()) {\n    std::vector<Measurement> across;\n    for (const std::vector<Measurement>& run : runs) {\n      const auto same = std::ranges::find(run, first.what, &Measurement::what);\n      if (same != run.end()) across.push_back(*same);\n    }\n    const std::optional<Spread> spread = spread_of(across);\n    if (!spread) continue;\n    const std::optional<double> margin = margin_percent(first, *spread);\n    const auto number = [&spread](double value) {\n      return spread->measured == 0 ? std::string(\"-\") : std::format(\"{:.2f}\", value);\n    };\n    text += std::format(\"{:<44} {:>10.2f} {:>8} {:>8} {:>8} {:>8} {:>8}\\n\", first.what, first.limit,\n                        number(spread->lowest), number(spread->highest),\n                        margin ? std::format(\"{:.1f}%\", *margin) : std::string(\"-\"), spread->outside,\n                        spread->missing);\n  }\n  return text;\n}\n\n}  // namespace bench\n\nint main() {\n  // Three runs of the missing-odometry scenario, with the route's own checks left out for room:\n  // a real verdict carries those four and the stop verification's four as well. The drop was set\n  // longer than the settle time, so odometry never came back before any of the runs ended.\n  constexpr std::array<std::string_view, 3> verdicts{\n      \"fail\\nscenario: missing_odom\\nsamples: 903\\n\"\n      \"ok     the drop cue went out at: 7.02 s, at least 0.00 s\\n\"\n      \"ok     time from the cue to the robot at rest: 0.61 s, at most 1.50 s\\n\"\n      \"ok     distance travelled after the cue: 0.09 m, at most 0.25 m\\n\"\n      \"failed top speed after odometry returned: not measured, at least 0.05 m/s\\n\",\n      \"fail\\nscenario: missing_odom\\nsamples: 899\\n\"\n      \"ok     the drop cue went out at: 7.01 s, at least 0.00 s\\n\"\n      \"ok     time from the cue to the robot at rest: 0.58 s, at most 1.50 s\\n\"\n      \"ok     distance travelled after the cue: 0.24 m, at most 0.25 m\\n\"\n      \"failed top speed after odometry returned: not measured, at least 0.05 m/s\\n\",\n      \"fail\\nscenario: missing_odom\\nsamples: 906\\n\"\n      \"ok     the drop cue went out at: 7.03 s, at least 0.00 s\\n\"\n      \"failed time from the cue to the robot at rest: not measured, at most 1.50 s\\n\"\n      \"failed distance travelled after the cue: not measured, at most 0.25 m\\n\"\n      \"failed top speed after odometry returned: not measured, at least 0.05 m/s\\n\"};\n\n  std::vector<std::vector<bench::Measurement>> runs;\n  for (const std::string_view verdict : verdicts) runs.push_back(bench::parse_measurements(verdict));\n  std::cout << bench::spread_table(runs);\n}"
+      },
+      {
+       "t": "output",
+       "text": "check                                             limit   lowest  highest   margin  outside  missing\nthe drop cue went out at                           0.00     7.01     7.03        -        0        0\ntime from the cue to the robot at rest             1.50     0.58     0.61    59.3%        0        1\ndistance travelled after the cue                   0.25     0.09     0.24     4.0%        0        1\ntop speed after odometry returned                  0.05        -        -        -        0        3"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four rows, four different things to do about them, and the "
+        },
+        {
+         "t": "code",
+         "v": "outside"
+        },
+        {
+         "t": "text",
+         "v": " column reads zero all the way down while every one of the three runs failed. Start there, because it is the point of the table: nothing went out of bounds, and the scenario is broken anyway."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first row has a limit of zero, so there is no percentage to give and the dash says so rather than a division by zero; it records a fact rather than bounding one. The second looks comfortable with 59% of its limit unused, and its "
+        },
+        {
+         "t": "code",
+         "v": "missing"
+        },
+        {
+         "t": "text",
+         "v": " column says one run in three never produced the number: the robot never came to rest in that run, so there is no value to be out of range. The third has the same missing count for the same reason, and the two measured runs came within 4% of the limit at the worst of them; 0.09 and 0.24 on a check whose usual value is around a tenth of a metre is a scatter, and a scatter means something is not repeating."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth row is the one that explains the other three. It was never measured in any run, so its range and its margin are dashes rather than a comfortable-looking zero, and the missing count is three out of three. That check needs odometry to come back before the run ends, and the drop had been set longer than the settle time, so it never could. The scenario was asking for something the timetable made impossible, and no single verdict says that: each one reports a failed check, and only the table shows it failing every time for a reason that has nothing to do with the robot."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Three details carry it. The unit is taken from the limit rather than from the measured value, because the limit is always a number and the measurement may be the words "
+         },
+         {
+          "t": "code",
+          "v": "not measured"
+         },
+         {
+          "t": "text",
+          "v": ". "
+         },
+         {
+          "t": "code",
+          "v": "spread_of"
+         },
+         {
+          "t": "text",
+          "v": " counts a missing value in its own column instead of folding it into "
+         },
+         {
+          "t": "code",
+          "v": "outside"
+         },
+         {
+          "t": "text",
+          "v": ", because the two mean different things to the person reading: one says the robot did something out of bounds, the other says nobody knows what the robot did. And "
+         },
+         {
+          "t": "code",
+          "v": "margin_percent"
+         },
+         {
+          "t": "text",
+          "v": " returns "
+         },
+         {
+          "t": "code",
+          "v": "std::optional"
+         },
+         {
+          "t": "text",
+          "v": ", which keeps two different nonsense rows out of a table people are supposed to skim: the cancel scenario's zero limit would divide by zero, and a check nothing ever measured would take its fallback of 0.0 and print the most comfortable margin on the page next to a full missing count."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the tool, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/app/spread.cpp"
+         },
+         {
+          "t": "text",
+          "v": ", which takes a list of verdict files and prints the table. Then run "
+         },
+         {
+          "t": "code",
+          "v": "./check.sh"
+         },
+         {
+          "t": "text",
+          "v": " and commit."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the spread tests pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, you saw them fail before the header existed, and the tool prints the same table as the fence when you hand it three files."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, each scenario has been run ten times, its table and its run times are written down, and you have said in writing which checks are too loose and which are too tight."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "repeat.sh"
+         },
+         {
+          "t": "text",
+          "v": " at the top of the repository:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "#!/usr/bin/env bash\n# repeat.sh SCENARIO [RUNS]: runs one scenario N times, keeping every verdict and report.\ncd \"$(dirname \"$0\")\"\nsource /opt/ros/jazzy/setup.bash\nsource install/setup.bash\nset -euo pipefail\nname=${1:?usage: ./repeat.sh SCENARIO [RUNS]}\nruns=${2:-10}\nmkdir -p \"results/repeat/$name\"\nfor i in $(seq 1 \"$runs\"); do\n  started=$(date +%s.%N)\n  ./run_scenario.sh \"$name\" > \"results/repeat/$name/$i.log\" 2>&1 || true\n  echo \"$(echo \"$(date +%s.%N) - $started\" | bc)\" >> \"results/repeat/$name/times.txt\"\n  cp \"results/$name.txt\" \"results/repeat/$name/$i.txt\" 2>/dev/null || true\n  cp \"results/$name.md\" \"results/repeat/$name/$i.md\" 2>/dev/null || true\ndone\ninstall/bench_core/bin/spread \"results/repeat/$name\"/[0-9]*.txt | tee \"results/repeat/$name/spread.txt\"\nsort -n \"results/repeat/$name/times.txt\" | awk 'NR==1{min=$1} {a[NR]=$1} END{printf \"wall seconds: min %.1f median %.1f max %.1f over %d runs\\n\", min, a[int((NR+1)/2)], a[NR], NR}'"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Ten runs of four scenarios is most of an hour, so start it and go and do something else. Every line that can fail carries "
+        },
+        {
+         "t": "code",
+         "v": "|| true"
+        },
+        {
+         "t": "text",
+         "v": ", and all three are there for one reason: a run that fails is data, not a reason to stop collecting. The two on the copies matter most, because a launch that died before the runner wrote anything leaves no verdict to copy, and under "
+        },
+        {
+         "t": "code",
+         "v": "set -e"
+        },
+        {
+         "t": "text",
+         "v": " that missing file would end the loop on exactly the run the "
+        },
+        {
+         "t": "code",
+         "v": "missing"
+        },
+        {
+         "t": "text",
+         "v": " column exists to record."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run it for each scenario, and keep the tables:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh\nfor s in smoke normal missing_odom cancel; do ./repeat.sh \"$s\" 10; done"
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Read each table with three questions, and write the answer to each in one line."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Which checks are too loose? A margin that never drops below about half the limit means the check cannot fail for any reason short of the robot not moving, and it is protecting nothing. The reproducibility topic's example had one at 61%. Tighten it until it could fail, using the measured highest value plus room rather than a round number, and say in the notes what you tightened and to what."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Which are too tight? A margin under about 10% over ten runs will fail on a loaded machine, and the answer is not always to widen it. Ask what produces the spread first: a check whose values sit in a narrow band with one outlier is a different problem from one that wanders across its whole range, and the first is worth chasing before the limit is touched."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Which never produced a number? The "
+        },
+        {
+         "t": "code",
+         "v": "missing"
+        },
+        {
+         "t": "text",
+         "v": " column is the one to read last and act on first, because a run that produced nothing is a run whose cause you have not found yet."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Now put a number on what ten clean runs are worth. The reproducibility topic's program gives the one-sided 95% bound for a sample with no failures, and at ten runs it is 25.9%: a scenario that passed ten times could still be failing one run in four. Sixty runs is where the bound crosses 5%. Write down which of your scenarios you are prepared to pay sixty runs for, and which you will state at ten with the bound written next to the claim. The honest sentence is \"ten of ten, so the failure rate is under 26% at 95% confidence\", and it reads as weak because it is."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "If one of the ten did fail, the same topic gives the procedure and this is the moment to follow it rather than improvise: keep everything, change the number of runs rather than the system, and count the failing run in the sample. One failure in thirty is a bound of about 15%, not a fixed bug."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Record the cost as well as the spread. From the times line, write down the median and the maximum for each scenario, and the total for a full repeat of all four. Those are the numbers the CI topic spends, and they are the reason it cannot run this on every push."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit the tightened limits on a branch, and merge through a pull request once CI is green. The tables and reports stay out of the repository: add "
+         },
+         {
+          "t": "code",
+          "v": "results/repeat/"
+         },
+         {
+          "t": "text",
+          "v": " to "
+         },
+         {
+          "t": "code",
+          "v": ".gitignore"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "each of the four scenarios has ten runs, a spread table and a times line;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "every check has a written verdict of too loose, too tight or right, with the limit you changed it to if you changed it;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the failure-rate bound at ten runs is written next to any claim that a scenario is reliable;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "./run_regressions.sh"
+         },
+         {
+          "t": "text",
+          "v": " still ends green with the tightened limits."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a \"Repeatability\" section to "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the one command and what it leaves behind. Then a table per scenario, or the four tables' worth in one, with each check's limit, the range over ten runs, the margin at the worst run and the missing count. Beside each row, the verdict you wrote in step 3 and the change you made."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then the two numbers that bound what any of it means: the failure-rate bound at ten runs, 25.9%, and the number of runs it would take to claim 5%. Say which scenarios you are prepared to pay that for."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Finish with the cost: the median and maximum wall time of each scenario, the total for a full repeat, and one sentence on what that rules out. A suite that takes an hour cannot run on every push, and knowing the number is what turns that from an opinion into a plan."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The rule of three for "
+     },
+     {
+      "t": "a",
+      "v": "a sample with no failures",
+      "href": "https://en.wikipedia.org/wiki/Rule_of_three_(statistics"
+     },
+     {
+      "t": "text",
+      "v": "), which is where the three-divided-by-the-number-of-runs bound comes from, and the exact one-sided bound the reproducibility topic computes instead."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo Harmonic's documentation on "
+     },
+     {
+      "t": "a",
+      "v": "the physics step and the real-time factor",
+      "href": "https://gazebosim.org/api/sim/8/physics.html"
+     },
+     {
+      "t": "text",
+      "v": ", for what changes between two runs of the same world."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "GNU coreutils manual",
+      "href": "https://www.gnu.org/software/coreutils/manual/coreutils.html"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "seq"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "sort"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "date"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "the awk manual",
+      "href": "https://www.gnu.org/software/gawk/manual/gawk.html"
+     },
+     {
+      "t": "text",
+      "v": " for the median line."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::from_chars",
+      "href": "https://en.cppreference.com/cpp/utility/from_chars"
+     },
+     {
+      "t": "text",
+      "v": ", which parses the verdict's numbers without a locale, and on "
+     },
+     {
+      "t": "a",
+      "v": "std::optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": ", which keeps a missing measurement apart from a measured zero."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, Back to Basics: (Range) Algorithms, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Algorithms.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=eJCA2fynzME"
+     },
+     {
+      "t": "text",
+      "v": ". "
+     },
+     {
+      "t": "code",
+      "v": "ranges::find"
+     },
+     {
+      "t": "text",
+      "v": " with a projection is what gathers one check across the runs."
+     }
+    ]
+   ]
+  }
+ ]
+}

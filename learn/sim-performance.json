@@ -1,0 +1,1140 @@
+{
+ "id": "sim-performance",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Name four things that limit how fast a headless simulation runs. Then say which of the four a larger step size helps and which it does not, and name the command that tells you the rate a run actually achieved. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Four, and they are the four you profile:"
+     }
+    ]
+   },
+   {
+    "t": "ul",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "The physics of each step: how many bodies and joints there are, how many contacts the solver has to resolve, and how many iterations it takes to do it."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The sensors, and above all the ones that render. A camera or a GPU lidar has to draw the scene, which is the most expensive thing in most worlds and the reason a rendering world is the usual reason a run is slow."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The systems and their publishing: every plugin's three phases run on every step, and everything they publish is serialised and sent."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "The machine: cores, memory bandwidth, and whether there is a GPU that the rendering can use at all."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A larger step helps the first, the third and the per-step part of the fourth, because there are fewer steps per simulated second and each of those costs is paid once per step. It does not help the sensors, because a sensor runs at its own rate in simulated time, so a 30 Hz camera renders thirty times per simulated second whether the step is 1 ms or 4. That asymmetry is the one to remember: doubling the step halves the physics bill and leaves the rendering bill exactly where it was."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The rate a run achieved comes from "
+     },
+     {
+      "t": "code",
+      "v": "gz topic -e -t /stats"
+     },
+     {
+      "t": "text",
+      "v": ", which carries "
+     },
+     {
+      "t": "code",
+      "v": "real_time_factor"
+     },
+     {
+      "t": "text",
+      "v": " for the latest step and "
+     },
+     {
+      "t": "code",
+      "v": "sim_time"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "real_time"
+     },
+     {
+      "t": "text",
+      "v": " as totals, whose ratio is the average over the run. For a benchmark rather than a reading, "
+     },
+     {
+      "t": "code",
+      "v": "gz sim -s -r --iterations N"
+     },
+     {
+      "t": "text",
+      "v": " runs a fixed amount of simulated time and exits, so wall time under "
+     },
+     {
+      "t": "code",
+      "v": "/usr/bin/time -v"
+     },
+     {
+      "t": "text",
+      "v": " divided into the simulated time is the factor with no sampling involved."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with four limits, the right split for the step size, and one of the two commands. Missing the sensor asymmetry is a partial pass, and it is the expensive one: it is the reason people spend a day tuning the step size on a world whose cost is a camera."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A simulation's speed is measured by its real-time factor: simulated seconds divided by wall seconds. A factor of one means it keeps up with the clock, and less than one means a ten-second scenario takes longer than ten seconds to run."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that the factor decides what you can afford to test. A continuous-integration job that runs twenty scenarios at a factor of 0.3 takes three times as long as the robot would, so either the job is slow enough that people stop waiting for it or the number of scenarios stops growing. It also changes the test itself, because the nodes outside the simulator run on wall time: a controller that needs five milliseconds of processor answers five milliseconds late at a factor of one and fifty milliseconds late at a factor of ten."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a budget per step. The simulator advances a fixed step of simulated time and paces itself so that one step takes one step's worth of wall time at the target factor. At a one-millisecond step and a target of one, everything that happens in a step has one millisecond of wall time to happen in: the physics solve, every loaded plugin's three phases, any sensor that is due, and the publishing. Miss the budget and the factor drops, and the lost time is not made up later."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The cost of getting it wrong is subtle. The two big levers pull against other things you want. A larger step buys speed and loses integration accuracy, which matters for anything stiff. Lower sensor rates buy more, because rendering usually dominates, and change what the robot's code receives."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Where you meet it is the first time a scenario times out in CI. The instinct is to raise the timeout. The right move is to measure where the step time goes, because the fix is usually a sensor you did not need for the claim the scenario is making, and removing it costs nothing."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "measure",
+   "title": "CPU, GPU, memory, rendering cost, headless throughput",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The whole subject is one sentence from the time-stepping topic, turned around. Gazebo paces its loop with an update period of "
+        },
+        {
+         "t": "code",
+         "v": "max_step_size"
+        },
+        {
+         "t": "text",
+         "v": " divided by the target real-time factor, and when a step takes longer than that period there is nothing to wait for and the lost time is never made up. So at a 1 ms step and a target factor of 1, each step has one millisecond of wall time to spend, and performance work is the work of finding out where that millisecond goes."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It goes to four places, and they divide in a way that decides which lever works. The physics solve, every loaded system's "
+        },
+        {
+         "t": "code",
+         "v": "PreUpdate"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Update"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "PostUpdate"
+        },
+        {
+         "t": "text",
+         "v": ", and the transport of anything published per step, including "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": ", are all paid once per step. Sensors are not: a sensor fires at its own rate in simulated time, so a 30 Hz camera renders thirty times per simulated second regardless of the step size. Write the cost per simulated second rather than per step and the asymmetry becomes arithmetic:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string_view>\n#include <vector>\n\n// A profile of one simulation, in wall milliseconds. Two of the three costs are paid once per\n// step, so they shrink when the step grows; the sensors are paid at their own rate, so they do\n// not. Replace these three numbers with ones measured on your machine: the point is the shape.\nstruct Profile {\n  double physics_ms_per_step;\n  double transport_ms_per_step;\n  double sensors_ms_per_second;  // at the sensor rates the world asks for\n};\n\n[[nodiscard]] double wall_ms_per_simulated_second(Profile profile, double step_ms) {\n  const double steps = 1000.0 / step_ms;\n  return steps * (profile.physics_ms_per_step + profile.transport_ms_per_step) + profile.sensors_ms_per_second;\n}\n\n[[nodiscard]] double factor(Profile profile, double step_ms) {\n  return 1000.0 / wall_ms_per_simulated_second(profile, step_ms);\n}\n\nstruct Lever {\n  std::string_view name;\n  Profile profile;\n  double step_ms;\n};\n\nint main() {\n  constexpr Profile measured{\n      .physics_ms_per_step = 0.42, .transport_ms_per_step = 0.16, .sensors_ms_per_second = 620.0};\n  constexpr double step_ms = 1.0;\n\n  const double steps = 1000.0 / step_ms;\n  const double physics = steps * measured.physics_ms_per_step;\n  const double transport = steps * measured.transport_ms_per_step;\n  const double total = wall_ms_per_simulated_second(measured, step_ms);\n\n  std::cout << std::format(\"per simulated second at a {:.0f} ms step, in wall milliseconds\\n\", step_ms);\n  std::cout << std::format(\"  physics    {:>7.0f}  {:>5.1f}%\\n\", physics, 100.0 * physics / total);\n  std::cout << std::format(\"  sensors    {:>7.0f}  {:>5.1f}%\\n\", measured.sensors_ms_per_second,\n                           100.0 * measured.sensors_ms_per_second / total);\n  std::cout << std::format(\"  transport  {:>7.0f}  {:>5.1f}%\\n\", transport, 100.0 * transport / total);\n  std::cout << std::format(\"  total      {:>7.0f}  real-time factor {:.2f}\\n\\n\", total, factor(measured, step_ms));\n\n  const Profile no_transport{.physics_ms_per_step = measured.physics_ms_per_step,\n                             .transport_ms_per_step = 0.0,\n                             .sensors_ms_per_second = measured.sensors_ms_per_second};\n  const Profile fast_physics{.physics_ms_per_step = measured.physics_ms_per_step / 2.0,\n                             .transport_ms_per_step = measured.transport_ms_per_step,\n                             .sensors_ms_per_second = measured.sensors_ms_per_second};\n  const Profile half_sensors{.physics_ms_per_step = measured.physics_ms_per_step,\n                             .transport_ms_per_step = measured.transport_ms_per_step,\n                             .sensors_ms_per_second = measured.sensors_ms_per_second / 2.0};\n\n  std::cout << std::format(\"{:<34} {:>7}\\n\", \"one change at a time\", \"factor\");\n  for (const Lever& lever : std::vector<Lever>{\n           {.name = \"nothing changed\", .profile = measured, .step_ms = 1.0},\n           {.name = \"transport removed entirely\", .profile = no_transport, .step_ms = 1.0},\n           {.name = \"physics twice as fast\", .profile = fast_physics, .step_ms = 1.0},\n           {.name = \"sensor rates halved\", .profile = half_sensors, .step_ms = 1.0},\n           {.name = \"step 1 ms to 2 ms\", .profile = measured, .step_ms = 2.0},\n           {.name = \"step 1 ms to 4 ms\", .profile = measured, .step_ms = 4.0},\n           {.name = \"step 4 ms and sensor rates halved\", .profile = half_sensors, .step_ms = 4.0}}) {\n    std::cout << std::format(\"{:<34} {:>7.2f}\\n\", lever.name, factor(lever.profile, lever.step_ms));\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "per simulated second at a 1 ms step, in wall milliseconds\n  physics        420   35.0%\n  sensors        620   51.7%\n  transport      160   13.3%\n  total         1200  real-time factor 0.83\n\none change at a time                factor\nnothing changed                       0.83\ntransport removed entirely            0.96\nphysics twice as fast                 1.01\nsensor rates halved                   1.12\nstep 1 ms to 2 ms                     1.10\nstep 1 ms to 4 ms                     1.31\nstep 4 ms and sensor rates halved     2.20"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The three numbers at the top are a profile, and they are the thing you have to measure on your own machine: this one has no Gazebo and no GPU, so the arithmetic is real and the inputs are an illustration. The shape of the answer is what transfers."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the lower table as a list of things people try. Removing the transport entirely, which is the change somebody always proposes because publishing looks wasteful, moves the factor from 0.83 to 0.96 and does not reach 1. Making the physics twice as fast, which is weeks of work if it is possible at all, reaches 1.01. Halving the sensor rates, which is one line in a model file, reaches 1.12 and beats both. And the step size, which costs nothing to change and costs accuracy to live with, gets to 1.31 on its own and to 2.20 combined with the sensor rates. The general rule is the old one about optimising: the component with the largest share bounds what any amount of work on the others can buy, and here the sensors are half the bill."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The four costs deserve a sentence each about where they actually come from."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Physics"
+        },
+        {
+         "t": "text",
+         "v": " scales with the number of bodies and joints, and worse with the number of contacts, because contacts are what the constraint solver spends its iterations on. A robot standing still on a flat floor has a handful; the same robot in a room full of scattered objects has many, and the cost is not linear in the object count but in how many of them are touching. This is also the cost that a larger step reduces most directly, and the one whose accuracy a larger step damages, which the time-stepping topic measured for a stiff system."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Rendering"
+        },
+        {
+         "t": "text",
+         "v": " is the sensors' cost and it is usually the largest. gz-sim runs it on a thread of its own, started in the "
+        },
+        {
+         "t": "code",
+         "v": "Sensors"
+        },
+        {
+         "t": "text",
+         "v": " system ("
+        },
+        {
+         "t": "a",
+         "v": "Sensors.cc",
+         "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/sensors/Sensors.cc"
+        },
+        {
+         "t": "text",
+         "v": "), and the time-stepping topic already gave the consequence: a step that needs a sensor update waits if the previous render has not finished. Two things drive it, the image size and the rate, and both are numbers in the model file. A GPU lidar with 360 samples is cheap; a 640 by 480 camera at 30 Hz is not; a depth camera is the same work again."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three things get run together here and they are worth keeping apart, because a reader who confuses them tunes the wrong one. "
+        },
+        {
+         "t": "code",
+         "v": "--headless-rendering"
+        },
+        {
+         "t": "text",
+         "v": " means rendering without a display: the "
+        },
+        {
+         "t": "code",
+         "v": "Sensors"
+        },
+        {
+         "t": "text",
+         "v": " system reads it from a "
+        },
+        {
+         "t": "code",
+         "v": "RenderEngineServerHeadless"
+        },
+        {
+         "t": "text",
+         "v": " component and passes it to "
+        },
+        {
+         "t": "code",
+         "v": "SetHeadlessRendering"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "Sensors.cc",
+         "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/sensors/Sensors.cc"
+        },
+        {
+         "t": "text",
+         "v": "). It still uses the graphics card when there is one, so it is not a slow mode and switching it on costs nothing. Separately, "
+        },
+        {
+         "t": "code",
+         "v": "--render-engine-server-api-backend"
+        },
+        {
+         "t": "text",
+         "v": " picks the graphics API, which "
+        },
+        {
+         "t": "code",
+         "v": "Sensors.cc"
+        },
+        {
+         "t": "text",
+         "v": " reads from a "
+        },
+        {
+         "t": "code",
+         "v": "RenderEngineServerApiBackend"
+        },
+        {
+         "t": "text",
+         "v": " component and passes to "
+        },
+        {
+         "t": "code",
+         "v": "SetApiBackend"
+        },
+        {
+         "t": "text",
+         "v": "; for the default ogre2 engine the documented values are "
+        },
+        {
+         "t": "code",
+         "v": "opengl"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "vulkan"
+        },
+        {
+         "t": "text",
+         "v": " in beta and "
+        },
+        {
+         "t": "code",
+         "v": "metal"
+        },
+        {
+         "t": "text",
+         "v": " on Apple ("
+        },
+        {
+         "t": "a",
+         "v": "the `gz sim` help text",
+         "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/cmd/cmdsim.rb.in"
+        },
+        {
+         "t": "text",
+         "v": "). Neither of those is a software renderer. The order of magnitude comes from a third place entirely: on a machine with no usable graphics driver, Mesa answers with llvmpipe, which rasterises on the processor, and a camera that cost a few milliseconds a frame on a card costs tens or hundreds there. That is a property of the machine, not a flag, and it is why a performance number has to carry the hardware it was measured on."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Transport"
+        },
+        {
+         "t": "text",
+         "v": " is the smallest of the three in most worlds and the one that grows quietly. Every message a system publishes is serialised, and at a 1 ms step "
+        },
+        {
+         "t": "code",
+         "v": "/clock"
+        },
+        {
+         "t": "text",
+         "v": " alone is a thousand messages a second before anything else. It becomes the bottleneck only when somebody bridges a camera topic to ROS, at which point the bridge is copying megabytes a second between two processes and the cost has moved out of Gazebo where none of your Gazebo measurements will find it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Memory"
+        },
+        {
+         "t": "text",
+         "v": " is rarely the limit for a small world and is worth measuring anyway, because when it is the limit the symptom is unlike the others: the factor collapses rather than degrading, because the machine has started swapping. Meshes and textures are what fill it, so a world assembled from detailed models can need gigabytes that the same world in primitives does not."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to measure, and with what. "
+        },
+        {
+         "t": "code",
+         "v": "gz topic -e -t /stats"
+        },
+        {
+         "t": "text",
+         "v": " gives the factor, the totals and the iteration count. "
+        },
+        {
+         "t": "code",
+         "v": "gz sim -s -r --iterations N"
+        },
+        {
+         "t": "text",
+         "v": " runs a fixed amount of simulated time and exits, which makes it a benchmark rather than a reading; wrap it in "
+        },
+        {
+         "t": "code",
+         "v": "/usr/bin/time -v"
+        },
+        {
+         "t": "text",
+         "v": " and you get the wall time and the maximum resident set size in one go. Per sensor, adding "
+        },
+        {
+         "t": "code",
+         "v": "<enable_metrics>true</enable_metrics>"
+        },
+        {
+         "t": "text",
+         "v": " makes it publish "
+        },
+        {
+         "t": "code",
+         "v": "<topic>/performance_metrics"
+        },
+        {
+         "t": "text",
+         "v": " with its nominal, simulated and real update rates ("
+        },
+        {
+         "t": "a",
+         "v": "Sensor.cc",
+         "href": "https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/Sensor.cc"
+        },
+        {
+         "t": "text",
+         "v": "), and a real rate far below the nominal is a sensor that cannot keep up. For per-thread processor time use "
+        },
+        {
+         "t": "code",
+         "v": "top -H"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "pidstat -t"
+        },
+        {
+         "t": "text",
+         "v": ", for the GPU use "
+        },
+        {
+         "t": "code",
+         "v": "nvidia-smi dmon"
+        },
+        {
+         "t": "text",
+         "v": " if there is one, and for per-system timing inside Gazebo the code carries "
+        },
+        {
+         "t": "code",
+         "v": "GZ_PROFILE"
+        },
+        {
+         "t": "text",
+         "v": " markers that the gz-common profiler reads when the build has it enabled."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "One number ties this to the bench. "
+        },
+        {
+         "t": "code",
+         "v": "run_scenario.sh"
+        },
+        {
+         "t": "text",
+         "v": " wraps each scenario in "
+        },
+        {
+         "t": "code",
+         "v": "timeout --signal=INT 180"
+        },
+        {
+         "t": "text",
+         "v": ", and the "
+        },
+        {
+         "t": "code",
+         "v": "smoke"
+        },
+        {
+         "t": "text",
+         "v": " scenario's plan is 2 s of warm-up, 3 s of driving and 3 s of settling, so 8 s of simulated time. At a factor of 0.83 that is under 10 s of wall time and the 180 s cap is irrelevant. The run alone reaches the cap at a factor of 8 divided by 180, which is 0.044. The cap covers more than the run, though: Gazebo has to start, the world has to load and the nodes have to discover each other before the first sample arrives, and none of that scales with the factor. Measure that start-up on your own machine, because it is the term this arithmetic turns on; if it takes 45 s, the run has 135 s left and the factor has to stay above 8 divided by 135, which is 0.059. So the real-time factor is more than a convenience: somewhere around 0.06 on a machine with that start-up, this scenario stops testing the robot and starts testing the timeout, and a run that fails that way needs a different diagnosis from one that fails a check."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bottleneck",
+   "title": "Measure a run and find the bottleneck",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes, with Gazebo installed."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run the bench's world headless for a fixed amount of simulated time and time it: "
+         },
+         {
+          "t": "code",
+          "v": "/usr/bin/time -v gz sim -s -r --iterations 10000 <world>"
+         },
+         {
+          "t": "text",
+          "v": " with a 1 ms step, which is 10 s of simulated time. Record the wall time and the maximum resident set size, and work out the real-time factor."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Repeat twice more, changing one thing each time: once with the lidar removed from the model, and once with "
+         },
+         {
+          "t": "code",
+          "v": "max_step_size"
+         },
+         {
+          "t": "text",
+          "v": " doubled to 0.002 and the iteration count halved so the simulated time is the same."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "From the three wall times, work out the three numbers of the profile above: the per-step cost of everything except the sensors, the per-second cost of the sensors, and the factor each lever buys. Say which lever you would pull and why."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Turn "
+         },
+         {
+          "t": "code",
+          "v": "<enable_metrics>true</enable_metrics>"
+         },
+         {
+          "t": "text",
+          "v": " on for the lidar and read its nominal, simulated and real update rates while the world runs at its natural speed. Say what a real rate below the nominal means and what it does not."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Answer two questions in writing. What would you have to measure to know whether the processor or the graphics is the limit? And if the machine has no GPU at all, what changes about your answer to step 3?"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 1 gives one number and a check. The factor is 10 simulated seconds divided by the wall time the "
+        },
+        {
+         "t": "code",
+         "v": "Elapsed (wall clock) time"
+        },
+        {
+         "t": "text",
+         "v": " line reports. The check is that "
+        },
+        {
+         "t": "code",
+         "v": "--iterations 10000"
+        },
+        {
+         "t": "text",
+         "v": " at a 1 ms step really is 10 s of simulated time, which you confirm from "
+        },
+        {
+         "t": "code",
+         "v": "/stats"
+        },
+        {
+         "t": "text",
+         "v": " before trusting any of it. The maximum resident set size is the "
+        },
+        {
+         "t": "code",
+         "v": "Maximum resident set size (kbytes)"
+        },
+        {
+         "t": "text",
+         "v": " line, and for a world of primitives it will be far below anything worth acting on; record it anyway, because the run after somebody adds a mesh is the one you want to compare against."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 3 is the arithmetic, and it comes out of the three runs by subtraction. Call the wall times for ten simulated seconds "
+        },
+        {
+         "t": "code",
+         "v": "full"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "no_lidar"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "big_step"
+        },
+        {
+         "t": "text",
+         "v": ". The sensors' per-second cost is "
+        },
+        {
+         "t": "code",
+         "v": "(full - no_lidar) / 10"
+        },
+        {
+         "t": "text",
+         "v": ", because removing the lidar removed exactly that. The per-step cost of everything else is "
+        },
+        {
+         "t": "code",
+         "v": "(no_lidar / 10) / 1000"
+        },
+        {
+         "t": "text",
+         "v": " milliseconds, dividing by the thousand steps in each simulated second. And "
+        },
+        {
+         "t": "code",
+         "v": "big_step"
+        },
+        {
+         "t": "text",
+         "v": " is the prediction you check your model against: it should come out near half the per-step part plus the whole of the sensor part, and if it does not, something else changed with the step size and the profile is not yet the right shape."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Which lever to pull follows from the shares, not from preference. If the sensors are more than half the bill, as they are in the illustration above, then no amount of work on the physics gets you to a factor of 1, and the two changes worth making are the sensor rate and the step size. If the sensors are a small share, the step size is the only lever with any reach and its cost is accuracy. Either way, name the claim the scenario makes before cutting a sensor: a lidar the scenario's checks never read is free to remove, and one the robot steers by is not, which is the fidelity topic's question arriving inside a performance decision."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4. A real update rate below the nominal means the sensor is not being served at the rate it asked for, which happens when the render of the previous update has not finished when the next is due. It does not mean the simulated rate is wrong: the simulated update rate can be exactly nominal while the real one is a third of it, and that combination is the normal state of a healthy run at a factor of one third. The number that tells you about the simulation's correctness is the simulated rate; the number that tells you about its speed is the real one. Reading the second as the first is the mistake this measurement exists to prevent."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5, the first question. Run the same world twice, once as it is and once with "
+        },
+        {
+         "t": "code",
+         "v": "--headless-rendering"
+        },
+        {
+         "t": "text",
+         "v": " on a machine with no display, and compare; then run with every rendering sensor removed and compare again. If removing the sensors changes the wall time a lot and the two rendering modes differ a lot, the graphics path is the limit. If neither changes much while the processor sits at 100% of one core, the limit is the physics on a single thread, which no graphics card will help with. "
+        },
+        {
+         "t": "code",
+         "v": "top -H"
+        },
+        {
+         "t": "text",
+         "v": " during the run tells you which thread is busy, and that alone usually settles it: a busy render thread and an idle physics thread is one answer, and the reverse is the other."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second question. Without a GPU the rendering runs in software, so the sensors' share of the bill is larger than the illustration and the ordering of the levers is more strongly in their favour: cutting a sensor rate buys more, and improving the physics buys even less than the table shows. It also means a number measured on your machine does not transfer to a machine with a GPU, and the honest way to report a performance result is with the hardware named next to it, which is the same rule the reproducibility topic gave for every other number a run produces."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the definition of the real-time factor and the budget a step has at a given step size. Name the four places a step's time goes and say which three are paid per step and which is not. Say what that asymmetry means for the step-size lever and the sensor-rate lever. Say what "
+        },
+        {
+         "t": "code",
+         "v": "--headless-rendering"
+        },
+        {
+         "t": "text",
+         "v": " does and does not change, and where the software renderer actually comes from. Name the command that benchmarks a fixed amount of simulated time, the one that reports the achieved factor, and the per-sensor measurement and what its two rates mean. Finish with the arithmetic that turns the bench's 180 s timeout into a lowest acceptable factor, and the term in it you have to measure."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Define the real-time factor, and say how much wall time one step has at a 2 ms step and a target factor of 1."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which costs are paid per step and which per simulated second, and what does that mean for doubling the step?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The sensors are 52% of the bill. What is the best factor any amount of physics work can reach?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does removing a rendering sensor help more than making the physics twice as fast in most worlds?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which two numbers in a model file drive the rendering cost?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "gz sim -s -r --iterations N"
+     },
+     {
+      "t": "text",
+      "v": " give you that reading "
+     },
+     {
+      "t": "code",
+      "v": "/stats"
+     },
+     {
+      "t": "text",
+      "v": " does not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A sensor's real update rate is a third of its nominal one while its simulated rate is exact. What is happening, and is it a bug?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How do you tell a processor-bound run from a graphics-bound one, with the commands?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The bench's 8 s smoke scenario runs under a 180 s timeout. At what factor does the run alone reach the cap, and what else do you have to measure before that number means anything?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank page: the three runs you would make to profile a simulation, and the arithmetic that turns their wall times into a per-step and a per-second cost."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "gz-sim on the gz-sim8 branch: "
+     },
+     {
+      "t": "a",
+      "v": "Sensors.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/systems/sensors/Sensors.cc"
+     },
+     {
+      "t": "text",
+      "v": " for the rendering thread and the "
+     },
+     {
+      "t": "code",
+      "v": "GZ_PROFILE"
+     },
+     {
+      "t": "text",
+      "v": " markers, and "
+     },
+     {
+      "t": "a",
+      "v": "SimulationRunner.cc",
+      "href": "https://github.com/gazebosim/gz-sim/blob/gz-sim8/src/SimulationRunner.cc"
+     },
+     {
+      "t": "text",
+      "v": " for the loop that paces the steps and publishes "
+     },
+     {
+      "t": "code",
+      "v": "/stats"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "gz-sensors on the gz-sensors8 branch, "
+     },
+     {
+      "t": "a",
+      "v": "Sensor.cc",
+      "href": "https://github.com/gazebosim/gz-sensors/blob/gz-sensors8/src/Sensor.cc"
+     },
+     {
+      "t": "text",
+      "v": ": the "
+     },
+     {
+      "t": "code",
+      "v": "performance_metrics"
+     },
+     {
+      "t": "text",
+      "v": " topic with the nominal, simulated and real update rates, published when a sensor has "
+     },
+     {
+      "t": "code",
+      "v": "enable_metrics"
+     },
+     {
+      "t": "text",
+      "v": " set."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo's documentation on "
+     },
+     {
+      "t": "a",
+      "v": "running a simulation headless and on the server options",
+      "href": "https://gazebosim.org/docs/harmonic/install/"
+     },
+     {
+      "t": "text",
+      "v": ", and its page on "
+     },
+     {
+      "t": "a",
+      "v": "physics",
+      "href": "https://gazebosim.org/api/sim/8/physics.html"
+     },
+     {
+      "t": "text",
+      "v": " for what the solver spends its time on."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "SDF specification",
+      "href": "https://sdformat.org/spec?ver=1.11&elem=physics"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "max_step_size"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "real_time_factor"
+     },
+     {
+      "t": "text",
+      "v": ", the two numbers the pacing comes from."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The Linux manual pages for "
+     },
+     {
+      "t": "a",
+      "v": "time(1)",
+      "href": "https://man7.org/linux/man-pages/man1/time.1.html"
+     },
+     {
+      "t": "text",
+      "v": ", which reports the wall time and the maximum resident set size, "
+     },
+     {
+      "t": "a",
+      "v": "top(1)",
+      "href": "https://man7.org/linux/man-pages/man1/top.1.html"
+     },
+     {
+      "t": "text",
+      "v": " for per-thread processor use with "
+     },
+     {
+      "t": "code",
+      "v": "-H"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "pidstat(1)",
+      "href": "https://man7.org/linux/man-pages/man1/pidstat.1.html"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gene Amdahl's argument from 1967, "
+     },
+     {
+      "t": "a",
+      "v": "stated with its arithmetic",
+      "href": "https://en.wikipedia.org/wiki/Amdahl%27s_law"
+     },
+     {
+      "t": "text",
+      "v": ": the share of the work you do not speed up bounds the speed-up of the whole, which is what the table of levers is showing."
+     }
+    ]
+   ]
+  }
+ ]
+}

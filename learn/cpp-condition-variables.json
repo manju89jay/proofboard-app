@@ -1,0 +1,1997 @@
+{
+ "id": "cpp-condition-variables",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Take 10 minutes, on paper, closed book. A loader thread reads an occupancy map from disk, and a planner thread must not touch it until it is there."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Write both sides: the members the shared object needs, the loader's publish, and the planner's wait. Say what each line is for."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Define a spurious wake-up and a lost wake-up, and say which line of your answer stops each one."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Why is the predicate checked with the mutex held?"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Why does the waiter hold a "
+      },
+      {
+       "t": "code",
+       "v": "std::unique_lock"
+      },
+      {
+       "t": "text",
+       "v": " rather than a "
+      },
+      {
+       "t": "code",
+       "v": "std::lock_guard"
+      },
+      {
+       "t": "text",
+       "v": "?"
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Three members that belong together: a "
+      },
+      {
+       "t": "code",
+       "v": "std::mutex"
+      },
+      {
+       "t": "text",
+       "v": ", a "
+      },
+      {
+       "t": "code",
+       "v": "std::condition_variable"
+      },
+      {
+       "t": "text",
+       "v": ", and the state itself, here a "
+      },
+      {
+       "t": "code",
+       "v": "bool loaded_"
+      },
+      {
+       "t": "text",
+       "v": " and the map. The loader takes the mutex, sets "
+      },
+      {
+       "t": "code",
+       "v": "loaded_ = true"
+      },
+      {
+       "t": "text",
+       "v": ", releases the mutex, then calls "
+      },
+      {
+       "t": "code",
+       "v": "notify_all()"
+      },
+      {
+       "t": "text",
+       "v": ". The planner takes the mutex in a "
+      },
+      {
+       "t": "code",
+       "v": "std::unique_lock"
+      },
+      {
+       "t": "text",
+       "v": " and calls "
+      },
+      {
+       "t": "code",
+       "v": "cv.wait(lock, [this] { return loaded_; })"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "fragment",
+    "expect": "",
+    "text": "void publish(Map map) {\n  {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    map_ = std::move(map);\n    loaded_ = true;\n  }\n  loaded_cv_.notify_all();\n}"
+   },
+   {
+    "t": "ol",
+    "start": 2,
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "A "
+      },
+      {
+       "t": "i",
+       "v": "spurious wake-up"
+      },
+      {
+       "t": "text",
+       "v": " is "
+      },
+      {
+       "t": "code",
+       "v": "wait"
+      },
+      {
+       "t": "text",
+       "v": " returning although nobody notified. The standard and POSIX both allow it, so a wait that assumes a notification is wrong. A "
+      },
+      {
+       "t": "i",
+       "v": "lost wake-up"
+      },
+      {
+       "t": "text",
+       "v": " is a notification sent while nobody was waiting: a condition variable stores nothing, so that notification is gone, and a thread that waits afterwards waits for a second one that may never come. The predicate stops both. On a spurious wake-up it is false and the wait loops; before the first wait it is already true, so the planner never waits at all."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Because the predicate reads the shared state, and reading it while the loader writes it is a data race. Holding the mutex also closes the window between the check and the wait: "
+      },
+      {
+       "t": "code",
+       "v": "wait"
+      },
+      {
+       "t": "text",
+       "v": " releases the mutex atomically with going to sleep, so there is no instant in which the planner has decided to wait and is not yet waiting."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Because "
+      },
+      {
+       "t": "code",
+       "v": "wait"
+      },
+      {
+       "t": "text",
+       "v": " releases the mutex while it sleeps and takes it again before it returns, so it needs a lock object it can operate. "
+      },
+      {
+       "t": "code",
+       "v": "std::lock_guard"
+      },
+      {
+       "t": "text",
+       "v": " has no interface for that. "
+      },
+      {
+       "t": "code",
+       "v": "std::condition_variable::wait"
+      },
+      {
+       "t": "text",
+       "v": " takes a "
+      },
+      {
+       "t": "code",
+       "v": "std::unique_lock<std::mutex>&"
+      },
+      {
+       "t": "text",
+       "v": " and nothing else."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with the predicate form of "
+     },
+     {
+      "t": "code",
+      "v": "wait"
+     },
+     {
+      "t": "text",
+      "v": ", the state changed under the mutex, and correct definitions of both wake-up problems. Writing "
+     },
+     {
+      "t": "code",
+      "v": "wait(lock)"
+     },
+     {
+      "t": "text",
+      "v": " without a predicate and then explaining the two problems correctly is a partial pass. A wait with no mutex, or a predicate that reads the state without one, is a fail: it is the bug this topic exists to remove."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A condition variable is a waiting room for threads. A thread that cannot make progress until some shared state changes goes to sleep on it, and a thread that changes that state wakes it up. "
+    },
+    {
+     "t": "code",
+     "v": "std::condition_variable"
+    },
+    {
+     "t": "text",
+     "v": " is that waiting room, and it always works with a "
+    },
+    {
+     "t": "code",
+     "v": "std::mutex"
+    },
+    {
+     "t": "text",
+     "v": " that guards the state, and with a "
+    },
+    {
+     "t": "i",
+     "v": "predicate"
+    },
+    {
+     "t": "text",
+     "v": ", a small function that returns whether the state the waiter wants is now true."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is the cost of asking again. Without it a waiting thread spins, testing a flag in a loop and burning a core while it does. I measured the two: a thread spinning on an atomic flag for half a second used 0.47 seconds of processor time, the same wait on a condition variable used 0.00, both finishing in the same half second of wall clock. On a robot with a control loop and four sensor threads, a spinner is a core stolen from the work."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism has three parts, and all three are needed. The writer changes the state while holding the mutex, then calls "
+    },
+    {
+     "t": "code",
+     "v": "notify_one"
+    },
+    {
+     "t": "text",
+     "v": " or "
+    },
+    {
+     "t": "code",
+     "v": "notify_all"
+    },
+    {
+     "t": "text",
+     "v": ". The waiter holds a "
+    },
+    {
+     "t": "code",
+     "v": "std::unique_lock"
+    },
+    {
+     "t": "text",
+     "v": " and calls "
+    },
+    {
+     "t": "code",
+     "v": "wait(lock, predicate)"
+    },
+    {
+     "t": "text",
+     "v": ", which is exactly "
+    },
+    {
+     "t": "code",
+     "v": "while (!predicate()) wait(lock);"
+    },
+    {
+     "t": "text",
+     "v": ". Plain "
+    },
+    {
+     "t": "code",
+     "v": "wait"
+    },
+    {
+     "t": "text",
+     "v": " releases the mutex, sleeps until a notification, and takes the mutex again before it returns. The predicate is what makes the loop correct, because a wait can return without a notification, which is called a spurious wake-up, and because a notification sent before anyone was waiting is not stored anywhere, which is called a lost wake-up. The predicate turns both into a test of the state instead of a test of the notification."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is that every waiter shares one queue. If threads on one condition variable are waiting for different things, "
+    },
+    {
+     "t": "code",
+     "v": "notify_one"
+    },
+    {
+     "t": "text",
+     "v": " can wake a thread whose predicate is false, which goes back to sleep while the thread that could have run is never woken. The fixes are "
+    },
+    {
+     "t": "code",
+     "v": "notify_all"
+    },
+    {
+     "t": "text",
+     "v": ", or one condition variable per condition, which is what the bounded queue does next."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet it in the robot whenever one thread hands work to another: a map loaded before planning starts, a monitor waiting for the next heartbeat, a worker waiting for the next command."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "basics",
+   "title": "Condition variables, predicates and wait loops",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A loader reads the map, two planners wait for it, and none of them spins:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <condition_variable>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <string>\n#include <thread>\n#include <utility>\n#include <vector>\n\nstruct Map {\n  std::string name;\n  std::int64_t cells = 0;\n};\n\nclass MapHandoff {\n public:\n  // The state changes under the lock; the notification goes out after the lock is released.\n  void publish(Map map) {\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      map_ = std::move(map);\n      loaded_ = true;\n    }\n    loaded_cv_.notify_all();\n  }\n\n  [[nodiscard]] Map wait_for_map() {\n    std::unique_lock<std::mutex> lock(mutex_);\n    loaded_cv_.wait(lock, [this] { return loaded_; });\n    return map_;\n  }\n\n private:\n  std::mutex mutex_;\n  std::condition_variable loaded_cv_;\n  bool loaded_ = false;\n  Map map_;\n};\n\nint main() {\n  MapHandoff handoff;\n  std::vector<std::string> seen(2);\n  {\n    std::vector<std::jthread> planners;\n    planners.reserve(seen.size());\n    for (std::ptrdiff_t i = 0; i < std::ssize(seen); ++i) {\n      planners.emplace_back([&handoff, slot = &seen[i]] {\n        const Map map = handoff.wait_for_map();\n        *slot = std::format(\"{} with {} cells\", map.name, map.cells);\n      });\n    }\n    std::this_thread::sleep_for(std::chrono::milliseconds(20));\n    handoff.publish({.name = \"warehouse\", .cells = 4'000'000});\n  }\n  for (std::ptrdiff_t i = 0; i < std::ssize(seen); ++i) {\n    std::cout << std::format(\"planner {} got {}\\n\", i, seen[i]);\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "planner 0 got warehouse with 4000000 cells\nplanner 1 got warehouse with 4000000 cells"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable"
+        },
+        {
+         "t": "text",
+         "v": " is a queue of sleeping threads and nothing else. It holds no value, remembers no notification, and knows nothing about what the threads are waiting for. All the knowledge lives in the state next to it, here "
+        },
+        {
+         "t": "code",
+         "v": "loaded_"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "map_"
+        },
+        {
+         "t": "text",
+         "v": ", which the mutex guards. That is why the three always appear together in one class, and why a condition variable on its own is never the answer to anything."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "wait(lock, predicate)"
+        },
+        {
+         "t": "text",
+         "v": " is defined as "
+        },
+        {
+         "t": "code",
+         "v": "while (!predicate()) wait(lock);"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/thread/condition_variable/wait"
+        },
+        {
+         "t": "text",
+         "v": "). Read it in that expanded form and the whole design follows. The predicate is evaluated first, with the mutex held, so a waiter that arrives after the map is loaded returns at once and never sleeps. If it is false, plain "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": " releases the mutex and goes to sleep as one indivisible step, which is the part you could not write yourself with a mutex and a flag. When it wakes, it takes the mutex again before returning, so the predicate is tested under the lock every time. The loop means a wake-up that turns out to be worthless costs a test and another sleep."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The writer's side has its own order. Change the state with the mutex held, release the mutex, then notify. Changing the state under the mutex is what stops a race with the predicate. Notifying after the release is a small optimisation: a waiter woken while the writer still holds the mutex would wake up and immediately block on the mutex instead, so it goes back to sleep once more for no reason ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/thread/condition_variable/notify_one"
+        },
+        {
+         "t": "text",
+         "v": " calls holding the lock during the notification a pessimisation). It is not a correctness question, and there is one case where holding it matters, which the failure step covers."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " wakes one waiting thread, chosen by the implementation; "
+        },
+        {
+         "t": "code",
+         "v": "notify_all"
+        },
+        {
+         "t": "text",
+         "v": " wakes all of them. Both do nothing at all when nobody is waiting, which is the source of the lost wake-up. The rule for choosing: if every waiter on that condition variable is waiting for the same condition and any one of them can take the work, "
+        },
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " is right and cheaper, because it avoids a crowd of threads waking to fight over one mutex. If the waiters are waiting for different conditions, or if one change lets several of them proceed, as a one-shot flag does, you need "
+        },
+        {
+         "t": "code",
+         "v": "notify_all"
+        },
+        {
+         "t": "text",
+         "v": ". The map above uses "
+        },
+        {
+         "t": "code",
+         "v": "notify_all"
+        },
+        {
+         "t": "text",
+         "v": " because both planners can go once the map exists."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The waiter holds a "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_lock<std::mutex>"
+        },
+        {
+         "t": "text",
+         "v": ", not a "
+        },
+        {
+         "t": "code",
+         "v": "std::lock_guard"
+        },
+        {
+         "t": "text",
+         "v": ", because "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": " has to release and retake the mutex, and only "
+        },
+        {
+         "t": "code",
+         "v": "unique_lock"
+        },
+        {
+         "t": "text",
+         "v": " exposes that. "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable::wait"
+        },
+        {
+         "t": "text",
+         "v": " accepts nothing else. "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable_any"
+        },
+        {
+         "t": "text",
+         "v": " accepts any lockable type, which costs an extra internal mutex and is what you reach for with a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_lock"
+        },
+        {
+         "t": "text",
+         "v": " or a custom lock. C++20 adds an overload of "
+        },
+        {
+         "t": "code",
+         "v": "condition_variable_any::wait"
+        },
+        {
+         "t": "text",
+         "v": " that also takes a "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_token"
+        },
+        {
+         "t": "text",
+         "v": ", so a wait ends when the "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " is asked to stop; plain "
+        },
+        {
+         "t": "code",
+         "v": "condition_variable"
+        },
+        {
+         "t": "text",
+         "v": " has no such overload, and the cancellation topic uses that difference."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The timed waits come in the same two shapes. "
+        },
+        {
+         "t": "code",
+         "v": "wait_for(lock, duration)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "wait_until(lock, time_point)"
+        },
+        {
+         "t": "text",
+         "v": " without a predicate return "
+        },
+        {
+         "t": "code",
+         "v": "std::cv_status::timeout"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "no_timeout"
+        },
+        {
+         "t": "text",
+         "v": ", and you still have to test the state yourself. With a predicate they return a "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": ", which is the value of the predicate after the deadline, so "
+        },
+        {
+         "t": "code",
+         "v": "false"
+        },
+        {
+         "t": "text",
+         "v": " means the deadline passed with the condition still false. Prefer the predicate form: "
+        },
+        {
+         "t": "code",
+         "v": "if (!cv.wait_for(lock, 100ms, [this] { return ready_; })) { /* a gap */ }"
+        },
+        {
+         "t": "text",
+         "v": " says what you mean in one line, and the standard defines it as "
+        },
+        {
+         "t": "code",
+         "v": "wait_until(lock, now() + limit, pred)"
+        },
+        {
+         "t": "text",
+         "v": ", so its deadline is fixed when you call it. Write the loop yourself with a bare "
+        },
+        {
+         "t": "code",
+         "v": "wait_for"
+        },
+        {
+         "t": "text",
+         "v": " inside and the clock starts again on every wake-up, which can add up to far more than the limit you meant."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What all this buys you is the processor time you would otherwise burn asking. A planner that spins on an atomic flag for half a second and one that waits on a condition variable for the same half second, both measured with "
+        },
+        {
+         "t": "code",
+         "v": "/usr/bin/time"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "spin on an atomic flag:   wall 0.51 s, user 0.47 s, sys 0.00 s\nwait on a condition:      wall 0.53 s, user 0.00 s, sys 0.00 s"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The waiting version uses no measurable processor time, because the kernel takes the thread off the run queue and puts it back when the notification comes. The spinning version keeps a core busy for the whole wait. On a robot that is a core the control loop no longer has, and on a battery it is watts. This is "
+        },
+        {
+         "t": "a",
+         "v": "CP.42",
+         "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-wait"
+        },
+        {
+         "t": "text",
+         "v": ", \"don't wait without a condition\", read from the other side: express the wait as a condition and the system can give the processor to somebody else."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two more facts to carry into an interview. The permission to wake without a notification is what lets an implementation take the cheapest wake-up path it has, which is why the standard grants it and why the predicate is not optional. And a notification costs little while nobody waits: glibc builds condition variables on futexes, so "
+        },
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " with nobody asleep is an atomic update rather than a system call."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The Test Bench monitor watches a heartbeat and reports a gap. Here it is as a handshake: the publisher hands over one sequence number at a time and waits until the monitor has taken it, and the monitor waits up to 100 ms for the next one. Two conditions, so two condition variables:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <condition_variable>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <optional>\n#include <thread>\n\nconstexpr std::int64_t kBeats = 3;\nconstexpr auto kGap = std::chrono::milliseconds(100);\n\n// One beat at a time: the publisher waits for the monitor to take the last one.\nclass Heartbeat {\n public:\n  void beat(std::int64_t seq) {\n    {\n      std::unique_lock<std::mutex> lock(mutex_);\n      taken_.wait(lock, [this] { return !pending_.has_value(); });\n      pending_ = seq;\n    }\n    arrived_.notify_one();\n  }\n\n  // The new sequence number, or no value when nothing arrived within the limit.\n  [[nodiscard]] std::optional<std::int64_t> take(std::chrono::milliseconds limit) {\n    std::optional<std::int64_t> seq;\n    {\n      std::unique_lock<std::mutex> lock(mutex_);\n      if (!arrived_.wait_for(lock, limit, [this] { return pending_.has_value(); })) return std::nullopt;\n      seq = pending_;\n      pending_.reset();\n    }\n    taken_.notify_one();\n    return seq;\n  }\n\n private:\n  std::mutex mutex_;\n  std::condition_variable arrived_;  // waited on by the monitor: a beat is pending\n  std::condition_variable taken_;    // waited on by the publisher: the slot is free\n  std::optional<std::int64_t> pending_;\n};\n\nint main() {\n  Heartbeat heartbeat;\n  std::int64_t gaps = 0;\n  {\n    std::jthread monitor([&heartbeat, &gaps] {\n      for (std::int64_t seen = 0; seen < kBeats + 1; ++seen) {\n        const std::optional<std::int64_t> seq = heartbeat.take(kGap);\n        if (seq.has_value()) {\n          std::cout << std::format(\"monitor got beat {}\\n\", seq.value());\n        } else {\n          ++gaps;\n          std::cout << std::format(\"monitor saw no beat for {} ms\\n\", kGap.count());\n        }\n      }\n    });\n    for (std::int64_t seq = 1; seq <= kBeats; ++seq) heartbeat.beat(seq);\n  }\n  std::cout << std::format(\"publisher sent {} beats, monitor reported {} gap\\n\", kBeats, gaps);\n}"
+      },
+      {
+       "t": "output",
+       "text": "monitor got beat 1\nmonitor got beat 2\nmonitor got beat 3\nmonitor saw no beat for 100 ms\npublisher sent 3 beats, monitor reported 1 gap"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What to notice:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "There are two conditions here, \"a beat is pending\" and \"the slot is free\", so there are two condition variables. Each one has exactly one kind of waiter, which is why "
+         },
+         {
+          "t": "code",
+          "v": "notify_one"
+         },
+         {
+          "t": "text",
+          "v": " is correct for both. One shared condition variable would work only with "
+         },
+         {
+          "t": "code",
+          "v": "notify_all"
+         },
+         {
+          "t": "text",
+          "v": ", and every notification would wake a thread that has nothing to do."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The output is the same on every run, and two separate things make it so. The handshake fixes the order: the publisher cannot run ahead, because "
+         },
+         {
+          "t": "code",
+          "v": "beat"
+         },
+         {
+          "t": "text",
+          "v": " waits until "
+         },
+         {
+          "t": "code",
+          "v": "pending_"
+         },
+         {
+          "t": "text",
+          "v": " is empty. The margin fixes the gap count: a beat has to reach the monitor inside 100 ms or the run gains a line, and the three handovers together took 421 to 546 microseconds over six runs, so each wait has more than two orders of magnitude of slack. A deadline set close to the work it waits for would make the output depend on how busy the machine is, and no amount of correct locking would save it. Given a queue instead of a single slot, the monitor might also see the beats in bursts, and the count of lines would depend on timing again. That is the difference the next topic is about."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "take"
+         },
+         {
+          "t": "text",
+          "v": " returns "
+         },
+         {
+          "t": "code",
+          "v": "std::optional<std::int64_t>"
+         },
+         {
+          "t": "text",
+          "v": ", not a sentinel sequence number and not a bool plus an out-parameter. No value means \"no beat within 100 ms\", which is the monitor's whole job to detect."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Both notifications are sent after the enclosing block has released the lock. The inner braces are there for that: they end the "
+         },
+         {
+          "t": "code",
+          "v": "unique_lock"
+         },
+         {
+          "t": "text",
+          "v": "'s scope before the "
+         },
+         {
+          "t": "code",
+          "v": "notify_one"
+         },
+         {
+          "t": "text",
+          "v": " line."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The monitor loops "
+         },
+         {
+          "t": "code",
+          "v": "kBeats + 1"
+         },
+         {
+          "t": "text",
+          "v": " times, so it asks once more after the publisher has stopped, and that last call is the gap. A real monitor loops until its stop token is set, and then the number of gaps depends on how long the program runs."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Nothing here is a queue yet: the publisher blocks while the monitor is slow, and one beat waiting is the whole buffer. A bounded queue is this class with room for "
+         },
+         {
+          "t": "code",
+          "v": "n"
+         },
+         {
+          "t": "text",
+          "v": " items, which is why its members look familiar."
+         }
+        ]
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "wakeups",
+   "title": "Spurious and lost wake-ups",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first failure is the lost wake-up, and it is worth seeing rather than describing. The map is published before anybody waits. A waiter that calls "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": " without a predicate then sleeps although the map is already there:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <condition_variable>\n#include <format>\n#include <iostream>\n#include <mutex>\n\nclass MapHandoff {\n public:\n  void publish() {\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      loaded_ = true;\n    }\n    loaded_cv_.notify_all();\n  }\n\n  // Wrong: wait() carries no memory. A notification sent before this call is gone for good.\n  void wait_without_predicate(std::chrono::milliseconds limit) {\n    std::unique_lock<std::mutex> lock(mutex_);\n    const auto deadline = std::chrono::steady_clock::now() + limit;\n    while (std::chrono::steady_clock::now() < deadline) loaded_cv_.wait_until(lock, deadline);\n  }\n\n  // Right: the predicate is the memory. It is checked before the first wait.\n  [[nodiscard]] bool wait_with_predicate(std::chrono::milliseconds limit) {\n    std::unique_lock<std::mutex> lock(mutex_);\n    return loaded_cv_.wait_for(lock, limit, [this] { return loaded_; });\n  }\n\n  [[nodiscard]] bool loaded() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return loaded_;\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::condition_variable loaded_cv_;\n  bool loaded_ = false;\n};\n\nint main() {\n  constexpr auto kLimit = std::chrono::milliseconds(200);\n  MapHandoff handoff;\n  handoff.publish();  // the map arrives before anybody waits\n  std::cout << std::format(\"published first: loaded {}\\n\", handoff.loaded());\n\n  const auto start = std::chrono::steady_clock::now();\n  handoff.wait_without_predicate(kLimit);\n  const bool waited_the_lot = std::chrono::steady_clock::now() - start >= kLimit;\n  std::cout << std::format(\"no predicate: waited the full {} ms: {}; loaded {}\\n\", kLimit.count(), waited_the_lot,\n                           handoff.loaded());\n  std::cout << std::format(\"with a predicate: returned {}\\n\", handoff.wait_with_predicate(kLimit));\n}"
+      },
+      {
+       "t": "output",
+       "text": "published first: loaded true\nno predicate: waited the full 200 ms: true; loaded true\nwith a predicate: returned true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The deadline in "
+        },
+        {
+         "t": "code",
+         "v": "wait_without_predicate"
+        },
+        {
+         "t": "text",
+         "v": " is there to keep the demonstration finishable. A real program writes "
+        },
+        {
+         "t": "code",
+         "v": "loaded_cv_.wait(lock);"
+        },
+        {
+         "t": "text",
+         "v": " and waits until somebody kills it, with the flag it needed sitting true the whole time. The predicate version returns at once, without sleeping once, because "
+        },
+        {
+         "t": "code",
+         "v": "wait(lock, pred)"
+        },
+        {
+         "t": "text",
+         "v": " tests the predicate before it does anything else. That is the rule: the condition variable is the doorbell, the state is the door, and you look at the door."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is the spurious wake-up, which is the same fix from the other direction. "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": " may return although nobody called "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": ". The standard allows it and POSIX allows it for "
+        },
+        {
+         "t": "code",
+         "v": "pthread_cond_wait"
+        },
+        {
+         "t": "text",
+         "v": " ("
+        },
+        {
+         "t": "a",
+         "v": "the POSIX rationale",
+         "href": "https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_cond_wait.html"
+        },
+        {
+         "t": "text",
+         "v": " explains that allowing it makes the implementation faster on some systems). One everyday route to it is a woken waiter that loses the mutex to a thread that was never waiting, and so finds the state already taken. The consequence is short: a bare "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": " tells you nothing about the state, so never act on the fact that it returned. With the predicate form you never notice spurious wake-ups at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third failure changes the state without the mutex. This code looks like it is doing the same job:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  void publish(Map map) {\n    map_ = std::move(map);  // no lock\n    loaded_ = true;\n    loaded_cv_.notify_all();\n  }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is a data race on "
+        },
+        {
+         "t": "code",
+         "v": "loaded_"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "map_"
+        },
+        {
+         "t": "text",
+         "v": ", and it also reopens the window the mutex closes. The waiter evaluates its predicate, sees "
+        },
+        {
+         "t": "code",
+         "v": "false"
+        },
+        {
+         "t": "text",
+         "v": ", and is on its way into "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": ". The writer sets "
+        },
+        {
+         "t": "code",
+         "v": "loaded_ = true"
+        },
+        {
+         "t": "text",
+         "v": " and notifies in that instant. The notification arrives before the waiter is in the queue, so nobody hears it, and the waiter then sleeps on a condition that is already true. With the mutex held, the writer cannot be in that instant: the waiter is either still holding the mutex, and the writer waits, or it is already inside "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": ", which released the mutex only once it was queued."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth failure is a notification that goes to the wrong thread. Suppose one condition variable, some threads waiting for \"the queue has an item\" and others for \"the queue has room\", and the code calls "
+        },
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " after taking an item out. The implementation may wake a consumer, whose predicate is false, so it goes straight back to sleep, while the producer waiting for room is never woken. Nothing is lost forever if more events follow, but under a steady load it shows up as a program that pauses for no reason, and with the last item it can stop for good. There are two fixes, and the bounded queue in the next topic uses the second: call "
+        },
+        {
+         "t": "code",
+         "v": "notify_all"
+        },
+        {
+         "t": "text",
+         "v": ", which costs a thundering herd of threads waking to take one mutex in turn, or give each condition its own condition variable, so that every waiter on a queue is waiting for the same thing and "
+        },
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " is exact."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fifth failure is about lifetime. Destroying a "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable"
+        },
+        {
+         "t": "text",
+         "v": " while a thread is blocked on it is undefined behaviour, and so is destroying the mutex. The standard's only concession is that you may destroy the condition variable once every waiter has been notified, even if they have not yet run ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/thread/condition_variable/~condition_variable"
+        },
+        {
+         "t": "text",
+         "v": "). In practice this means the object that owns the condition variable has to outlive every thread that waits on it, which the "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": "-in-a-scope pattern gives you at no cost, as long as the object is declared before the threads. A class that owns both the threads and the condition variable must stop and join the threads in its destructor, before its own members are destroyed; a member "
+        },
+        {
+         "t": "code",
+         "v": "std::jthread"
+        },
+        {
+         "t": "text",
+         "v": " declared last does that for you."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last one is not a bug but a habit worth having. Notifying while holding the mutex costs the woken thread a second sleep, because it wakes into a mutex the notifier still owns. Release first, then notify. The exception is the case where the notifier is about to destroy the state, or where the waiter's predicate reads something the notifier is still changing; then the notification belongs inside the lock, and the cost is one extra context switch."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "latch",
+   "title": "One-shot event and countdown latch",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. Build the two waiting primitives every robot start-up needs, from a mutex and a condition variable."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "class Event"
+         },
+         {
+          "t": "text",
+          "v": ", a one-shot flag. "
+         },
+         {
+          "t": "code",
+          "v": "set()"
+         },
+         {
+          "t": "text",
+          "v": " makes it set for good, "
+         },
+         {
+          "t": "code",
+          "v": "wait() const"
+         },
+         {
+          "t": "text",
+          "v": " blocks until it is, "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] bool wait_for(std::chrono::milliseconds) const"
+         },
+         {
+          "t": "text",
+          "v": " gives up after the limit and returns whether it is set, and "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] bool is_set() const"
+         },
+         {
+          "t": "text",
+          "v": " asks without waiting. Two calls to "
+         },
+         {
+          "t": "code",
+          "v": "set()"
+         },
+         {
+          "t": "text",
+          "v": " must behave like one."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "class Countdown"
+         },
+         {
+          "t": "text",
+          "v": ", a latch. The constructor takes a count, "
+         },
+         {
+          "t": "code",
+          "v": "count_down()"
+         },
+         {
+          "t": "text",
+          "v": " lowers it by one and never below zero, "
+         },
+         {
+          "t": "code",
+          "v": "wait() const"
+         },
+         {
+          "t": "text",
+          "v": " blocks until it reaches zero, and "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::int64_t left() const"
+         },
+         {
+          "t": "text",
+          "v": " reports what is left."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "In "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ", print the state before anything happens and show that "
+         },
+         {
+          "t": "code",
+          "v": "wait_for"
+         },
+         {
+          "t": "text",
+          "v": " on an unset event returns false after 50 ms. Then start three planner threads that wait on the event and record which one they are, and four worker threads that each call "
+         },
+         {
+          "t": "code",
+          "v": "count_down()"
+         },
+         {
+          "t": "text",
+          "v": ". Wait for the countdown, print what is left, then set the event. After joining, print the three planners' notes and show that a "
+         },
+         {
+          "t": "code",
+          "v": "wait_for"
+         },
+         {
+          "t": "text",
+          "v": " on the set event returns at once."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every wait uses a predicate. Nothing sleeps to wait for something, and nothing spins. Then answer two questions. Why does "
+        },
+        {
+         "t": "code",
+         "v": "count_down"
+        },
+        {
+         "t": "text",
+         "v": " notify outside the lock and only when the count reaches zero? And what do "
+        },
+        {
+         "t": "code",
+         "v": "std::latch"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::barrier"
+        },
+        {
+         "t": "text",
+         "v": " from C++20 give you that this "
+        },
+        {
+         "t": "code",
+         "v": "Countdown"
+        },
+        {
+         "t": "text",
+         "v": " does not?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <chrono>\n#include <condition_variable>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <string>\n#include <thread>\n#include <vector>\n\n// One-shot: set() once, and every wait after that returns at once.\nclass Event {\n public:\n  void set() {\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      if (set_) return;\n      set_ = true;\n    }\n    cv_.notify_all();  // every waiter is waiting for the same thing, so wake them all\n  }\n\n  void wait() const {\n    std::unique_lock<std::mutex> lock(mutex_);\n    cv_.wait(lock, [this] { return set_; });\n  }\n\n  [[nodiscard]] bool wait_for(std::chrono::milliseconds limit) const {\n    std::unique_lock<std::mutex> lock(mutex_);\n    return cv_.wait_for(lock, limit, [this] { return set_; });\n  }\n\n  [[nodiscard]] bool is_set() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return set_;\n  }\n\n private:\n  mutable std::mutex mutex_;\n  mutable std::condition_variable cv_;\n  bool set_ = false;\n};\n\n// Counts down to zero once, and then stays there.\nclass Countdown {\n public:\n  explicit Countdown(std::int64_t count) : left_(count) {}\n\n  void count_down() {\n    bool reached_zero = false;\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      if (left_ > 0) {\n        --left_;\n        reached_zero = left_ == 0;\n      }\n    }\n    if (reached_zero) cv_.notify_all();\n  }\n\n  void wait() const {\n    std::unique_lock<std::mutex> lock(mutex_);\n    cv_.wait(lock, [this] { return left_ == 0; });\n  }\n\n  [[nodiscard]] std::int64_t left() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return left_;\n  }\n\n private:\n  mutable std::mutex mutex_;\n  mutable std::condition_variable cv_;\n  std::int64_t left_ = 0;\n};\n\nint main() {\n  constexpr std::ptrdiff_t kPlanners = 3;\n  constexpr std::int64_t kWorkers = 4;\n\n  Event start_driving;\n  Countdown calibrated(kWorkers);\n  std::vector<std::string> notes(kPlanners);\n\n  std::cout << std::format(\"before anything: event set {}, countdown left {}\\n\", start_driving.is_set(),\n                           calibrated.left());\n  std::cout << std::format(\"wait_for on an unset event returns {}\\n\",\n                           start_driving.wait_for(std::chrono::milliseconds(50)));\n\n  {\n    std::vector<std::jthread> threads;\n    threads.reserve(kPlanners + kWorkers);\n    for (std::ptrdiff_t i = 0; i < kPlanners; ++i) {\n      threads.emplace_back([&start_driving, slot = &notes[i], i] {\n        start_driving.wait();\n        *slot = std::format(\"planner {} started\", i);\n      });\n    }\n    for (std::int64_t i = 0; i < kWorkers; ++i) {\n      threads.emplace_back([&calibrated] { calibrated.count_down(); });\n    }\n    calibrated.wait();  // every worker has finished calibrating\n    std::cout << std::format(\"all {} workers calibrated, countdown left {}\\n\", kWorkers, calibrated.left());\n    start_driving.set();\n  }\n\n  for (const std::string& note : notes) std::cout << note << \"\\n\";\n  std::cout << std::format(\"after set: event set {}, a later wait_for returns {}\\n\", start_driving.is_set(),\n                           start_driving.wait_for(std::chrono::milliseconds(50)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "before anything: event set false, countdown left 4\nwait_for on an unset event returns false\nall 4 workers calibrated, countdown left 0\nplanner 0 started\nplanner 1 started\nplanner 2 started\nafter set: event set true, a later wait_for returns true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "count_down"
+        },
+        {
+         "t": "text",
+         "v": " notifies outside the lock for the reason the theory gave: a waiter woken while the counter still holds the mutex would wake into a blocked mutex. It notifies only on the transition to zero because that is the only moment any predicate changes from false to true. A notification at count 3 would wake every waiter to find "
+        },
+        {
+         "t": "code",
+         "v": "left_ == 3"
+        },
+        {
+         "t": "text",
+         "v": ", test false and sleep again. Watching for the transition rather than the state is the shape to remember: compute the change under the lock, act on it outside."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "if (left_ > 0)"
+        },
+        {
+         "t": "text",
+         "v": " keeps the count from going negative when "
+        },
+        {
+         "t": "code",
+         "v": "count_down"
+        },
+        {
+         "t": "text",
+         "v": " is called more often than the constructor promised. Without it the predicate "
+        },
+        {
+         "t": "code",
+         "v": "left_ == 0"
+        },
+        {
+         "t": "text",
+         "v": " would be false forever after an extra call, and every waiter would hang. Defending the invariant inside the class is cheaper than a comment asking callers to be careful."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Both classes make their mutex and condition variable "
+        },
+        {
+         "t": "code",
+         "v": "mutable"
+        },
+        {
+         "t": "text",
+         "v": " so that "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "wait_for"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "is_set"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " can be "
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": ". Waiting does not change the logical value of an event; it changes the machinery. That is the same "
+        },
+        {
+         "t": "code",
+         "v": "mutable std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " from the previous topic, applied to a second member."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "C++20 has both of these in the standard library, and once you have written them yourself you should use the standard ones. "
+        },
+        {
+         "t": "code",
+         "v": "std::latch"
+        },
+        {
+         "t": "text",
+         "v": " is this "
+        },
+        {
+         "t": "code",
+         "v": "Countdown"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "count_down"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "try_wait"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "arrive_and_wait"
+        },
+        {
+         "t": "text",
+         "v": ", built on atomic waits rather than a mutex in libstdc++, and it can be neither copied nor reused. "
+        },
+        {
+         "t": "code",
+         "v": "std::barrier"
+        },
+        {
+         "t": "text",
+         "v": " is the reusable version: every arrival at the barrier blocks until all of them arrive, then the barrier resets for the next round, with an optional completion function that runs once between rounds. There is no standard one-shot "
+        },
+        {
+         "t": "code",
+         "v": "Event"
+        },
+        {
+         "t": "text",
+         "v": "; "
+        },
+        {
+         "t": "code",
+         "v": "std::latch"
+        },
+        {
+         "t": "text",
+         "v": " with a count of one is the usual stand-in, which is what the "
+        },
+        {
+         "t": "code",
+         "v": "std::latch"
+        },
+        {
+         "t": "text",
+         "v": " pairs in the previous topic's examples were doing."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write six to ten lines from memory and keep them as this topic's proof. Give the three members a waiting class needs and say what each is for. Write the waiter and the writer, in order, including which side holds the mutex when. Expand "
+        },
+        {
+         "t": "code",
+         "v": "wait(lock, pred)"
+        },
+        {
+         "t": "text",
+         "v": " into its loop and say what the loop defends against. Define a spurious wake-up and a lost wake-up in one sentence each. Say when "
+        },
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " is right and when it is not, and what two condition variables buy. Say why the waiter needs "
+        },
+        {
+         "t": "code",
+         "v": "std::unique_lock"
+        },
+        {
+         "t": "text",
+         "v": ". Finish with the measured cost of spinning instead: 0.47 seconds of processor time against 0.00 for the same half-second wait."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What are the three parts of a condition variable protocol, and which one holds the state?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Expand "
+     },
+     {
+      "t": "code",
+      "v": "cv.wait(lock, pred)"
+     },
+     {
+      "t": "text",
+      "v": " into the loop it stands for. What does each part defend against?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Define a lost wake-up. Which line of the correct code makes it impossible?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Define a spurious wake-up. Where do they come from, and what does the standard promise about them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why must the state change happen with the mutex held, when the notification does not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does the waiter hold a "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_lock"
+     },
+     {
+      "t": "text",
+      "v": " and not a "
+     },
+     {
+      "t": "code",
+      "v": "std::lock_guard"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "When is "
+     },
+     {
+      "t": "code",
+      "v": "notify_one"
+     },
+     {
+      "t": "text",
+      "v": " wrong, and what are the two ways to fix it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What do the two return types of "
+     },
+     {
+      "t": "code",
+      "v": "wait_for"
+     },
+     {
+      "t": "text",
+      "v": " mean, and which one do you use?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "count_down"
+     },
+     {
+      "t": "text",
+      "v": " notify only on the step to zero?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "std::condition_variable_any"
+     },
+     {
+      "t": "text",
+      "v": " add, and which C++20 overload only it has?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: a one-shot event with "
+     },
+     {
+      "t": "code",
+      "v": "set"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "wait"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "wait_for"
+     },
+     {
+      "t": "text",
+      "v": ", safe against both wake-up problems."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: Concurrency, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B-Concurrency.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=8rEGu20Uw4g"
+     },
+     {
+      "t": "text",
+      "v": ". The wait loop and why the predicate is the state."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Concurrency, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_concurrency/back_to_basics_concurrency__arthur_odwyer__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=F6Ipn7gCOsY"
+     },
+     {
+      "t": "text",
+      "v": ". Condition variables with a mutex, and the handoff between two threads."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Rainer Grimm, Back to Basics: Atomics, Locks and Tasks, CppCon 2019: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2019/blob/master/Presentations/back_to_basics_atomics_locks_and_tasks/back_to_basics_atomics_locks_and_tasks__rainer_grimm__cppcon_2019.pdf"
+     },
+     {
+      "t": "text",
+      "v": ". Lost and spurious wake-ups, and tasks as the alternative to a raw wait."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "CP.42",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-wait"
+     },
+     {
+      "t": "text",
+      "v": ", don't wait without a condition, and "
+     },
+     {
+      "t": "a",
+      "v": "CP.50",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-mutex"
+     },
+     {
+      "t": "text",
+      "v": ", define a mutex with the data it guards."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "condition_variable",
+      "href": "https://en.cppreference.com/cpp/thread/condition_variable"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "wait",
+      "href": "https://en.cppreference.com/cpp/thread/condition_variable/wait"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "notify_one",
+      "href": "https://en.cppreference.com/cpp/thread/condition_variable/notify_one"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "condition_variable_any",
+      "href": "https://en.cppreference.com/cpp/thread/condition_variable_any"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "latch",
+      "href": "https://en.cppreference.com/cpp/thread/latch"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "barrier",
+      "href": "https://en.cppreference.com/cpp/thread/barrier"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "POSIX on pthread_cond_wait",
+      "href": "https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_cond_wait.html"
+     },
+     {
+      "t": "text",
+      "v": ": the rationale for allowing spurious wake-ups, and the same predicate loop in C."
+     }
+    ]
+   ]
+  }
+ ]
+}

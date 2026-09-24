@@ -1,0 +1,2088 @@
+{
+ "id": "pat-iterator",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A "
+     },
+     {
+      "t": "code",
+      "v": "FixedRoute<N>"
+     },
+     {
+      "t": "text",
+      "v": " holds "
+     },
+     {
+      "t": "code",
+      "v": "N"
+     },
+     {
+      "t": "text",
+      "v": " leg lengths in millimetres in a "
+     },
+     {
+      "t": "code",
+      "v": "std::array"
+     },
+     {
+      "t": "text",
+      "v": ". From memory, write "
+     },
+     {
+      "t": "code",
+      "v": "begin()"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "end()"
+     },
+     {
+      "t": "text",
+      "v": ", for both a mutable and a "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " "
+     },
+     {
+      "t": "code",
+      "v": "FixedRoute"
+     },
+     {
+      "t": "text",
+      "v": ", so one range-for loop can fill it and a second range-for loop can read it back through a "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " reference. Plain pointers into the underlying array are enough; no custom iterator class is needed here. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <array>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n\ntemplate <std::size_t N>\nclass FixedRoute {\n public:\n  [[nodiscard]] std::int32_t* begin() { return legs_mm_.data(); }\n  [[nodiscard]] std::int32_t* end() { return legs_mm_.data() + legs_mm_.size(); }\n  [[nodiscard]] const std::int32_t* begin() const { return legs_mm_.data(); }\n  [[nodiscard]] const std::int32_t* end() const { return legs_mm_.data() + legs_mm_.size(); }\n\n private:\n  std::array<std::int32_t, N> legs_mm_{};\n};\n\nint main() {\n  FixedRoute<4> route;\n  std::int32_t leg = 500;\n  for (std::int32_t& mm : route) {\n    mm = leg;\n    leg += 250;\n  }\n\n  std::int64_t total = 0;\n  for (const std::int32_t mm : route) total += mm;\n  std::cout << std::format(\"total {} mm\\n\", total);\n\n  const FixedRoute<4>& view = route;\n  std::int64_t again = 0;\n  for (const std::int32_t mm : view) again += mm;\n  std::cout << std::format(\"same total through a const reference: {}\\n\", again == total);\n}"
+   },
+   {
+    "t": "output",
+    "text": "total 3500 mm\nsame total through a const reference: true"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A "
+     },
+     {
+      "t": "code",
+      "v": "std::int32_t*"
+     },
+     {
+      "t": "text",
+      "v": " already has everything a range-for loop needs: "
+     },
+     {
+      "t": "code",
+      "v": "*"
+     },
+     {
+      "t": "text",
+      "v": " to read, "
+     },
+     {
+      "t": "code",
+      "v": "++"
+     },
+     {
+      "t": "text",
+      "v": " to move on, "
+     },
+     {
+      "t": "code",
+      "v": "!="
+     },
+     {
+      "t": "text",
+      "v": " to compare with "
+     },
+     {
+      "t": "code",
+      "v": "end()"
+     },
+     {
+      "t": "text",
+      "v": ". Nothing about "
+     },
+     {
+      "t": "code",
+      "v": "FixedRoute"
+     },
+     {
+      "t": "text",
+      "v": " has to build a new type for that; the array's own storage already provides one."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if both the mutable and the "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " overloads exist and the second loop, over "
+     },
+     {
+      "t": "code",
+      "v": "view"
+     },
+     {
+      "t": "text",
+      "v": ", compiles and reads every element. Writing only the mutable pair is a partial pass: it compiles today and refuses the moment a caller holds the route by "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " reference, which is exactly what "
+     },
+     {
+      "t": "code",
+      "v": "view"
+     },
+     {
+      "t": "text",
+      "v": " tests. Returning "
+     },
+     {
+      "t": "code",
+      "v": "std::array"
+     },
+     {
+      "t": "text",
+      "v": "'s own iterator instead of a raw pointer would pass too; a raw pointer is enough only because it already satisfies every operation a range-for loop asks for."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "An iterator is an object standing at one position in a sequence: it reads the element there with "
+    },
+    {
+     "t": "code",
+     "v": "*"
+    },
+    {
+     "t": "text",
+     "v": ", moves to the next with "
+    },
+    {
+     "t": "code",
+     "v": "++"
+    },
+    {
+     "t": "text",
+     "v": ", and is compared with another iterator of the same type using "
+    },
+    {
+     "t": "code",
+     "v": "=="
+    },
+    {
+     "t": "text",
+     "v": " or "
+    },
+    {
+     "t": "code",
+     "v": "!="
+    },
+    {
+     "t": "text",
+     "v": ". A container's "
+    },
+    {
+     "t": "code",
+     "v": "begin()"
+    },
+    {
+     "t": "text",
+     "v": " names the first position and "
+    },
+    {
+     "t": "code",
+     "v": "end()"
+    },
+    {
+     "t": "text",
+     "v": " names one past the last, and a range-for loop, or any function in "
+    },
+    {
+     "t": "code",
+     "v": "<algorithm>"
+    },
+    {
+     "t": "text",
+     "v": ", walks from one to the other without knowing anything about how the container stores its elements."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is that without this common shape, an algorithm has to be rewritten once per container: one loop for something indexed by a whole number, another for something reached only by following a link from one node to the next, and a caller who wants to walk either has to know which."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a small hierarchy of promises, from weakest to strongest. An input iterator can be read once and moved forward. A forward iterator can also be copied and walked again from a saved position. A bidirectional iterator can move back with "
+    },
+    {
+     "t": "code",
+     "v": "--"
+    },
+    {
+     "t": "text",
+     "v": ". A random-access iterator can jump by any offset in one step. "
+    },
+    {
+     "t": "code",
+     "v": "std::find_if"
+    },
+    {
+     "t": "text",
+     "v": " only asks for an input iterator; "
+    },
+    {
+     "t": "code",
+     "v": "std::sort"
+    },
+    {
+     "t": "text",
+     "v": " asks for random access, and refuses anything weaker at compile time. Writing a container's own iterator means providing "
+    },
+    {
+     "t": "code",
+     "v": "begin()"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "end()"
+    },
+    {
+     "t": "text",
+     "v": ", with "
+    },
+    {
+     "t": "code",
+     "v": "const"
+    },
+    {
+     "t": "text",
+     "v": " overloads, returning something meeting whichever of these an algorithm you call needs."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is the boilerplate: the member types the standard library's traits look for, both a "
+    },
+    {
+     "t": "code",
+     "v": "const"
+    },
+    {
+     "t": "text",
+     "v": " and a non-"
+    },
+    {
+     "t": "code",
+     "v": "const"
+    },
+    {
+     "t": "text",
+     "v": " form, and every comparison and increment operator written by hand. Wrapping a "
+    },
+    {
+     "t": "code",
+     "v": "std::vector"
+    },
+    {
+     "t": "text",
+     "v": " or "
+    },
+    {
+     "t": "code",
+     "v": "std::array"
+    },
+    {
+     "t": "text",
+     "v": " you already hold, and handing back its own iterator, is smaller and safer than writing a new type, and is the right choice whenever your storage already has one."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in any collection of your own that has to work in a range-for loop or feed a standard algorithm, and the interview question is exactly that: given a tiny collection, write the two functions that make it a sequence."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Iterator requirements, categories and range-for",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A fixed-capacity ring keeps the most recent readings and overwrites the oldest once it is full. Nothing about that storage is a plain run of memory a pointer could walk, so it earns a real iterator, one that hides the wraparound and always reports oldest to newest:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <vector>\n\n// A fixed-capacity ring: push overwrites the oldest reading once it is full.\n// The iterator walks oldest to newest and hides the wraparound entirely.\nclass RecentReadings {\n public:\n  explicit RecentReadings(std::size_t capacity) : mm_(capacity) {}\n\n  void push(std::int32_t mm) {\n    mm_[next_] = mm;\n    next_ = (next_ + 1) % mm_.size();\n    if (count_ < static_cast<std::ptrdiff_t>(mm_.size())) ++count_;\n  }\n\n  class Iterator {\n   public:\n    using iterator_category = std::forward_iterator_tag;\n    using value_type = std::int32_t;\n    using difference_type = std::ptrdiff_t;\n    using pointer = const std::int32_t*;\n    using reference = const std::int32_t&;\n\n    Iterator() = default;\n    Iterator(const std::vector<std::int32_t>* mm, std::size_t oldest, std::ptrdiff_t index)\n        : mm_(mm), oldest_(oldest), index_(index) {}\n\n    [[nodiscard]] reference operator*() const {\n      return (*mm_)[(oldest_ + static_cast<std::size_t>(index_)) % mm_->size()];\n    }\n    Iterator& operator++() {\n      ++index_;\n      return *this;\n    }\n    Iterator operator++(int) {\n      Iterator copy = *this;\n      ++*this;\n      return copy;\n    }\n    [[nodiscard]] bool operator==(const Iterator& other) const { return index_ == other.index_; }\n\n   private:\n    const std::vector<std::int32_t>* mm_ = nullptr;\n    std::size_t oldest_ = 0;\n    std::ptrdiff_t index_ = 0;\n  };\n\n  [[nodiscard]] Iterator begin() const { return Iterator(&mm_, oldest_index(), 0); }\n  [[nodiscard]] Iterator end() const { return Iterator(&mm_, oldest_index(), count_); }\n\n private:\n  [[nodiscard]] std::size_t oldest_index() const {\n    if (count_ < static_cast<std::ptrdiff_t>(mm_.size())) return 0;\n    return next_;\n  }\n\n  std::vector<std::int32_t> mm_;\n  std::size_t next_ = 0;\n  std::ptrdiff_t count_ = 0;\n};\n\nstatic_assert(std::forward_iterator<RecentReadings::Iterator>);\n\nint main() {\n  RecentReadings readings(4);\n  for (const std::int32_t mm : {900, 850, 1300, 1250, 700, 640}) readings.push(mm);  // 6 pushes, capacity 4\n\n  std::cout << \"oldest to newest:\";\n  for (const std::int32_t mm : readings) std::cout << ' ' << mm;\n  std::cout << '\\n';\n\n  const auto close = std::ranges::find_if(readings, [](std::int32_t mm) { return mm < 700; });\n  std::cout << std::format(\"first reading under 700 mm: {}\\n\", close != readings.end() ? *close : -1);\n}"
+      },
+      {
+       "t": "output",
+       "text": "oldest to newest: 1300 1250 700 640\nfirst reading under 700 mm: 640"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "readings"
+        },
+        {
+         "t": "text",
+         "v": " never exposes "
+        },
+        {
+         "t": "code",
+         "v": "next_"
+        },
+        {
+         "t": "text",
+         "v": " or the raw index a reading lives at; every reader sees a plain sequence, oldest first, which is what an iterator is for. The range-for loop and "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::find_if"
+        },
+        {
+         "t": "text",
+         "v": " both compile against the same four members: "
+        },
+        {
+         "t": "code",
+         "v": "operator*"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "operator++"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "operator=="
+        },
+        {
+         "t": "text",
+         "v": " and the pair "
+        },
+        {
+         "t": "code",
+         "v": "begin()"
+        },
+        {
+         "t": "text",
+         "v": "/"
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": ". A range-for loop needs exactly that shape and nothing more, because it desugars to almost exactly the loop written by hand: fetch "
+        },
+        {
+         "t": "code",
+         "v": "begin()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": " once, and loop while they compare unequal, dereferencing and incrementing each time ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/language/range-for"
+        },
+        {
+         "t": "text",
+         "v": "). It does not consult "
+        },
+        {
+         "t": "code",
+         "v": "std::iterator_traits"
+        },
+        {
+         "t": "text",
+         "v": " at all."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Algorithms in "
+        },
+        {
+         "t": "code",
+         "v": "<algorithm>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "<ranges>"
+        },
+        {
+         "t": "text",
+         "v": " do, and that is where categories start to matter. Gamma, Helm, Johnson and Vlissides describe Iterator, in the behavioural chapter of the 1994 catalogue ("
+        },
+        {
+         "t": "a",
+         "v": "Design Patterns",
+         "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+        },
+        {
+         "t": "text",
+         "v": "), as a way to walk a collection without exposing its representation, and the standard library adds a ladder of promises on top of that one idea, each stronger than the last."
+        }
+       ]
+      },
+      {
+       "t": "table",
+       "head": [
+        [
+         {
+          "t": "text",
+          "v": "Category"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Adds over the one before"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Example"
+         }
+        ]
+       ],
+       "rows": [
+        [
+         [
+          {
+           "t": "text",
+           "v": "Input"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "read once, moving only forward"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::istream_iterator"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Forward"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "copyable, and can be walked again from a saved position"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::forward_list::iterator"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "RecentReadings::Iterator"
+          },
+          {
+           "t": "text",
+           "v": " above"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Bidirectional"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "--"
+          },
+          {
+           "t": "text",
+           "v": ", moving back one position"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::list::iterator"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "std::map::iterator"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Random access"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "+n"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "-n"
+          },
+          {
+           "t": "text",
+           "v": ", subtraction and ordering, each in one step"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::vector::iterator"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "std::deque::iterator"
+          }
+         ]
+        ],
+        [
+         [
+          {
+           "t": "text",
+           "v": "Contiguous"
+          }
+         ],
+         [
+          {
+           "t": "text",
+           "v": "the elements sit next to each other in memory"
+          }
+         ],
+         [
+          {
+           "t": "code",
+           "v": "std::vector::iterator"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "std::array::iterator"
+          },
+          {
+           "t": "text",
+           "v": ", "
+          },
+          {
+           "t": "code",
+           "v": "T*"
+          }
+         ]
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "An algorithm names the weakest category it can work with: "
+        },
+        {
+         "t": "code",
+         "v": "std::find_if"
+        },
+        {
+         "t": "text",
+         "v": " only reads forward, so an input iterator is enough, and "
+        },
+        {
+         "t": "code",
+         "v": "RecentReadings::Iterator"
+        },
+        {
+         "t": "text",
+         "v": " qualifies as a forward one because it can also be copied and re-walked, which "
+        },
+        {
+         "t": "code",
+         "v": "close"
+        },
+        {
+         "t": "text",
+         "v": " above and "
+        },
+        {
+         "t": "code",
+         "v": "readings.end()"
+        },
+        {
+         "t": "text",
+         "v": " both do without disturbing one another. "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " needs to jump around the sequence, so it asks for a random-access iterator and refuses anything weaker, which the worked example checks directly."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The five member types at the top of "
+        },
+        {
+         "t": "code",
+         "v": "Iterator"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "iterator_category"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "value_type"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "difference_type"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "pointer"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "reference"
+        },
+        {
+         "t": "text",
+         "v": ", are what "
+        },
+        {
+         "t": "code",
+         "v": "std::iterator_traits<Iterator>"
+        },
+        {
+         "t": "text",
+         "v": " reads, and what the C++20 concepts "
+        },
+        {
+         "t": "code",
+         "v": "std::forward_iterator"
+        },
+        {
+         "t": "text",
+         "v": " and friends check for before they look at a single operator. Nicolai Josuttis's "
+        },
+        {
+         "t": "a",
+         "v": "Back to Basics talk on iterators",
+         "href": "https://www.youtube.com/watch?v=26aW6aBVpk0"
+        },
+        {
+         "t": "text",
+         "v": " (CppCon 2023) calls this the glue between a container and every algorithm that walks it: get the five types right, once, and the whole of "
+        },
+        {
+         "t": "code",
+         "v": "<algorithm>"
+        },
+        {
+         "t": "text",
+         "v": " becomes available; get them wrong, and only range-for, which never asks for them, still works. The failure cases below measure exactly that gap."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " needs more than "
+        },
+        {
+         "t": "code",
+         "v": "RecentReadings::Iterator"
+        },
+        {
+         "t": "text",
+         "v": " promises, and the compiler says so before it looks at a single element:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "random_access_iterator",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <iterator>\n#include <vector>\n\nclass RecentReadings {\n public:\n  explicit RecentReadings(std::size_t capacity) : mm_(capacity) {}\n  void push(std::int32_t mm) {\n    mm_[next_] = mm;\n    next_ = (next_ + 1) % mm_.size();\n    if (count_ < static_cast<std::ptrdiff_t>(mm_.size())) ++count_;\n  }\n\n  class Iterator {\n   public:\n    using iterator_category = std::forward_iterator_tag;\n    using value_type = std::int32_t;\n    using difference_type = std::ptrdiff_t;\n    using pointer = const std::int32_t*;\n    using reference = const std::int32_t&;\n\n    Iterator() = default;\n    Iterator(const std::vector<std::int32_t>* mm, std::size_t oldest, std::ptrdiff_t index)\n        : mm_(mm), oldest_(oldest), index_(index) {}\n    [[nodiscard]] reference operator*() const {\n      return (*mm_)[(oldest_ + static_cast<std::size_t>(index_)) % mm_->size()];\n    }\n    Iterator& operator++() {\n      ++index_;\n      return *this;\n    }\n    Iterator operator++(int) {\n      Iterator copy = *this;\n      ++*this;\n      return copy;\n    }\n    [[nodiscard]] bool operator==(const Iterator& other) const { return index_ == other.index_; }\n\n   private:\n    const std::vector<std::int32_t>* mm_ = nullptr;\n    std::size_t oldest_ = 0;\n    std::ptrdiff_t index_ = 0;\n  };\n\n  [[nodiscard]] Iterator begin() const { return Iterator(&mm_, 0, 0); }\n  [[nodiscard]] Iterator end() const { return Iterator(&mm_, 0, count_); }\n\n private:\n  std::vector<std::int32_t> mm_;\n  std::size_t next_ = 0;\n  std::ptrdiff_t count_ = 0;\n};\n\nint main() {\n  RecentReadings readings(4);\n  readings.push(1);\n  std::ranges::sort(readings);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 refuses it deep inside "
+        },
+        {
+         "t": "code",
+         "v": "<algorithm>"
+        },
+        {
+         "t": "text",
+         "v": ", tracing the requirement down to "
+        },
+        {
+         "t": "code",
+         "v": "bidirectional_iterator<...>"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "random_access_iterator<...>"
+        },
+        {
+         "t": "text",
+         "v": ", and naming "
+        },
+        {
+         "t": "code",
+         "v": "std::forward_iterator_tag"
+        },
+        {
+         "t": "text",
+         "v": " as the reason: it is not a base of "
+        },
+        {
+         "t": "code",
+         "v": "std::bidirectional_iterator_tag"
+        },
+        {
+         "t": "text",
+         "v": ", so the chain stops there. Nothing about the elements or their order is inspected, because the type never reaches that point. A forward iterator also costs more to walk in full than a random-access one on the same task: "
+        },
+        {
+         "t": "code",
+         "v": "std::distance(first, last)"
+        },
+        {
+         "t": "text",
+         "v": " on a forward iterator counts one increment at a time and is O(n), while on a random-access iterator it is a single subtraction, O(1) ("
+        },
+        {
+         "t": "a",
+         "v": "cppreference",
+         "href": "https://en.cppreference.com/cpp/iterator/distance"
+        },
+        {
+         "t": "text",
+         "v": "). That is the whole trade a category ladder makes visible: "
+        },
+        {
+         "t": "code",
+         "v": "RecentReadings"
+        },
+        {
+         "t": "text",
+         "v": " chose to hide its wraparound behind the weakest iterator that could still express oldest-to-newest order, and every algorithm that needs more than that has to be told so at compile time rather than discover it by being slow, or wrong, at run time."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "collection",
+   "title": "Small collection supporting range-for and std::find_if",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. "
+        },
+        {
+         "t": "code",
+         "v": "FaultHistory"
+        },
+        {
+         "t": "text",
+         "v": " keeps the most recent faults a robot has raised, in a fixed-capacity ring, oldest to newest, the same shape the theory step used for readings."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "struct Fault { std::string code; std::int64_t at_ms; };"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "FaultHistory"
+         },
+         {
+          "t": "text",
+          "v": ", constructed with its capacity, with "
+         },
+         {
+          "t": "code",
+          "v": "void record(Fault fault)"
+         },
+         {
+          "t": "text",
+          "v": " that overwrites the oldest fault once the ring is full, and "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::ptrdiff_t size() const"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A nested "
+         },
+         {
+          "t": "code",
+          "v": "Iterator"
+         },
+         {
+          "t": "text",
+          "v": ", a forward iterator over "
+         },
+         {
+          "t": "code",
+          "v": "const Fault&"
+         },
+         {
+          "t": "text",
+          "v": ", with the five member types "
+         },
+         {
+          "t": "code",
+          "v": "std::iterator_traits"
+         },
+         {
+          "t": "text",
+          "v": " needs: "
+         },
+         {
+          "t": "code",
+          "v": "iterator_category"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "value_type"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "difference_type"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "pointer"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "reference"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "begin()"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "end()"
+         },
+         {
+          "t": "text",
+          "v": ", both "
+         },
+         {
+          "t": "code",
+          "v": "const"
+         },
+         {
+          "t": "text",
+          "v": " member functions, walking oldest to newest."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Record "
+        },
+        {
+         "t": "code",
+         "v": "{\"E_TIMEOUT\", 100}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{\"E_TIMEOUT\", 250}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{\"E_STALL\", 400}"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "{\"E_LOW_BATTERY\", 900}"
+        },
+        {
+         "t": "text",
+         "v": " into a history of capacity 3, so the first "
+        },
+        {
+         "t": "code",
+         "v": "E_TIMEOUT"
+        },
+        {
+         "t": "text",
+         "v": " is overwritten. Print the history's size, then every fault in it with a range-for loop. Then use "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::find_if"
+        },
+        {
+         "t": "text",
+         "v": " to find the first "
+        },
+        {
+         "t": "code",
+         "v": "E_STALL"
+        },
+        {
+         "t": "text",
+         "v": " and print its timestamp, and to look for an "
+        },
+        {
+         "t": "code",
+         "v": "E_VOLTAGE"
+        },
+        {
+         "t": "text",
+         "v": " fault and print that none was found. Prove with "
+        },
+        {
+         "t": "code",
+         "v": "static_assert"
+        },
+        {
+         "t": "text",
+         "v": " that "
+        },
+        {
+         "t": "code",
+         "v": "FaultHistory::Iterator"
+        },
+        {
+         "t": "text",
+         "v": " satisfies "
+        },
+        {
+         "t": "code",
+         "v": "std::forward_iterator"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions in writing. Which two functions would change, and how, if "
+        },
+        {
+         "t": "code",
+         "v": "FaultHistory"
+        },
+        {
+         "t": "text",
+         "v": " had to support "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::sort"
+        },
+        {
+         "t": "text",
+         "v": " by severity? Why does "
+        },
+        {
+         "t": "code",
+         "v": "Iterator"
+        },
+        {
+         "t": "text",
+         "v": " store a pointer to the whole "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Fault>"
+        },
+        {
+         "t": "text",
+         "v": " rather than a pointer to one "
+        },
+        {
+         "t": "code",
+         "v": "Fault"
+        },
+        {
+         "t": "text",
+         "v": "?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <iterator>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Fault {\n  std::string code;\n  std::int64_t at_ms = 0;\n};\n\n// A fixed-capacity ring of the most recent faults. record() overwrites the oldest once full.\nclass FaultHistory {\n public:\n  explicit FaultHistory(std::size_t capacity) : faults_(capacity) {}\n\n  void record(Fault fault) {\n    faults_[next_] = std::move(fault);\n    next_ = (next_ + 1) % faults_.size();\n    if (count_ < static_cast<std::ptrdiff_t>(faults_.size())) ++count_;\n  }\n\n  [[nodiscard]] std::ptrdiff_t size() const { return count_; }\n\n  class Iterator {\n   public:\n    using iterator_category = std::forward_iterator_tag;\n    using value_type = Fault;\n    using difference_type = std::ptrdiff_t;\n    using pointer = const Fault*;\n    using reference = const Fault&;\n\n    Iterator() = default;\n    Iterator(const std::vector<Fault>* faults, std::size_t oldest, std::ptrdiff_t index)\n        : faults_(faults), oldest_(oldest), index_(index) {}\n\n    [[nodiscard]] reference operator*() const {\n      return (*faults_)[(oldest_ + static_cast<std::size_t>(index_)) % faults_->size()];\n    }\n    [[nodiscard]] pointer operator->() const { return &**this; }\n    Iterator& operator++() {\n      ++index_;\n      return *this;\n    }\n    Iterator operator++(int) {\n      Iterator copy = *this;\n      ++*this;\n      return copy;\n    }\n    [[nodiscard]] bool operator==(const Iterator& other) const { return index_ == other.index_; }\n\n   private:\n    const std::vector<Fault>* faults_ = nullptr;\n    std::size_t oldest_ = 0;\n    std::ptrdiff_t index_ = 0;\n  };\n\n  [[nodiscard]] Iterator begin() const { return Iterator(&faults_, oldest_index(), 0); }\n  [[nodiscard]] Iterator end() const { return Iterator(&faults_, oldest_index(), count_); }\n\n private:\n  [[nodiscard]] std::size_t oldest_index() const {\n    if (count_ < static_cast<std::ptrdiff_t>(faults_.size())) return 0;\n    return next_;\n  }\n\n  std::vector<Fault> faults_;\n  std::size_t next_ = 0;\n  std::ptrdiff_t count_ = 0;\n};\n\nstatic_assert(std::forward_iterator<FaultHistory::Iterator>);\n\nint main() {\n  FaultHistory history(3);\n  history.record({.code = \"E_TIMEOUT\", .at_ms = 100});\n  history.record({.code = \"E_TIMEOUT\", .at_ms = 250});\n  history.record({.code = \"E_STALL\", .at_ms = 400});\n  history.record({.code = \"E_LOW_BATTERY\", .at_ms = 900});  // overwrites the first E_TIMEOUT\n\n  std::cout << std::format(\"history holds {} of the most recent faults:\\n\", history.size());\n  for (const Fault& fault : history) std::cout << std::format(\"  {} at {} ms\\n\", fault.code, fault.at_ms);\n\n  const auto stall = std::ranges::find_if(history, [](const Fault& fault) { return fault.code == \"E_STALL\"; });\n  std::cout << std::format(\"first E_STALL at {} ms\\n\", stall != history.end() ? stall->at_ms : -1);\n\n  const auto missing = std::ranges::find_if(history, [](const Fault& fault) { return fault.code == \"E_VOLTAGE\"; });\n  std::cout << std::format(\"E_VOLTAGE found: {}\\n\", missing != history.end());\n}"
+      },
+      {
+       "t": "output",
+       "text": "history holds 3 of the most recent faults:\n  E_TIMEOUT at 250 ms\n  E_STALL at 400 ms\n  E_LOW_BATTERY at 900 ms\nfirst E_STALL at 400 ms\nE_VOLTAGE found: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two answers. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::sort"
+        },
+        {
+         "t": "text",
+         "v": " needs a random-access iterator, so "
+        },
+        {
+         "t": "code",
+         "v": "Iterator"
+        },
+        {
+         "t": "text",
+         "v": " would need "
+        },
+        {
+         "t": "code",
+         "v": "operator+"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "operator-"
+        },
+        {
+         "t": "text",
+         "v": ", subtraction between two iterators and the four ordering comparisons, all in terms of "
+        },
+        {
+         "t": "code",
+         "v": "index_"
+        },
+        {
+         "t": "text",
+         "v": ", which is already a plain offset and makes every one of them O(1); "
+        },
+        {
+         "t": "code",
+         "v": "iterator_category"
+        },
+        {
+         "t": "text",
+         "v": " would become "
+        },
+        {
+         "t": "code",
+         "v": "std::random_access_iterator_tag"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "begin()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": " would stay exactly as written, because sorting the ring in place would also have to stop pretending the storage has no wraparound, which is a bigger change than the iterator: the physical order defines the logical one only once nothing is \"oldest\" any more. "
+        },
+        {
+         "t": "code",
+         "v": "Iterator"
+        },
+        {
+         "t": "text",
+         "v": " stores a pointer to the whole vector, not to one "
+        },
+        {
+         "t": "code",
+         "v": "Fault"
+        },
+        {
+         "t": "text",
+         "v": ", because the ring wraps: the same "
+        },
+        {
+         "t": "code",
+         "v": "Iterator"
+        },
+        {
+         "t": "text",
+         "v": " object has to compute a different physical index every time "
+        },
+        {
+         "t": "code",
+         "v": "oldest_"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "index_"
+        },
+        {
+         "t": "text",
+         "v": " changes, and it can only do that with the container's size and a reference to the whole buffer, not a fixed address of one element the way a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " iterator itself can be."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pitfalls",
+   "title": "Missing iterator traits, const iterators, invalidation",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Drop the five member types from "
+        },
+        {
+         "t": "code",
+         "v": "Iterator"
+        },
+        {
+         "t": "text",
+         "v": " and range-for keeps working, because it never looked for them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <iostream>\n#include <vector>\n\nclass RecentReadings {\n public:\n  explicit RecentReadings(std::size_t capacity) : mm_(capacity) {}\n  void push(std::int32_t mm) {\n    mm_[next_] = mm;\n    next_ = (next_ + 1) % mm_.size();\n  }\n\n  // No nested typedefs at all: this is the mistake, and range-for never notices it.\n  class Iterator {\n   public:\n    Iterator() = default;\n    Iterator(const std::vector<std::int32_t>* mm, std::ptrdiff_t index) : mm_(mm), index_(index) {}\n    [[nodiscard]] const std::int32_t& operator*() const { return (*mm_)[static_cast<std::size_t>(index_)]; }\n    Iterator& operator++() {\n      ++index_;\n      return *this;\n    }\n    [[nodiscard]] bool operator==(const Iterator& other) const { return index_ == other.index_; }\n\n   private:\n    const std::vector<std::int32_t>* mm_ = nullptr;\n    std::ptrdiff_t index_ = 0;\n  };\n\n  [[nodiscard]] Iterator begin() const { return Iterator(&mm_, 0); }\n  [[nodiscard]] Iterator end() const { return Iterator(&mm_, static_cast<std::ptrdiff_t>(mm_.size())); }\n\n private:\n  std::vector<std::int32_t> mm_;\n  std::size_t next_ = 0;\n};\n\nint main() {\n  RecentReadings readings(3);\n  readings.push(10);\n  readings.push(20);\n  std::cout << \"raw buffer:\";\n  for (const std::int32_t mm : readings) std::cout << ' ' << mm;\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "raw buffer: 10 20 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That prints, and it also prints the wrong thing, a third reading nobody pushed, because this cut-down "
+        },
+        {
+         "t": "code",
+         "v": "Iterator"
+        },
+        {
+         "t": "text",
+         "v": " walks the raw buffer instead of hiding the wraparound the way the theory step's version did; range-for's silence about missing traits is orthogonal to that bug and would be there even in a correct one. The traits themselves are what the standard's own concepts ask for, and they refuse before a single element is touched:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "std::iter_difference_t",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <iterator>\n#include <vector>\n\nclass RecentReadings {\n public:\n  explicit RecentReadings(std::size_t capacity) : mm_(capacity) {}\n  void push(std::int32_t mm) { mm_[0] = mm; }\n\n  // No nested typedefs at all: this is the mistake.\n  class Iterator {\n   public:\n    Iterator() = default;\n    Iterator(const std::vector<std::int32_t>* mm, std::ptrdiff_t index) : mm_(mm), index_(index) {}\n    [[nodiscard]] const std::int32_t& operator*() const { return (*mm_)[static_cast<std::size_t>(index_)]; }\n    Iterator& operator++() {\n      ++index_;\n      return *this;\n    }\n    Iterator operator++(int) {\n      Iterator copy = *this;\n      ++*this;\n      return copy;\n    }\n    [[nodiscard]] bool operator==(const Iterator& other) const { return index_ == other.index_; }\n\n   private:\n    const std::vector<std::int32_t>* mm_ = nullptr;\n    std::ptrdiff_t index_ = 0;\n  };\n\n  [[nodiscard]] Iterator begin() const { return Iterator(&mm_, 0); }\n  [[nodiscard]] Iterator end() const { return Iterator(&mm_, static_cast<std::ptrdiff_t>(mm_.size())); }\n\n private:\n  std::vector<std::int32_t> mm_;\n};\n\nstatic_assert(std::forward_iterator<RecentReadings::Iterator>);\n\nint main() { return 0; }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 stops at "
+        },
+        {
+         "t": "code",
+         "v": "weakly_incrementable"
+        },
+        {
+         "t": "text",
+         "v": ", the base every iterator concept builds on, and names the exact gap: "
+        },
+        {
+         "t": "code",
+         "v": "the required type 'std::iter_difference_t<_Iter>' is invalid"
+        },
+        {
+         "t": "text",
+         "v": ". Without a "
+        },
+        {
+         "t": "code",
+         "v": "difference_type"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::iterator_traits"
+        },
+        {
+         "t": "text",
+         "v": " has nothing to report, and every concept built on it, "
+        },
+        {
+         "t": "code",
+         "v": "std::forward_iterator"
+        },
+        {
+         "t": "text",
+         "v": " here, and every algorithm constrained by one, fails the same way, before it asks whether "
+        },
+        {
+         "t": "code",
+         "v": "*"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "++"
+        },
+        {
+         "t": "text",
+         "v": " even exist."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is a container whose "
+        },
+        {
+         "t": "code",
+         "v": "begin()"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": " only come as non-"
+        },
+        {
+         "t": "code",
+         "v": "const"
+        },
+        {
+         "t": "text",
+         "v": " member functions:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "compile-fail",
+       "expect": "discards qualifiers",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <vector>\n\nclass RecentReadings {\n public:\n  explicit RecentReadings(std::size_t capacity) : mm_(capacity) {}\n  void push(std::int32_t mm) { mm_[0] = mm; }\n\n  // Only a non-const begin/end: the mistake.\n  [[nodiscard]] std::int32_t* begin() { return mm_.data(); }\n  [[nodiscard]] std::int32_t* end() { return mm_.data() + mm_.size(); }\n\n private:\n  std::vector<std::int32_t> mm_;\n};\n\nstd::int32_t sum(const RecentReadings& readings) {\n  std::int32_t total = 0;\n  for (const std::int32_t mm : readings) total += mm;  // readings is const: no begin() to call\n  return total;\n}\n\nint main() {\n  RecentReadings readings(2);\n  return sum(readings);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "GCC 13 says "
+        },
+        {
+         "t": "code",
+         "v": "passing 'const RecentReadings' as 'this' argument discards qualifiers"
+        },
+        {
+         "t": "text",
+         "v": ", on the line the range-for loop expands to. The cold check's "
+        },
+        {
+         "t": "code",
+         "v": "FixedRoute"
+        },
+        {
+         "t": "text",
+         "v": " avoided this by writing both overloads; a container with only one pair of "
+        },
+        {
+         "t": "code",
+         "v": "begin()"
+        },
+        {
+         "t": "text",
+         "v": "/"
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": " works everywhere until the day a caller holds it by "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": ", which library code, taking parameters by "
+        },
+        {
+         "t": "code",
+         "v": "const&"
+        },
+        {
+         "t": "text",
+         "v": " on principle, does constantly."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third failure is the one the invalidation topic already gave you the rules for, and writing your own iterator does not exempt you from them. A container that hands back a standard container's own iterator, rather than a hand-written one, invalidates on exactly the same operations:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <vector>\n\n// A custom collection that forwards std::vector's own iterators rather than writing new ones.\nclass ReadingLog {\n public:\n  using iterator = std::vector<std::int32_t>::const_iterator;\n  void record(std::int32_t mm) { mm_.push_back(mm); }\n  [[nodiscard]] iterator begin() const { return mm_.begin(); }\n  [[nodiscard]] iterator end() const { return mm_.end(); }\n\n private:\n  std::vector<std::int32_t> mm_;\n};\n\nint main() {\n  ReadingLog log;\n  log.record(10);\n  const auto first = log.begin();  // an iterator into a one-element vector, capacity 1\n  log.record(20);                  // grows past capacity: reallocates\n  std::cout << std::format(\"first logged reading: {}\\n\", *first);  // reads freed memory\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "ReadingLog"
+        },
+        {
+         "t": "text",
+         "v": " never writes a single line of iterator code, and it inherits "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": "'s exact invalidation rules along with its iterator, the same table the invalidation topic already gave you for "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": ". A hand-written iterator like "
+        },
+        {
+         "t": "code",
+         "v": "RecentReadings::Iterator"
+        },
+        {
+         "t": "text",
+         "v": " is no safer by default: it holds a pointer to the container's buffer, so the same reallocation would leave it pointing at freed memory too. The fix is the one that topic already reached for, "
+        },
+        {
+         "t": "code",
+         "v": "reserve"
+        },
+        {
+         "t": "text",
+         "v": " when the final size is known or an index instead of an iterator when it isn't, and the same two tools, AddressSanitizer and libstdc++'s debug mode, still find it."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the four operations a range-for loop needs and say why it never checks "
+        },
+        {
+         "t": "code",
+         "v": "std::iterator_traits"
+        },
+        {
+         "t": "text",
+         "v": ". List the iterator categories from weakest to strongest, one example type for each, and which one "
+        },
+        {
+         "t": "code",
+         "v": "std::find_if"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::sort"
+        },
+        {
+         "t": "text",
+         "v": " each ask for. Say what happens when the five member types are missing, and which concept catches it first. Give the const-correctness rule for "
+        },
+        {
+         "t": "code",
+         "v": "begin()"
+        },
+        {
+         "t": "text",
+         "v": "/"
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": " and the message GCC gives when it is broken. Finish with the reason writing your own iterator does not exempt a container from the invalidation rules of the storage behind it."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What four operations does a range-for loop need from an iterator, and where does it get them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the five iterator categories in order, from weakest to strongest, and one example type for each."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which category does "
+     },
+     {
+      "t": "code",
+      "v": "std::find_if"
+     },
+     {
+      "t": "text",
+      "v": " need, which does "
+     },
+     {
+      "t": "code",
+      "v": "std::sort"
+     },
+     {
+      "t": "text",
+      "v": " need, and what happens when you give "
+     },
+     {
+      "t": "code",
+      "v": "std::sort"
+     },
+     {
+      "t": "text",
+      "v": " less?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the five member types "
+     },
+     {
+      "t": "code",
+      "v": "std::iterator_traits"
+     },
+     {
+      "t": "text",
+      "v": " looks for, and what happened when "
+     },
+     {
+      "t": "code",
+      "v": "Iterator"
+     },
+     {
+      "t": "text",
+      "v": " didn't declare them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why did range-for keep working on an iterator with no traits at all, while "
+     },
+     {
+      "t": "code",
+      "v": "static_assert(std::forward_iterator<Iterator>)"
+     },
+     {
+      "t": "text",
+      "v": " on the same type did not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What must be true of "
+     },
+     {
+      "t": "code",
+      "v": "begin()"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "end()"
+     },
+     {
+      "t": "text",
+      "v": " for a range-for loop over a "
+     },
+     {
+      "t": "code",
+      "v": "const"
+     },
+     {
+      "t": "text",
+      "v": " reference to compile?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does forwarding "
+     },
+     {
+      "t": "code",
+      "v": "std::vector"
+     },
+     {
+      "t": "text",
+      "v": "'s own iterator not protect a custom collection from "
+     },
+     {
+      "t": "code",
+      "v": "push_back"
+     },
+     {
+      "t": "text",
+      "v": " invalidating it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: a fixed-capacity ring with a forward iterator that hides its wraparound, usable in both range-for and "
+     },
+     {
+      "t": "code",
+      "v": "std::find_if"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Gamma, Helm, Johnson and Vlissides, Design Patterns, Addison-Wesley 1994: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "behavioural chapter",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+     },
+     {
+      "t": "text",
+      "v": ", where Iterator is defined as access to a collection's elements without exposing how they are stored."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Nicolai Josuttis, Back to Basics: Iterators, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B_Iterators.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=26aW6aBVpk0"
+     },
+     {
+      "t": "text",
+      "v": ". Iterators as the glue between containers and algorithms, and what each category promises."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Design Patterns, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_design_patterns/back_to_basics_design_patterns__michael_shah__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=2UUqX2eIdSM"
+     },
+     {
+      "t": "text",
+      "v": ". Iterator worked through in C++, as the talk's behavioural example."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "range-based for loop",
+      "href": "https://en.cppreference.com/cpp/language/range-for"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "iterator library",
+      "href": "https://en.cppreference.com/cpp/iterator"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "iterator_traits",
+      "href": "https://en.cppreference.com/cpp/iterator/iterator_traits"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::distance",
+      "href": "https://en.cppreference.com/cpp/iterator/distance"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "SL.con.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rsl-arrays"
+     },
+     {
+      "t": "text",
+      "v": " on choosing a container, and "
+     },
+     {
+      "t": "a",
+      "v": "ES.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-lib"
+     },
+     {
+      "t": "text",
+      "v": " on preferring the standard library's algorithms over a hand-written loop."
+     }
+    ]
+   ]
+  }
+ ]
+}

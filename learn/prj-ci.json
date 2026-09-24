@@ -1,0 +1,785 @@
+{
+ "id": "prj-ci",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage makes the bench check itself. The skeleton topic gave it a workflow that builds and runs the unit tests in "
+    },
+    {
+     "t": "code",
+     "v": "ros:jazzy-ros-base"
+    },
+    {
+     "t": "text",
+     "v": ", which is the fast layer and takes a couple of minutes. What it has never done is run a scenario, because that image carries no Gazebo, so every claim about the robot has rested on somebody running a command on their own laptop."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is building an image for scenario runs and pinning it by digest rather than by tag. The reproducibility topic was blunt that two runs are comparable when they come from the same image and only approximately otherwise, and that a tag moves while a digest does not. So there is a second workflow that builds the image and prints its digest, the digest is pasted into the scenario job by hand, and the run records it in its report. Updating it is then a commit somebody reviewed rather than something that happened overnight."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: every push builds the bench and runs its tests, and on a green build a second job runs one headless scenario in the pinned image and keeps its report as an artefact."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "ci",
+   "title": "CI workflow with build, tests and a headless scenario",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, the fast layer of CI is trustworthy: you know what it catches, what it does not, how long it takes, and you have seen it go red for a real break rather than for flakiness."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What exists is the workflow from the skeleton topic: on every push and pull request, "
+        },
+        {
+         "t": "code",
+         "v": "ubuntu-24.04"
+        },
+        {
+         "t": "text",
+         "v": " with the container "
+        },
+        {
+         "t": "code",
+         "v": "ros:jazzy-ros-base"
+        },
+        {
+         "t": "text",
+         "v": ", then checkout, "
+        },
+        {
+         "t": "code",
+         "v": "rosdep install"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": ". That covers the "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " unit tests, the supervisor's fake-input cases, "
+        },
+        {
+         "t": "code",
+         "v": "StopsWithinTheOdometryTimeout"
+        },
+        {
+         "t": "text",
+         "v": ", the relay's drop cases and the regression logic, all without a simulator. It is the layer worth running on every save, and the regression topic measured why: it goes red in seconds for a supervisor whose timeout was raised, where the scenario suite takes minutes to say the same thing."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "What it does not cover is everything about the robot. No world starts, no scenario runs, no verdict is written, and the checks the last six topics were about are never exercised. That is not a small gap and it is worth naming out loud before closing it, because a green tick on a pull request reads as \"the bench works\" whatever it actually ran."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Read the workflow you have and write down, in "
+         },
+         {
+          "t": "code",
+          "v": "docs/upstream-rosbag2.md"
+         },
+         {
+          "t": "text",
+          "v": "'s sibling for your own repository, three facts about it: what it runs, how long a run takes from the Actions tab, and what it would miss. The third is the list from the paragraph above."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Make the build reproducible enough to trust. The temptation is to cache "
+         },
+         {
+          "t": "code",
+          "v": "build/"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "install/"
+         },
+         {
+          "t": "text",
+          "v": " between runs, and it is the wrong first move: colcon's incremental build depends on timestamps and on the install layout, and a stale cache produces a green run that proves nothing. The dependency install is the slow part worth attacking, and Build 2 attacks it properly by baking those packages into an image. Until then, leave the workflow simple and slow."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add three things the current one lacks:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "      - name: Build and test\n        shell: bash\n        run: ./check.sh\n      - name: Keep the test results\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: test-results\n          path: build/*/test_results/\n          if-no-files-found: warn"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "if: always()"
+        },
+        {
+         "t": "text",
+         "v": " is the part that matters: without it the upload is skipped exactly when the run failed, which is the only time anybody wants the files. Then give the job a "
+        },
+        {
+         "t": "code",
+         "v": "timeout-minutes"
+        },
+        {
+         "t": "text",
+         "v": " a little above the measured time, so a hung job stops in minutes rather than in six hours of runner time. It is a job key, not a workflow one: a workflow with several jobs gives each its own, which is what lets the scenario job below have twenty minutes while this one has five."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Prove it goes red for a real break and green again. On a branch, change one expected value in a "
+         },
+         {
+          "t": "code",
+          "v": "bench_core"
+         },
+         {
+          "t": "text",
+          "v": " test, push, open a pull request, watch the check fail and read the log to find the assertion. Then undo it and watch it pass. That is the same discipline the skeleton topic asked for, repeated now that there is more to break."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Turn the check into a rule. In the repository's branch protection settings, require the build-and-test check to pass before merging into "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": ". A check that can be ignored is a report, not a gate, and a report that nobody reads is a slow test suite."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the fast layer runs on every push, its wall time is written down, it keeps its test results as an artefact on failure, it is required for merging, and you have seen it red and green on a pull request of your own."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, a second job runs one headless scenario in an image you built and pinned, and the report it produces is downloadable from the run."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is the gap the reproducibility topic named: the bench pins an image for the build and has none for scenario runs, so a comparison between your machine and CI has no other side to compare against. "
+        },
+        {
+         "t": "code",
+         "v": "ros:jazzy-ros-base"
+        },
+        {
+         "t": "text",
+         "v": " carries no Gazebo, so the scenario job needs an image that does, and the reason to build one rather than use a general desktop image is the same reason the reproducibility topic gave for recording a digest: the thing you are pinning is the compiler, the maths library, the physics engine and the robot's model all at once."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "docker/sim.Dockerfile"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "FROM ros:jazzy-ros-base\n\nRUN apt-get update && apt-get install -y --no-install-recommends \\\n      ros-jazzy-ros-gz \\\n      ros-jazzy-nav2-minimal-tb3-sim \\\n      ros-jazzy-robot-state-publisher \\\n      ros-jazzy-xacro \\\n      ros-jazzy-rmw-fastrtps-cpp \\\n && rm -rf /var/lib/apt/lists/*\n\nRUN dpkg-query -W -f='${Package} ${Version}\\n' > /image-packages.txt"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last line is the image's own manifest, and it costs nothing. When a scenario behaves differently in two images, the first question is which package versions differ, and having the answer inside the image saves an afternoon of guessing. Pinning every apt version in the Dockerfile is the other way to do it, and it is brittle: the archive drops old versions and the build starts failing for reasons that have nothing to do with you. The practical pin is the image digest, with the manifest inside it for when you need the detail."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Build and publish it from its own workflow, "
+         },
+         {
+          "t": "code",
+          "v": ".github/workflows/sim-image.yml"
+         },
+         {
+          "t": "text",
+          "v": ", which runs when the Dockerfile changes or when you ask for it:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "name: sim-image\non:\n  push:\n    paths: ['docker/sim.Dockerfile']\n  workflow_dispatch:\n\njobs:\n  build:\n    runs-on: ubuntu-24.04\n    permissions:\n      contents: read\n      packages: write\n    steps:\n      - uses: actions/checkout@v4\n      - uses: docker/login-action@v3\n        with:\n          registry: ghcr.io\n          username: ${{ github.actor }}\n          password: ${{ secrets.GITHUB_TOKEN }}\n      - id: push\n        uses: docker/build-push-action@v6\n        with:\n          context: .\n          file: docker/sim.Dockerfile\n          push: true\n          tags: ghcr.io/${{ github.repository_owner }}/bench-sim:latest\n      - run: echo \"digest is ${{ steps.push.outputs.digest }}\""
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Paste the digest into the scenario job by hand. That manual step is the design, not a shortcut around one: a workflow that follows "
+         },
+         {
+          "t": "code",
+          "v": ":latest"
+         },
+         {
+          "t": "text",
+          "v": " picks up a new physics engine on a Tuesday morning and every comparison with last week's numbers quietly stops meaning anything. Add the job to "
+         },
+         {
+          "t": "code",
+          "v": "ci.yml"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "  scenario:\n    runs-on: ubuntu-24.04\n    needs: build-and-test\n    timeout-minutes: 20\n    permissions:\n      contents: read\n      packages: read\n    container:\n      image: ghcr.io/<you>/bench-sim@sha256:<the digest from step 2>\n      credentials:\n        username: ${{ github.actor }}\n        password: ${{ secrets.GITHUB_TOKEN }}\n    steps:\n      - uses: actions/checkout@v4\n      - name: Install dependencies\n        shell: bash\n        run: |\n          apt-get update -qq\n          rosdep update\n          rosdep install --from-paths src --ignore-src -y\n      - name: Build\n        shell: bash\n        run: ./check.sh\n      - name: Run one scenario\n        shell: bash\n        env:\n          BENCH_IMAGE_DIGEST: sha256:<the same digest>\n          LIBGL_ALWAYS_SOFTWARE: '1'\n        run: ./run_scenario.sh smoke\n      - name: Keep the report\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: smoke-report\n          path: results/"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four things in it are deliberate. "
+        },
+        {
+         "t": "code",
+         "v": "needs: build-and-test"
+        },
+        {
+         "t": "text",
+         "v": " keeps the slow job from starting when the fast one has already answered, which is most of the value of having two layers. The "
+        },
+        {
+         "t": "code",
+         "v": "credentials"
+        },
+        {
+         "t": "text",
+         "v": " block and "
+        },
+        {
+         "t": "code",
+         "v": "packages: read"
+        },
+        {
+         "t": "text",
+         "v": " are there because a package pushed to the registry is private until somebody says otherwise, and a job that pulls a private image without credentials fails with "
+        },
+        {
+         "t": "code",
+         "v": "manifest unknown"
+        },
+        {
+         "t": "text",
+         "v": ", which reads like a wrong digest and is not. Making the package public once in its registry settings is the other way, and then the two lines come out again; choose one and write down which, because the next person to see that error will look at the digest first. "
+        },
+        {
+         "t": "code",
+         "v": "BENCH_IMAGE_DIGEST"
+        },
+        {
+         "t": "text",
+         "v": " is the variable the report topic left empty, so the digest now appears in the report instead of in its list of what was not recorded. And "
+        },
+        {
+         "t": "code",
+         "v": "smoke"
+        },
+        {
+         "t": "text",
+         "v": " is the scenario to start with, because it is the shortest and it proves the whole path: a world, a robot, a supervisor, a runner and a verdict."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Expect rendering to be the first thing that fails, and find out rather than guess. The robot carries a lidar, and a sensor that renders needs a graphics stack that a runner with no display may not provide. "
+         },
+         {
+          "t": "code",
+          "v": "LIBGL_ALWAYS_SOFTWARE=1"
+         },
+         {
+          "t": "text",
+          "v": " is the first thing to try, as it was under WSL in the robot-world topic. Read the Gazebo lines in the job's log: if the sensors system did not start, say so in the notes, and write down beside it that the smoke scenario's checks read odometry rather than the scan, so a run can still be valid while a sensor is missing. A scenario that needs the scan cannot, and that is a limit to write down rather than discover later."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Measure what the job costs and what it says. Write down the wall time of the scenario job, and open the report artefact from a green run. Two numbers in it matter more than the verdict: the real-time factor, which on a shared runner with software rendering will be well under what your laptop gives, and the time-based checks' measured values. If the time from the first movement to the last goal is close to its limit in CI while it has half the limit to spare at home, the tolerance was measured on the wrong machine, and the repeat-measure topic's answer applies: take the limit from the slowest machine you intend to run on, and record both numbers."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Decide what runs where, now that both numbers exist. The fast layer runs on every push and gates merging. One scenario runs on every push. The full regression suite and the ten-run repeats are too slow for that, and they belong on a schedule with the report kept as an artefact:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "yaml",
+       "tag": "",
+       "expect": "",
+       "text": "on:\n  push:\n  schedule:\n    - cron: '0 3 * * *'"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down which of the three you chose for each, with the measured time beside it. That table is the answer to the interview question about how you keep a test suite useful as it grows."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 7,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once both jobs are green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "the scenario job runs "
+         },
+         {
+          "t": "code",
+          "v": "./run_scenario.sh smoke"
+         },
+         {
+          "t": "text",
+          "v": " in the pinned image on every push, after the fast layer passes;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the report artefact carries the image digest, and its \"Not recorded\" section has one fewer line than before;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the wall time of both jobs is written down, with the real-time factor CI achieved;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a broken supervisor turns the fast layer red in under two minutes, and you have watched it."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a \"CI\" section to "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ", and update the sentence in your notes that said the bench had no image for scenario runs. It is the proof for this topic, and the two places have to agree from now on."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the three layers with what each runs and how long it takes: the unit tests on every push, one scenario on every push in the pinned image, and the regression suite on a schedule. Then the image: where its Dockerfile lives, what is in it, how to rebuild it, and the digest in use, with the sentence about why it is a digest and not a tag."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then two honest limits. What the scenario job does not cover, which is every scenario but one, and what rendering does on a runner with no display, with what you measured. Finish with the CI real-time factor next to your laptop's, and the tolerance that would have to move if CI is the slowest machine the bench has to pass on."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The GitHub Actions documentation on "
+     },
+     {
+      "t": "a",
+      "v": "running jobs in a container",
+      "href": "https://docs.github.com/en/actions/using-jobs/running-jobs-in-a-container"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "job dependencies with needs",
+      "href": "https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "scheduled workflows",
+      "href": "https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "protected branches",
+      "href": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The actions this workflow uses: "
+     },
+     {
+      "t": "a",
+      "v": "checkout",
+      "href": "https://github.com/actions/checkout"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "upload-artifact",
+      "href": "https://github.com/actions/upload-artifact"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "login-action",
+      "href": "https://github.com/docker/login-action"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "build-push-action",
+      "href": "https://github.com/docker/build-push-action"
+     },
+     {
+      "t": "text",
+      "v": ", whose "
+     },
+     {
+      "t": "code",
+      "v": "digest"
+     },
+     {
+      "t": "text",
+      "v": " output is what gets pinned."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "ros docker images",
+      "href": "https://hub.docker.com/_/ros"
+     },
+     {
+      "t": "text",
+      "v": " and the "
+     },
+     {
+      "t": "a",
+      "v": "osrf/docker_images repository",
+      "href": "https://github.com/osrf/docker_images"
+     },
+     {
+      "t": "text",
+      "v": ", for what "
+     },
+     {
+      "t": "code",
+      "v": "jazzy-ros-base"
+     },
+     {
+      "t": "text",
+      "v": " does and does not contain."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "building from source",
+      "href": "https://docs.ros.org/en/jazzy/Installation/Alternatives/Ubuntu-Development-Setup.html"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "rosdep",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Rosdep.html"
+     },
+     {
+      "t": "text",
+      "v": ", which is what the job runs before it builds."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo Harmonic's documentation on "
+     },
+     {
+      "t": "a",
+      "v": "headless rendering and sensors",
+      "href": "https://gazebosim.org/api/sim/8/headless_rendering.html"
+     },
+     {
+      "t": "text",
+      "v": ", for the part of a run that needs a graphics stack."
+     }
+    ]
+   ]
+  }
+ ]
+}

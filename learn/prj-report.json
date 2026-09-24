@@ -1,0 +1,921 @@
+{
+ "id": "prj-report",
+ "check": null,
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "This stage makes every run produce something another engineer can act on. Until now a run left two files: a verdict, which says pass or fail and lists the checks, and a small environment file with the commit and a few versions. Neither of them says what was asked for, and nothing ties them together, so a failure sent to a colleague arrived as a paste with no context around it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The decision worth defending is that the report names what it could not record. The reproducibility topic listed the facts two runs need before they can be compared, and the bench has only some of them: there is no container image yet, and no seed is passed to Gazebo. A report that quietly left those out would read as complete. So the list lives in "
+    },
+    {
+     "t": "code",
+     "v": "bench_core"
+    },
+    {
+     "t": "text",
+     "v": ", every report prints a section naming what is absent, and the gap stays visible in each run until somebody closes it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What we can now show: one Markdown file per run carrying its inputs, its environment, its timing on both clocks and its verdict, with the missing facts named at the bottom of every one."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "report",
+   "title": "Run report with inputs, versions and results",
+   "steps": [
+    {
+     "kind": "build",
+     "heading": "Build 1",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, "
+        },
+        {
+         "t": "code",
+         "v": "bench_core"
+        },
+        {
+         "t": "text",
+         "v": " can turn a verdict and a list of facts into a report, with GoogleTest tests you wrote first and saw fail, and a "
+        },
+        {
+         "t": "code",
+         "v": "run_report"
+        },
+        {
+         "t": "text",
+         "v": " tool that does it from the command line."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The reader of this file is a colleague who was not there, or you in three months, which is the same person. They arrive with a link and no context, and they need three questions answered before they can do anything: what was run, where it ran, and what happened. The verdict answers the third. The environment file answers a third of the second. Nothing at all answers the first, which is why a failing run currently has to be explained in a message rather than read."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "There is a fourth question, and it is the one that separates a report from a dump. What about this run cannot be compared with another? The reproducibility topic was blunt about it: two runs are comparable when they come from the same container image and only approximately otherwise, and the bench has no image for scenario runs yet. A report that lists what it has and stops implies that what it has is enough. This one carries the checklist and prints what is missing from it, so the absence is on the page rather than in somebody's memory."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write the tests first, in "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/test/report_test.cpp"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "#include <gtest/gtest.h>\n\n#include \"bench/report.hpp\"\n\nTEST(MissingFacts, CountsAFactWithAnEmptyValueAsAbsent) {\n  const bench::RunRecord record{.case_name = \"normal\",\n                                .environment = {{.name = \"commit\", .value = \"6d7552c\"},\n                                                {.name = \"image digest\", .value = \"\"}}};\n  const std::vector<std::string> missing = bench::missing_facts(record);\n  EXPECT_NE(std::ranges::find(missing, \"image digest\"), missing.end());\n  EXPECT_EQ(std::ranges::find(missing, \"commit\"), missing.end());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add one case each for: a fact found in any of the three groups counts as present; a report whose verdict is empty says so in its title rather than crashing; the verdict's text appears in the report unchanged; and a record with every required fact prints no section about what is absent. Add "
+        },
+        {
+         "t": "code",
+         "v": "report"
+        },
+        {
+         "t": "text",
+         "v": " to the test list in "
+        },
+        {
+         "t": "code",
+         "v": "src/bench_core/CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": ", and run "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " to watch it fail to compile."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Write "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/include/bench/report.hpp"
+         },
+         {
+          "t": "text",
+          "v": ", with the definitions in "
+         },
+         {
+          "t": "code",
+          "v": "src/report.cpp"
+         },
+         {
+          "t": "text",
+          "v": ". Here it is as one program, with a made-up run:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <array>\n#include <format>\n#include <iostream>\n#include <ranges>\n#include <span>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nnamespace bench {\n\n// bench/report.hpp: one run turned into something another engineer can act on.\n\n// One fact about the run: a name and whatever the shell managed to find out.\nstruct Fact {\n  std::string name;\n  std::string value;\n};\n\n// Everything the report holds besides the verdict itself.\nstruct RunRecord {\n  std::string case_name;\n  std::vector<Fact> inputs;       // what was asked for: scenario, arguments, parameters, seed\n  std::vector<Fact> environment;  // where it ran: commit, image, versions, middleware\n  std::vector<Fact> timing;       // how long it took, on both clocks\n};\n\n// The facts a run has to record before two runs can be compared. The reproducibility topic named\n// them; keeping the list here means a report cannot quietly leave one out.\n[[nodiscard]] std::vector<std::string> missing_facts(const RunRecord& record) {\n  constexpr std::array<std::string_view, 6> required{\"commit\",       \"image digest\", \"gazebo\",\n                                                     \"rmw\",          \"seed\",         \"real-time factor\"};\n  std::vector<std::string> missing;\n  for (const std::string_view name : required) {\n    const auto present = [name](const Fact& fact) { return fact.name == name && !fact.value.empty(); };\n    if (!std::ranges::any_of(record.inputs, present) && !std::ranges::any_of(record.environment, present) &&\n        !std::ranges::any_of(record.timing, present)) {\n      missing.emplace_back(name);\n    }\n  }\n  return missing;\n}\n\nnamespace {\n\n[[nodiscard]] std::string table(std::string_view title, std::span<const Fact> facts) {\n  std::string text = std::format(\"\\n## {}\\n\\n| | |\\n|---|---|\\n\", title);\n  for (const Fact& fact : facts) {\n    text += std::format(\"| {} | {} |\\n\", fact.name, fact.value.empty() ? \"not recorded\" : fact.value);\n  }\n  return text;\n}\n\n[[nodiscard]] std::string_view first_line(std::string_view text) {\n  const auto end = text.find('\\n');\n  return end == std::string_view::npos ? text : text.substr(0, end);\n}\n\n}  // namespace\n\n// The report, as Markdown, for a person who was not there when the run happened.\n[[nodiscard]] std::string report(const RunRecord& record, std::string_view verdict) {\n  const std::string_view outcome = first_line(verdict);\n  std::string text = std::format(\"# {}: {}\\n\", record.case_name, outcome.empty() ? \"no verdict\" : outcome);\n  text += table(\"Inputs\", record.inputs);\n  text += table(\"Environment\", record.environment);\n  text += table(\"Timing\", record.timing);\n  text += \"\\n## Result\\n\\n\";  // indented, so the verdict needs no fence inside a Markdown file\n  for (const auto part : std::views::split(verdict, '\\n')) {\n    const std::string_view verdict_line(part.begin(), part.end());\n    if (!verdict_line.empty()) text += std::format(\"    {}\\n\", verdict_line);\n  }\n\n  const std::vector<std::string> missing = missing_facts(record);\n  if (!missing.empty()) {\n    text += \"\\n## Not recorded\\n\\n\";\n    for (const std::string& name : missing) text += std::format(\"- {}\\n\", name);\n    text += \"\\nA run missing any of these can be read, and cannot be compared with another.\\n\";\n  }\n  return text;\n}\n\n}  // namespace bench\n\nint main() {\n  const bench::RunRecord record{\n      .case_name = \"normal_no_relay\",\n      .inputs = {{.name = \"scenario\", .value = \"normal\"},\n                 {.name = \"launch arguments\", .value = \"relay:=False\"},\n                 {.name = \"parameter file\", .value = \"config/normal.yaml, sha256 9f2c1a…\"},\n                 {.name = \"seed\", .value = \"\"}},\n      .environment = {{.name = \"commit\", .value = \"6d7552c\"},\n                      {.name = \"image digest\", .value = \"\"},\n                      {.name = \"os\", .value = \"Ubuntu 24.04\"},\n                      {.name = \"gazebo\", .value = \"Gazebo Sim 8.9.0\"},\n                      {.name = \"rmw\", .value = \"rmw_fastrtps_cpp\"}},\n      .timing = {{.name = \"wall seconds\", .value = \"46.2\"},\n                 {.name = \"simulated seconds\", .value = \"29.0\"},\n                 {.name = \"real-time factor\", .value = \"0.94\"}}};\n\n  constexpr std::string_view verdict =\n      \"fail\\nscenario: normal\\nsamples: 790\\n\"\n      \"failed goals reached in order: 0.00, at least 2.00\\n\"\n      \"ok     top speed: 0.00 m/s, at most 0.30 m/s\\n\";\n\n  std::cout << bench::report(record, verdict);\n}"
+      },
+      {
+       "t": "output",
+       "text": "# normal_no_relay: fail\n\n## Inputs\n\n| | |\n|---|---|\n| scenario | normal |\n| launch arguments | relay:=False |\n| parameter file | config/normal.yaml, sha256 9f2c1a… |\n| seed | not recorded |\n\n## Environment\n\n| | |\n|---|---|\n| commit | 6d7552c |\n| image digest | not recorded |\n| os | Ubuntu 24.04 |\n| gazebo | Gazebo Sim 8.9.0 |\n| rmw | rmw_fastrtps_cpp |\n\n## Timing\n\n| | |\n|---|---|\n| wall seconds | 46.2 |\n| simulated seconds | 29.0 |\n| real-time factor | 0.94 |\n\n## Result\n\n    fail\n    scenario: normal\n    samples: 790\n    failed goals reached in order: 0.00, at least 2.00\n    ok     top speed: 0.00 m/s, at most 0.30 m/s\n\n## Not recorded\n\n- image digest\n- seed\n\nA run missing any of these can be read, and cannot be compared with another."
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Read the bottom of it first. Two facts are missing, and the report says which, so nobody reading this run has to work out whether it can be held against yesterday's. The image digest is missing because the bench has no image for scenario runs, which the CI topic builds. The seed is missing because nothing passes one to Gazebo yet, which is the next session's work. Neither is a surprise, and that is the point: a surprise is what you get when a report leaves a field out instead of printing it empty."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Three details are worth stating. "
+         },
+         {
+          "t": "code",
+          "v": "missing_facts"
+         },
+         {
+          "t": "text",
+          "v": " searches all three groups for a name, so moving a fact from one table to another cannot silently turn it into a missing one. A fact whose value is an empty string counts as absent rather than as present and blank, which is what the shell produces when a command it ran found nothing. And the verdict goes into the report verbatim, indented by four spaces rather than reformatted: the runner already decided how that text reads, and two formats for one fact is how they start disagreeing. The indent is there instead of a fence because a report is Markdown that other Markdown quotes, and a fence inside a fence ends the outer one early."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Add the tool, "
+         },
+         {
+          "t": "code",
+          "v": "src/bench_core/app/run_report.cpp"
+         },
+         {
+          "t": "text",
+          "v": ", which reads a facts file and a verdict file and writes the Markdown to standard output. The facts file has a section header in square brackets and then "
+         },
+         {
+          "t": "code",
+          "v": "name: value"
+         },
+         {
+          "t": "text",
+          "v": " lines, so the parse is nine lines:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// One line of the facts file: [inputs], [environment], [timing], or \"name: value\" under one.\nstd::vector<bench::Fact>* group = &record.inputs;\nfor (std::string line; std::getline(in, line);) {\n  if (line == \"[inputs]\") group = &record.inputs;\n  else if (line == \"[environment]\") group = &record.environment;\n  else if (line == \"[timing]\") group = &record.timing;\n  else if (const auto colon = line.find(\": \"); colon != std::string::npos) {\n    group->push_back({.name = line.substr(0, colon), .value = line.substr(colon + 2)});\n  }\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A line the parser does not recognise is skipped rather than refused, because this file is written by a shell script and a blank line or a comment in it is not a reason to lose the run. Add it to "
+        },
+        {
+         "t": "code",
+         "v": "CMakeLists.txt"
+        },
+        {
+         "t": "text",
+         "v": " beside "
+        },
+        {
+         "t": "code",
+         "v": "compare_runs"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "check_verdict"
+        },
+        {
+         "t": "text",
+         "v": ", run "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": ", and commit."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when the report tests pass in "
+        },
+        {
+         "t": "code",
+         "v": "./check.sh"
+        },
+        {
+         "t": "text",
+         "v": " and in CI, you saw them fail before the header existed, and "
+        },
+        {
+         "t": "code",
+         "v": "run_report"
+        },
+        {
+         "t": "text",
+         "v": " turns a facts file and a verdict file into the Markdown above."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "build",
+     "heading": "Build 2",
+     "minutes": 75,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "By the end of this session, every scenario run writes a report of its own, and you have read one the way a stranger would."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Change what "
+         },
+         {
+          "t": "code",
+          "v": "run_scenario.sh"
+         },
+         {
+          "t": "text",
+          "v": " records. It writes "
+         },
+         {
+          "t": "code",
+          "v": "results/<name>.env"
+         },
+         {
+          "t": "text",
+          "v": " today from four commands; that file becomes the facts file, with the sections and every fact the report asks for:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "facts=\"results/$name.facts\"\n{ echo \"[inputs]\"\n  echo \"scenario: $name\"\n  echo \"launch arguments: ${*:2}\"\n  echo \"parameter file: $(sha256sum \"install/bench_sim/share/bench_sim/config/$name.yaml\" | cut -c1-16)\"\n  echo \"seed: ${BENCH_SEED:-}\"\n  echo \"[environment]\"\n  echo \"commit: $(git rev-parse --short HEAD)\"\n  echo \"working tree: $(git status --porcelain | wc -l) files modified\"\n  echo \"image digest: ${BENCH_IMAGE_DIGEST:-}\"\n  echo \"os: $(lsb_release -ds)\"\n  echo \"gazebo: $(gz sim --version | head -1)\"\n  echo \"tb3 sim: $(dpkg-query -W ros-jazzy-nav2-minimal-tb3-sim)\"\n  echo \"rmw: ${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp default}\"\n  echo \"domain id: ${ROS_DOMAIN_ID:-0}\"; } > \"$facts\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two of those deserve their line. The working tree count turns \"it worked on my machine\" into a number: a report from a commit with eleven modified files is not a report about that commit. And the two empty variables, "
+        },
+        {
+         "t": "code",
+         "v": "BENCH_SEED"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "BENCH_IMAGE_DIGEST"
+        },
+        {
+         "t": "text",
+         "v": ", are there so that the day something sets them the report starts carrying them without another change; until then "
+        },
+        {
+         "t": "code",
+         "v": "missing_facts"
+        },
+        {
+         "t": "text",
+         "v": " prints them at the bottom."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 2,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Record the timing, which takes both clocks and two writers. Only the runner sees the simulation clock, so it appends what it knows to the facts file and the shell adds the rest afterwards. Give "
+         },
+         {
+          "t": "code",
+          "v": "ScenarioRunner"
+         },
+         {
+          "t": "text",
+          "v": " a "
+         },
+         {
+          "t": "code",
+          "v": "facts_file"
+         },
+         {
+          "t": "text",
+          "v": " parameter and one more thing to do in "
+         },
+         {
+          "t": "code",
+          "v": "finish()"
+         },
+         {
+          "t": "text",
+          "v": ":"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "// In finish(), after the verdict is written. Only this node sees the simulation clock, so it\n// records the run's simulated length and the shell divides by its own measurement.\nif (!facts_file_.empty() && elapsed) {\n  std::ofstream facts(facts_file_, std::ios::app);\n  facts << std::format(\"[timing]\\nsimulated seconds: {:.2f}\\n\",\n                       std::chrono::duration<double>(*elapsed).count());\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every scenario gets that line, and that is the reason for doing it here rather than in the shell. The simulated length appears in a verdict only for "
+        },
+        {
+         "t": "code",
+         "v": "smoke"
+        },
+        {
+         "t": "text",
+         "v": ", as the first check of "
+        },
+        {
+         "t": "code",
+         "v": "smoke_checks"
+        },
+        {
+         "t": "text",
+         "v": "; "
+        },
+        {
+         "t": "code",
+         "v": "normal_checks"
+        },
+        {
+         "t": "text",
+         "v": " has nothing like it, so a shell that scraped the verdict would find a number for one scenario in four and write a real-time factor of zero for the other three."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The parameter has to reach the node, which takes two lines in "
+        },
+        {
+         "t": "code",
+         "v": "scenario.launch.py"
+        },
+        {
+         "t": "text",
+         "v": " beside the two that carry "
+        },
+        {
+         "t": "code",
+         "v": "verdict_file"
+        },
+        {
+         "t": "text",
+         "v": ":"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "python",
+       "tag": "",
+       "expect": "",
+       "text": "        DeclareLaunchArgument('facts_file', default_value=''),\n        # and in the runner's parameter dict, next to 'verdict_file':\n        #     'facts_file': LaunchConfiguration('facts_file'),"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Leave either of them out and nothing complains. "
+        },
+        {
+         "t": "code",
+         "v": "ros2 launch"
+        },
+        {
+         "t": "text",
+         "v": " accepts an argument the description never declared, stores it as a launch configuration that nothing reads, and starts the run; the parameter keeps its empty default, "
+        },
+        {
+         "t": "code",
+         "v": "finish()"
+        },
+        {
+         "t": "text",
+         "v": " skips the append, and the factor comes out blank on every run. That failure looks exactly like the one the next paragraph describes, which is why it is worth knowing both: if the factor is missing, check that the launch file forwards "
+        },
+        {
+         "t": "code",
+         "v": "facts_file"
+        },
+        {
+         "t": "text",
+         "v": " before you go looking in Gazebo's log for a crash that never happened."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then the shell:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "started=$(date +%s.%N)\ntimeout --signal=INT 180 ros2 launch bench_sim scenario.launch.py \\\n  scenario:=\"$name\" verdict_file:=\"$verdict\" facts_file:=\"$facts\" \"${@:2}\" || true\nwall=$(echo \"$(date +%s.%N) - $started\" | bc)\nsimulated=$(sed -n 's/^simulated seconds: //p' \"$facts\" | tail -1)\n{ echo \"[timing]\"\n  echo \"wall seconds: $(printf '%.1f' \"$wall\")\"\n  echo \"real-time factor: $([ -n \"$simulated\" ] && echo \"scale=2; $simulated / $wall\" | bc)\"; } >> \"$facts\"\ninstall/bench_core/bin/run_report \"$name\" \"$facts\" \"$verdict\" > \"results/$name.md\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The factor comes out empty when the runner wrote no simulated length, which is what happens when the launch died before "
+        },
+        {
+         "t": "code",
+         "v": "finish()"
+        },
+        {
+         "t": "text",
+         "v": " ran. That case is worth getting right rather than defaulting to zero: a zero looks like a measurement and sits quietly in the table, while an empty value puts "
+        },
+        {
+         "t": "code",
+         "v": "real-time factor"
+        },
+        {
+         "t": "text",
+         "v": " on the report's list of what was not recorded, where somebody will see it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The real-time factor here is the whole run's, start-up included, which is the honest number for \"what did this cost\" and the wrong one for \"how fast does the simulation run\". The scenario runner topic measured the second one over the scenario's own stretch; keep them apart and label them, because a factor of 0.6 that is mostly Gazebo starting says something different from a factor of 0.6 while the robot drives."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 3,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Run one of each and read them:"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "./check.sh\n./run_scenario.sh normal\n./run_scenario.sh normal relay:=False\ncat results/normal.md"
+      },
+      {
+       "t": "ol",
+       "start": 4,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Now read the failing report as a stranger. Cover the terminal, open only "
+         },
+         {
+          "t": "code",
+          "v": "results/normal.md"
+         },
+         {
+          "t": "text",
+          "v": " from the second run, and answer four questions from the file alone: what was asked for, what the robot did, which check decided it, and what you would run first. If any of the four needs something not in the file, that is the field to add, and adding it is this step rather than a note for later."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The commonest gap the first time is the last question. A verdict names the check that failed and not what to do about it, so add one line to the report from the bench's own knowledge: for a failing case, the first command from the debugging notes for that symptom. It costs a lookup table of three entries and saves the reader the walk through "
+        },
+        {
+         "t": "code",
+         "v": "docs/debugging.md"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 5,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Keep the reports out of the repository and say where they go instead. "
+         },
+         {
+          "t": "code",
+          "v": "results/"
+         },
+         {
+          "t": "text",
+          "v": " is already in "
+         },
+         {
+          "t": "code",
+          "v": ".gitignore"
+         },
+         {
+          "t": "text",
+          "v": "; the CI topic uploads them as artefacts of the run, which is where a report belongs when the machine that produced it is gone ten seconds later."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "ol",
+       "start": 6,
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Commit on a branch, and merge through a pull request once CI is green."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "You are done when:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "every "
+         },
+         {
+          "t": "code",
+          "v": "./run_scenario.sh"
+         },
+         {
+          "t": "text",
+          "v": " writes "
+         },
+         {
+          "t": "code",
+          "v": "results/<name>.md"
+         },
+         {
+          "t": "text",
+          "v": " beside its verdict;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the report of a failing run answers all four questions from the file alone;"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "the \"Not recorded\" section names the image digest and the seed, and no more than those;"
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "./run_regressions.sh"
+         },
+         {
+          "t": "text",
+          "v": " still ends green."
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Add a \"Run reports\" section to "
+        },
+        {
+         "t": "code",
+         "v": "README.md"
+        },
+        {
+         "t": "text",
+         "v": ". It is the proof for this topic."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Give the three files a run leaves, what each is for, and which of them a person reads. Then the four questions a report has to answer without help, and the one you had to add a field for. Then the checklist in "
+        },
+        {
+         "t": "code",
+         "v": "missing_facts"
+        },
+        {
+         "t": "text",
+         "v": ", the six facts on it, and which two the bench cannot yet fill, with the topic that closes each."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Finish with the two real-time factors and why they are labelled apart: the one over the whole command, which is what a run costs, and the one over the scenario's own stretch, which is how fast the simulation ran. A reader who confuses them will tune the wrong thing."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The ROS 2 Jazzy documentation on "
+     },
+     {
+      "t": "a",
+      "v": "recording and playing back data",
+      "href": "https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Recording-And-Playing-Back-Data/Recording-And-Playing-Back-Data.html"
+     },
+     {
+      "t": "text",
+      "v": ", for the bag that belongs beside a report of a failing run."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The "
+     },
+     {
+      "t": "a",
+      "v": "GNU coreutils manual",
+      "href": "https://www.gnu.org/software/coreutils/manual/coreutils.html"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "date"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "sha256sum"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "timeout"
+     },
+     {
+      "t": "text",
+      "v": ", which are what the facts file is built from."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Gazebo Harmonic's documentation on "
+     },
+     {
+      "t": "a",
+      "v": "the physics step and the real-time factor",
+      "href": "https://gazebosim.org/api/sim/8/physics.html"
+     },
+     {
+      "t": "text",
+      "v": ", for what the number in the timing table means."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::format",
+      "href": "https://en.cppreference.com/cpp/utility/format/format"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::ranges::any_of",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/all_any_none_of"
+     },
+     {
+      "t": "text",
+      "v": ", which are what compose the report and check the list."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Simon Tatham, "
+     },
+     {
+      "t": "a",
+      "v": "his essay on writing a bug report that gets acted on",
+      "href": "https://www.chiark.greenend.org.uk/~sgtatham/bugs.html"
+     },
+     {
+      "t": "text",
+      "v": ": the separation between what was observed and what it is thought to mean, which is why the verdict goes in verbatim."
+     }
+    ]
+   ]
+  }
+ ]
+}

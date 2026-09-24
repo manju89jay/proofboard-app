@@ -1,0 +1,1702 @@
+{
+ "id": "pat-observer",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "From memory, sketch an "
+     },
+     {
+      "t": "code",
+      "v": "EventSource"
+     },
+     {
+      "t": "text",
+      "v": " that a "
+     },
+     {
+      "t": "code",
+      "v": "Listener"
+     },
+     {
+      "t": "text",
+      "v": " interface can subscribe to and unsubscribe from, and a "
+     },
+     {
+      "t": "code",
+      "v": "notify"
+     },
+     {
+      "t": "text",
+      "v": " that calls every subscribed listener. Then say, in writing, what happens if a listener is destroyed while it is still subscribed, and "
+     },
+     {
+      "t": "code",
+      "v": "notify"
+     },
+     {
+      "t": "text",
+      "v": " is called afterward. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "asan:stack-use-after-scope",
+    "text": "#include <algorithm>\n#include <format>\n#include <iostream>\n#include <vector>\n\nclass Listener {\n public:\n  Listener() = default;\n  Listener(const Listener&) = delete;\n  Listener& operator=(const Listener&) = delete;\n  virtual ~Listener() = default;\n  virtual void on_event(int value) = 0;\n};\n\nclass EventSource {\n public:\n  void subscribe(Listener& listener) { listeners_.push_back(&listener); }\n  void unsubscribe(Listener& listener) { std::erase(listeners_, &listener); }\n  void notify(int value) {\n    for (Listener* listener : listeners_) listener->on_event(value);\n  }\n\n private:\n  std::vector<Listener*> listeners_;\n};\n\nclass PrintingListener final : public Listener {\n public:\n  void on_event(int value) override { std::cout << std::format(\"saw {}\\n\", value); }\n};\n\nint main() {\n  EventSource source;\n  {\n    PrintingListener listener;\n    source.subscribe(listener);\n    source.notify(1);\n  }  // listener destroyed here, without unsubscribing first\n  source.notify(2);  // calls into a destroyed object\n}"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "AddressSanitizer reports "
+     },
+     {
+      "t": "code",
+      "v": "stack-use-after-scope"
+     },
+     {
+      "t": "text",
+      "v": " on the second "
+     },
+     {
+      "t": "code",
+      "v": "notify"
+     },
+     {
+      "t": "text",
+      "v": ", at the line that calls "
+     },
+     {
+      "t": "code",
+      "v": "listener->on_event(value)"
+     },
+     {
+      "t": "text",
+      "v": " through a pointer whose object no longer exists. "
+     },
+     {
+      "t": "code",
+      "v": "unsubscribe"
+     },
+     {
+      "t": "text",
+      "v": " exists on this class, and nothing forces anyone to call it."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the sketch has both "
+     },
+     {
+      "t": "code",
+      "v": "subscribe"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "unsubscribe"
+     },
+     {
+      "t": "text",
+      "v": ", and the written answer says the pointer is left dangling and the next "
+     },
+     {
+      "t": "code",
+      "v": "notify"
+     },
+     {
+      "t": "text",
+      "v": " is undefined behaviour, whatever it happens to print. Saying only \"it crashes\" without naming the dangling pointer is a partial pass. Saying the program is safe because "
+     },
+     {
+      "t": "code",
+      "v": "unsubscribe"
+     },
+     {
+      "t": "text",
+      "v": " exists is a fail: existing and being called are different things, which is the whole of this topic."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Observer lets one object announce that something happened to any number of others without knowing what they do about it. The object making the announcement is the "
+    },
+    {
+     "t": "i",
+     "v": "subject"
+    },
+    {
+     "t": "text",
+     "v": ", or "
+    },
+    {
+     "t": "i",
+     "v": "event source"
+    },
+    {
+     "t": "text",
+     "v": "; the objects that react are "
+    },
+    {
+     "t": "i",
+     "v": "observers"
+    },
+    {
+     "t": "text",
+     "v": ", or "
+    },
+    {
+     "t": "i",
+     "v": "listeners"
+    },
+    {
+     "t": "text",
+     "v": "; each one registers itself with the subject through "
+    },
+    {
+     "t": "code",
+     "v": "subscribe"
+    },
+    {
+     "t": "text",
+     "v": ", and the subject calls every registered listener when its event occurs, through "
+    },
+    {
+     "t": "code",
+     "v": "notify"
+    },
+    {
+     "t": "text",
+     "v": "."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is code that would otherwise call each interested party by name: a battery monitor that has to know about the logger, the low-voltage alarm and the dashboard individually, and gains a new parameter every time a fourth thing needs to react. Observer inverts that: the subject knows only that some list of listeners exists, and a new listener is one more subscription, not one more parameter anywhere."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a list the subject holds and walks on every event, calling each listener in turn. Two shapes for the call exist. "
+    },
+    {
+     "t": "i",
+     "v": "Push"
+    },
+    {
+     "t": "text",
+     "v": " hands the listener the data itself, simple to call but tying every listener to the exact shape the subject sends. "
+    },
+    {
+     "t": "i",
+     "v": "Pull"
+    },
+    {
+     "t": "text",
+     "v": " only says something changed, and the listener reads what it needs by calling back into the subject, which frees the payload from the subject's own type at the cost of an extra call per listener."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is not the call, it is lifetime. A listener destroyed without unsubscribing leaves the subject holding a pointer to nothing, and a listener that unsubscribes itself from inside its own callback can corrupt the list the subject is in the middle of walking. Both are solved by never handing the subject something it can dereference after it stops being valid: a "
+    },
+    {
+     "t": "code",
+     "v": "std::weak_ptr"
+    },
+    {
+     "t": "text",
+     "v": " locked before every call, or a removal deferred until the walk is over."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in a ROS 2 subscription, where a callback fires for every message a publisher sends, and the interview question is exactly the lifetime half of it: sketch subscribe and unsubscribe, and say what happens when a listener goes first."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Subject and observers; push versus pull",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A weather station tells every listener the full reading on every update. This is "
+        },
+        {
+         "t": "i",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": ": the subject sends the data itself, and every listener gets all of it, whether it needs all of it or not."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <vector>\n\nstruct Reading {\n  std::int32_t temperature_c;\n  std::int32_t humidity_pct;\n};\n\n// The target the subject calls: pushed the full reading, whether a listener needs all of it or not.\nclass WeatherListener {\n public:\n  WeatherListener() = default;\n  WeatherListener(const WeatherListener&) = delete;\n  WeatherListener& operator=(const WeatherListener&) = delete;\n  virtual ~WeatherListener() = default;\n  virtual void on_reading(const Reading& reading) = 0;\n};\n\nclass WeatherStation {\n public:\n  void subscribe(WeatherListener& listener) { listeners_.push_back(&listener); }\n\n  void publish(Reading reading) {\n    for (WeatherListener* listener : listeners_) listener->on_reading(reading);\n  }\n\n private:\n  std::vector<WeatherListener*> listeners_;\n};\n\nclass Logger final : public WeatherListener {\n public:\n  void on_reading(const Reading& reading) override {\n    std::cout << std::format(\"log: {} C, {}%\\n\", reading.temperature_c, reading.humidity_pct);\n  }\n};\n\n// Only ever reads the temperature, and is still handed the humidity on every call.\nclass FrostAlarm final : public WeatherListener {\n public:\n  void on_reading(const Reading& reading) override {\n    if (reading.temperature_c <= 0) std::cout << std::format(\"frost alarm: {} C\\n\", reading.temperature_c);\n  }\n};\n\nint main() {\n  WeatherStation station;\n  Logger logger;\n  FrostAlarm alarm;\n  station.subscribe(logger);\n  station.subscribe(alarm);\n\n  station.publish({.temperature_c = 8, .humidity_pct = 55});\n  station.publish({.temperature_c = -2, .humidity_pct = 80});\n}"
+      },
+      {
+       "t": "output",
+       "text": "log: 8 C, 55%\nlog: -2 C, 80%\nfrost alarm: -2 C"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "WeatherStation"
+        },
+        {
+         "t": "text",
+         "v": " names neither "
+        },
+        {
+         "t": "code",
+         "v": "Logger"
+        },
+        {
+         "t": "text",
+         "v": " nor "
+        },
+        {
+         "t": "code",
+         "v": "FrostAlarm"
+        },
+        {
+         "t": "text",
+         "v": "; it holds "
+        },
+        {
+         "t": "code",
+         "v": "WeatherListener&"
+        },
+        {
+         "t": "text",
+         "v": ", an interface, and a third listener is one more class implementing it, with no change to the station at all. Gamma, Helm, Johnson and Vlissides describe exactly this shape in the behavioural chapter of the 1994 catalogue ("
+        },
+        {
+         "t": "a",
+         "v": "Design Patterns",
+         "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+        },
+        {
+         "t": "text",
+         "v": "): a subject notifies its dependents of a state change, without knowing what any of them are."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "FrostAlarm"
+        },
+        {
+         "t": "text",
+         "v": " reads only "
+        },
+        {
+         "t": "code",
+         "v": "temperature_c"
+        },
+        {
+         "t": "text",
+         "v": ", and every "
+        },
+        {
+         "t": "code",
+         "v": "publish"
+        },
+        {
+         "t": "text",
+         "v": " still builds and passes the whole "
+        },
+        {
+         "t": "code",
+         "v": "Reading"
+        },
+        {
+         "t": "text",
+         "v": " to it. That coupling is small here, two fields, but it grows with the subject: every field anyone might ever want has to be in the one struct every listener receives, whether they read it or not, and adding a field means every listener that takes "
+        },
+        {
+         "t": "code",
+         "v": "const Reading&"
+        },
+        {
+         "t": "text",
+         "v": " keeps compiling, correctly, while a listener that took the two fields as separate parameters would need every call site updated. Two costs are already visible before a single listener misbehaves: the subject's payload type is now public API for every listener that will ever exist, and a listener is called synchronously, on the subject's own thread and stack, for as long as its "
+        },
+        {
+         "t": "code",
+         "v": "on_reading"
+        },
+        {
+         "t": "text",
+         "v": " takes."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same station, asking each listener to pull what it needs instead of pushing everything:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <vector>\n\nstruct Reading {\n  std::int32_t temperature_c;\n  std::int32_t humidity_pct;\n};\n\nclass WeatherListener {\n public:\n  WeatherListener() = default;\n  WeatherListener(const WeatherListener&) = delete;\n  WeatherListener& operator=(const WeatherListener&) = delete;\n  virtual ~WeatherListener() = default;\n  virtual void on_changed() = 0;  // no data: the listener asks for what it needs\n};\n\nclass WeatherStation {\n public:\n  void subscribe(WeatherListener& listener) { listeners_.push_back(&listener); }\n\n  void publish(Reading reading) {\n    reading_ = reading;\n    for (WeatherListener* listener : listeners_) listener->on_changed();\n  }\n\n  [[nodiscard]] const Reading& reading() const { return reading_; }\n\n private:\n  std::vector<WeatherListener*> listeners_;\n  Reading reading_{};\n};\n\n// Reads only the field it cares about, by calling back into the station.\nclass FrostAlarm final : public WeatherListener {\n public:\n  explicit FrostAlarm(const WeatherStation& station) : station_(station) {}\n  void on_changed() override {\n    if (station_.reading().temperature_c <= 0) {\n      std::cout << std::format(\"frost alarm: {} C\\n\", station_.reading().temperature_c);\n    }\n  }\n\n private:\n  const WeatherStation& station_;\n};\n\nint main() {\n  WeatherStation station;\n  FrostAlarm alarm(station);\n  station.subscribe(alarm);\n\n  station.publish({.temperature_c = 8, .humidity_pct = 55});\n  station.publish({.temperature_c = -2, .humidity_pct = 80});\n}"
+      },
+      {
+       "t": "output",
+       "text": "frost alarm: -2 C"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "on_changed"
+        },
+        {
+         "t": "text",
+         "v": " carries no data at all; "
+        },
+        {
+         "t": "code",
+         "v": "FrostAlarm"
+        },
+        {
+         "t": "text",
+         "v": " calls "
+        },
+        {
+         "t": "code",
+         "v": "station_.reading()"
+        },
+        {
+         "t": "text",
+         "v": " for exactly the field it wants, and a new field on "
+        },
+        {
+         "t": "code",
+         "v": "Reading"
+        },
+        {
+         "t": "text",
+         "v": " needs no change here, because nothing about this listener's signature depends on the payload's shape. That is the trade for the extra call: "
+        },
+        {
+         "t": "code",
+         "v": "FrostAlarm"
+        },
+        {
+         "t": "text",
+         "v": " now holds a "
+        },
+        {
+         "t": "code",
+         "v": "const WeatherStation&"
+        },
+        {
+         "t": "text",
+         "v": " and reads through it every time, so it is coupled to the subject's lifetime the whole time it can be called, where the pushed version only ever touched the one "
+        },
+        {
+         "t": "code",
+         "v": "Reading"
+        },
+        {
+         "t": "text",
+         "v": " it was handed. Pull also cannot tell a listener what changed without a second round trip of its own, which is why most real designs, ROS 2's topics included, push: the message is the payload, sent once, and a subscriber that wants less of it reads less of what arrived. Reach for pull when the payload is expensive to assemble and most listeners want only a slice of it; reach for push, which is simpler and is what both "
+        },
+        {
+         "t": "code",
+         "v": "EventSource"
+        },
+        {
+         "t": "text",
+         "v": " implementations below do, everywhere else."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "source",
+   "title": "Event source with subscribe and unsubscribe tokens",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes. Rebuild the event source as a small class template that takes any callable, rather than a fixed "
+        },
+        {
+         "t": "code",
+         "v": "Listener"
+        },
+        {
+         "t": "text",
+         "v": " interface, and gives every subscriber a token it can unsubscribe with later."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "struct Token { std::int64_t id; };"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "operator=="
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "template <typename... Args> class EventSource"
+         },
+         {
+          "t": "text",
+          "v": ", holding "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::pair<Token, std::function<void(Args...)>>>"
+         },
+         {
+          "t": "text",
+          "v": " and a counter for the next token's id."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] Token subscribe(std::function<void(Args...)> callback)"
+         },
+         {
+          "t": "text",
+          "v": ", returning a fresh token for each call."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "void unsubscribe(Token token)"
+         },
+         {
+          "t": "text",
+          "v": ", removing the entry with that token; use "
+         },
+         {
+          "t": "code",
+          "v": "std::erase_if"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "void notify(Args... args) const"
+         },
+         {
+          "t": "text",
+          "v": ", calling every subscribed callback with the given arguments, in subscription order."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::size_t listener_count() const"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Build an "
+        },
+        {
+         "t": "code",
+         "v": "EventSource<std::int32_t>"
+        },
+        {
+         "t": "text",
+         "v": " for a battery's millivolt readings. Subscribe a logger that prints every reading and an alarm that prints only when the reading is under 11000. Print the listener count, then call "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " twice, once above the threshold and once below it. Unsubscribe the alarm, print the count again, and call "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " once more below the threshold to show the alarm no longer fires. Finally unsubscribe the logger too and print the count a last time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions in writing. Why does "
+        },
+        {
+         "t": "code",
+         "v": "subscribe"
+        },
+        {
+         "t": "text",
+         "v": " return a "
+        },
+        {
+         "t": "code",
+         "v": "Token"
+        },
+        {
+         "t": "text",
+         "v": " rather than an index into the vector? What would "
+        },
+        {
+         "t": "code",
+         "v": "unsubscribe"
+        },
+        {
+         "t": "text",
+         "v": " have to do differently if two listeners could be given the same token by mistake?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <utility>\n#include <vector>\n\nstruct Token {\n  std::int64_t id;\n};\n[[nodiscard]] constexpr bool operator==(Token a, Token b) { return a.id == b.id; }\n\ntemplate <typename... Args>\nclass EventSource {\n public:\n  using Callback = std::function<void(Args...)>;\n\n  [[nodiscard]] Token subscribe(Callback callback) {\n    const Token token{.id = next_id_++};\n    callbacks_.emplace_back(token, std::move(callback));\n    return token;\n  }\n\n  void unsubscribe(Token token) {\n    std::erase_if(callbacks_, [token](const auto& entry) { return entry.first == token; });\n  }\n\n  void notify(Args... args) const {\n    for (const auto& [token, callback] : callbacks_) callback(args...);\n  }\n\n  [[nodiscard]] std::size_t listener_count() const { return callbacks_.size(); }\n\n private:\n  std::vector<std::pair<Token, Callback>> callbacks_;\n  std::int64_t next_id_ = 0;\n};\n\nint main() {\n  EventSource<std::int32_t> voltage_mv;\n\n  const Token logger = voltage_mv.subscribe([](std::int32_t mv) { std::cout << std::format(\"log: {} mV\\n\", mv); });\n  const Token alarm = voltage_mv.subscribe([](std::int32_t mv) {\n    if (mv < 11000) std::cout << std::format(\"low battery alarm: {} mV\\n\", mv);\n  });\n\n  std::cout << std::format(\"listeners: {}\\n\", voltage_mv.listener_count());\n  voltage_mv.notify(12400);\n  voltage_mv.notify(10800);\n\n  voltage_mv.unsubscribe(alarm);\n  std::cout << std::format(\"listeners after unsubscribe: {}\\n\", voltage_mv.listener_count());\n  voltage_mv.notify(9000);  // no alarm printed: it was unsubscribed\n\n  voltage_mv.unsubscribe(logger);\n  std::cout << std::format(\"listeners after both unsubscribed: {}\\n\", voltage_mv.listener_count());\n}"
+      },
+      {
+       "t": "output",
+       "text": "listeners: 2\nlog: 12400 mV\nlog: 10800 mV\nlow battery alarm: 10800 mV\nlisteners after unsubscribe: 1\nlog: 9000 mV\nlisteners after both unsubscribed: 0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two answers. "
+        },
+        {
+         "t": "code",
+         "v": "subscribe"
+        },
+        {
+         "t": "text",
+         "v": " returns a "
+        },
+        {
+         "t": "code",
+         "v": "Token"
+        },
+        {
+         "t": "text",
+         "v": " rather than an index because an index is only valid until the next "
+        },
+        {
+         "t": "code",
+         "v": "unsubscribe"
+        },
+        {
+         "t": "text",
+         "v": ", which shifts everything after the removed entry back by one, the same rule the invalidation topic gave for erasing from a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": "; a "
+        },
+        {
+         "t": "code",
+         "v": "Token"
+        },
+        {
+         "t": "text",
+         "v": " carries an identity that survives every other subscriber's comings and goings, whatever position it ends up at. If two listeners could share a token, "
+        },
+        {
+         "t": "code",
+         "v": "unsubscribe"
+        },
+        {
+         "t": "text",
+         "v": " would have to remove every entry with that token, or refuse to remove any, because it has no way to tell which one the caller meant; the fix is to make the id impossible to duplicate, which is exactly what a counter that only ever increases guarantees, and a "
+        },
+        {
+         "t": "code",
+         "v": "Token"
+        },
+        {
+         "t": "text",
+         "v": " built any other way would need that guarantee restated somewhere else."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lifetime",
+   "title": "Safe listener lifetime with weak_ptr or an RAII subscription; unsubscribing during notify",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A listener that is destroyed without calling "
+        },
+        {
+         "t": "code",
+         "v": "unsubscribe"
+        },
+        {
+         "t": "text",
+         "v": " is the cold check's own bug, and the token-based source has it too: a listener that keeps its token as a member, meaning to unsubscribe eventually, but never adds the code that actually does:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-use-after-scope",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <utility>\n#include <vector>\n\nstruct Token {\n  std::int64_t id;\n};\n[[nodiscard]] constexpr bool operator==(Token a, Token b) { return a.id == b.id; }\n\ntemplate <typename... Args>\nclass EventSource {\n public:\n  using Callback = std::function<void(Args...)>;\n  [[nodiscard]] Token subscribe(Callback callback) {\n    const Token token{.id = next_id_++};\n    callbacks_.emplace_back(token, std::move(callback));\n    return token;\n  }\n  void notify(Args... args) const {\n    for (const auto& [token, callback] : callbacks_) callback(args...);\n  }\n\n private:\n  std::vector<std::pair<Token, Callback>> callbacks_;\n  std::int64_t next_id_ = 0;\n};\n\nclass VoltageLogger {\n public:\n  // Keeps the token, but nothing ever calls source.unsubscribe(token_) with it.\n  explicit VoltageLogger(EventSource<std::int32_t>& source) {\n    token_ = source.subscribe([this](std::int32_t mv) { log(mv); });\n  }\n  void log(std::int32_t mv) {\n    ++seen_;\n    std::cout << std::format(\"log #{}: {} mV\\n\", seen_, mv) << std::flush;  // visible before the crash below\n  }\n\n private:\n  Token token_{};\n  int seen_ = 0;\n};\n\nint main() {\n  EventSource<std::int32_t> voltage_mv;\n  {\n    VoltageLogger logger(voltage_mv);\n    voltage_mv.notify(12000);\n  }  // logger destroyed here, without unsubscribing\n  voltage_mv.notify(9000);  // the stored lambda still calls into it\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " runs and returns cleanly; the explicit "
+        },
+        {
+         "t": "code",
+         "v": "std::flush"
+        },
+        {
+         "t": "text",
+         "v": " in "
+        },
+        {
+         "t": "code",
+         "v": "log"
+        },
+        {
+         "t": "text",
+         "v": " is there so "
+        },
+        {
+         "t": "code",
+         "v": "log #1: 12000 mV"
+        },
+        {
+         "t": "text",
+         "v": " reaches the terminal even piped, the way this page's own checker runs every example, rather than sitting in a buffer AddressSanitizer never gets to empty. ASan stops the second "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": ", reading "
+        },
+        {
+         "t": "code",
+         "v": "seen_"
+        },
+        {
+         "t": "text",
+         "v": " through a "
+        },
+        {
+         "t": "code",
+         "v": "this"
+        },
+        {
+         "t": "text",
+         "v": " that points at a destroyed "
+        },
+        {
+         "t": "code",
+         "v": "VoltageLogger"
+        },
+        {
+         "t": "text",
+         "v": ". A "
+        },
+        {
+         "t": "code",
+         "v": "Token"
+        },
+        {
+         "t": "text",
+         "v": " stored as a member and never used anywhere is not a safeguard; it is a promise the class never kept."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure needs no sanitizer to see in its narrowest form, and a common shape of it is exactly what AddressSanitizer is for. It is a listener that unsubscribes itself from inside its own callback, while "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " is still walking the list that callback lives in, and two separate facts decide what actually happens: whether the erase shifts a live entry into the slot the walk is still reading, and whether the callback touches any of its own captured state after the erase runs."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "source.subscribe([](int) { log_before(); });  // slot 0: still there when the walk passes it\nself_token = source.subscribe([&](int) {      // slot 1: erases itself mid-walk\n  source.unsubscribe(self_token);\n});\nsource.subscribe([](int) { log_after(); });   // slot 2: shifted into slot 1 by the erase"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "I built this arrangement, and two others, on top of this page's own "
+        },
+        {
+         "t": "code",
+         "v": "EventSource"
+        },
+        {
+         "t": "text",
+         "v": " and ran each in WSL. With the self-unsubscribing listener alone, or last with nothing after it, no shift happens: "
+        },
+        {
+         "t": "code",
+         "v": "++it"
+        },
+        {
+         "t": "text",
+         "v": " lands on the vector's own "
+        },
+        {
+         "t": "code",
+         "v": "end()"
+        },
+        {
+         "t": "text",
+         "v": " once the loop is done, and the walk survives either way. Only with a listener registered after it, as above, does the erase shift that live entry down into the slot the walk is still reading from; the loop then calls through the moved-from "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " that used to sit there, and the program prints nothing further and terminates from an uncaught "
+        },
+        {
+         "t": "code",
+         "v": "std::bad_function_call"
+        },
+        {
+         "t": "text",
+         "v": ", exit 134."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That covers the container, and nothing about the callback. Destroying the closure whose "
+        },
+        {
+         "t": "code",
+         "v": "operator()"
+        },
+        {
+         "t": "text",
+         "v": " is on the call stack is undefined behaviour the moment "
+        },
+        {
+         "t": "code",
+         "v": "unsubscribe"
+        },
+        {
+         "t": "text",
+         "v": " runs, in every arrangement, whether or not anything moved; the \"last, nothing after\" case only looked clean because the callback stopped touching itself the instant it returned. Give it one more line, reading a capture it took by value, and the same arrangement that walked cleanly above reports a real bug:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:heap-use-after-free",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Token {\n  std::int64_t id;\n};\n[[nodiscard]] constexpr bool operator==(Token a, Token b) { return a.id == b.id; }\n\ntemplate <typename... Args>\nclass EventSource {\n public:\n  using Callback = std::function<void(Args...)>;\n  [[nodiscard]] Token subscribe(Callback callback) {\n    const Token token{.id = next_id_++};\n    callbacks_.emplace_back(token, std::move(callback));\n    return token;\n  }\n  void unsubscribe(Token token) {\n    std::erase_if(callbacks_, [token](const auto& entry) { return entry.first == token; });\n  }\n  void notify(Args... args) const {\n    for (const auto& [token, callback] : callbacks_) callback(args...);\n  }\n\n private:\n  std::vector<std::pair<Token, Callback>> callbacks_;\n  std::int64_t next_id_ = 0;\n};\n\nint main() {\n  EventSource<int> source;\n  [[maybe_unused]] const Token before =\n      source.subscribe([](int mv) { std::cout << std::format(\"before saw {}\\n\", mv); });\n\n  const std::string tag = \"self-unsubscribing listener\";  // captured by value, lives inside the closure\n  Token self_token{};\n  self_token = source.subscribe([&source, &self_token, tag](int mv) {\n    source.unsubscribe(self_token);                        // destroys this closure, tag included\n    std::cout << std::format(\"{} saw {}\\n\", tag, mv);       // reads tag after it is gone\n  });\n\n  source.notify(1);\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports "
+        },
+        {
+         "t": "code",
+         "v": "heap-use-after-free"
+        },
+        {
+         "t": "text",
+         "v": ", an 8-byte read, inside "
+        },
+        {
+         "t": "code",
+         "v": "std::string::data()"
+        },
+        {
+         "t": "text",
+         "v": ", called while formatting "
+        },
+        {
+         "t": "code",
+         "v": "tag"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "unsubscribe"
+        },
+        {
+         "t": "text",
+         "v": " destroyed the closure's own storage, "
+        },
+        {
+         "t": "code",
+         "v": "tag"
+        },
+        {
+         "t": "text",
+         "v": " included, before this line reads it, even though "
+        },
+        {
+         "t": "code",
+         "v": "self_token"
+        },
+        {
+         "t": "text",
+         "v": " is last in the list and nothing shifted. The two facts stay apart. Whether the erase shifts anything decides whether the container itself stays walkable, which is the order-dependence the fragment above showed. Whether the callback touches its own state afterward decides whether either sanitizer has anything to report at all: a callback that erases itself and returns without touching anything leaves nothing behind for AddressSanitizer or UndefinedBehaviorSanitizer to catch, which is the narrow case they miss, not the common one. The safe rule covers both: never erase the entry "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " is currently reading while it is reading it, and never let that entry run any of its own code afterward either; the exercise below satisfies both by construction, deferring every removal until the walk is over."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Calling back into the source from a callback costs the same way again once several threads are involved, and it costs more. "
+        },
+        {
+         "t": "code",
+         "v": "EventSource"
+        },
+        {
+         "t": "text",
+         "v": "'s "
+        },
+        {
+         "t": "code",
+         "v": "callbacks_"
+        },
+        {
+         "t": "text",
+         "v": " is one "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " that "
+        },
+        {
+         "t": "code",
+         "v": "subscribe"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "unsubscribe"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " all touch, and cpp-threads-mutexes already measured what several threads calling into one unguarded "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": " does: "
+        },
+        {
+         "t": "code",
+         "v": "push_back"
+        },
+        {
+         "t": "text",
+         "v": " from two threads corrupts the size, the capacity and the buffer pointer together. Guarding the three functions with one mutex, next to the data the way that topic's own examples do, closes that race:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n#include <mutex>\n#include <utility>\n#include <vector>\n\nstruct Token {\n  std::int64_t id;\n};\n[[nodiscard]] constexpr bool operator==(Token a, Token b) { return a.id == b.id; }\n\n// Guarded the way cpp-threads-mutexes guards any data several threads reach: one mutex, next to it.\ntemplate <typename... Args>\nclass EventSource {\n public:\n  using Callback = std::function<void(Args...)>;\n\n  [[nodiscard]] Token subscribe(Callback callback) {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    const Token token{.id = next_id_++};\n    callbacks_.emplace_back(token, std::move(callback));\n    return token;\n  }\n  void unsubscribe(Token token) {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    std::erase_if(callbacks_, [token](const auto& entry) { return entry.first == token; });\n  }\n  void notify(Args... args) {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    for (const auto& [token, callback] : callbacks_) callback(args...);\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::vector<std::pair<Token, Callback>> callbacks_;\n  std::int64_t next_id_ = 0;\n};\n\nint main() {\n  EventSource<std::int32_t> voltage_mv;\n  [[maybe_unused]] const Token token =\n      voltage_mv.subscribe([](std::int32_t mv) { std::cout << std::format(\"log: {} mV\\n\", mv); });\n  voltage_mv.notify(12000);\n}"
+      },
+      {
+       "t": "output",
+       "text": "log: 12000 mV"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The lock closes the race and reopens the second failure in a worse shape: "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " holds "
+        },
+        {
+         "t": "code",
+         "v": "mutex_"
+        },
+        {
+         "t": "text",
+         "v": " for the whole walk, so a callback that calls "
+        },
+        {
+         "t": "code",
+         "v": "unsubscribe"
+        },
+        {
+         "t": "text",
+         "v": " on the same source now asks for a mutex its own call frame already owns. "
+        },
+        {
+         "t": "code",
+         "v": "std::mutex"
+        },
+        {
+         "t": "text",
+         "v": " is not recursive, so that is not slow, it is a deadlock, exactly the shape cpp-threads-mutexes' own rule against calling unknown code while holding a lock warns about. A guarded "
+        },
+        {
+         "t": "code",
+         "v": "EventSource"
+        },
+        {
+         "t": "text",
+         "v": " is safe from other threads and still not safe from itself; the two failures share one cause, "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " calling out while it is in no position to be called back into, whether the danger is a corrupted vector or a mutex locked twice."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 20,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 20 minutes. Rebuild the battery voltage source so a listener's destruction can never be dereferenced and a listener never has to remember to unsubscribe."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "class VoltageListener"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "virtual void on_reading(std::int32_t mv) = 0"
+         },
+         {
+          "t": "text",
+          "v": " and the destructor and copy operations a polymorphic base needs."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "class VoltageSource"
+         },
+         {
+          "t": "text",
+          "v": " holding "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::weak_ptr<VoltageListener>>"
+         },
+         {
+          "t": "text",
+          "v": ", with "
+         },
+         {
+          "t": "code",
+          "v": "void subscribe(std::weak_ptr<VoltageListener> listener)"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "void notify(std::int32_t mv)"
+         },
+         {
+          "t": "text",
+          "v": ": for each stored "
+         },
+         {
+          "t": "code",
+          "v": "weak_ptr"
+         },
+         {
+          "t": "text",
+          "v": ", call "
+         },
+         {
+          "t": "code",
+          "v": "lock()"
+         },
+         {
+          "t": "text",
+          "v": ", and call "
+         },
+         {
+          "t": "code",
+          "v": "on_reading"
+         },
+         {
+          "t": "text",
+          "v": " on the result only if it is not empty. After the loop over every listener has finished, remove every entry whose "
+         },
+         {
+          "t": "code",
+          "v": "weak_ptr"
+         },
+         {
+          "t": "text",
+          "v": " is now "
+         },
+         {
+          "t": "code",
+          "v": "expired()"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::size_t listener_count() const"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "In "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", build one "
+        },
+        {
+         "t": "code",
+         "v": "Logger"
+        },
+        {
+         "t": "text",
+         "v": " kept alive for the whole program and subscribe it. In a nested scope, build a second "
+        },
+        {
+         "t": "code",
+         "v": "Logger"
+        },
+        {
+         "t": "text",
+         "v": " as a "
+        },
+        {
+         "t": "code",
+         "v": "std::shared_ptr"
+        },
+        {
+         "t": "text",
+         "v": ", subscribe it too, print the listener count, and call "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": ". Let the nested scope end, destroying the second logger without unsubscribing it. Call "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " again, and print the listener count once more to show the pruning happened."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer one question in writing: why is it safe for "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " to erase expired entries after its own loop, when the failure cases showed that erasing during the loop corrupts the callback that is running?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <vector>\n\nclass VoltageListener {\n public:\n  VoltageListener() = default;\n  VoltageListener(const VoltageListener&) = delete;\n  VoltageListener& operator=(const VoltageListener&) = delete;\n  virtual ~VoltageListener() = default;\n  virtual void on_reading(std::int32_t mv) = 0;\n};\n\n// Holds weak_ptrs: a destroyed listener is skipped, never dereferenced.\nclass VoltageSource {\n public:\n  void subscribe(std::weak_ptr<VoltageListener> listener) { listeners_.push_back(std::move(listener)); }\n\n  void notify(std::int32_t mv) {\n    for (const std::weak_ptr<VoltageListener>& weak : listeners_) {\n      if (const std::shared_ptr<VoltageListener> alive = weak.lock()) alive->on_reading(mv);\n    }\n    // Safe to erase now: the loop above has already finished.\n    std::erase_if(listeners_, [](const std::weak_ptr<VoltageListener>& weak) { return weak.expired(); });\n  }\n\n  [[nodiscard]] std::size_t listener_count() const { return listeners_.size(); }\n\n private:\n  std::vector<std::weak_ptr<VoltageListener>> listeners_;\n};\n\nclass Logger final : public VoltageListener {\n public:\n  void on_reading(std::int32_t mv) override { std::cout << std::format(\"log: {} mV\\n\", mv); }\n};\n\nint main() {\n  VoltageSource source;\n  auto logger = std::make_shared<Logger>();\n  source.subscribe(logger);\n\n  {\n    auto temporary = std::make_shared<Logger>();\n    source.subscribe(temporary);\n    std::cout << std::format(\"listeners before it goes out of scope: {}\\n\", source.listener_count());\n    source.notify(12000);\n  }  // temporary destroyed here; source still holds a weak_ptr to it, not a dangling raw pointer\n\n  source.notify(9000);  // the expired weak_ptr is skipped, not dereferenced\n  std::cout << std::format(\"listeners after the next notify pruned it: {}\\n\", source.listener_count());\n}"
+      },
+      {
+       "t": "output",
+       "text": "listeners before it goes out of scope: 2\nlog: 12000 mV\nlog: 12000 mV\nlog: 9000 mV\nlisteners after the next notify pruned it: 1"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The erase after the loop is safe because nothing is reading "
+        },
+        {
+         "t": "code",
+         "v": "listeners_"
+        },
+        {
+         "t": "text",
+         "v": " at that point: every callback that was going to run this round has already returned, so "
+        },
+        {
+         "t": "code",
+         "v": "std::erase_if"
+        },
+        {
+         "t": "text",
+         "v": " shifts and destroys entries in a container no call frame still has a reference into. Erasing during the loop is dangerous specifically because the entry being removed can be the one whose code is still executing; erasing after the loop removes only entries that have already finished being used, which is a fact about time, not about which container operation is doing the erasing."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Name the subject, the observer and the two shapes of the call, push and pull, and what each costs. Say what a "
+        },
+        {
+         "t": "code",
+         "v": "Token"
+        },
+        {
+         "t": "text",
+         "v": " gives you that an index does not. Describe the two ways a listener's own lifetime bites: destroyed without unsubscribing, and unsubscribing itself mid-notify, and why erasing after the loop fixes the second where erasing during it does not. Finish with the one line that ties a data race and a self-deadlock together: both come from "
+        },
+        {
+         "t": "code",
+         "v": "notify"
+        },
+        {
+         "t": "text",
+         "v": " calling out while it is in no position to be called back into."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does the subject know about its observers, and what does an observer know about the subject, in push and in pull?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "FrostAlarm"
+     },
+     {
+      "t": "text",
+      "v": " under push read a field it never uses, and what does pull cost instead?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "subscribe"
+     },
+     {
+      "t": "text",
+      "v": " return a "
+     },
+     {
+      "t": "code",
+      "v": "Token"
+     },
+     {
+      "t": "text",
+      "v": " instead of the position a listener was stored at?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What did AddressSanitizer report when a listener kept its token but never called "
+     },
+     {
+      "t": "code",
+      "v": "unsubscribe"
+     },
+     {
+      "t": "text",
+      "v": ", and on what line?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What goes wrong when a callback unsubscribes itself while "
+     },
+     {
+      "t": "code",
+      "v": "notify"
+     },
+     {
+      "t": "text",
+      "v": " is walking the list it is stored in, and what did that failure look like when it was run?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does locking "
+     },
+     {
+      "t": "code",
+      "v": "subscribe"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "unsubscribe"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "notify"
+     },
+     {
+      "t": "text",
+      "v": " with one mutex fix the race between threads and reopen the self-unsubscribe failure in a worse form?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why is it safe for "
+     },
+     {
+      "t": "code",
+      "v": "VoltageSource::notify"
+     },
+     {
+      "t": "text",
+      "v": " to erase expired entries after its loop, when erasing mid-loop is not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: an event source holding "
+     },
+     {
+      "t": "code",
+      "v": "std::weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": " listeners, notifying only the live ones and pruning the rest afterward."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Gamma, Helm, Johnson and Vlissides, Design Patterns, Addison-Wesley 1994: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "behavioural chapter",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+     },
+     {
+      "t": "text",
+      "v": ", where Observer is defined as a subject notifying its dependents of a state change without knowing what they are."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "CP.22",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-unknown"
+     },
+     {
+      "t": "text",
+      "v": " on never calling unknown code while holding a lock, and "
+     },
+     {
+      "t": "a",
+      "v": "R.30",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-smartptrparam"
+     },
+     {
+      "t": "text",
+      "v": " on taking a smart pointer as a parameter only to state lifetime semantics explicitly, which is what a "
+     },
+     {
+      "t": "code",
+      "v": "weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": " parameter here does."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "weak_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/weak_ptr"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "std::function",
+      "href": "https://en.cppreference.com/cpp/utility/functional/function"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "erase_if for vector",
+      "href": "https://en.cppreference.com/cpp/container/vector/erase2"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

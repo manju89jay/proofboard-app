@@ -1,0 +1,1523 @@
+{
+ "id": "sd-networking",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Without looking anything up, write the differences between TCP and UDP under four headings: what arrives, in what order, what happens to a loss, and what the receiver's read gives back. Then say which you would choose for each of these four, in one line each: a 10 Hz lidar scan to a planner on the same machine; a 40 MB map downloaded once at start-up; a camera stream to an operator on a wireless link; a firmware update to a motor controller. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "TCP gives you a byte stream: every byte you wrote arrives, once, in order, and a loss is repaired by retransmission before anything after it is delivered. A read gives back whatever bytes have arrived, which may be part of one message or several run together, so framing your messages is your job and not the protocol's. UDP gives you datagrams: each one arrives whole or not at all, there is no order between them, a loss stays lost, and a read gives back exactly one datagram with the boundaries you sent."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The choice follows from what a loss costs and what a delay costs."
+     }
+    ]
+   },
+   {
+    "t": "table",
+    "head": [
+     [
+      {
+       "t": "text",
+       "v": "Need"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Choice"
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Reason"
+      }
+     ]
+    ],
+    "rows": [
+     [
+      [
+       {
+        "t": "text",
+        "v": "10 Hz lidar to a planner"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "UDP"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "The newest scan is what matters; waiting for a lost one to be resent delays every scan behind it"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "40 MB map at start-up"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "TCP"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Every byte matters, nothing is time critical, and the retransmission is exactly what you want"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Camera stream over a wireless link"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "UDP"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "Losses are frequent on a wireless link, and a repaired frame arriving a second late is worth nothing"
+       }
+      ]
+     ],
+     [
+      [
+       {
+        "t": "text",
+        "v": "Firmware update"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "TCP"
+       }
+      ],
+      [
+       {
+        "t": "text",
+        "v": "A byte lost here bricks a motor controller"
+       }
+      ]
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The property behind the first and third rows is head-of-line blocking: in a TCP stream, one lost segment holds back every byte that arrives after it until the retransmission gets through. For a file that is invisible. For a 10 Hz sensor it means the newest scan waits behind an old one that nobody wants any more, which is the whole reason robot middleware runs on UDP."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if the four headings are right and at least three of the four choices have a reason naming loss or delay. Getting TCP and UDP the right way round but describing a TCP read as giving back one message is a partial pass, and it is the most common gap: it is the difference between code that works on loopback and code that works on a network."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "TCP and UDP are the two ways a program on one machine gets bytes to a program on another. Both sit on IP, which gets a packet to a host, and both add a 16-bit port number, so an address and a port together name one program rather than one computer."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "UDP sends a datagram: one block of bytes that arrives whole or not at all. There is no connection, no acknowledgement, no ordering and no repair, so a lost datagram stays lost and the next one is not held up by it. TCP opens a connection and gives back a byte stream: every byte arrives, once, in order, and anything missing is retransmitted before the bytes behind it are delivered. That last clause is head-of-line blocking, and it decides most robot designs. One lost segment holds back everything after it for at least a round trip, so a 10 Hz sensor's newest scan waits behind an old one nobody wants any more. TCP also does not keep your message boundaries, so a protocol on TCP has to say where each message ends, with a length in front of it or a delimiter after it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The two solve different problems. TCP solves \"every byte matters and I can wait\", which is a map download or a firmware update. UDP solves \"the newest value matters and a lost one is not worth waiting for\", which is a lidar scan or a velocity command. Middleware that wants reliability without the blocking, as DDS does, builds acknowledgement and retransmission for each sample on top of UDP, so repairing one sample does not delay the next."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Multicast is UDP's other property: one sender reaches many receivers by sending to a group address that receivers join. It belongs to the network rather than to your program, and a switch without IGMP snooping or an access point with client isolation takes it away."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What UDP costs is the failures TCP was hiding: loss, reordering, duplication, and a datagram bigger than the link's maximum packet size, which is split into fragments and lost entirely if any one of them is. You meet all of this the first day two machines on one switch cannot see each other's nodes while "
+    },
+    {
+     "t": "code",
+     "v": "ping"
+    },
+    {
+     "t": "text",
+     "v": " works perfectly, and the answer is a layer below anything the middleware can tell you."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "transport",
+   "title": "TCP, UDP, ports, multicast, network interfaces",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four commands tell you almost everything about the network under a ROS system, and it is worth running them before reading further:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ip -brief addr             # every interface with its address: lo, eth0, wlan0, docker0, tun0\nip route get 192.168.1.20  # which interface and source address a packet to that host would use\nss -ulpn                   # every UDP socket bound on this machine, with the process that owns it\nip link show eth0          # the MTU of that interface, normally 1500"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Under the middleware there are three layers you touch. An Ethernet frame carries an IP packet, which carries either a UDP datagram or a TCP segment. IP gets a packet to a host; UDP and TCP get it to a program on that host, using a 16-bit port number. An address plus a port is an endpoint, and the two protocols have separate port spaces, so UDP 7400 and TCP 7400 are different things. Ports below 1024 need privilege; the kernel hands out the rest as ephemeral ports when you do not ask for one, from a range you can read:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "sysctl net.ipv4.ip_local_port_range   # 32768 60999 on a stock Ubuntu kernel"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "That range matters more than it looks, because anything that binds a fixed port in it is racing with every outgoing connection on the machine."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "UDP"
+        },
+        {
+         "t": "text",
+         "v": " is a datagram: you hand the kernel a block of bytes and an address, and it either arrives whole or does not arrive. There is no connection, no acknowledgement, no ordering and no flow control. Two datagrams can arrive in the other order, one can arrive twice, and most of the time neither happens. What you get in exchange is that nothing is held back: a datagram sent now is on the wire now, and a datagram that was lost stays lost rather than delaying the next one. UDP is also the only one of the two that can be multicast."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "TCP"
+        },
+        {
+         "t": "text",
+         "v": " is a byte stream between two endpoints, set up with a three-way handshake. Every byte is acknowledged, retransmitted if it is missing, and delivered in order. It also has flow control, so a slow reader slows the writer down, and congestion control, so a busy network slows every writer down. The property that surprises people is framing: one "
+        },
+        {
+         "t": "code",
+         "v": "send"
+        },
+        {
+         "t": "text",
+         "v": " does not become one "
+        },
+        {
+         "t": "code",
+         "v": "recv"
+        },
+        {
+         "t": "text",
+         "v": ". The stream may deliver your 100-byte message as 40 bytes and then 60, or run two messages together into one read. Every protocol on TCP has to say where a message ends, with a length prefix or a delimiter, and a protocol that forgets is a protocol that works in testing and breaks under load."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Head-of-line blocking is the cost that decides most robot designs. A TCP receiver may not hand your program byte 1001 until byte 1000 has arrived, so one lost segment stalls everything behind it for at least a round trip. On a link with 2% loss and a 20 ms round trip, a 10 Hz sensor stream loses one packet every five seconds and pays about 20 ms of delay for every scan queued behind it, and the scans keep arriving while the repair is in flight. This is why a middleware that wants both reliability and low latency, as DDS does, builds acknowledgement and retransmission per sample on top of UDP instead of using TCP: a repair for one sample does not hold back the next. The topic on DDS and rmw takes that apart."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Latency"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "i",
+         "v": "bandwidth"
+        },
+        {
+         "t": "text",
+         "v": " are separate numbers and people mix them constantly. Latency is how long one byte takes to get there; bandwidth is how many bytes per second the link carries. A satellite link can have 600 ms of latency and 100 Mbit/s of bandwidth; a 100 Mbit/s cable across a room has 0.1 ms and the same bandwidth. The two meet in two places. Serialisation delay: pushing a 1 MB image onto a 100 Mbit/s link takes at least 80 ms no matter how short the wire, so bandwidth shows up as latency for anything large. And the bandwidth-delay product: a 1 Gbit/s link with a 100 ms round trip holds 12.5 MB in flight, which is how much a sender must be allowed to have unacknowledged to keep the link full. Measure them separately:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ping -c 20 192.168.1.20    # round-trip latency: min, avg, max and mdev, plus the loss percentage\niperf3 -c 192.168.1.20     # throughput in one direction, with a server running iperf3 -s\nss -ti                     # per TCP socket: the kernel's rtt estimate, the congestion window, retransmits"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Interfaces"
+        },
+        {
+         "t": "text",
+         "v": " are the part people skip and then lose a day to. A machine has several, and the kernel picks one per destination from the routing table. "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " is loopback, where everything is fast and nothing is lost, which is why a system can work on one machine and fail on two. "
+        },
+        {
+         "t": "code",
+         "v": "docker0"
+        },
+        {
+         "t": "text",
+         "v": " and the "
+        },
+        {
+         "t": "code",
+         "v": "veth"
+        },
+        {
+         "t": "text",
+         "v": " pairs behind it are a separate network with their own addresses. A VPN adds a "
+        },
+        {
+         "t": "code",
+         "v": "tun0"
+        },
+        {
+         "t": "text",
+         "v": " whose routes can be more specific than your local ones, so traffic you meant for the robot on the same switch goes into the tunnel and comes back, adding tens of milliseconds and sometimes losing multicast entirely. "
+        },
+        {
+         "t": "code",
+         "v": "ip route get <address>"
+        },
+        {
+         "t": "text",
+         "v": " answers which interface and source address will actually be used, and it is the first command to run when two machines on one switch cannot find each other."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Multicast"
+        },
+        {
+         "t": "text",
+         "v": " is how one sender reaches many receivers without sending a copy to each. The destination is a group address in 224.0.0.0/4, a receiver joins the group with an IGMP message, and the switch, if it does IGMP snooping, forwards that group only to ports that joined; a switch without snooping floods it to every port, and a router does not forward it at all unless it is configured to. So multicast is a property of the network you are on, not of your program. Two commands show the state:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "ip maddr show                              # the groups each interface has joined\ntcpdump -n -i eth0 'udp and dst net 224.0.0.0/4'   # whether the datagrams are actually on the wire"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "On a wireless link multicast is much worse than it looks. An access point sends a multicast frame at one of the low basic rates and does not acknowledge or retransmit it, so it is both slow and lossy compared with the unicast traffic next to it, and RFC 9119 is a whole document about the consequences. Many access points also have client isolation switched on, which drops traffic between two wireless clients whatever its destination. A robot and a laptop on the same wifi with client isolation on will never discover each other, and nothing on either machine can tell you why."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "MTU"
+        },
+        {
+         "t": "text",
+         "v": " is the largest packet an interface will carry, normally 1500 bytes on Ethernet. A UDP datagram larger than that is split by IP into fragments, and here is the part that matters: the datagram is delivered only if every fragment arrives. A 60 kB point cloud is about 42 fragments, and losing any one of them loses the whole cloud. Worse, the receiving kernel holds the fragments it did get while it waits for the missing one, for "
+        },
+        {
+         "t": "code",
+         "v": "net.ipv4.ipfrag_time"
+        },
+        {
+         "t": "text",
+         "v": " seconds, in a buffer of "
+        },
+        {
+         "t": "code",
+         "v": "net.ipv4.ipfrag_high_thresh"
+        },
+        {
+         "t": "text",
+         "v": " bytes; while that buffer is full, other fragmented datagrams cannot be reassembled either. Read the three numbers rather than assuming them, because the defaults have changed between kernel versions:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "sysctl net.ipv4.ipfrag_time net.ipv4.ipfrag_high_thresh   # seconds to hold fragments, and the buffer\nping -M do -s 1472 192.168.1.20                           # 1472 + 28 = 1500: fails if the path MTU is smaller\ngrep -A1 '^Ip:' /proc/net/snmp                            # ReasmReqds and ReasmFails: reassembly attempted and failed"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Finally, how to tell a network problem from a middleware problem, which is the question this whole section exists to answer. Work up the stack and stop at the first layer that fails:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "ping"
+         },
+         {
+          "t": "text",
+          "v": " the other machine. No reply means routing, firewall or cable, and nothing above this matters."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Send a plain datagram to a port you opened yourself, with "
+         },
+         {
+          "t": "code",
+          "v": "socat"
+         },
+         {
+          "t": "text",
+          "v": " or the echo program in the exercise below. If your own datagram arrives and the middleware's does not, the network is fine and the problem is configuration."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "tcpdump"
+         },
+         {
+          "t": "text",
+          "v": " on both ends for the middleware's ports. Packets leaving one machine and not arriving at the other is a network answer; packets arriving and the program not reacting is a program answer."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Only now open the middleware's own tools."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The value of the ladder is that each step is cheap and each one eliminates a layer. Starting at step 4, which is what everybody does, means guessing."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "echo",
+   "title": "Small UDP or TCP echo in C++",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 25 minutes. Write a UDP echo in modern C++, as two programs and then as one test."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "echo_server"
+         },
+         {
+          "t": "text",
+          "v": " binds a UDP socket on 127.0.0.1 and a port given on the command line, then loops: receive a datagram, send the same bytes back to whoever sent it, log the length. Wrap the file descriptor in a class whose destructor closes it, and make that class move-only."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "echo_client"
+         },
+         {
+          "t": "text",
+          "v": " sends each of its command-line arguments as one datagram, waits for the echo and prints it. Give the receive a 200 ms timeout so it cannot wait for ever, and say in a comment which socket option does that."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Bind the server to port 0 in a third program that holds both sockets, ask the kernel which port it chose, and run the whole exchange in one process. This is the version you can put in a test suite: no fixed port, no second process, no sleep."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Send a datagram longer than the interface's MTU and describe what "
+         },
+         {
+          "t": "code",
+          "v": "tcpdump"
+         },
+         {
+          "t": "text",
+          "v": " shows. Then send one to a port where nothing is listening and say what comes back."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Answer two questions. Why does the client's receive need a timeout even on loopback, where nothing is ever lost? And what would change in the server if you wrote it on TCP instead?"
+         }
+        ]
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Steps 1 to 3 in the form that can be measured. The two-program version is this one split at the obvious line, with the port passed in rather than asked for:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <arpa/inet.h>\n#include <netinet/in.h>\n#include <sys/socket.h>\n#include <unistd.h>\n\n#include <array>\n#include <cerrno>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <utility>\n\n// Owns one file descriptor and closes it. A socket is a resource like any other, and the only\n// reason so much socket code leaks one is that the C interface hands back a bare int.\nclass Socket {\n public:\n  explicit Socket(int domain, int type) : fd_(::socket(domain, type, 0)) {}\n  Socket(const Socket&) = delete;\n  Socket& operator=(const Socket&) = delete;\n  Socket(Socket&& other) noexcept : fd_(std::exchange(other.fd_, -1)) {}\n  Socket& operator=(Socket&& other) noexcept {\n    std::swap(fd_, other.fd_);\n    return *this;\n  }\n  ~Socket() {\n    if (fd_ >= 0) ::close(fd_);\n  }\n\n  [[nodiscard]] int get() const { return fd_; }\n  [[nodiscard]] bool valid() const { return fd_ >= 0; }\n\n private:\n  int fd_ = -1;\n};\n\n[[nodiscard]] sockaddr_in loopback(std::uint16_t port) {\n  sockaddr_in address{};\n  address.sin_family = AF_INET;\n  address.sin_port = htons(port);\n  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);\n  return address;\n}\n\n// Asks the kernel which port it gave us. Binding to port 0 means \"any free one\", which is what a\n// test wants: a fixed port is a test that fails when somebody else is already using it.\n[[nodiscard]] std::uint16_t port_of(const Socket& socket) {\n  sockaddr_in address{};\n  socklen_t length = sizeof(address);\n  if (::getsockname(socket.get(), reinterpret_cast<sockaddr*>(&address), &length) != 0) return 0;\n  return ntohs(address.sin_port);\n}\n\nint main() {\n  Socket server(AF_INET, SOCK_DGRAM);\n  Socket client(AF_INET, SOCK_DGRAM);\n  if (!server.valid() || !client.valid()) {\n    std::cout << \"could not open a socket\\n\";\n    return 1;\n  }\n\n  const sockaddr_in any_port = loopback(0);\n  if (::bind(server.get(), reinterpret_cast<const sockaddr*>(&any_port), sizeof(any_port)) != 0) {\n    std::cout << \"could not bind\\n\";\n    return 1;\n  }\n  const sockaddr_in server_address = loopback(port_of(server));\n\n  // SO_RCVTIMEO is what gives up rather than waiting for ever. Without it the next line has no\n  // timeout at all, which is the worst kind of failure: a hang with nothing in any log.\n  timeval limit{};\n  limit.tv_usec = 200000;  // 200 ms\n  ::setsockopt(client.get(), SOL_SOCKET, SO_RCVTIMEO, &limit, sizeof(limit));\n  ::setsockopt(server.get(), SOL_SOCKET, SO_RCVTIMEO, &limit, sizeof(limit));\n\n  std::array<char, 256> buffer{};\n  for (const std::string_view request : {\"odom 1\", \"odom 2\", \"scan\"}) {\n    ::sendto(client.get(), request.data(), request.size(), 0,\n             reinterpret_cast<const sockaddr*>(&server_address), sizeof(server_address));\n\n    sockaddr_in from{};\n    socklen_t from_length = sizeof(from);\n    const auto taken = ::recvfrom(server.get(), buffer.data(), buffer.size(), 0,\n                                  reinterpret_cast<sockaddr*>(&from), &from_length);\n    if (taken < 0) {\n      std::cout << \"the server heard nothing\\n\";\n      return 1;\n    }\n    ::sendto(server.get(), buffer.data(), static_cast<std::size_t>(taken), 0,\n             reinterpret_cast<const sockaddr*>(&from), from_length);\n\n    const auto echoed = ::recvfrom(client.get(), buffer.data(), buffer.size(), 0, nullptr, nullptr);\n    if (echoed < 0) {\n      std::cout << \"the client heard nothing\\n\";\n      return 1;\n    }\n    const std::string_view reply(buffer.data(), static_cast<std::size_t>(echoed));\n    std::cout << std::format(\"sent '{}', got back '{}', {} bytes\\n\", request, reply, echoed);\n  }\n\n  // Nobody is going to answer this one, so the timeout is what ends the call.\n  errno = 0;\n  const auto nothing = ::recvfrom(client.get(), buffer.data(), buffer.size(), 0, nullptr, nullptr);\n  const bool timed_out = nothing < 0 && (errno == EAGAIN || errno == EWOULDBLOCK);\n  std::cout << std::format(\"with no reply to wait for: {}\\n\", timed_out ? \"timed out after 200 ms\" : \"something else\");\n}"
+      },
+      {
+       "t": "output",
+       "text": "sent 'odom 1', got back 'odom 1', 6 bytes\nsent 'odom 2', got back 'odom 2', 6 bytes\nsent 'scan', got back 'scan', 4 bytes\nwith no reply to wait for: timed out after 200 ms"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Five things in it are the point of the exercise. "
+        },
+        {
+         "t": "code",
+         "v": "Socket"
+        },
+        {
+         "t": "text",
+         "v": " closes the descriptor in its destructor and deletes its copy operations, so there is no path on which the program leaks one and no way to close the same one twice; a bare "
+        },
+        {
+         "t": "code",
+         "v": "int fd"
+        },
+        {
+         "t": "text",
+         "v": " and a "
+        },
+        {
+         "t": "code",
+         "v": "close"
+        },
+        {
+         "t": "text",
+         "v": " at the end of "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " is wrong on every early return. Binding to port 0 and reading the port back with "
+        },
+        {
+         "t": "code",
+         "v": "getsockname"
+        },
+        {
+         "t": "text",
+         "v": " is what makes this runnable in a test suite, on a machine where somebody else already has 5000. "
+        },
+        {
+         "t": "code",
+         "v": "SO_RCVTIMEO"
+        },
+        {
+         "t": "text",
+         "v": " turns a wait with no end into a call that returns -1 with "
+        },
+        {
+         "t": "code",
+         "v": "errno"
+        },
+        {
+         "t": "text",
+         "v": " set to "
+        },
+        {
+         "t": "code",
+         "v": "EAGAIN"
+        },
+        {
+         "t": "text",
+         "v": ", which is the last line of the output. The buffer is a "
+        },
+        {
+         "t": "code",
+         "v": "std::array"
+        },
+        {
+         "t": "text",
+         "v": ", not a "
+        },
+        {
+         "t": "code",
+         "v": "char[256]"
+        },
+        {
+         "t": "text",
+         "v": ", so its size travels with it and "
+        },
+        {
+         "t": "code",
+         "v": "buffer.size()"
+        },
+        {
+         "t": "text",
+         "v": " cannot disagree with the declaration. And the message boundaries are free: every "
+        },
+        {
+         "t": "code",
+         "v": "recvfrom"
+        },
+        {
+         "t": "text",
+         "v": " returned exactly one of the strings sent, with its own length, and no framing code was written."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 4. A datagram larger than the interface's MTU is split by IP, and "
+        },
+        {
+         "t": "code",
+         "v": "tcpdump"
+        },
+        {
+         "t": "text",
+         "v": " shows it as several packets: the first with the UDP header and a "
+        },
+        {
+         "t": "code",
+         "v": "flags [+]"
+        },
+        {
+         "t": "text",
+         "v": " marking more fragments, the rest as "
+        },
+        {
+         "t": "code",
+         "v": "frag"
+        },
+        {
+         "t": "text",
+         "v": " continuations with only an IP header. You see one datagram from the program and 42 packets on the wire for a 60 kB payload. If one of them is dropped the receiver never gets the datagram at all, and the "
+        },
+        {
+         "t": "code",
+         "v": "ReasmFails"
+        },
+        {
+         "t": "text",
+         "v": " counter in "
+        },
+        {
+         "t": "code",
+         "v": "/proc/net/snmp"
+        },
+        {
+         "t": "text",
+         "v": " goes up. A datagram sent to a port where nothing is listening gets an ICMP port-unreachable back, which on a connected UDP socket surfaces as "
+        },
+        {
+         "t": "code",
+         "v": "ECONNREFUSED"
+        },
+        {
+         "t": "text",
+         "v": " on the next operation and on an unconnected one is usually discarded, which is why a UDP client with no timeout can wait for ever even when the answer is \"nobody is there\"."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Step 5, the two questions. The receive needs a timeout even on loopback because loss is not the only reason an answer never comes: the peer may not be running, may have crashed after receiving, may be listening on another port, or may have answered to a different address. The timeout is not about the network, it is about a wait that would otherwise have no end. On TCP the server changes shape: "
+        },
+        {
+         "t": "code",
+         "v": "listen"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "accept"
+        },
+        {
+         "t": "text",
+         "v": " per client, one connection object per client instead of a source address per datagram, and a framing decision, because "
+        },
+        {
+         "t": "code",
+         "v": "recv"
+        },
+        {
+         "t": "text",
+         "v": " gives back whatever bytes have arrived rather than the message you sent. The echo would have to loop until it had a complete message by its own definition, which for an echo means choosing one, and that choice is the thing UDP handed you for free."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "contracts",
+   "title": "Timeouts, serialisation formats, API compatibility",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every socket call that waits has a timeout, and the default value of that timeout is for ever. Four of them are worth knowing by name, because the default is wrong in all four cases:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "SO_RCVTIMEO"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "SO_SNDTIMEO"
+         },
+         {
+          "t": "text",
+          "v": ", in "
+         },
+         {
+          "t": "code",
+          "v": "setsockopt"
+         },
+         {
+          "t": "text",
+          "v": ", bound one receive or send and return "
+         },
+         {
+          "t": "code",
+          "v": "EAGAIN"
+         },
+         {
+          "t": "text",
+          "v": " when they expire ("
+         },
+         {
+          "t": "a",
+          "v": "socket(7)",
+          "href": "https://man7.org/linux/man-pages/man7/socket.7.html"
+         },
+         {
+          "t": "text",
+          "v": ")."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "connect"
+         },
+         {
+          "t": "text",
+          "v": " on a blocking TCP socket uses the kernel's own retry schedule, which can run for over two minutes. To bound it, set the socket non-blocking, call "
+         },
+         {
+          "t": "code",
+          "v": "connect"
+         },
+         {
+          "t": "text",
+          "v": ", and wait on "
+         },
+         {
+          "t": "code",
+          "v": "poll"
+         },
+         {
+          "t": "text",
+          "v": " with your own limit."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "TCP_USER_TIMEOUT"
+         },
+         {
+          "t": "text",
+          "v": " bounds how long unacknowledged data may stay unacknowledged before the connection is dropped, which is the only setting that catches a peer that vanished mid-stream ("
+         },
+         {
+          "t": "a",
+          "v": "tcp(7)",
+          "href": "https://man7.org/linux/man-pages/man7/tcp.7.html"
+         },
+         {
+          "t": "text",
+          "v": ")."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "TCP keepalive is off by default, and when you switch it on with "
+         },
+         {
+          "t": "code",
+          "v": "SO_KEEPALIVE"
+         },
+         {
+          "t": "text",
+          "v": " it starts probing after "
+         },
+         {
+          "t": "code",
+          "v": "net.ipv4.tcp_keepalive_time"
+         },
+         {
+          "t": "text",
+          "v": " seconds, which is 7200 on a stock kernel. Two hours is not a health check."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The reliability topic covers where the numbers come from; what belongs here is that these are the four places to put them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "Serialisation"
+        },
+        {
+         "t": "text",
+         "v": " is the other half of talking to another process, and a format has to decide six things: the order of the fields, the width of each number, the byte order, whether anything is padded for alignment, how a string or an array says how long it is, and how the reader knows where one message ends. Two families answer them differently. A self-describing format carries the field names with the data, so a reader can skip what it does not know: JSON, CBOR and MessagePack are in this family, and they cost bytes and parsing time. A schema-based format carries only the values, with both sides compiled against the same description: Protobuf, FlatBuffers, Cap'n Proto and CDR, the one DDS uses, are in this family, and they are smaller and faster and useless without the schema."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Whatever the family, never put a C++ struct on the wire with "
+        },
+        {
+         "t": "code",
+         "v": "memcpy"
+        },
+        {
+         "t": "text",
+         "v": ". The padding between members is chosen by the compiler, the byte order is the machine's, an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " is a different width on a different target, and a "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " is one byte here and four somewhere else. Two builds of the same struct with different compiler flags can disagree. Write each field with a fixed width and a fixed byte order, or use a format that does it for you."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "i",
+         "v": "API compatibility"
+        },
+        {
+         "t": "text",
+         "v": " is what happens when the two sides are not the same version, which on a robot is most of the time: the laptop was rebuilt and the robot was not. Three rules cover almost all of it. Add fields at the end, and give each one a default that means \"the old behaviour\", so an old writer's message still reads correctly. Never reuse a field's tag or change its type, because a reader compiled against the old definition will read the new bytes as the old type and get a plausible wrong number rather than an error. And deploy readers before writers, so nothing emits a field that nothing can read."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Even with all three, you want the mismatch to be detectable rather than inferred. That means a version number in the message or in a handshake, and a rule about what to do when it is higher than you know: refuse and say so, which is the same answer the recovery topic gave for a record from a newer format. ROS 2 does this with a hash of the message definition that travels with discovery, so two nodes built from different "
+        },
+        {
+         "t": "code",
+         "v": ".msg"
+        },
+        {
+         "t": "text",
+         "v": " files are visibly different rather than quietly incompatible; the topic on DDS and rmw shows where to read it."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Four network failures produce symptoms that look nothing like their cause."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fragmentation stall is the worst of them, because the link looks perfect. A node sends 60 kB point clouds over wifi, one fragment in forty is lost, and the receiving kernel holds the rest while it waits, for "
+        },
+        {
+         "t": "code",
+         "v": "net.ipv4.ipfrag_time"
+        },
+        {
+         "t": "text",
+         "v": " seconds. With clouds arriving continuously, the fragment buffer fills and stays full, and now nothing fragmented gets through, including traffic from other programs. "
+        },
+        {
+         "t": "code",
+         "v": "ping"
+        },
+        {
+         "t": "text",
+         "v": " still reports 0.4 ms and no loss, because a ping is one small packet. The evidence is "
+        },
+        {
+         "t": "code",
+         "v": "ReasmFails"
+        },
+        {
+         "t": "text",
+         "v": " climbing in "
+        },
+        {
+         "t": "code",
+         "v": "/proc/net/snmp"
+        },
+        {
+         "t": "text",
+         "v": ", and the fixes are all about not fragmenting: send smaller messages, turn the reliability down so the retransmissions stop adding to the pressure, or raise the buffer and shorten the hold time."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Multicast on wifi is the second, and it is usually reported as \"discovery does not work but ping does\". The access point sends multicast frames at a low basic rate without acknowledgement, and client isolation, if it is on, drops client-to-client traffic entirely. Neither shows up in anything you can run on the two machines. The test is "
+        },
+        {
+         "t": "code",
+         "v": "ip maddr show"
+        },
+        {
+         "t": "text",
+         "v": " on the receiver to confirm the group was joined, and "
+        },
+        {
+         "t": "code",
+         "v": "tcpdump"
+        },
+        {
+         "t": "text",
+         "v": " on both ends to see whether the frames leave one and arrive at the other; the fix is to stop relying on multicast, by naming the peers directly or by putting a wire between the machines for the part that matters."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The stolen route is the third. A VPN or a container bridge installs a route that is more specific than the local one, so packets you meant for the robot on the same switch go into the tunnel. Nothing fails: the packets arrive, thirty milliseconds later, sometimes reordered, and multicast does not arrive at all. "
+        },
+        {
+         "t": "code",
+         "v": "ip route get <robot address>"
+        },
+        {
+         "t": "text",
+         "v": " shows it in one line, and it is the command to run before anything else when latency is inexplicably high."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth is small and costs 40 ms at a time. TCP's Nagle algorithm holds a small write until the previous one is acknowledged, and the receiver's delayed acknowledgement holds that acknowledgement for up to 40 ms hoping to combine it with data. Put the two together and a request-response protocol with small messages stalls once per exchange. "
+        },
+        {
+         "t": "code",
+         "v": "TCP_NODELAY"
+        },
+        {
+         "t": "text",
+         "v": " switches Nagle off, and any protocol sending small messages and waiting for a reply should set it. The general form of this failure is worth remembering: two sensible optimisations, one on each end, that are pathological together."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Give the four differences between TCP and UDP and say what a TCP read gives back. Say what head-of-line blocking costs a sensor stream and why middleware builds reliability on UDP instead. Separate latency from bandwidth and give the two places they meet. Name the command that shows which interface a destination uses, the one that shows who is bound to a port, and the one that shows reassembly failures. Say what happens to a UDP datagram larger than the MTU and what that does to the receiving kernel. Name the socket option that bounds a receive, and the three rules for changing a message without breaking the other side."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does a TCP "
+     },
+     {
+      "t": "code",
+      "v": "recv"
+     },
+     {
+      "t": "text",
+      "v": " give back, and what does a UDP "
+     },
+     {
+      "t": "code",
+      "v": "recvfrom"
+     },
+     {
+      "t": "text",
+      "v": " give back?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is head-of-line blocking, and what does it cost a 10 Hz sensor stream on a lossy link?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A link has 600 ms of latency and 100 Mbit/s of bandwidth. Which of the two hurts a 40 MB download, and which hurts a 20 Hz control loop?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which command tells you the interface and source address a packet to a given host will use?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What has to be true of the switch and of the access point for multicast to reach a second machine?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A 60 kB UDP datagram goes onto a 1500-byte link. How many packets, and what happens if one is lost?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which two sysctl values decide how long a half-reassembled datagram blocks the buffer, and which counter shows it happening?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which socket option bounds a receive, and what does the call return when it expires?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why must a C++ struct never be written to the wire with "
+     },
+     {
+      "t": "code",
+      "v": "memcpy"
+     },
+     {
+      "t": "text",
+      "v": "? Name three things that differ."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Two machines on one switch cannot see each other's ROS nodes, and "
+     },
+     {
+      "t": "code",
+      "v": "ping"
+     },
+     {
+      "t": "text",
+      "v": " works. Give the next three checks in order."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file in 20 minutes: a UDP echo whose socket is closed on every path and whose receive cannot wait for ever."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "The Linux manual pages: "
+     },
+     {
+      "t": "a",
+      "v": "socket(7)",
+      "href": "https://man7.org/linux/man-pages/man7/socket.7.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "SO_RCVTIMEO"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "SO_KEEPALIVE"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "tcp(7)",
+      "href": "https://man7.org/linux/man-pages/man7/tcp.7.html"
+     },
+     {
+      "t": "text",
+      "v": " for "
+     },
+     {
+      "t": "code",
+      "v": "TCP_NODELAY"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "TCP_USER_TIMEOUT"
+     },
+     {
+      "t": "text",
+      "v": " and the keepalive timers, "
+     },
+     {
+      "t": "a",
+      "v": "udp(7)",
+      "href": "https://man7.org/linux/man-pages/man7/udp.7.html"
+     },
+     {
+      "t": "text",
+      "v": " for datagram semantics and "
+     },
+     {
+      "t": "code",
+      "v": "ECONNREFUSED"
+     },
+     {
+      "t": "text",
+      "v": ", and "
+     },
+     {
+      "t": "a",
+      "v": "ss(8)",
+      "href": "https://man7.org/linux/man-pages/man8/ss.8.html"
+     },
+     {
+      "t": "text",
+      "v": " for the socket listing and "
+     },
+     {
+      "t": "code",
+      "v": "-i"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "The kernel's "
+     },
+     {
+      "t": "a",
+      "v": "IP sysctl documentation",
+      "href": "https://www.kernel.org/doc/html/latest/networking/ip-sysctl.html"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "ip_local_port_range"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "ipfrag_time"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "ipfrag_high_thresh"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "tcp_keepalive_time"
+     },
+     {
+      "t": "text",
+      "v": ". The two values this page quotes, the ephemeral range and the two-hour keepalive, are the ones a stock Ubuntu kernel ships; the fragment buffer's size has changed between kernel versions, which is why the page has you read that one with "
+     },
+     {
+      "t": "code",
+      "v": "sysctl"
+     },
+     {
+      "t": "text",
+      "v": " rather than trusting a number in a document."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "RFC 9119",
+      "href": "https://www.rfc-editor.org/rfc/rfc9119.html"
+     },
+     {
+      "t": "text",
+      "v": ", multicast over 802 wireless media: why a multicast frame on wifi is sent at a low rate without acknowledgement, and what that does to a protocol that relies on it."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "RFC 896",
+      "href": "https://www.rfc-editor.org/rfc/rfc896.html"
+     },
+     {
+      "t": "text",
+      "v": " for the Nagle algorithm and "
+     },
+     {
+      "t": "a",
+      "v": "RFC 1122",
+      "href": "https://www.rfc-editor.org/rfc/rfc1122.html"
+     },
+     {
+      "t": "text",
+      "v": " for delayed acknowledgement, the pair that produces the 40 ms stall."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "ROS 2 Jazzy documentation, "
+     },
+     {
+      "t": "a",
+      "v": "DDS tuning",
+      "href": "https://docs.ros.org/en/jazzy/How-To-Guides/DDS-tuning.html"
+     },
+     {
+      "t": "text",
+      "v": ": the fragmentation stall as it appears to a ROS user, and the sysctl changes that relieve it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "W. Richard Stevens, Bill Fenner and Andrew Rudoff, "
+     },
+     {
+      "t": "a",
+      "v": "the sockets volume of the network programming book",
+      "href": "https://www.informit.com/store/unix-network-programming-volume-1-the-sockets-networking-9780131411555"
+     },
+     {
+      "t": "text",
+      "v": ": the reference for every call in the exercise."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "R.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-raii"
+     },
+     {
+      "t": "text",
+      "v": " on owning a handle through an object, and "
+     },
+     {
+      "t": "a",
+      "v": "C.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+     },
+     {
+      "t": "text",
+      "v": " on the copy and move operations a handle class has to decide about."
+     }
+    ]
+   ]
+  }
+ ]
+}

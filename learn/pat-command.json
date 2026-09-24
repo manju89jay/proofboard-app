@@ -1,0 +1,1470 @@
+{
+ "id": "pat-command",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "From memory, sketch a "
+     },
+     {
+      "t": "code",
+      "v": "Command"
+     },
+     {
+      "t": "text",
+      "v": " interface with "
+     },
+     {
+      "t": "code",
+      "v": "execute"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "undo"
+     },
+     {
+      "t": "text",
+      "v": ", and a "
+     },
+     {
+      "t": "code",
+      "v": "MoveBy"
+     },
+     {
+      "t": "text",
+      "v": " that changes a robot's position by a fixed amount in "
+     },
+     {
+      "t": "code",
+      "v": "execute"
+     },
+     {
+      "t": "text",
+      "v": " and reverses it in "
+     },
+     {
+      "t": "code",
+      "v": "undo"
+     },
+     {
+      "t": "text",
+      "v": ". Run two moves, keep them in a history, and undo the last one. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <vector>\n\nstruct Robot {\n  std::int32_t x_mm = 0;\n};\n\nclass Command {\n public:\n  Command() = default;\n  Command(const Command&) = delete;\n  Command& operator=(const Command&) = delete;\n  virtual ~Command() = default;\n  virtual void execute(Robot& robot) = 0;\n  virtual void undo(Robot& robot) = 0;\n};\n\nclass MoveBy final : public Command {\n public:\n  explicit MoveBy(std::int32_t delta_mm) : delta_mm_(delta_mm) {}\n  void execute(Robot& robot) override { robot.x_mm += delta_mm_; }\n  void undo(Robot& robot) override { robot.x_mm -= delta_mm_; }\n\n private:\n  std::int32_t delta_mm_;\n};\n\nint main() {\n  Robot robot;\n  std::vector<std::unique_ptr<Command>> history;\n\n  auto run = [&](std::unique_ptr<Command> cmd) {\n    cmd->execute(robot);\n    history.push_back(std::move(cmd));\n  };\n\n  run(std::make_unique<MoveBy>(500));\n  run(std::make_unique<MoveBy>(300));\n  std::cout << std::format(\"after two moves: {} mm\\n\", robot.x_mm);\n\n  history.back()->undo(robot);\n  history.pop_back();\n  std::cout << std::format(\"after undo: {} mm\\n\", robot.x_mm);\n}"
+   },
+   {
+    "t": "output",
+    "text": "after two moves: 800 mm\nafter undo: 500 mm"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "code",
+      "v": "MoveBy"
+     },
+     {
+      "t": "text",
+      "v": " stores only what it needs to reverse itself, the same "
+     },
+     {
+      "t": "code",
+      "v": "delta_mm"
+     },
+     {
+      "t": "text",
+      "v": " it applied, and "
+     },
+     {
+      "t": "code",
+      "v": "Robot"
+     },
+     {
+      "t": "text",
+      "v": " never appears until "
+     },
+     {
+      "t": "code",
+      "v": "execute"
+     },
+     {
+      "t": "text",
+      "v": " or "
+     },
+     {
+      "t": "code",
+      "v": "undo"
+     },
+     {
+      "t": "text",
+      "v": " is called with one."
+     }
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass if "
+     },
+     {
+      "t": "code",
+      "v": "Command"
+     },
+     {
+      "t": "text",
+      "v": " declares both "
+     },
+     {
+      "t": "code",
+      "v": "execute"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "undo"
+     },
+     {
+      "t": "text",
+      "v": ", the history holds commands by "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": " rather than by value, and undoing the last one restores the value it had before that command ran. An interface with only "
+     },
+     {
+      "t": "code",
+      "v": "execute"
+     },
+     {
+      "t": "text",
+      "v": " is a partial pass: undo is the reason this is Command and not a plain callback. Reversing the move by recomputing a new delta instead of storing the one that was applied is a fail, because it stops working the moment "
+     },
+     {
+      "t": "code",
+      "v": "execute"
+     },
+     {
+      "t": "text",
+      "v": "'s logic is anything other than addition."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "Command turns a request into an object instead of a function call made and forgotten. The class implements at least "
+    },
+    {
+     "t": "code",
+     "v": "execute"
+    },
+    {
+     "t": "text",
+     "v": ", and usually "
+    },
+    {
+     "t": "code",
+     "v": "undo"
+    },
+    {
+     "t": "text",
+     "v": "; each instance stores exactly the arguments one particular call needed, so that calling "
+    },
+    {
+     "t": "code",
+     "v": "execute"
+    },
+    {
+     "t": "text",
+     "v": " later needs nothing else, and calling "
+    },
+    {
+     "t": "code",
+     "v": "undo"
+    },
+    {
+     "t": "text",
+     "v": " can reverse exactly that call rather than guess at a new one. The object making the request builds a "
+    },
+    {
+     "t": "code",
+     "v": "Command"
+    },
+    {
+     "t": "text",
+     "v": " and hands it to whatever will run it; that receiver does not need to know what the command does, only that it can be executed."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is a call that has to happen somewhere other than where it was decided: queued for later, run on a different thread, written to a log, sent across a network, or reversed. A function call is gone the instant it returns; nothing about it can be replayed, inspected first, or undone, because there was never an object to hold and look at."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is packaging a request as data before it runs: the receiver and the arguments become member variables, "
+    },
+    {
+     "t": "code",
+     "v": "execute"
+    },
+    {
+     "t": "text",
+     "v": " performs the call using them, and "
+    },
+    {
+     "t": "code",
+     "v": "undo"
+    },
+    {
+     "t": "text",
+     "v": ", when the command supports it, performs the inverse using the same stored data. A queue is "
+    },
+    {
+     "t": "code",
+     "v": "std::vector<std::unique_ptr<Command>>"
+    },
+    {
+     "t": "text",
+     "v": " waiting to be executed; a history is the same commands moved into a second list after they run, ready to be undone in reverse order; a macro command holds a list of other commands and executes or undoes all of them as one."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is an object and a virtual call where a direct call would have done, and a class per kind of request. Skip it for a call that runs once, right where it is made, and never needs to be queued, logged or undone: that call is smaller and clearer written directly. Reach for it once any of those four needs shows up, because retrofitting undo into code that only ever called functions means finding every call site and deciding what its inverse is, after the fact."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this in any editor, planner or console with an undo command, and the interview question is exactly the shape that makes undo possible: an object that remembers enough to reverse itself."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "Commands as objects; queues, undo and redo",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A queue of commands, run in order, each one logged before it runs, and undone in reverse order afterward:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <vector>\n\nstruct Robot {\n  std::int32_t x_mm = 0;\n  std::int32_t heading_mdeg = 0;\n};\n\n// The request as an object: a description for logging, and both directions of the change.\nclass Command {\n public:\n  Command() = default;\n  Command(const Command&) = delete;\n  Command& operator=(const Command&) = delete;\n  virtual ~Command() = default;\n  [[nodiscard]] virtual std::string describe() const = 0;\n  virtual void execute(Robot& robot) = 0;\n  virtual void undo(Robot& robot) = 0;\n};\n\nclass MoveBy final : public Command {\n public:\n  explicit MoveBy(std::int32_t delta_mm) : delta_mm_(delta_mm) {}\n  [[nodiscard]] std::string describe() const override { return std::format(\"move by {} mm\", delta_mm_); }\n  void execute(Robot& robot) override { robot.x_mm += delta_mm_; }\n  void undo(Robot& robot) override { robot.x_mm -= delta_mm_; }\n\n private:\n  std::int32_t delta_mm_;\n};\n\nclass TurnBy final : public Command {\n public:\n  explicit TurnBy(std::int32_t delta_mdeg) : delta_mdeg_(delta_mdeg) {}\n  [[nodiscard]] std::string describe() const override { return std::format(\"turn by {} mdeg\", delta_mdeg_); }\n  void execute(Robot& robot) override { robot.heading_mdeg += delta_mdeg_; }\n  void undo(Robot& robot) override { robot.heading_mdeg -= delta_mdeg_; }\n\n private:\n  std::int32_t delta_mdeg_;\n};\n\n// Coordinates a queue of commands: logs each one before running it, and can undo the whole run.\nclass CommandQueue {\n public:\n  void push(std::unique_ptr<Command> command) { pending_.push_back(std::move(command)); }\n\n  void run_all(Robot& robot) {\n    for (auto& command : pending_) {\n      std::cout << std::format(\"running: {}\\n\", command->describe());\n      command->execute(robot);\n      done_.push_back(std::move(command));\n    }\n    pending_.clear();\n  }\n\n  void undo_all(Robot& robot) {\n    while (!done_.empty()) {\n      std::cout << std::format(\"undoing: {}\\n\", done_.back()->describe());\n      done_.back()->undo(robot);\n      done_.pop_back();\n    }\n  }\n\n private:\n  std::vector<std::unique_ptr<Command>> pending_;\n  std::vector<std::unique_ptr<Command>> done_;\n};\n\nint main() {\n  Robot robot;\n  CommandQueue queue;\n  queue.push(std::make_unique<MoveBy>(500));\n  queue.push(std::make_unique<TurnBy>(900));\n  queue.push(std::make_unique<MoveBy>(-200));\n\n  queue.run_all(robot);\n  std::cout << std::format(\"after the queue: x {} mm, heading {} mdeg\\n\", robot.x_mm, robot.heading_mdeg);\n\n  queue.undo_all(robot);\n  std::cout << std::format(\"after undoing all: x {} mm, heading {} mdeg\\n\", robot.x_mm, robot.heading_mdeg);\n}"
+      },
+      {
+       "t": "output",
+       "text": "running: move by 500 mm\nrunning: turn by 900 mdeg\nrunning: move by -200 mm\nafter the queue: x 300 mm, heading 900 mdeg\nundoing: move by -200 mm\nundoing: turn by 900 mdeg\nundoing: move by 500 mm\nafter undoing all: x 0 mm, heading 0 mdeg"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "CommandQueue"
+        },
+        {
+         "t": "text",
+         "v": " never names "
+        },
+        {
+         "t": "code",
+         "v": "MoveBy"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "TurnBy"
+        },
+        {
+         "t": "text",
+         "v": "; it holds "
+        },
+        {
+         "t": "code",
+         "v": "Command"
+        },
+        {
+         "t": "text",
+         "v": ", and a third kind of request is one more class, with no change to the queue. Gamma, Helm, Johnson and Vlissides describe exactly this shape in the behavioural chapter of the 1994 catalogue ("
+        },
+        {
+         "t": "a",
+         "v": "Design Patterns",
+         "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+        },
+        {
+         "t": "text",
+         "v": "): a request wrapped as an object, so the code that issues it and the code that carries it out can be parameterised, queued and logged independently of each other. "
+        },
+        {
+         "t": "code",
+         "v": "run_all"
+        },
+        {
+         "t": "text",
+         "v": " logs "
+        },
+        {
+         "t": "code",
+         "v": "describe()"
+        },
+        {
+         "t": "text",
+         "v": " before calling "
+        },
+        {
+         "t": "code",
+         "v": "execute"
+        },
+        {
+         "t": "text",
+         "v": ", which a bare function call has no way to do, because there is nothing to ask for a description until the call has already happened. Undoing in reverse order, last command first, is what makes a chain of moves and turns invertible as a whole: undoing "
+        },
+        {
+         "t": "code",
+         "v": "MoveBy(-200)"
+        },
+        {
+         "t": "text",
+         "v": " before "
+        },
+        {
+         "t": "code",
+         "v": "TurnBy(900)"
+        },
+        {
+         "t": "text",
+         "v": " gets the robot back through the same states it passed through going forward, in the opposite order."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The dependency injection topic's own three sites for a dependency have a parallel here, and it is worth being precise about it, because Strategy and Command look alike from a distance. A Strategy is a property of an object, chosen once and used on every call after; the pricing rule a "
+        },
+        {
+         "t": "code",
+         "v": "Quoter"
+        },
+        {
+         "t": "text",
+         "v": " holds does not change between quotes. A Command is one piece of work, built for one call, usually thrown away after "
+        },
+        {
+         "t": "code",
+         "v": "execute"
+        },
+        {
+         "t": "text",
+         "v": " unless something might still need to "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " it. "
+        },
+        {
+         "t": "code",
+         "v": "MoveBy(500)"
+        },
+        {
+         "t": "text",
+         "v": " is not a policy the queue consults repeatedly; it is a specific request, spent the moment it runs."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Klaus Iglberger's Guideline 21 in C++ Software Design makes the same distinction from the implementation side: where Strategy isolates "
+        },
+        {
+         "t": "i",
+         "v": "how"
+        },
+        {
+         "t": "text",
+         "v": " a step is done, Command isolates "
+        },
+        {
+         "t": "i",
+         "v": "what"
+        },
+        {
+         "t": "text",
+         "v": " is done, and the two often sit next to each other in the same codebase without competing for the same job."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A command built out of other commands, so one call to "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " reverses all of them:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Robot {\n  std::int32_t x_mm = 0;\n  std::int32_t heading_mdeg = 0;\n};\n\nclass Command {\n public:\n  Command() = default;\n  Command(const Command&) = delete;\n  Command& operator=(const Command&) = delete;\n  virtual ~Command() = default;\n  [[nodiscard]] virtual std::string describe() const = 0;\n  virtual void execute(Robot& robot) = 0;\n  virtual void undo(Robot& robot) = 0;\n};\n\nclass MoveBy final : public Command {\n public:\n  explicit MoveBy(std::int32_t delta_mm) : delta_mm_(delta_mm) {}\n  [[nodiscard]] std::string describe() const override { return std::format(\"move by {} mm\", delta_mm_); }\n  void execute(Robot& robot) override { robot.x_mm += delta_mm_; }\n  void undo(Robot& robot) override { robot.x_mm -= delta_mm_; }\n\n private:\n  std::int32_t delta_mm_;\n};\n\nclass TurnBy final : public Command {\n public:\n  explicit TurnBy(std::int32_t delta_mdeg) : delta_mdeg_(delta_mdeg) {}\n  [[nodiscard]] std::string describe() const override { return std::format(\"turn by {} mdeg\", delta_mdeg_); }\n  void execute(Robot& robot) override { robot.heading_mdeg += delta_mdeg_; }\n  void undo(Robot& robot) override { robot.heading_mdeg -= delta_mdeg_; }\n\n private:\n  std::int32_t delta_mdeg_;\n};\n\n// A command built out of other commands: one undo step for the whole group.\nclass MacroCommand final : public Command {\n public:\n  explicit MacroCommand(std::vector<std::unique_ptr<Command>> steps) : steps_(std::move(steps)) {}\n\n  [[nodiscard]] std::string describe() const override { return std::format(\"macro of {} steps\", steps_.size()); }\n  void execute(Robot& robot) override {\n    for (auto& step : steps_) step->execute(robot);\n  }\n  void undo(Robot& robot) override {\n    for (auto it = steps_.rbegin(); it != steps_.rend(); ++it) (*it)->undo(robot);\n  }\n\n private:\n  std::vector<std::unique_ptr<Command>> steps_;\n};\n\nint main() {\n  Robot robot;\n\n  std::vector<std::unique_ptr<Command>> steps;\n  steps.push_back(std::make_unique<MoveBy>(400));\n  steps.push_back(std::make_unique<TurnBy>(900));\n  steps.push_back(std::make_unique<MoveBy>(200));\n\n  std::unique_ptr<Command> square_leg = std::make_unique<MacroCommand>(std::move(steps));\n  std::cout << std::format(\"running: {}\\n\", square_leg->describe());\n  square_leg->execute(robot);\n  std::cout << std::format(\"after the macro: x {} mm, heading {} mdeg\\n\", robot.x_mm, robot.heading_mdeg);\n\n  square_leg->undo(robot);\n  std::cout << std::format(\"after one undo(): x {} mm, heading {} mdeg\\n\", robot.x_mm, robot.heading_mdeg);\n}"
+      },
+      {
+       "t": "output",
+       "text": "running: macro of 3 steps\nafter the macro: x 600 mm, heading 900 mdeg\nafter one undo(): x 0 mm, heading 0 mdeg"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "MacroCommand"
+        },
+        {
+         "t": "text",
+         "v": " implements "
+        },
+        {
+         "t": "code",
+         "v": "Command"
+        },
+        {
+         "t": "text",
+         "v": " by holding a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::unique_ptr<Command>>"
+        },
+        {
+         "t": "text",
+         "v": ", so it is itself a command that a "
+        },
+        {
+         "t": "code",
+         "v": "CommandQueue"
+        },
+        {
+         "t": "text",
+         "v": " could hold without knowing it is a group. Undoing walks the steps in reverse, "
+        },
+        {
+         "t": "code",
+         "v": "rbegin()"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "rend()"
+        },
+        {
+         "t": "text",
+         "v": ", because the third "
+        },
+        {
+         "t": "code",
+         "v": "MoveBy"
+        },
+        {
+         "t": "text",
+         "v": " was applied last and has to be reversed first to retrace the same path backward; undoing in forward order would still restore the same final position for these two fields, but for a command whose steps depend on each other's results, forward-order undo can produce a state that was never actually visited going in. One "
+        },
+        {
+         "t": "code",
+         "v": "undo()"
+        },
+        {
+         "t": "text",
+         "v": " call reverses all three steps, which a caller of three separate function calls would have to do by hand, once per call, remembering the order itself."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "editor",
+   "title": "Text-editor insert and delete with undo and redo",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. Build a small text editor's command history."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "struct Document { std::string text; };"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "An "
+         },
+         {
+          "t": "code",
+          "v": "EditCommand"
+         },
+         {
+          "t": "text",
+          "v": " interface with "
+         },
+         {
+          "t": "code",
+          "v": "virtual void execute(Document&)"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "virtual void undo(Document&)"
+         },
+         {
+          "t": "text",
+          "v": ", and the destructor and copy operations a polymorphic base needs."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "InsertCommand"
+         },
+         {
+          "t": "text",
+          "v": ", constructed from a position and the text to insert; "
+         },
+         {
+          "t": "code",
+          "v": "execute"
+         },
+         {
+          "t": "text",
+          "v": " inserts it, "
+         },
+         {
+          "t": "code",
+          "v": "undo"
+         },
+         {
+          "t": "text",
+          "v": " erases the same number of characters from the same position."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "DeleteCommand"
+         },
+         {
+          "t": "text",
+          "v": ", constructed from a position and a count; "
+         },
+         {
+          "t": "code",
+          "v": "execute"
+         },
+         {
+          "t": "text",
+          "v": " saves the erased text before removing it, "
+         },
+         {
+          "t": "code",
+          "v": "undo"
+         },
+         {
+          "t": "text",
+          "v": " inserts the saved text back at the same position."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "History"
+         },
+         {
+          "t": "text",
+          "v": " with "
+         },
+         {
+          "t": "code",
+          "v": "void do_command(std::unique_ptr<EditCommand>, Document&)"
+         },
+         {
+          "t": "text",
+          "v": ", which executes the command, stores it, and clears whatever could have been redone; "
+         },
+         {
+          "t": "code",
+          "v": "bool undo(Document&)"
+         },
+         {
+          "t": "text",
+          "v": "; and "
+         },
+         {
+          "t": "code",
+          "v": "bool redo(Document&)"
+         },
+         {
+          "t": "text",
+          "v": ", each returning whether there was anything to do."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Starting from an empty document, insert "
+        },
+        {
+         "t": "code",
+         "v": "\"Hello\""
+        },
+        {
+         "t": "text",
+         "v": " at position 0, then insert "
+        },
+        {
+         "t": "code",
+         "v": "\" World\""
+        },
+        {
+         "t": "text",
+         "v": " at position 5, and print the text. Delete 6 characters starting at position 5 (removing "
+        },
+        {
+         "t": "code",
+         "v": "\" World\""
+        },
+        {
+         "t": "text",
+         "v": ") and print the text. Undo twice and print the text after each undo. Redo once and print the text. Then make a fresh edit, inserting "
+        },
+        {
+         "t": "code",
+         "v": "\"!\""
+        },
+        {
+         "t": "text",
+         "v": " at position 5, print the text, and show that "
+        },
+        {
+         "t": "code",
+         "v": "redo"
+        },
+        {
+         "t": "text",
+         "v": " now returns "
+        },
+        {
+         "t": "code",
+         "v": "false"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions in writing. Why does "
+        },
+        {
+         "t": "code",
+         "v": "do_command"
+        },
+        {
+         "t": "text",
+         "v": " clear the redo list on every fresh edit rather than leaving it alone? Why must "
+        },
+        {
+         "t": "code",
+         "v": "DeleteCommand"
+        },
+        {
+         "t": "text",
+         "v": " save the text it removes before "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " can do anything, where "
+        },
+        {
+         "t": "code",
+         "v": "InsertCommand"
+        },
+        {
+         "t": "text",
+         "v": "'s "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " needs no saved state at all?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Document {\n  std::string text;\n};\n\nclass EditCommand {\n public:\n  EditCommand() = default;\n  EditCommand(const EditCommand&) = delete;\n  EditCommand& operator=(const EditCommand&) = delete;\n  virtual ~EditCommand() = default;\n  virtual void execute(Document& doc) = 0;\n  virtual void undo(Document& doc) = 0;\n};\n\nclass InsertCommand final : public EditCommand {\n public:\n  InsertCommand(std::size_t pos, std::string text) : pos_(pos), text_(std::move(text)) {}\n  void execute(Document& doc) override { doc.text.insert(pos_, text_); }\n  void undo(Document& doc) override { doc.text.erase(pos_, text_.size()); }\n\n private:\n  std::size_t pos_;\n  std::string text_;\n};\n\nclass DeleteCommand final : public EditCommand {\n public:\n  DeleteCommand(std::size_t pos, std::size_t count) : pos_(pos), count_(count) {}\n  void execute(Document& doc) override {\n    removed_ = doc.text.substr(pos_, count_);\n    doc.text.erase(pos_, count_);\n  }\n  void undo(Document& doc) override { doc.text.insert(pos_, removed_); }\n\n private:\n  std::size_t pos_;\n  std::size_t count_;\n  std::string removed_;\n};\n\nclass History {\n public:\n  void do_command(std::unique_ptr<EditCommand> command, Document& doc) {\n    command->execute(doc);\n    done_.push_back(std::move(command));\n    undone_.clear();  // a fresh edit invalidates whatever could have been redone\n  }\n  bool undo(Document& doc) {\n    if (done_.empty()) return false;\n    done_.back()->undo(doc);\n    undone_.push_back(std::move(done_.back()));\n    done_.pop_back();\n    return true;\n  }\n  bool redo(Document& doc) {\n    if (undone_.empty()) return false;\n    undone_.back()->execute(doc);\n    done_.push_back(std::move(undone_.back()));\n    undone_.pop_back();\n    return true;\n  }\n\n private:\n  std::vector<std::unique_ptr<EditCommand>> done_;\n  std::vector<std::unique_ptr<EditCommand>> undone_;\n};\n\nint main() {\n  Document doc;\n  History history;\n\n  history.do_command(std::make_unique<InsertCommand>(0, \"Hello\"), doc);\n  history.do_command(std::make_unique<InsertCommand>(5, \" World\"), doc);\n  std::cout << std::format(\"after two inserts: \\\"{}\\\"\\n\", doc.text);\n\n  history.do_command(std::make_unique<DeleteCommand>(5, 6), doc);\n  std::cout << std::format(\"after deleting \\\" World\\\": \\\"{}\\\"\\n\", doc.text);\n\n  history.undo(doc);\n  std::cout << std::format(\"after undoing the delete: \\\"{}\\\"\\n\", doc.text);\n\n  history.undo(doc);\n  std::cout << std::format(\"after undoing the second insert: \\\"{}\\\"\\n\", doc.text);\n\n  history.redo(doc);\n  std::cout << std::format(\"after redoing: \\\"{}\\\"\\n\", doc.text);\n\n  history.do_command(std::make_unique<InsertCommand>(5, \"!\"), doc);\n  std::cout << std::format(\"after a fresh edit: \\\"{}\\\"\\n\", doc.text);\n  std::cout << std::format(\"redo available after a fresh edit: {}\\n\", history.redo(doc));\n}"
+      },
+      {
+       "t": "output",
+       "text": "after two inserts: \"Hello World\"\nafter deleting \" World\": \"Hello\"\nafter undoing the delete: \"Hello World\"\nafter undoing the second insert: \"Hello\"\nafter redoing: \"Hello World\"\nafter a fresh edit: \"Hello! World\"\nredo available after a fresh edit: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two answers. "
+        },
+        {
+         "t": "code",
+         "v": "do_command"
+        },
+        {
+         "t": "text",
+         "v": " clears the redo list because a fresh edit changes the document from a state the undone commands no longer agree with; a "
+        },
+        {
+         "t": "code",
+         "v": "redo"
+        },
+        {
+         "t": "text",
+         "v": " after that would replay an insert or delete written for text that has since changed underneath it, at a position that may no longer mean what it meant when the command was built. "
+        },
+        {
+         "t": "code",
+         "v": "DeleteCommand"
+        },
+        {
+         "t": "text",
+         "v": " must save what it removed because "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " cannot reconstruct erased text from nothing; "
+        },
+        {
+         "t": "code",
+         "v": "InsertCommand"
+        },
+        {
+         "t": "text",
+         "v": "'s "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " needs no saved state because the text to remove is exactly the text it inserted, which it already has."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "alternatives",
+   "title": "Queues of std::function; command lifetime",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A command built from two independent "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": "s reads well and hides a mismatch no type checks:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <functional>\n#include <iostream>\n\nstruct Robot {\n  std::int32_t x_mm = 0;\n  std::int32_t heading_mdeg = 0;\n};\n\nstruct FunctionCommand {\n  std::function<void()> execute;\n  std::function<void()> undo;\n};\n\nint main() {\n  Robot robot;\n\n  // The mistake: undo was copied from a different command and never updated.\n  FunctionCommand turn;\n  turn.execute = [&robot] { robot.heading_mdeg += 900; };\n  turn.undo = [&robot] { robot.x_mm -= 900; };  // wrong field: nothing ties this to turn.execute\n\n  turn.execute();\n  std::cout << std::format(\"after execute: x {} mm, heading {} mdeg\\n\", robot.x_mm, robot.heading_mdeg);\n  turn.undo();\n  std::cout << std::format(\"after undo:    x {} mm, heading {} mdeg\\n\", robot.x_mm, robot.heading_mdeg);\n}"
+      },
+      {
+       "t": "output",
+       "text": "after execute: x 0 mm, heading 900 mdeg\nafter undo:    x -900 mm, heading 900 mdeg"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The heading is never restored and "
+        },
+        {
+         "t": "code",
+         "v": "x_mm"
+        },
+        {
+         "t": "text",
+         "v": " is wrongly changed, and nothing about the types catches it: "
+        },
+        {
+         "t": "code",
+         "v": "execute"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " are both "
+        },
+        {
+         "t": "code",
+         "v": "std::function<void()>"
+        },
+        {
+         "t": "text",
+         "v": ", so any two callables with that signature type-check together whether or not they are inverses of each other. A "
+        },
+        {
+         "t": "code",
+         "v": "Command"
+        },
+        {
+         "t": "text",
+         "v": " class ties the two together in one type, sharing the same member, "
+        },
+        {
+         "t": "code",
+         "v": "delta_mdeg_"
+        },
+        {
+         "t": "text",
+         "v": ", so "
+        },
+        {
+         "t": "code",
+         "v": "execute"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " can only ever disagree about the sign, never about which field they touch. A queue of "
+        },
+        {
+         "t": "code",
+         "v": "FunctionCommand"
+        },
+        {
+         "t": "text",
+         "v": "s is smaller to write and fine where nothing needs undoing, or where one function builds both closures together and a reader can see them side by side; it stops being fine the moment "
+        },
+        {
+         "t": "code",
+         "v": "execute"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " are written, or edited, separately."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is a command that stores a reference to what it operates on, chosen so "
+        },
+        {
+         "t": "code",
+         "v": "execute"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " need no arguments:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "asan:stack-use-after-scope",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <vector>\n\nstruct Robot {\n  std::int32_t x_mm = 0;\n};\n\nclass Command {\n public:\n  Command() = default;\n  Command(const Command&) = delete;\n  Command& operator=(const Command&) = delete;\n  virtual ~Command() = default;\n  virtual void execute() = 0;\n  virtual void undo() = 0;\n};\n\n// Binds its receiver at construction, so execute() and undo() take no arguments.\nclass MoveBy final : public Command {\n public:\n  MoveBy(Robot& robot, std::int32_t delta_mm) : robot_(robot), delta_mm_(delta_mm) {}\n  void execute() override { robot_.x_mm += delta_mm_; }\n  void undo() override { robot_.x_mm -= delta_mm_; }\n\n private:\n  Robot& robot_;\n  std::int32_t delta_mm_;\n};\n\nint main() {\n  std::vector<std::unique_ptr<Command>> history;\n  {\n    Robot robot;\n    auto move = std::make_unique<MoveBy>(robot, 500);\n    move->execute();\n    std::cout << std::format(\"moved to {} mm\\n\", robot.x_mm);\n    history.push_back(std::move(move));\n  }  // robot destroyed here; the command in history still refers to it\n  history.back()->undo();  // writes through a reference to a destroyed Robot\n}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "AddressSanitizer reports "
+        },
+        {
+         "t": "code",
+         "v": "stack-use-after-scope"
+        },
+        {
+         "t": "text",
+         "v": " inside "
+        },
+        {
+         "t": "code",
+         "v": "MoveBy::undo"
+        },
+        {
+         "t": "text",
+         "v": ", writing through "
+        },
+        {
+         "t": "code",
+         "v": "robot_"
+        },
+        {
+         "t": "text",
+         "v": " after the "
+        },
+        {
+         "t": "code",
+         "v": "Robot"
+        },
+        {
+         "t": "text",
+         "v": " it names has gone out of scope. Every command in a history that outlives one call has to outlive whatever it touches, which is why "
+        },
+        {
+         "t": "code",
+         "v": "MoveBy"
+        },
+        {
+         "t": "text",
+         "v": " in the theory section and "
+        },
+        {
+         "t": "code",
+         "v": "EditCommand"
+        },
+        {
+         "t": "text",
+         "v": " in the exercise take their receiver as a parameter of "
+        },
+        {
+         "t": "code",
+         "v": "execute"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " instead of storing it: the caller who keeps the history is the same caller who can guarantee the "
+        },
+        {
+         "t": "code",
+         "v": "Document"
+        },
+        {
+         "t": "text",
+         "v": " or the "
+        },
+        {
+         "t": "code",
+         "v": "Robot"
+        },
+        {
+         "t": "text",
+         "v": " is still there when "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": " finally runs. Storing the receiver is only safe when the command's own lifetime is provably shorter than the receiver's, which a queue built to be kept around for undo cannot promise."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a "
+        },
+        {
+         "t": "code",
+         "v": "Command"
+        },
+        {
+         "t": "text",
+         "v": " stores that a function call does not, and the four reasons to reach for one: queuing, logging, sending elsewhere, undoing. Give the one-line difference between Command and Strategy. Say what a macro command is and why undoing it in reverse order matters. Name the two failure cases: a "
+        },
+        {
+         "t": "code",
+         "v": "std::function"
+        },
+        {
+         "t": "text",
+         "v": " pair with no type tying "
+        },
+        {
+         "t": "code",
+         "v": "execute"
+        },
+        {
+         "t": "text",
+         "v": " to "
+        },
+        {
+         "t": "code",
+         "v": "undo"
+        },
+        {
+         "t": "text",
+         "v": ", and a command that stores its receiver by reference and outlives it. Finish with the rule: a command kept for later takes its receiver as a parameter when it runs, not as a member it stored at birth."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does a "
+     },
+     {
+      "t": "code",
+      "v": "Command"
+     },
+     {
+      "t": "text",
+      "v": " object store that a plain function call throws away the moment it returns?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Name the four reasons to reach for Command instead of calling a function directly."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In one sentence, what does a Strategy stay for that a Command does not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does undoing a "
+     },
+     {
+      "t": "code",
+      "v": "MacroCommand"
+     },
+     {
+      "t": "text",
+      "v": " walk its steps in reverse order?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "History::do_command"
+     },
+     {
+      "t": "text",
+      "v": " clear the redo list on every fresh edit?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What ties "
+     },
+     {
+      "t": "code",
+      "v": "execute"
+     },
+     {
+      "t": "text",
+      "v": " to "
+     },
+     {
+      "t": "code",
+      "v": "undo"
+     },
+     {
+      "t": "text",
+      "v": " in a "
+     },
+     {
+      "t": "code",
+      "v": "Command"
+     },
+     {
+      "t": "text",
+      "v": " class that a pair of independent "
+     },
+     {
+      "t": "code",
+      "v": "std::function"
+     },
+     {
+      "t": "text",
+      "v": "s does not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "MoveBy"
+     },
+     {
+      "t": "text",
+      "v": " in the failure case crash where the same class in the cold check does not?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: an "
+     },
+     {
+      "t": "code",
+      "v": "EditCommand"
+     },
+     {
+      "t": "text",
+      "v": " interface, an insert and a delete command, and a history that supports undo and redo."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Gamma, Helm, Johnson and Vlissides, Design Patterns, Addison-Wesley 1994: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "behavioural chapter",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+     },
+     {
+      "t": "text",
+      "v": ", where Command is defined as a request wrapped as an object, so it can be parameterised, queued and logged."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, C++ Software Design, O'Reilly 2022: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+     },
+     {
+      "t": "text",
+      "v": ". Guideline 21, Command isolating what is done, contrasted with Strategy isolating how."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "F.60",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rf-ptr-ref"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": " on a non-owning reference, and "
+     },
+     {
+      "t": "a",
+      "v": "C.35",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-dtor-virtual"
+     },
+     {
+      "t": "text",
+      "v": " on a virtual destructor for a base deleted through "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::function",
+      "href": "https://en.cppreference.com/cpp/utility/functional/function"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::unique_ptr",
+      "href": "https://en.cppreference.com/cpp/memory/unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

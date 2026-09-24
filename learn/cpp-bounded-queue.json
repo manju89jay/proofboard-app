@@ -1,0 +1,2038 @@
+{
+ "id": "cpp-bounded-queue",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "Take 10 minutes, on paper, closed book. A sensor thread hands commands to a control thread through a queue that holds at most "
+     },
+     {
+      "t": "code",
+      "v": "capacity"
+     },
+     {
+      "t": "text",
+      "v": " items."
+     }
+    ]
+   },
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "List the members the class needs, with their types, and say what each is for."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Write the signature of every public operation, and say which of them can block and on what."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "State the invariants: what is always true of the members between calls."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Say what a producer and a consumer each see when the queue is full, when it is empty, and after somebody has closed it."
+      }
+     ]
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "ol",
+    "items": [
+     [
+      {
+       "t": "text",
+       "v": "Six members. A "
+      },
+      {
+       "t": "code",
+       "v": "mutable std::mutex"
+      },
+      {
+       "t": "text",
+       "v": " guarding everything below it. Two condition variables, one waited on by producers and one by consumers. A container for the items, a "
+      },
+      {
+       "t": "code",
+       "v": "std::deque<T>"
+      },
+      {
+       "t": "text",
+       "v": " or a "
+      },
+      {
+       "t": "code",
+       "v": "std::vector<T>"
+      },
+      {
+       "t": "text",
+       "v": " used as a ring. A "
+      },
+      {
+       "t": "code",
+       "v": "std::ptrdiff_t capacity_"
+      },
+      {
+       "t": "text",
+       "v": ". And a "
+      },
+      {
+       "t": "code",
+       "v": "bool closed_"
+      },
+      {
+       "t": "text",
+       "v": "."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "explicit BoundedQueue(std::ptrdiff_t capacity)"
+      },
+      {
+       "t": "text",
+       "v": "; "
+      },
+      {
+       "t": "code",
+       "v": "[[nodiscard]] bool push(T item)"
+      },
+      {
+       "t": "text",
+       "v": ", which blocks while the queue is full and returns false once it is closed; "
+      },
+      {
+       "t": "code",
+       "v": "[[nodiscard]] std::optional<T> pop()"
+      },
+      {
+       "t": "text",
+       "v": ", which blocks while the queue is empty and gives no value once it is closed and empty; "
+      },
+      {
+       "t": "code",
+       "v": "[[nodiscard]] bool try_push(T item)"
+      },
+      {
+       "t": "text",
+       "v": ", which never blocks; "
+      },
+      {
+       "t": "code",
+       "v": "void close()"
+      },
+      {
+       "t": "text",
+       "v": ", which never blocks; and "
+      },
+      {
+       "t": "code",
+       "v": "[[nodiscard]] std::ptrdiff_t size() const"
+      },
+      {
+       "t": "text",
+       "v": ", which never blocks."
+      }
+     ],
+     [
+      {
+       "t": "code",
+       "v": "0 <= std::ssize(items_) <= capacity_"
+      },
+      {
+       "t": "text",
+       "v": " between calls, and inside them whenever the mutex is free. "
+      },
+      {
+       "t": "code",
+       "v": "closed_"
+      },
+      {
+       "t": "text",
+       "v": " goes from false to true once and never back. A thread sleeps on the not-empty condition variable only while "
+      },
+      {
+       "t": "code",
+       "v": "items_"
+      },
+      {
+       "t": "text",
+       "v": " is empty and the queue is open, and on the not-full one only while it is full and the queue is open. Every read and every write of those members happens with the mutex held."
+      }
+     ],
+     [
+      {
+       "t": "text",
+       "v": "Full: the producer waits until a consumer takes an item, and "
+      },
+      {
+       "t": "code",
+       "v": "try_push"
+      },
+      {
+       "t": "text",
+       "v": " returns false at once. Empty: the consumer waits until a producer adds one. Closed: "
+      },
+      {
+       "t": "code",
+       "v": "push"
+      },
+      {
+       "t": "text",
+       "v": " and "
+      },
+      {
+       "t": "code",
+       "v": "try_push"
+      },
+      {
+       "t": "text",
+       "v": " return false and add nothing; "
+      },
+      {
+       "t": "code",
+       "v": "pop"
+      },
+      {
+       "t": "text",
+       "v": " keeps handing out what is already there, and gives no value once that is gone, so a consumer loop ends by itself."
+      }
+     ]
+    ]
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with the six members, the blocking behaviour of both operations, the closed rules, and the size invariant. Missing the second condition variable is a partial pass, and it is the most common answer; missing "
+     },
+     {
+      "t": "code",
+      "v": "closed_"
+     },
+     {
+      "t": "text",
+      "v": " altogether is a fail, because the queue then has no way to end."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "A bounded producer-consumer queue is a fixed-size buffer that one set of threads puts items into and another set takes items out of, with the queue doing the waiting for both. Bounded means it holds at most a chosen number of items, and blocking means a thread that cannot proceed sleeps rather than failing or spinning: a producer waits while the queue is full, a consumer waits while it is empty."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem it solves is what happens when the two sides run at different speeds. An unbounded queue looks kinder and is worse: the fast side never waits, so the backlog grows until the machine runs out of memory. I filled one with 20000 laser scans of 360 ranges and it held 28800000 bytes of range data, with a peak resident size of 32 megabytes; the same run through a queue bounded at eight holds 11520 bytes. The bound turns a memory leak into back pressure, which is a signal the producer can act on."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is a mutex, two condition variables and a closed flag. Every operation takes the mutex. A producer waits on the not-full condition variable with the predicate \"there is room or the queue is closed\", puts its item in, releases the mutex and notifies the not-empty one. A consumer does the mirror image. Two condition variables rather than one, because each then has a single kind of waiter, all waiting for the same thing, which is what makes "
+    },
+    {
+     "t": "code",
+     "v": "notify_one"
+    },
+    {
+     "t": "text",
+     "v": " correct: with one shared condition variable a notification can wake a thread whose predicate is false while the thread that could run sleeps on. Closing sets the flag and notifies both, which ends every wait for good."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is one mutex for both directions, so producers and consumers contend even when the queue is neither full nor empty. At high rates that becomes the bottleneck, and the answers are batching, a queue per consumer, or a lock-free ring. It also needs a shutdown story: what a close does to items still in the queue, and whether a half-finished command should be delivered or dropped."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "In the robot this is the queue between a sensor callback and the thread that plans on it, and the one between a command source and the driver."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "design",
+   "title": "Invariants, two condition variables, close()",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Start with what happens without a bound. A producer that never waits, and a consumer that is not there yet:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <queue>\n#include <vector>\n\nstruct Scan {\n  std::int64_t seq = 0;\n  std::vector<float> ranges;\n};\n\nint main() {\n  constexpr std::int64_t kBeams = 360;\n  constexpr std::int64_t kScans = 20'000;\n  std::queue<Scan> backlog;  // no bound: push always succeeds\n  for (std::int64_t seq = 0; seq < kScans; ++seq) {\n    backlog.push({.seq = seq, .ranges = std::vector<float>(kBeams)});\n  }\n  const std::int64_t bytes = std::ssize(backlog) * kBeams * static_cast<std::int64_t>(sizeof(float));\n  std::cout << std::format(\"{} scans queued, nothing consumed: {} bytes of range data\\n\", backlog.size(), bytes);\n  std::cout << std::format(\"the same run with a queue bounded at 8 would hold {} bytes\\n\",\n                           8 * kBeams * static_cast<std::int64_t>(sizeof(float)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "20000 scans queued, nothing consumed: 28800000 bytes of range data\nthe same run with a queue bounded at 8 would hold 11520 bytes"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Built at "
+        },
+        {
+         "t": "code",
+         "v": "-O2"
+        },
+        {
+         "t": "text",
+         "v": " without sanitizers, "
+        },
+        {
+         "t": "code",
+         "v": "/usr/bin/time -v"
+        },
+        {
+         "t": "text",
+         "v": " reports a peak resident set of 32480 kilobytes for that run, against 3360 for the same program with the loop taken out. Twenty thousand scans is eleven minutes of a camera at 30 frames a second, or half an hour of a 10 Hz lidar, and a consumer that stalls for that long is a consumer that has died. An unbounded queue turns a temporary stall into a permanent memory problem, and the memory it takes is invisible until the machine starts swapping. A bound is a decision made in advance about how far behind the consumer may fall before the producer has to care, which is called "
+        },
+        {
+         "t": "i",
+         "v": "back pressure"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The class that gives you that has six members, and they belong together for the reason the previous topic gave: the mutex, the condition variables and the state they are about are one unit."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  mutable std::mutex mutex_;\n  std::condition_variable not_full_;   // waited on by producers: there is room\n  std::condition_variable not_empty_;  // waited on by consumers: there is an item\n  std::deque<T> items_;\n  std::ptrdiff_t capacity_ = 0;\n  bool closed_ = false;"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The invariants are what every operation has to leave true. Between calls, and at every moment the mutex is free, "
+        },
+        {
+         "t": "code",
+         "v": "0 <= std::ssize(items_) <= capacity_"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "closed_"
+        },
+        {
+         "t": "text",
+         "v": " changes from false to true at most once and never changes back, which makes every predicate that mentions it monotone: once a wait can end because of the close, it stays ended. And no thread sleeps while its predicate is true, which follows from the predicate form of "
+        },
+        {
+         "t": "code",
+         "v": "wait"
+        },
+        {
+         "t": "text",
+         "v": " rather than needing checking."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two condition variables, not one. Each one then has a single kind of waiter, waiting for a single condition: "
+        },
+        {
+         "t": "code",
+         "v": "not_full_"
+        },
+        {
+         "t": "text",
+         "v": " is waited on only by producers and only for room, "
+        },
+        {
+         "t": "code",
+         "v": "not_empty_"
+        },
+        {
+         "t": "text",
+         "v": " only by consumers and only for an item. That is the property that makes "
+        },
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " correct, and "
+        },
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " is what you want, because waking every producer to have one of them take the single free slot is work for nothing. One shared condition variable forces "
+        },
+        {
+         "t": "code",
+         "v": "notify_all"
+        },
+        {
+         "t": "text",
+         "v": ", and with "
+        },
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " it deadlocks, which the failure step measures."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The predicates carry the closed flag as well as the state:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "a producer waits while "
+         },
+         {
+          "t": "code",
+          "v": "!closed_ && std::ssize(items_) == capacity_"
+         },
+         {
+          "t": "text",
+          "v": ", so its predicate is "
+         },
+         {
+          "t": "code",
+          "v": "closed_ || std::ssize(items_) < capacity_"
+         },
+         {
+          "t": "text",
+          "v": ";"
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "a consumer waits while "
+         },
+         {
+          "t": "code",
+          "v": "!closed_ && items_.empty()"
+         },
+         {
+          "t": "text",
+          "v": ", so its predicate is "
+         },
+         {
+          "t": "code",
+          "v": "closed_ || !items_.empty()"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "After the wait, each checks which of the two reasons woke it. A producer that finds "
+        },
+        {
+         "t": "code",
+         "v": "closed_"
+        },
+        {
+         "t": "text",
+         "v": " returns false without adding anything. A consumer that finds the queue empty returns no value, and a consumer that finds an item takes it, whether the queue is closed or not. That ordering is what gives close its meaning: "
+        },
+        {
+         "t": "i",
+         "v": "drain"
+        },
+        {
+         "t": "text",
+         "v": ", not discard. Everything already accepted is still delivered, and a consumer loop written as "
+        },
+        {
+         "t": "code",
+         "v": "while (const auto item = queue.pop())"
+        },
+        {
+         "t": "text",
+         "v": " ends by itself when the last one is gone."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The return types say what can fail. "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": ", because the one thing that can stop it is a closed queue, and the caller has to know so it can stop producing. "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " returns "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<T>"
+        },
+        {
+         "t": "text",
+         "v": ", because the one thing that can stop it is a closed and empty queue, and no value is the honest way to say \"nothing more is coming\". Neither throws, and neither takes an output parameter. The alternative interfaces are worth knowing because you will meet them: a "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " that returns "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " and throws on close, which makes the ordinary end of a program an exception; a "
+        },
+        {
+         "t": "code",
+         "v": "bool pop(T& out)"
+        },
+        {
+         "t": "text",
+         "v": ", which needs "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " to be default-constructible and leaves the caller with a half-built object on failure; and the one every review catches, a "
+        },
+        {
+         "t": "code",
+         "v": "bool empty()"
+        },
+        {
+         "t": "text",
+         "v": " the caller tests before calling "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": ", whose answer can be wrong before the caller has acted on it, because another consumer can empty the queue in between."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two more design points before you write it. "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " takes "
+        },
+        {
+         "t": "code",
+         "v": "T"
+        },
+        {
+         "t": "text",
+         "v": " by value and moves it in, so a caller can hand over an rvalue with one move and a copy is still possible when the caller wants to keep its item. And "
+        },
+        {
+         "t": "code",
+         "v": "try_push"
+        },
+        {
+         "t": "text",
+         "v": " exists because the blocking behaviour is sometimes wrong: a control loop that must not block would rather lose a scan than wait for the consumer. "
+        },
+        {
+         "t": "code",
+         "v": "try_push"
+        },
+        {
+         "t": "text",
+         "v": " drops the scan it was given, and a version that makes room by throwing away the oldest one instead is a "
+        },
+        {
+         "t": "code",
+         "v": "push_and_drop_oldest"
+        },
+        {
+         "t": "text",
+         "v": " written on the same mutex. Decide which of the two a topic wants where the data is understood, not inside the queue."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "implement",
+   "title": "Implement push, pop and close, then tests with several producers and consumers",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. Write "
+        },
+        {
+         "t": "code",
+         "v": "template <typename T> class BoundedQueue"
+        },
+        {
+         "t": "text",
+         "v": " with the members and contracts from the theory step:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "explicit BoundedQueue(std::ptrdiff_t capacity)"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] bool push(T item)"
+         },
+         {
+          "t": "text",
+          "v": ": wait for room, add the item, return true. Return false without adding it once the queue is closed."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::optional<T> pop()"
+         },
+         {
+          "t": "text",
+          "v": ": wait for an item, take the oldest, return it. Return no value once the queue is closed and empty."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] bool try_push(T item)"
+         },
+         {
+          "t": "text",
+          "v": ": never wait; false when the queue is full or closed."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "void close()"
+         },
+         {
+          "t": "text",
+          "v": ": set the flag and end every wait. Calling it twice must be harmless."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "[[nodiscard]] std::ptrdiff_t size() const"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] bool closed() const"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then write a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that proves it, with a "
+        },
+        {
+         "t": "code",
+         "v": "struct Scan { std::int64_t seq = 0; };"
+        },
+        {
+         "t": "text",
+         "v": ". With a capacity of two: two pushes succeed, a third "
+        },
+        {
+         "t": "code",
+         "v": "try_push"
+        },
+        {
+         "t": "text",
+         "v": " fails, a "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " gives the first scan, a "
+        },
+        {
+         "t": "code",
+         "v": "try_push"
+        },
+        {
+         "t": "text",
+         "v": " then succeeds. After "
+        },
+        {
+         "t": "code",
+         "v": "close()"
+        },
+        {
+         "t": "text",
+         "v": ": "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "try_push"
+        },
+        {
+         "t": "text",
+         "v": " fail, the two items left still come out in order, and the next "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " gives no value. Then run 1000 scans through a queue of capacity two with one producer and one consumer thread, and print how many arrived and their sum."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every notification goes out after the lock is released. No sleeping to wait for anything."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <condition_variable>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <optional>\n#include <thread>\n#include <utility>\n\n// A queue with room for `capacity` items. Producers block while it is full, consumers while it is empty,\n// and close() ends both waits for good.\ntemplate <typename T>\nclass BoundedQueue {\n public:\n  explicit BoundedQueue(std::ptrdiff_t capacity) : capacity_(capacity) {}\n\n  // False once the queue is closed; otherwise it waits for room and hands the item over.\n  [[nodiscard]] bool push(T item) {\n    {\n      std::unique_lock<std::mutex> lock(mutex_);\n      not_full_.wait(lock, [this] { return closed_ || std::ssize(items_) < capacity_; });\n      if (closed_) return false;\n      items_.push_back(std::move(item));\n    }\n    not_empty_.notify_one();\n    return true;\n  }\n\n  // No value once the queue is closed and empty; otherwise it waits for an item.\n  [[nodiscard]] std::optional<T> pop() {\n    std::optional<T> item;\n    {\n      std::unique_lock<std::mutex> lock(mutex_);\n      not_empty_.wait(lock, [this] { return closed_ || !items_.empty(); });\n      if (items_.empty()) return std::nullopt;\n      item = std::move(items_.front());\n      items_.pop_front();\n    }\n    not_full_.notify_one();\n    return item;\n  }\n\n  // Never waits: false when the queue is full or closed.\n  [[nodiscard]] bool try_push(T item) {\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      if (closed_ || std::ssize(items_) >= capacity_) return false;\n      items_.push_back(std::move(item));\n    }\n    not_empty_.notify_one();\n    return true;\n  }\n\n  // Stop accepting items. Consumers drain what is left, then get no value.\n  void close() {\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      if (closed_) return;\n      closed_ = true;\n    }\n    not_empty_.notify_all();\n    not_full_.notify_all();\n  }\n\n  [[nodiscard]] std::ptrdiff_t size() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return std::ssize(items_);\n  }\n\n  [[nodiscard]] bool closed() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return closed_;\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::condition_variable not_full_;   // waited on by producers: there is room\n  std::condition_variable not_empty_;  // waited on by consumers: there is an item\n  std::deque<T> items_;\n  std::ptrdiff_t capacity_ = 0;\n  bool closed_ = false;\n};\n\nstruct Scan {\n  std::int64_t seq = 0;\n};\n\nint main() {\n  BoundedQueue<Scan> queue(2);\n  std::cout << std::format(\"empty: size {}, closed {}\\n\", queue.size(), queue.closed());\n  const bool first = queue.push({.seq = 1});\n  const bool second = queue.push({.seq = 2});\n  const bool third = queue.try_push({.seq = 3});  // the queue is full, so this one fails instead of waiting\n  std::cout << std::format(\"push 1: {}, push 2: {}, try_push 3 into a full queue: {}\\n\", first, second, third);\n  std::cout << std::format(\"pop gives {}\\n\", queue.pop().value().seq);\n  const bool room_now = queue.try_push({.seq = 3});  // one call per statement: argument order is unspecified\n  std::cout << std::format(\"try_push 3 now: {}, size {}\\n\", room_now, queue.size());\n\n  queue.close();\n  std::cout << std::format(\"after close: push 4: {}\\n\", queue.push({.seq = 4}));\n  std::cout << std::format(\"after close: try_push 4: {}\\n\", queue.try_push({.seq = 4}));\n  std::cout << std::format(\"draining: {}\\n\", queue.pop().value().seq);\n  std::cout << std::format(\"draining: {}\\n\", queue.pop().value().seq);\n  std::cout << std::format(\"the next pop gives {}\\n\", queue.pop().has_value() ? \"an item\" : \"no value\");\n\n  // One producer, one consumer, a queue two items deep: the producer blocks, nothing is lost.\n  BoundedQueue<Scan> pipe(2);\n  std::int64_t received = 0;\n  std::int64_t sum = 0;\n  {\n    std::jthread consumer([&pipe, &received, &sum] {\n      while (const std::optional<Scan> scan = pipe.pop()) {\n        ++received;\n        sum += scan.value().seq;\n      }\n    });\n    for (std::int64_t seq = 1; seq <= 1000; ++seq) {\n      if (!pipe.push({.seq = seq})) break;\n    }\n    pipe.close();\n  }\n  std::cout << std::format(\"1000 scans through a queue of 2: received {}, sum {}\\n\", received, sum);\n}"
+      },
+      {
+       "t": "output",
+       "text": "empty: size 0, closed false\npush 1: true, push 2: true, try_push 3 into a full queue: false\npop gives 1\ntry_push 3 now: true, size 2\nafter close: push 4: false\nafter close: try_push 4: false\ndraining: 2\ndraining: 3\nthe next pop gives no value\n1000 scans through a queue of 2: received 1000, sum 500500"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Five things in that code are the whole topic:"
+        }
+       ]
+      },
+      {
+       "t": "ul",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Every wait is a predicate that mentions "
+         },
+         {
+          "t": "code",
+          "v": "closed_"
+         },
+         {
+          "t": "text",
+          "v": ". Take the flag out of the predicate and a producer blocked on a full queue sleeps through the close for ever."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "pop"
+         },
+         {
+          "t": "text",
+          "v": " tests "
+         },
+         {
+          "t": "code",
+          "v": "items_.empty()"
+         },
+         {
+          "t": "text",
+          "v": " after the wait, not "
+         },
+         {
+          "t": "code",
+          "v": "closed_"
+         },
+         {
+          "t": "text",
+          "v": ". A closed queue with items in it still hands them out, which is what makes "
+         },
+         {
+          "t": "code",
+          "v": "while (const auto scan = pipe.pop())"
+         },
+         {
+          "t": "text",
+          "v": " a complete consumer."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Both notifications are outside the lock, which the inner braces arrange. "
+         },
+         {
+          "t": "code",
+          "v": "push"
+         },
+         {
+          "t": "text",
+          "v": " also notifies before its "
+         },
+         {
+          "t": "code",
+          "v": "return true"
+         },
+         {
+          "t": "text",
+          "v": ", so the return value is computed after the handover, not instead of it."
+         }
+        ],
+        [
+         {
+          "t": "code",
+          "v": "close()"
+         },
+         {
+          "t": "text",
+          "v": " returns early when it is called twice, so a second call does not notify a second time, and "
+         },
+         {
+          "t": "code",
+          "v": "notify_all"
+         },
+         {
+          "t": "text",
+          "v": " rather than "
+         },
+         {
+          "t": "code",
+          "v": "notify_one"
+         },
+         {
+          "t": "text",
+          "v": " because every waiter on both condition variables can now proceed."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The single-threaded part of "
+         },
+         {
+          "t": "code",
+          "v": "main"
+         },
+         {
+          "t": "text",
+          "v": " runs the whole contract without a thread in sight. A blocking queue whose non-blocking paths are tested single-threaded is a queue you can debug."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The consumer thread is declared before the producer loop and joined by the closing brace after "
+        },
+        {
+         "t": "code",
+         "v": "pipe.close()"
+        },
+        {
+         "t": "text",
+         "v": ", so the order is: start the consumer, produce, close, join. Closing before the join is what lets the consumer's loop end; joining before the close would wait for a consumer that is waiting for an item that never comes, which is the classic hang of this exercise."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 30,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 30 minutes. Now prove the queue under load, with the class you wrote in exercise 1."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Four producer threads, each pushing 500 commands with a "
+         },
+         {
+          "t": "code",
+          "v": "struct Command { std::int64_t id = 0; };"
+         },
+         {
+          "t": "text",
+          "v": ", where producer "
+         },
+         {
+          "t": "code",
+          "v": "p"
+         },
+         {
+          "t": "text",
+          "v": "'s ids are "
+         },
+         {
+          "t": "code",
+          "v": "p * 500 + k"
+         },
+         {
+          "t": "text",
+          "v": ". Three consumer threads, each collecting the ids it receives into its own "
+         },
+         {
+          "t": "code",
+          "v": "std::vector<std::int64_t>"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Capacity eight, so the producers really do block."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Start the consumers first, then the producers in an inner scope so they are joined when it ends, then "
+         },
+         {
+          "t": "code",
+          "v": "close()"
+         },
+         {
+          "t": "text",
+          "v": ", then let the consumers be joined."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "After joining, merge the three vectors, sort, and print: how many commands were sent and received, that the merged list is exactly 0 to 1999 with nothing missing and nothing twice, and that the queue is empty."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Add a watcher thread that samples "
+         },
+         {
+          "t": "code",
+          "v": "size()"
+         },
+         {
+          "t": "text",
+          "v": " 50000 times while the run is going and keeps the largest it saw. Print whether it ever saw more than the capacity."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Then a second scenario: a fresh queue, three consumers all waiting on it while it is empty, and a "
+         },
+         {
+          "t": "code",
+          "v": "close()"
+         },
+         {
+          "t": "text",
+          "v": " from the main thread. Print how many of them woke up with no value."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Print only totals, never per-thread counts, so that the output is the same on every run."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <chrono>\n#include <condition_variable>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <numeric>\n#include <optional>\n#include <ranges>\n#include <thread>\n#include <utility>\n#include <vector>\n\ntemplate <typename T>\nclass BoundedQueue {\n public:\n  explicit BoundedQueue(std::ptrdiff_t capacity) : capacity_(capacity) {}\n\n  [[nodiscard]] bool push(T item) {\n    {\n      std::unique_lock<std::mutex> lock(mutex_);\n      not_full_.wait(lock, [this] { return closed_ || std::ssize(items_) < capacity_; });\n      if (closed_) return false;\n      items_.push_back(std::move(item));\n    }\n    not_empty_.notify_one();\n    return true;\n  }\n\n  [[nodiscard]] std::optional<T> pop() {\n    std::optional<T> item;\n    {\n      std::unique_lock<std::mutex> lock(mutex_);\n      not_empty_.wait(lock, [this] { return closed_ || !items_.empty(); });\n      if (items_.empty()) return std::nullopt;\n      item = std::move(items_.front());\n      items_.pop_front();\n    }\n    not_full_.notify_one();\n    return item;\n  }\n\n  void close() {\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      if (closed_) return;\n      closed_ = true;\n    }\n    not_empty_.notify_all();\n    not_full_.notify_all();\n  }\n\n  [[nodiscard]] std::ptrdiff_t size() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return std::ssize(items_);\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::condition_variable not_full_;\n  std::condition_variable not_empty_;\n  std::deque<T> items_;\n  std::ptrdiff_t capacity_ = 0;\n  bool closed_ = false;\n};\n\nconstexpr std::int64_t kProducers = 4;\nconstexpr std::int64_t kConsumers = 3;\nconstexpr std::int64_t kPerProducer = 500;\n\nstruct Command {\n  std::int64_t id = 0;\n};\n\nint main() {\n  constexpr std::ptrdiff_t kCapacity = 8;\n  BoundedQueue<Command> queue(kCapacity);\n  std::vector<std::vector<std::int64_t>> received(kConsumers);  // one vector per consumer: no sharing\n  std::ptrdiff_t high_water = 0;\n  {\n    std::jthread watcher([&queue, &high_water] {\n      for (int k = 0; k < 50'000; ++k) high_water = std::max(high_water, queue.size());\n    });\n    std::vector<std::jthread> consumers;\n    consumers.reserve(kConsumers);\n    for (std::int64_t c = 0; c < kConsumers; ++c) {\n      consumers.emplace_back([&queue, mine = &received[c]] {\n        while (const std::optional<Command> command = queue.pop()) mine->push_back(command.value().id);\n      });\n    }\n    {\n      std::vector<std::jthread> producers;\n      producers.reserve(kProducers);\n      for (std::int64_t p = 0; p < kProducers; ++p) {\n        producers.emplace_back([&queue, p] {\n          for (std::int64_t k = 0; k < kPerProducer; ++k) {\n            if (!queue.push({.id = p * kPerProducer + k})) return;\n          }\n        });\n      }\n    }\n    queue.close();  // every producer has finished; the consumers drain and then stop\n  }\n\n  std::vector<std::int64_t> all;\n  for (const std::vector<std::int64_t>& mine : received) all.insert(all.end(), mine.begin(), mine.end());\n  std::ranges::sort(all);\n  const std::int64_t expected = kProducers * kPerProducer;\n  std::vector<std::int64_t> wanted(expected);\n  std::iota(wanted.begin(), wanted.end(), 0);\n  std::cout << std::format(\"{} commands sent, {} received, queue left with {}\\n\", expected, std::ssize(all),\n                           queue.size());\n  std::cout << std::format(\"every command exactly once: {}\\n\", all == wanted);\n  std::cout << std::format(\"a watcher sampled the size 50000 times and never saw more than {}: {}\\n\", kCapacity,\n                           high_water <= kCapacity);\n\n  // Closing while every consumer is waiting on an empty queue.\n  BoundedQueue<Command> idle(8);\n  std::vector<int> woke(kConsumers, 0);\n  {\n    std::vector<std::jthread> consumers;\n    consumers.reserve(kConsumers);\n    for (std::int64_t c = 0; c < kConsumers; ++c) {\n      consumers.emplace_back([&idle, flag = &woke[c]] {\n        const std::optional<Command> command = idle.pop();\n        *flag = command.has_value() ? 0 : 1;\n      });\n    }\n    std::this_thread::sleep_for(std::chrono::milliseconds(20));\n    idle.close();\n  }\n  std::cout << std::format(\"{} consumers waiting on an empty queue, {} woke with no value\\n\", kConsumers,\n                           std::ranges::count(woke, 1));\n}"
+      },
+      {
+       "t": "output",
+       "text": "2000 commands sent, 2000 received, queue left with 0\nevery command exactly once: true\na watcher sampled the size 50000 times and never saw more than 8: true\n3 consumers waiting on an empty queue, 3 woke with no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The test is built so that its output cannot move. Each consumer writes only its own vector and only the main thread merges them, after every thread has been joined. Nothing prints a per-thread count, because which consumer gets how many depends on the scheduler. What is printed instead are the four properties that have to hold whatever the scheduler does: nothing lost, nothing duplicated, nothing left behind, and the bound respected."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "all == wanted"
+        },
+        {
+         "t": "text",
+         "v": " is the strongest line in the test. Comparing the sorted ids against 0 to 1999 catches a lost item, a duplicated item and a corrupted item in one comparison, where a count alone would miss a swap and a sum alone would miss two errors that cancel."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The watcher is the invariant check. It reads "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": " from a fourth thread while four producers and three consumers are hammering the queue, and it never sees more than the capacity, because "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": " takes the same mutex and the bound holds at every moment the mutex is free. Delete the lock from "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": " and the number it reads means nothing; the failure step shows what ThreadSanitizer says about that."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The nesting of scopes is the shutdown order, and it is worth reading twice. The producers live in the inner scope, so its closing brace joins them: after that line, no more items can arrive. "
+        },
+        {
+         "t": "code",
+         "v": "queue.close()"
+        },
+        {
+         "t": "text",
+         "v": " then tells the consumers there will be no more, and the outer closing brace joins them, which happens after they have drained the queue and left their loops. Turn those two steps around and the program hangs, because joining a consumer that is waiting for an item nobody will send waits for ever."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The 20 millisecond sleep in the second scenario is the one place a sleep is honest: it is not waiting for a condition, it is making sure the consumers have reached the wait before the close, so that the test tests what it says it does. A test that must not be timing-dependent would use the "
+        },
+        {
+         "t": "code",
+         "v": "Countdown"
+        },
+        {
+         "t": "text",
+         "v": " from the previous topic instead, with each consumer counting down before its "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "shutdown",
+   "title": "Closing while threads wait; drain or discard; a TSan run",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 25,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The first failure is the one condition variable everybody writes first. Replace "
+        },
+        {
+         "t": "code",
+         "v": "not_full_"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "not_empty_"
+        },
+        {
+         "t": "text",
+         "v": " with a single "
+        },
+        {
+         "t": "code",
+         "v": "ready_"
+        },
+        {
+         "t": "text",
+         "v": ", keep "
+        },
+        {
+         "t": "code",
+         "v": "notify_one"
+        },
+        {
+         "t": "text",
+         "v": " in both "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": ", and the code still looks reasonable:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  [[nodiscard]] bool push(T item) {\n    {\n      std::unique_lock<std::mutex> lock(mutex_);\n      ready_.wait(lock, [this] { return closed_ || std::ssize(items_) < capacity_; });\n      if (closed_) return false;\n      items_.push_back(std::move(item));\n    }\n    ready_.notify_one();  // may wake the other producer, which has nothing to do\n    return true;\n  }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "With a capacity of one, two producers of 2000 items each and two consumers, that queue stopped dead on all six runs I made, every one of them killed by "
+        },
+        {
+         "t": "code",
+         "v": "timeout 10"
+        },
+        {
+         "t": "text",
+         "v": " with exit code 124:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-sanitize-recover=all \\\n    one_cv_queue.cpp -o one_cv_queue\nfor i in 1 2 3 4 5 6; do timeout 10 ./one_cv_queue; echo \"exit=$?\"; done"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "exit=124\nexit=124\nexit=124\nexit=124\nexit=124\nexit=124"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The interleaving that stops it is short. A consumer takes the only item and notifies; the implementation wakes the other consumer, whose predicate \"there is an item or the queue is closed\" is false, so it sleeps again. Meanwhile the producer waiting for room was never told, and nobody will notify again, because every further notification comes from an operation that is now blocked. Two condition variables remove the possibility, because a "
+        },
+        {
+         "t": "code",
+         "v": "not_full_"
+        },
+        {
+         "t": "text",
+         "v": " notification can only reach a producer. Changing both calls to "
+        },
+        {
+         "t": "code",
+         "v": "notify_all"
+        },
+        {
+         "t": "text",
+         "v": " also works and wakes threads that have nothing to do on every single operation."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The second failure is a close that tells nobody:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  void close() {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    closed_ = true;  // wrong: nobody is told\n  }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The flag is set correctly and under the lock, and every predicate mentions it, so the logic is right. What is missing is that a sleeping thread does not re-evaluate its predicate until something notifies it. Three consumers waiting on an empty queue stay asleep, "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " never returns, and the "
+        },
+        {
+         "t": "code",
+         "v": "jthread"
+        },
+        {
+         "t": "text",
+         "v": " destructors wait for them: my stress test with that "
+        },
+        {
+         "t": "code",
+         "v": "close"
+        },
+        {
+         "t": "text",
+         "v": " was killed by "
+        },
+        {
+         "t": "code",
+         "v": "timeout 10"
+        },
+        {
+         "t": "text",
+         "v": " on all three runs, again with exit code 124. Setting a flag that a sleeping thread is waiting on is only half the operation; the notification is the other half, and it has to be "
+        },
+        {
+         "t": "code",
+         "v": "notify_all"
+        },
+        {
+         "t": "text",
+         "v": ", because every waiter can now proceed."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The third failure is not a bug but a decision that has to be made on purpose: what a close does to the items still in the queue. Draining is what the queue above does, and it suits a command log or a writer thread, where every item already accepted must still be handled. Discarding suits a control pipeline, where a stale velocity command is worse than none. The clean way to have both is two operations on the same state:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  void cancel() {\n    {\n      const std::lock_guard<std::mutex> lock(mutex_);\n      closed_ = true;\n      items_.clear();  // discard rather than drain\n    }\n    not_empty_.notify_all();\n    not_full_.notify_all();\n  }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Name them "
+        },
+        {
+         "t": "code",
+         "v": "close"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "cancel"
+        },
+        {
+         "t": "text",
+         "v": ", document which one drains, and let the caller pick. A shutdown that calls "
+        },
+        {
+         "t": "code",
+         "v": "close"
+        },
+        {
+         "t": "text",
+         "v": ", waits a bounded time for the queue to empty and then calls "
+        },
+        {
+         "t": "code",
+         "v": "cancel"
+        },
+        {
+         "t": "text",
+         "v": " is the usual compromise: finish what you can, drop the rest, and never wait for ever. The cancellation topic later in this track builds that on "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_token"
+        },
+        {
+         "t": "text",
+         "v": ", where the queue's waits end because the token was set rather than because somebody called a member function."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The fourth failure is a "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": " that reads without the lock, which looks harmless because it returns a number nobody acts on:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "fragment",
+       "expect": "",
+       "text": "  [[nodiscard]] std::ptrdiff_t size() const {\n    return std::ssize(items_);  // wrong: read without the mutex\n  }"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is a data race, and the watcher thread from exercise 2 is enough to find it. ThreadSanitizer, in its own build, reports it at once:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -fsanitize=thread queue_stress.cpp -o queue_stress\nsetarch $(uname -m) -R ./queue_stress"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "WARNING: ThreadSanitizer: data race (pid=156950)\n  Write of size 8 at 0x7fffffffde68 by thread T5 (mutexes: write M0):\n    #0 std::deque<Command>::emplace_back<Command>(Command&&) /usr/include/c++/13/bits/deque.tcc:173\n    #2 BoundedQueue<Command>::push(Command) /tmp/cw/queue_stress.cpp:26\n\n  Previous read of size 8 at 0x7fffffffde68 by thread T1:\n    #1 std::deque<Command>::size() const /usr/include/c++/13/bits/stl_deque.h:1269\n    #3 BoundedQueue<Command>::size() const /tmp/cw/queue_stress.cpp:56"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The last line of the run says how many distinct races it found, and that number moves: two runs of this binary reported six warnings and three. One is enough, so never treat a smaller count as progress. Read the report itself in three steps. The write is "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " adding an item, and "
+        },
+        {
+         "t": "code",
+         "v": "(mutexes: write M0)"
+        },
+        {
+         "t": "text",
+         "v": " says that thread held a mutex while it did. The read is "
+        },
+        {
+         "t": "code",
+         "v": "size()"
+        },
+        {
+         "t": "text",
+         "v": ", with no mutex named, which is the whole bug in one line. The address is inside the "
+        },
+        {
+         "t": "code",
+         "v": "std::deque"
+        },
+        {
+         "t": "text",
+         "v": "'s bookkeeping, not inside any item: the two threads are not fighting over a command, they are fighting over the pointers the deque keeps. That is why an unlocked reader can hand back nonsense rather than a number that is merely a little out of date. The same stress test with the lock restored runs clean under ThreadSanitizer, exits with 0 and prints the same four lines as above."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "TSan is the tool this topic ends with because a queue is exactly the kind of code where reading the source is not enough. Build the stress test with "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=thread"
+        },
+        {
+         "t": "text",
+         "v": ", run it with several producers and several consumers, and do it in a job of its own, because the flag cannot share a build with AddressSanitizer and the run is 5 to 15 times slower."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write eight to twelve lines from memory and keep them as this topic's proof. List the six members and say what each is for. State the two invariants, on the size and on the flag. Write both predicates, including the closed flag. Say why there are two condition variables and what breaks with one. Say what "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " return, and why neither is a bool with an output parameter. Describe what close does to a waiting producer, a waiting consumer and an item already in the queue, and what "
+        },
+        {
+         "t": "code",
+         "v": "cancel"
+        },
+        {
+         "t": "text",
+         "v": " would do instead. Give the shutdown order: join the producers, close, join the consumers. Finish with the two commands: the stress test, and the same test under ThreadSanitizer."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Name the six members of a bounded blocking queue and what each one is for."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What are the invariants, and which of them makes every predicate monotone?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Write both wait predicates from memory, including the closed flag."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why two condition variables? What exactly goes wrong with one and "
+     },
+     {
+      "t": "code",
+      "v": "notify_one"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "pop"
+     },
+     {
+      "t": "text",
+      "v": " test "
+     },
+     {
+      "t": "code",
+      "v": "items_.empty()"
+     },
+     {
+      "t": "text",
+      "v": " after the wait rather than "
+     },
+     {
+      "t": "code",
+      "v": "closed_"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What does "
+     },
+     {
+      "t": "code",
+      "v": "push"
+     },
+     {
+      "t": "text",
+      "v": " return and why, and what is wrong with "
+     },
+     {
+      "t": "code",
+      "v": "bool pop(T& out)"
+     },
+     {
+      "t": "text",
+      "v": " and with a public "
+     },
+     {
+      "t": "code",
+      "v": "empty()"
+     },
+     {
+      "t": "text",
+      "v": "?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "A consumer is blocked in "
+     },
+     {
+      "t": "code",
+      "v": "pop"
+     },
+     {
+      "t": "text",
+      "v": " and somebody calls "
+     },
+     {
+      "t": "code",
+      "v": "close"
+     },
+     {
+      "t": "text",
+      "v": ". Trace what happens, line by line."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the difference between draining and discarding on close, and which does a velocity command want?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In which order do you join the producers, the consumers and call close, and what happens if you swap two of them?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "How would you test that nothing is lost and nothing is duplicated, without printing per-thread counts?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Which build finds an unlocked "
+     },
+     {
+      "t": "code",
+      "v": "size()"
+     },
+     {
+      "t": "text",
+      "v": ", and what are the three things its report tells you?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From a blank file: the queue, plus a test with four producers and three consumers that proves the bound holds."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "David Olsen, Back to Basics: Concurrency, CppCon 2023: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2023/blob/main/Presentations/B2B-Concurrency.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=8rEGu20Uw4g"
+     },
+     {
+      "t": "text",
+      "v": ". The producer-consumer queue as the standard example of a mutex with condition variables."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Arthur O'Dwyer, Back to Basics: Concurrency, CppCon 2020: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2020/blob/main/Presentations/back_to_basics_concurrency/back_to_basics_concurrency__arthur_odwyer__cppcon_2020.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=F6Ipn7gCOsY"
+     },
+     {
+      "t": "text",
+      "v": ". Why the predicate carries the shutdown flag, and the cost of one shared condition variable."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mike Shah, Back to Basics: Concurrency, CppCon 2021: "
+     },
+     {
+      "t": "a",
+      "v": "slides",
+      "href": "https://github.com/CppCon/CppCon2021/blob/main/Presentations/Mike_Shah_CPPCON_2021_Concurrency_1.pdf"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=pfIC-kle4b0"
+     },
+     {
+      "t": "text",
+      "v": ". The thread-safe queue built up from a mutex."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "CP.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-lock"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.42",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-wait"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "CP.43",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-time"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "CP.50",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rconc-mutex"
+     },
+     {
+      "t": "text",
+      "v": ", and the "
+     },
+     {
+      "t": "a",
+      "v": "messaging section",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#sscp-mess"
+     },
+     {
+      "t": "text",
+      "v": " on passing work instead of sharing it."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "condition_variable",
+      "href": "https://en.cppreference.com/cpp/thread/condition_variable"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "deque",
+      "href": "https://en.cppreference.com/cpp/container/deque"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "counting_semaphore",
+      "href": "https://en.cppreference.com/cpp/thread/counting_semaphore"
+     },
+     {
+      "t": "text",
+      "v": ", the other way to write the two waits."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "The ThreadSanitizer manual",
+      "href": "https://clang.llvm.org/docs/ThreadSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": ": what the report's fields mean, and what the build costs."
+     }
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1414 @@
+{
+ "id": "pat-state",
+ "check": {
+  "task": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "A mission moves through five states: idle, running, cancelling, finished and failed. From memory, name the five edges it may follow between them, one line each as "
+     },
+     {
+      "t": "code",
+      "v": "from -> to"
+     },
+     {
+      "t": "text",
+      "v": ", and say in one sentence why finished and failed have no arrows leaving them. Then write a "
+     },
+     {
+      "t": "code",
+      "v": "valid_transition"
+     },
+     {
+      "t": "text",
+      "v": " function taking the two states and returning whether that edge exists, and run it against a handful of pairs, including at least one that should be refused. Take 10 minutes."
+     }
+    ]
+   }
+  ],
+  "answer": [
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "The five edges: "
+     },
+     {
+      "t": "code",
+      "v": "idle -> running"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "running -> cancelling"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "running -> finished"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "running -> failed"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "code",
+      "v": "cancelling -> finished"
+     },
+     {
+      "t": "text",
+      "v": ". Finished and failed have no arrows leaving them because a mission that has ended does not resume; whatever comes next is a new mission."
+     }
+    ]
+   },
+   {
+    "t": "code",
+    "lang": "cpp",
+    "tag": "run",
+    "expect": "",
+    "text": "#include <format>\n#include <iostream>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nenum class MissionState { idle, running, cancelling, finished, failed };\n\n[[nodiscard]] constexpr std::string_view name_of(MissionState state) {\n  switch (state) {\n    case MissionState::idle:\n      return \"idle\";\n    case MissionState::running:\n      return \"running\";\n    case MissionState::cancelling:\n      return \"cancelling\";\n    case MissionState::finished:\n      return \"finished\";\n    case MissionState::failed:\n      return \"failed\";\n  }\n  return \"unknown\";\n}\n\n// The five edges a mission may follow. Anything else is refused.\n[[nodiscard]] constexpr bool valid_transition(MissionState from, MissionState to) {\n  switch (from) {\n    case MissionState::idle:\n      return to == MissionState::running;\n    case MissionState::running:\n      return to == MissionState::cancelling || to == MissionState::finished || to == MissionState::failed;\n    case MissionState::cancelling:\n      return to == MissionState::finished;\n    case MissionState::finished:\n    case MissionState::failed:\n      return false;\n  }\n  return false;\n}\n\nint main() {\n  const std::vector<std::pair<MissionState, MissionState>> tries{\n      {MissionState::idle, MissionState::running},\n      {MissionState::running, MissionState::cancelling},\n      {MissionState::cancelling, MissionState::finished},\n      {MissionState::running, MissionState::failed},\n      {MissionState::running, MissionState::idle},\n      {MissionState::finished, MissionState::running},\n  };\n  for (const auto& [from, to] : tries) {\n    std::cout << std::format(\"{:<11} -> {:<11} {}\\n\", name_of(from), name_of(to), valid_transition(from, to));\n  }\n}"
+   },
+   {
+    "t": "output",
+    "text": "idle        -> running     true\nrunning     -> cancelling  true\ncancelling  -> finished    true\nrunning     -> failed      true\nrunning     -> idle        false\nfinished    -> running     false"
+   },
+   {
+    "t": "p",
+    "c": [
+     {
+      "t": "text",
+      "v": "You pass with all five edges named correctly, the reason finished and failed have none leaving them, and a function that agrees with that table on both an accepted and a refused pair. Four of the five edges, or a function untested against a refused pair, is a partial pass. Drawing an edge from finished or failed to anywhere else is a fail: it treats the end of a mission as a state like the others, which is the mistake this topic is about."
+     }
+    ]
+   }
+  ]
+ },
+ "interview": [
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "State lets an object change what it does when it is called, by changing which state object it currently delegates to, rather than by checking a flag inside every method. The object that changes is the "
+    },
+    {
+     "t": "i",
+     "v": "context"
+    },
+    {
+     "t": "text",
+     "v": "; each named mode it can be in is a "
+    },
+    {
+     "t": "i",
+     "v": "state"
+    },
+    {
+     "t": "text",
+     "v": ", given its own class implementing a common interface; the context holds one state at a time, usually through a "
+    },
+    {
+     "t": "code",
+     "v": "std::unique_ptr"
+    },
+    {
+     "t": "text",
+     "v": " to that interface, and every operation the context exposes forwards to it."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The problem is a method whose body is a chain of "
+    },
+    {
+     "t": "code",
+     "v": "if state == X"
+    },
+    {
+     "t": "text",
+     "v": " checks, repeated in every other method the object has. Adding a state means finding and updating every one of those chains, and forgetting one is a silent bug, not a build error."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "The mechanism is that each state's class implements only the operations that state reacts to; an operation a state ignores does nothing by default, so the object stays where it is. A transition is a state's own method returning the next state, which the context installs in place of itself. The context's own code never mentions which state it is in."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "What it costs is a class per state, and every transition allocates or moves one, so it earns that cost only when a state's behaviour genuinely differs across several operations. A handful of states with one small rule each, checked in one place, is usually smaller and no less safe as a plain enum and a switch, and the compiler's own unhandled-case warning finds a state you forgot to add. "
+    },
+    {
+     "t": "code",
+     "v": "std::variant"
+    },
+    {
+     "t": "text",
+     "v": " and "
+    },
+    {
+     "t": "code",
+     "v": "std::visit"
+    },
+    {
+     "t": "text",
+     "v": " sit between the two: a closed set of small state values, visited by one function, with the same compile-time check for a missing branch that state classes cannot offer at all."
+    }
+   ]
+  },
+  {
+   "t": "p",
+   "c": [
+    {
+     "t": "text",
+     "v": "You meet this wherever a robot or a mission has named modes with real rules about which one follows which, and the interview question is exactly that: draw the states, implement the transitions, and say which of the three shapes earns its keep here."
+    }
+   ]
+  }
+ ],
+ "subs": [
+  {
+   "id": "idea",
+   "title": "State pattern versus enum and switch versus variant",
+   "steps": [
+    {
+     "kind": "theory",
+     "heading": "Theory",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A "
+        },
+        {
+         "t": "code",
+         "v": "Connection"
+        },
+        {
+         "t": "text",
+         "v": " moves between three modes, and what each of its operations does depends entirely on which one it is in. One class per state, each overriding only the events it reacts to, is the classic shape:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <string_view>\n#include <utility>\n\n// One class per state. Each overrides only the events it reacts to; the rest are ignored by default.\nclass ConnectionState {\n public:\n  ConnectionState() = default;\n  ConnectionState(const ConnectionState&) = delete;\n  ConnectionState& operator=(const ConnectionState&) = delete;\n  virtual ~ConnectionState() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n  [[nodiscard]] virtual std::unique_ptr<ConnectionState> on_connect() { return nullptr; }\n  [[nodiscard]] virtual std::unique_ptr<ConnectionState> on_open_ack() { return nullptr; }\n  [[nodiscard]] virtual std::unique_ptr<ConnectionState> on_timeout() { return nullptr; }\n  [[nodiscard]] virtual std::unique_ptr<ConnectionState> on_close() { return nullptr; }\n};\n\nclass Connecting;\nclass Connected;\n\nclass Disconnected final : public ConnectionState {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"disconnected\"; }\n  [[nodiscard]] std::unique_ptr<ConnectionState> on_connect() override;\n};\n\nclass Connecting final : public ConnectionState {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"connecting\"; }\n  [[nodiscard]] std::unique_ptr<ConnectionState> on_open_ack() override;\n  [[nodiscard]] std::unique_ptr<ConnectionState> on_timeout() override;\n};\n\nclass Connected final : public ConnectionState {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"connected\"; }\n  [[nodiscard]] std::unique_ptr<ConnectionState> on_close() override;\n};\n\nstd::unique_ptr<ConnectionState> Disconnected::on_connect() { return std::make_unique<Connecting>(); }\nstd::unique_ptr<ConnectionState> Connecting::on_open_ack() { return std::make_unique<Connected>(); }\nstd::unique_ptr<ConnectionState> Connecting::on_timeout() { return std::make_unique<Disconnected>(); }\nstd::unique_ptr<ConnectionState> Connected::on_close() { return std::make_unique<Disconnected>(); }\n\nclass Connection {\n public:\n  Connection() : state_(std::make_unique<Disconnected>()) {}\n\n  void connect() { transition(state_->on_connect()); }\n  void open_ack() { transition(state_->on_open_ack()); }\n  void timeout() { transition(state_->on_timeout()); }\n  void close() { transition(state_->on_close()); }\n\n  [[nodiscard]] std::string_view state() const { return state_->name(); }\n\n private:\n  void transition(std::unique_ptr<ConnectionState> next) {\n    if (next) state_ = std::move(next);\n  }\n\n  std::unique_ptr<ConnectionState> state_;\n};\n\nint main() {\n  Connection link;\n  std::cout << std::format(\"start:              {}\\n\", link.state());\n  link.connect();\n  std::cout << std::format(\"after connect():    {}\\n\", link.state());\n  link.close();  // Connecting has no on_close override: ignored, the state stays\n  std::cout << std::format(\"close() while connecting, ignored: {}\\n\", link.state());\n  link.open_ack();\n  std::cout << std::format(\"after open_ack():   {}\\n\", link.state());\n  link.close();\n  std::cout << std::format(\"after close():      {}\\n\", link.state());\n}"
+      },
+      {
+       "t": "output",
+       "text": "start:              disconnected\nafter connect():    connecting\nclose() while connecting, ignored: connecting\nafter open_ack():   connected\nafter close():      disconnected"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "Connection"
+        },
+        {
+         "t": "text",
+         "v": " never names "
+        },
+        {
+         "t": "code",
+         "v": "Disconnected"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Connecting"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "Connected"
+        },
+        {
+         "t": "text",
+         "v": " in its own methods; it only calls whichever event the caller raised and installs whatever comes back. "
+        },
+        {
+         "t": "code",
+         "v": "close()"
+        },
+        {
+         "t": "text",
+         "v": " while connecting does nothing, silently, because "
+        },
+        {
+         "t": "code",
+         "v": "Connecting"
+        },
+        {
+         "t": "text",
+         "v": " never overrides "
+        },
+        {
+         "t": "code",
+         "v": "on_close"
+        },
+        {
+         "t": "text",
+         "v": ", and the base class's default is to ignore it, which is worth noticing before it becomes a bug: a state that should refuse an event still has to say so somehow, which the failure cases below come back to. Gamma, Helm, Johnson and Vlissides describe exactly this shape in the behavioural chapter of the 1994 catalogue ("
+        },
+        {
+         "t": "a",
+         "v": "Design Patterns",
+         "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+        },
+        {
+         "t": "text",
+         "v": "): an object appears to change its class as its state changes, because every operation is redirected through a state object that can be swapped for another implementing the same interface."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Three states and four events already needed four classes and a base. The trade this pattern makes explicit is the one Klaus Iglberger's Guideline 15 in C++ Software Design names for any class hierarchy: a new state is one new class, written once, and nothing existing has to change; a new operation, "
+        },
+        {
+         "t": "code",
+         "v": "on_reset()"
+        },
+        {
+         "t": "text",
+         "v": " say, has to be added to the base and considered in every state class that exists, whether or not most of them do anything with it. That is the cost side of the ledger this pattern asks you to accept, and it is worth asking, before writing the fifth state class, whether the alternative in the worked example would do the same job for less."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "example",
+     "heading": "Worked example",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The same three-state connection, written as an enum and a switch, and as a "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": " of empty tag structs visited with one function, both do exactly what the state classes did:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string_view>\n#include <type_traits>\n#include <variant>\n\nenum class Event { connect, open_ack, timeout, close };\nenum class SimpleState { disconnected, connecting, connected };\n\n[[nodiscard]] constexpr std::string_view name_of(SimpleState state) {\n  switch (state) {\n    case SimpleState::disconnected:\n      return \"disconnected\";\n    case SimpleState::connecting:\n      return \"connecting\";\n    case SimpleState::connected:\n      return \"connected\";\n  }\n  return \"unknown\";\n}\n\n// One function, one switch: the whole machine in one place.\n[[nodiscard]] constexpr SimpleState next(SimpleState state, Event event) {\n  switch (state) {\n    case SimpleState::disconnected:\n      return event == Event::connect ? SimpleState::connecting : state;\n    case SimpleState::connecting:\n      if (event == Event::open_ack) return SimpleState::connected;\n      if (event == Event::timeout) return SimpleState::disconnected;\n      return state;\n    case SimpleState::connected:\n      return event == Event::close ? SimpleState::disconnected : state;\n  }\n  return state;\n}\n\n// The same three states as tag structs in a variant, visited with one function.\nstruct Disconnected {};\nstruct Connecting {};\nstruct Connected {};\nusing AnyState = std::variant<Disconnected, Connecting, Connected>;\n\n[[nodiscard]] std::string_view name_of(const AnyState& state) {\n  return std::visit(\n      [](const auto& s) -> std::string_view {\n        using T = std::decay_t<decltype(s)>;\n        if constexpr (std::is_same_v<T, Disconnected>) return \"disconnected\";\n        if constexpr (std::is_same_v<T, Connecting>) return \"connecting\";\n        return \"connected\";\n      },\n      state);\n}\n\n[[nodiscard]] AnyState next(const AnyState& state, Event event) {\n  return std::visit(\n      [event](const auto& s) -> AnyState {\n        using T = std::decay_t<decltype(s)>;\n        if constexpr (std::is_same_v<T, Disconnected>) {\n          return event == Event::connect ? AnyState{Connecting{}} : AnyState{s};\n        } else if constexpr (std::is_same_v<T, Connecting>) {\n          if (event == Event::open_ack) return AnyState{Connected{}};\n          if (event == Event::timeout) return AnyState{Disconnected{}};\n          return AnyState{s};\n        } else {\n          return event == Event::close ? AnyState{Disconnected{}} : AnyState{s};\n        }\n      },\n      state);\n}\n\nint main() {\n  SimpleState enum_state = SimpleState::disconnected;\n  AnyState variant_state = Disconnected{};\n  for (const Event event : {Event::connect, Event::close, Event::open_ack, Event::close}) {\n    enum_state = next(enum_state, event);\n    variant_state = next(variant_state, event);\n    std::cout << std::format(\"enum: {:<13} variant: {:<13} agree: {}\\n\", name_of(enum_state), name_of(variant_state),\n                             name_of(enum_state) == name_of(variant_state));\n  }\n  std::cout << std::format(\"sizeof SimpleState: {}, sizeof AnyState: {}\\n\", sizeof(SimpleState), sizeof(AnyState));\n}"
+      },
+      {
+       "t": "output",
+       "text": "enum: connecting    variant: connecting    agree: true\nenum: connecting    variant: connecting    agree: true\nenum: connected     variant: connected     agree: true\nenum: disconnected  variant: disconnected  agree: true\nsizeof SimpleState: 4, sizeof AnyState: 2"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "All three shapes, the state classes above and these two, agree on every step. "
+        },
+        {
+         "t": "code",
+         "v": "SimpleState"
+        },
+        {
+         "t": "text",
+         "v": " costs 4 bytes, an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " under the hood; "
+        },
+        {
+         "t": "code",
+         "v": "AnyState"
+        },
+        {
+         "t": "text",
+         "v": " costs 2, because its three alternatives hold no data of their own and a "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": " needs only its index besides them. Neither allocates, where every transition among the state classes built a new object on the heap. Mateusz Pusz's "
+        },
+        {
+         "t": "a",
+         "v": "CppCon 2018 talk on replacing dynamic polymorphism with std::variant",
+         "href": "https://www.youtube.com/watch?v=gKbORJtnVu8"
+        },
+        {
+         "t": "text",
+         "v": " works through this exact comparison, a small state machine written both ways, and measures the variant version faster to run and shorter to write, with the trade Iglberger's Guideline 15 already named: "
+        },
+        {
+         "t": "code",
+         "v": "next"
+        },
+        {
+         "t": "text",
+         "v": " for the variant is one function that a new event has to touch in every branch, the same shape as the switch, while a new state is a new alternative and a new branch in each visitor, not a new file."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Reach for the enum and the switch when the states carry no data of their own and the rules read as one function; reach for a variant when some states need to carry a value the others don't, such as a retry count only "
+        },
+        {
+         "t": "code",
+         "v": "Connecting"
+        },
+        {
+         "t": "text",
+         "v": " has, which a plain enum cannot express; reach for state classes only once several operations, not one, genuinely differ enough per state to be worth their own class and their own file. Three states and four events, as "
+        },
+        {
+         "t": "code",
+         "v": "Connection"
+        },
+        {
+         "t": "text",
+         "v": " has here, sit well inside the range where the switch and the variant are both smaller than the four classes and the base it took to say the same thing."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "mission",
+   "title": "Mission states: idle, running, cancelling, finished, failed",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 45 minutes. Build the five-state mission from the cold check twice: once as state classes, once as a "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": ", and show they agree."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "code",
+          "v": "enum class MissionEvent { start, cancel, complete, fail };"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "State classes: a "
+         },
+         {
+          "t": "code",
+          "v": "MissionState"
+         },
+         {
+          "t": "text",
+          "v": " interface with "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] virtual std::string_view name() const"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] virtual std::unique_ptr<MissionState> on_event(MissionEvent) const"
+         },
+         {
+          "t": "text",
+          "v": ", defaulting to "
+         },
+         {
+          "t": "code",
+          "v": "nullptr"
+         },
+         {
+          "t": "text",
+          "v": " for an event a state does not react to. Five classes, "
+         },
+         {
+          "t": "code",
+          "v": "Idle"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "Running"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "Cancelling"
+         },
+         {
+          "t": "text",
+          "v": ", "
+         },
+         {
+          "t": "code",
+          "v": "Finished"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "Failed"
+         },
+         {
+          "t": "text",
+          "v": ", overriding "
+         },
+         {
+          "t": "code",
+          "v": "on_event"
+         },
+         {
+          "t": "text",
+          "v": " only where the cold check's table has an edge; "
+         },
+         {
+          "t": "code",
+          "v": "Finished"
+         },
+         {
+          "t": "text",
+          "v": " and "
+         },
+         {
+          "t": "code",
+          "v": "Failed"
+         },
+         {
+          "t": "text",
+          "v": " override nothing."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A "
+         },
+         {
+          "t": "code",
+          "v": "Mission"
+         },
+         {
+          "t": "text",
+          "v": " holding the current state through a "
+         },
+         {
+          "t": "code",
+          "v": "std::unique_ptr<MissionState>"
+         },
+         {
+          "t": "text",
+          "v": ", with "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] bool handle(MissionEvent event)"
+         },
+         {
+          "t": "text",
+          "v": " that asks the current state for the next one, installs it and returns "
+         },
+         {
+          "t": "code",
+          "v": "true"
+         },
+         {
+          "t": "text",
+          "v": " when one came back, or returns "
+         },
+         {
+          "t": "code",
+          "v": "false"
+         },
+         {
+          "t": "text",
+          "v": " and leaves the state unchanged otherwise."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "The same five states as empty tag structs in "
+         },
+         {
+          "t": "code",
+          "v": "using AnyMissionState = std::variant<IdleV, RunningV, CancellingV, FinishedV, FailedV>;"
+         },
+         {
+          "t": "text",
+          "v": ", with a free function "
+         },
+         {
+          "t": "code",
+          "v": "[[nodiscard]] bool handle(AnyMissionState& state, MissionEvent event)"
+         },
+         {
+          "t": "text",
+          "v": " doing the same job through "
+         },
+         {
+          "t": "code",
+          "v": "std::visit"
+         },
+         {
+          "t": "text",
+          "v": "."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Drive both a "
+        },
+        {
+         "t": "code",
+         "v": "Mission"
+        },
+        {
+         "t": "text",
+         "v": " and an "
+        },
+        {
+         "t": "code",
+         "v": "AnyMissionState"
+        },
+        {
+         "t": "text",
+         "v": " through the same five events, "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "cancel"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "complete"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "fail"
+        },
+        {
+         "t": "text",
+         "v": ", and print, for each one, whether the class version accepted it and which state it reached, whether the variant version did the same, and whether the two agree. The fourth and fifth events, arriving after the mission has already finished, must both be refused."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then answer two questions in writing. Which state's "
+        },
+        {
+         "t": "code",
+         "v": "on_event"
+        },
+        {
+         "t": "text",
+         "v": " override is the shortest, and why? What would have to change in both versions if a "
+        },
+        {
+         "t": "code",
+         "v": "paused"
+        },
+        {
+         "t": "text",
+         "v": " state were added, reachable only from "
+        },
+        {
+         "t": "code",
+         "v": "running"
+        },
+        {
+         "t": "text",
+         "v": " and returning only to "
+        },
+        {
+         "t": "code",
+         "v": "running"
+        },
+        {
+         "t": "text",
+         "v": "?"
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <string_view>\n#include <type_traits>\n#include <utility>\n#include <variant>\n#include <vector>\n\nenum class MissionEvent { start, cancel, complete, fail };\n\n[[nodiscard]] constexpr std::string_view name_of(MissionEvent event) {\n  switch (event) {\n    case MissionEvent::start:\n      return \"start\";\n    case MissionEvent::cancel:\n      return \"cancel\";\n    case MissionEvent::complete:\n      return \"complete\";\n    case MissionEvent::fail:\n      return \"fail\";\n  }\n  return \"unknown\";\n}\n\n// ---- 1. One class per state ----\n\nclass MissionState {\n public:\n  MissionState() = default;\n  MissionState(const MissionState&) = delete;\n  MissionState& operator=(const MissionState&) = delete;\n  virtual ~MissionState() = default;\n  [[nodiscard]] virtual std::string_view name() const = 0;\n  // Ignored by default: a state that overrides nothing rejects every event.\n  [[nodiscard]] virtual std::unique_ptr<MissionState> on_event(MissionEvent) const { return nullptr; }\n};\n\nclass Running;\nclass Cancelling;\n\nclass Idle final : public MissionState {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"idle\"; }\n  [[nodiscard]] std::unique_ptr<MissionState> on_event(MissionEvent event) const override;\n};\n\nclass Running final : public MissionState {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"running\"; }\n  [[nodiscard]] std::unique_ptr<MissionState> on_event(MissionEvent event) const override;\n};\n\nclass Cancelling final : public MissionState {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"cancelling\"; }\n  [[nodiscard]] std::unique_ptr<MissionState> on_event(MissionEvent event) const override;\n};\n\nclass Finished final : public MissionState {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"finished\"; }\n};\n\nclass Failed final : public MissionState {\n public:\n  [[nodiscard]] std::string_view name() const override { return \"failed\"; }\n};\n\nstd::unique_ptr<MissionState> Idle::on_event(MissionEvent event) const {\n  if (event == MissionEvent::start) return std::make_unique<Running>();\n  return nullptr;\n}\nstd::unique_ptr<MissionState> Running::on_event(MissionEvent event) const {\n  if (event == MissionEvent::cancel) return std::make_unique<Cancelling>();\n  if (event == MissionEvent::complete) return std::make_unique<Finished>();\n  if (event == MissionEvent::fail) return std::make_unique<Failed>();\n  return nullptr;\n}\nstd::unique_ptr<MissionState> Cancelling::on_event(MissionEvent event) const {\n  if (event == MissionEvent::complete) return std::make_unique<Finished>();\n  return nullptr;\n}\n\nclass Mission {\n public:\n  Mission() : state_(std::make_unique<Idle>()) {}\n\n  [[nodiscard]] bool handle(MissionEvent event) {\n    std::unique_ptr<MissionState> next = state_->on_event(event);\n    if (!next) return false;\n    state_ = std::move(next);\n    return true;\n  }\n  [[nodiscard]] std::string_view state() const { return state_->name(); }\n\n private:\n  std::unique_ptr<MissionState> state_;\n};\n\n// ---- 2. The same five states as tag structs in a variant ----\n\nstruct IdleV {};\nstruct RunningV {};\nstruct CancellingV {};\nstruct FinishedV {};\nstruct FailedV {};\nusing AnyMissionState = std::variant<IdleV, RunningV, CancellingV, FinishedV, FailedV>;\n\n[[nodiscard]] std::string_view name_of(const AnyMissionState& state) {\n  return std::visit(\n      [](const auto& s) -> std::string_view {\n        using T = std::decay_t<decltype(s)>;\n        if constexpr (std::is_same_v<T, IdleV>) return \"idle\";\n        else if constexpr (std::is_same_v<T, RunningV>) return \"running\";\n        else if constexpr (std::is_same_v<T, CancellingV>) return \"cancelling\";\n        else if constexpr (std::is_same_v<T, FinishedV>) return \"finished\";\n        else return \"failed\";\n      },\n      state);\n}\n\n// Returns whether the event was accepted; on rejection, state is left unchanged.\n[[nodiscard]] bool handle(AnyMissionState& state, MissionEvent event) {\n  return std::visit(\n      [&state, event](const auto& s) -> bool {\n        using T = std::decay_t<decltype(s)>;\n        if constexpr (std::is_same_v<T, IdleV>) {\n          if (event == MissionEvent::start) {\n            state = RunningV{};\n            return true;\n          }\n        } else if constexpr (std::is_same_v<T, RunningV>) {\n          if (event == MissionEvent::cancel) {\n            state = CancellingV{};\n            return true;\n          }\n          if (event == MissionEvent::complete) {\n            state = FinishedV{};\n            return true;\n          }\n          if (event == MissionEvent::fail) {\n            state = FailedV{};\n            return true;\n          }\n        } else if constexpr (std::is_same_v<T, CancellingV>) {\n          if (event == MissionEvent::complete) {\n            state = FinishedV{};\n            return true;\n          }\n        }\n        return false;\n      },\n      state);\n}\n\nint main() {\n  Mission classes;\n  AnyMissionState variant = IdleV{};\n\n  const std::vector<MissionEvent> events{MissionEvent::start, MissionEvent::cancel, MissionEvent::complete,\n                                         MissionEvent::start, MissionEvent::fail};\n  for (const MissionEvent event : events) {\n    const bool accepted_by_class = classes.handle(event);\n    const bool accepted_by_variant = handle(variant, event);\n    std::cout << std::format(\"{:<9} accepted {:<5} -> {:<10} (variant accepted {:<5} -> {:<10}) agree: {}\\n\",\n                             name_of(event), accepted_by_class, classes.state(), accepted_by_variant,\n                             name_of(variant), classes.state() == name_of(variant));\n  }\n}"
+      },
+      {
+       "t": "output",
+       "text": "start     accepted true  -> running    (variant accepted true  -> running   ) agree: true\ncancel    accepted true  -> cancelling (variant accepted true  -> cancelling) agree: true\ncomplete  accepted true  -> finished   (variant accepted true  -> finished  ) agree: true\nstart     accepted false -> finished   (variant accepted false -> finished  ) agree: true\nfail      accepted false -> finished   (variant accepted false -> finished  ) agree: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The two answers. "
+        },
+        {
+         "t": "code",
+         "v": "Finished::on_event"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "Failed::on_event"
+        },
+        {
+         "t": "text",
+         "v": " are the shortest, because neither overrides it at all: the base class's default, returning "
+        },
+        {
+         "t": "code",
+         "v": "nullptr"
+        },
+        {
+         "t": "text",
+         "v": " for everything, is already the correct behaviour for a state nothing may leave. Adding "
+        },
+        {
+         "t": "code",
+         "v": "paused"
+        },
+        {
+         "t": "text",
+         "v": ", reachable only from "
+        },
+        {
+         "t": "code",
+         "v": "running"
+        },
+        {
+         "t": "text",
+         "v": " and back, changes exactly one state on each side: "
+        },
+        {
+         "t": "code",
+         "v": "Running::on_event"
+        },
+        {
+         "t": "text",
+         "v": " gains a branch for a "
+        },
+        {
+         "t": "code",
+         "v": "pause"
+        },
+        {
+         "t": "text",
+         "v": " event returning a new "
+        },
+        {
+         "t": "code",
+         "v": "Paused"
+        },
+        {
+         "t": "text",
+         "v": " class, which itself overrides "
+        },
+        {
+         "t": "code",
+         "v": "on_event"
+        },
+        {
+         "t": "text",
+         "v": " only for "
+        },
+        {
+         "t": "code",
+         "v": "resume"
+        },
+        {
+         "t": "text",
+         "v": ", returning a fresh "
+        },
+        {
+         "t": "code",
+         "v": "Running"
+        },
+        {
+         "t": "text",
+         "v": "; the variant's visitor gains one alternative and the two branches that mention it, in the "
+        },
+        {
+         "t": "code",
+         "v": "RunningV"
+        },
+        {
+         "t": "text",
+         "v": " arm and a new "
+        },
+        {
+         "t": "code",
+         "v": "PausedV"
+        },
+        {
+         "t": "text",
+         "v": " arm. Neither "
+        },
+        {
+         "t": "code",
+         "v": "Idle"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Cancelling"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Finished"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "Failed"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "IdleV"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "CancellingV"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "FinishedV"
+        },
+        {
+         "t": "text",
+         "v": " nor "
+        },
+        {
+         "t": "code",
+         "v": "FailedV"
+        },
+        {
+         "t": "text",
+         "v": ", nor the two "
+        },
+        {
+         "t": "code",
+         "v": "Mission"
+        },
+        {
+         "t": "text",
+         "v": "-shaped wrapper types, changes at all."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "invalid",
+   "title": "Invalid transitions and their tests",
+   "steps": [
+    {
+     "kind": "failure",
+     "heading": "Failure cases",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A state machine is often written as a switch on the event, checked once and reused everywhere, rather than as a switch on the state. Here it costs a mission that has already finished the ability to stay finished:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <string_view>\n\nenum class MissionState { idle, running, cancelling, finished, failed };\nenum class MissionEvent { start, cancel, complete, fail };\n\n[[nodiscard]] constexpr std::string_view name_of(MissionState state) {\n  switch (state) {\n    case MissionState::idle:\n      return \"idle\";\n    case MissionState::running:\n      return \"running\";\n    case MissionState::cancelling:\n      return \"cancelling\";\n    case MissionState::finished:\n      return \"finished\";\n    case MissionState::failed:\n      return \"failed\";\n  }\n  return \"unknown\";\n}\n\n// The bug: switches on the event alone, and never looks at the state it started in.\n[[nodiscard]] constexpr MissionState buggy_next(MissionState state, MissionEvent event) {\n  switch (event) {\n    case MissionEvent::start:\n      return MissionState::running;\n    case MissionEvent::cancel:\n      return MissionState::cancelling;\n    case MissionEvent::complete:\n      return MissionState::finished;\n    case MissionEvent::fail:\n      return MissionState::failed;\n  }\n  return state;\n}\n\nint main() {\n  MissionState state = MissionState::finished;  // the mission is already over\n  std::cout << std::format(\"before: {}\\n\", name_of(state));\n  state = buggy_next(state, MissionEvent::start);  // a stray start event arrives late\n  std::cout << std::format(\"after a stray start event: {}\\n\", name_of(state));\n}"
+      },
+      {
+       "t": "output",
+       "text": "before: finished\nafter a stray start event: running"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Nothing here is undefined behaviour and nothing warns: the switch covers every "
+        },
+        {
+         "t": "code",
+         "v": "MissionEvent"
+        },
+        {
+         "t": "text",
+         "v": ", so "
+        },
+        {
+         "t": "code",
+         "v": "-Wswitch"
+        },
+        {
+         "t": "text",
+         "v": " has nothing to say, and every branch returns a value of the right type. The bug is a design mistake a warning cannot see, checking half of the pair that decides a transition and ignoring the other half entirely. The state classes and the variant in the exercise cannot make this mistake by construction: "
+        },
+        {
+         "t": "code",
+         "v": "Finished::on_event"
+        },
+        {
+         "t": "text",
+         "v": " and the "
+        },
+        {
+         "t": "code",
+         "v": "FinishedV"
+        },
+        {
+         "t": "text",
+         "v": " arm of the visitor both live under the current state, so there is no branch left to reach for the wrong one."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A happy-path test never finds this. "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "cancel"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "complete"
+        },
+        {
+         "t": "text",
+         "v": " in order never revisits "
+        },
+        {
+         "t": "code",
+         "v": "finished"
+        },
+        {
+         "t": "text",
+         "v": " with a stray "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": ", so the bug survives exactly the sequence most tests write first. What catches it is testing every pair, beyond the path a mission is expected to take:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <format>\n#include <iostream>\n#include <string_view>\n\nenum class MissionState { idle, running, cancelling, finished, failed };\nenum class MissionEvent { start, cancel, complete, fail };\n\n[[nodiscard]] constexpr std::string_view name_of(MissionState state) {\n  switch (state) {\n    case MissionState::idle:\n      return \"idle\";\n    case MissionState::running:\n      return \"running\";\n    case MissionState::cancelling:\n      return \"cancelling\";\n    case MissionState::finished:\n      return \"finished\";\n    case MissionState::failed:\n      return \"failed\";\n  }\n  return \"unknown\";\n}\n\n[[nodiscard]] constexpr std::string_view name_of(MissionEvent event) {\n  switch (event) {\n    case MissionEvent::start:\n      return \"start\";\n    case MissionEvent::cancel:\n      return \"cancel\";\n    case MissionEvent::complete:\n      return \"complete\";\n    case MissionEvent::fail:\n      return \"fail\";\n  }\n  return \"unknown\";\n}\n\n[[nodiscard]] constexpr MissionState correct_next(MissionState state, MissionEvent event) {\n  switch (state) {\n    case MissionState::idle:\n      return event == MissionEvent::start ? MissionState::running : state;\n    case MissionState::running:\n      if (event == MissionEvent::cancel) return MissionState::cancelling;\n      if (event == MissionEvent::complete) return MissionState::finished;\n      if (event == MissionEvent::fail) return MissionState::failed;\n      return state;\n    case MissionState::cancelling:\n      return event == MissionEvent::complete ? MissionState::finished : state;\n    case MissionState::finished:\n    case MissionState::failed:\n      return state;\n  }\n  return state;\n}\n\n// The bug from the previous fence: switches on the event alone.\n[[nodiscard]] constexpr MissionState buggy_next(MissionState state, MissionEvent event) {\n  switch (event) {\n    case MissionEvent::start:\n      return MissionState::running;\n    case MissionEvent::cancel:\n      return MissionState::cancelling;\n    case MissionEvent::complete:\n      return MissionState::finished;\n    case MissionEvent::fail:\n      return MissionState::failed;\n  }\n  return state;\n}\n\nint main() {\n  constexpr std::array<MissionState, 5> states{MissionState::idle, MissionState::running, MissionState::cancelling,\n                                               MissionState::finished, MissionState::failed};\n  constexpr std::array<MissionEvent, 4> events{MissionEvent::start, MissionEvent::cancel, MissionEvent::complete,\n                                               MissionEvent::fail};\n  int mismatches = 0;\n  for (const MissionState state : states) {\n    for (const MissionEvent event : events) {\n      const MissionState correct = correct_next(state, event);\n      const MissionState buggy = buggy_next(state, event);\n      if (correct != buggy) {\n        ++mismatches;\n        std::cout << std::format(\"mismatch: {:<10} + {:<8} -> correct {:<10} buggy {}\\n\", name_of(state),\n                                 name_of(event), name_of(correct), name_of(buggy));\n      }\n    }\n  }\n  std::cout << std::format(\"checked {} state-event pairs, {} mismatches\\n\", states.size() * events.size(),\n                           mismatches);\n}"
+      },
+      {
+       "t": "output",
+       "text": "mismatch: idle       + cancel   -> correct idle       buggy cancelling\nmismatch: idle       + complete -> correct idle       buggy finished\nmismatch: idle       + fail     -> correct idle       buggy failed\nmismatch: cancelling + start    -> correct cancelling buggy running\nmismatch: cancelling + fail     -> correct cancelling buggy failed\nmismatch: finished   + start    -> correct finished   buggy running\nmismatch: finished   + cancel   -> correct finished   buggy cancelling\nmismatch: finished   + fail     -> correct finished   buggy failed\nmismatch: failed     + start    -> correct failed     buggy running\nmismatch: failed     + cancel   -> correct failed     buggy cancelling\nmismatch: failed     + complete -> correct failed     buggy finished\nchecked 20 state-event pairs, 11 mismatches"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Eleven of the twenty pairs disagree, eleven edges the cold check's table never drew that the buggy version accepts anyway. A test suite for a state machine is only as good as the pairs it tries, and the number worth writing down is five valid edges out of twenty possible ones: everything else, fifteen pairs here, is expected to be refused, and a test that only drives the five that should succeed never looks at the fifteen that should not. The exercise's "
+        },
+        {
+         "t": "code",
+         "v": "handle"
+        },
+        {
+         "t": "text",
+         "v": " returning "
+        },
+        {
+         "t": "code",
+         "v": "bool"
+        },
+        {
+         "t": "text",
+         "v": " is what makes that check possible to write in the first place: a version that silently stayed put on a bad event, the way "
+        },
+        {
+         "t": "code",
+         "v": "ConnectionState"
+        },
+        {
+         "t": "text",
+         "v": "'s default did, gives a test nothing to assert against except the state itself, one pair at a time, instead of one boolean per call."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write five to eight lines from memory, and keep them as the proof for this topic. Say what a context forwards to and what changes at a transition. Give the one-line cost of state classes against Iglberger's guideline: cheap to add a state, expensive to add an operation. Say when an enum and a switch beat state classes, and when a "
+        },
+        {
+         "t": "code",
+         "v": "std::variant"
+        },
+        {
+         "t": "text",
+         "v": " beats the switch. Name the bug a switch on the event alone produces, and why "
+        },
+        {
+         "t": "code",
+         "v": "-Wswitch"
+        },
+        {
+         "t": "text",
+         "v": " says nothing about it. Finish with the reason an exhaustive test over every state-event pair catches what a happy-path test does not."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "What does a context do when a state's method returns a new state, and what does it do when it returns nothing?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "In one sentence, what does a new state cost a class hierarchy, and what does a new operation cost it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "For three states and four events, which of state classes, an enum and switch, or a "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": " is smallest, and by how much?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What kind of state would force you to use a "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": " over a plain enum?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "What is the bug in a state machine that switches on the event instead of the state, and why does the compiler say nothing about it?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Out of five valid edges among twenty possible state-event pairs, how many pairs must a test refuse to be complete?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Why does "
+     },
+     {
+      "t": "code",
+      "v": "Finished::on_event"
+     },
+     {
+      "t": "text",
+      "v": " need no override at all, in both the state-class and the variant version?"
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "From memory: a five-state mission, its five valid edges, and one implementation that reports whether an event was accepted."
+     }
+    ]
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "Gamma, Helm, Johnson and Vlissides, Design Patterns, Addison-Wesley 1994: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/"
+     },
+     {
+      "t": "text",
+      "v": ", and its "
+     },
+     {
+      "t": "a",
+      "v": "behavioural chapter",
+      "href": "https://www.oreilly.com/library/view/design-patterns-elements/0201633612/ch05.html"
+     },
+     {
+      "t": "text",
+      "v": ", where State is defined as an object that appears to change its class as its internal state changes."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Mateusz Pusz, Effective replacement of dynamic polymorphism with std::variant, CppCon 2018: "
+     },
+     {
+      "t": "a",
+      "v": "video",
+      "href": "https://www.youtube.com/watch?v=gKbORJtnVu8"
+     },
+     {
+      "t": "text",
+      "v": ". A small state machine written both as a class hierarchy and as a "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": ", measured and compared."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Klaus Iglberger, C++ Software Design, O'Reilly 2022: "
+     },
+     {
+      "t": "a",
+      "v": "the book",
+      "href": "https://www.oreilly.com/library/view/c-software-design/9781098113155/"
+     },
+     {
+      "t": "text",
+      "v": ". Guideline 15, on a class hierarchy making a new type cheap and a new operation expensive, and a "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": " the other way round."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines: "
+     },
+     {
+      "t": "a",
+      "v": "I.4",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ri-typed"
+     },
+     {
+      "t": "text",
+      "v": " on types that say what they mean, and "
+     },
+     {
+      "t": "a",
+      "v": "C.181",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#ru-naked"
+     },
+     {
+      "t": "text",
+      "v": " on "
+     },
+     {
+      "t": "code",
+      "v": "std::variant"
+     },
+     {
+      "t": "text",
+      "v": " over a hand-written tagged union."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "GCC 13, "
+     },
+     {
+      "t": "a",
+      "v": "warning options",
+      "href": "https://gcc.gnu.org/onlinedocs/gcc-13.3.0/gcc/Warning-Options.html"
+     },
+     {
+      "t": "text",
+      "v": ": "
+     },
+     {
+      "t": "code",
+      "v": "-Wswitch"
+     },
+     {
+      "t": "text",
+      "v": ", which finds a missing enumerator but not a switch on the wrong variable."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::variant",
+      "href": "https://en.cppreference.com/cpp/utility/variant"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "std::visit",
+      "href": "https://en.cppreference.com/cpp/utility/variant/visit"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}
