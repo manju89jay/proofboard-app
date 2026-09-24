@@ -1,0 +1,595 @@
+{
+ "id": "dsa-mixed-3",
+ "check": null,
+ "interview": null,
+ "subs": [
+  {
+   "id": "set",
+   "title": "Three re-solves",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Pick three problems from earlier topics that you found hard the first time, one that leaned on a hash map, one on a graph, and one on a tree. These three re-solve exactly that spread, with new numbers and a new story around each, so treat this set as a stand-in for your own three if you would rather use them. 40 minutes each, a timer, no notes and no rereading the original page before you write a line. Name the pattern and its time and space before you touch the keyboard, then write the function and a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that tests it, edge cases included."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Score each problem out of 3: one point for naming a working pattern before coding, one for a correct solution with the complexity you named, one for tests that cover the edge cases the solution lists."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The problem: a test rig replays route codes recorded from a fleet trial. Each code is a nonempty string of at most 12 lowercase letters, and there are at most 2000 of them. Two codes are equivalent when one is a rearrangement of the other's letters, using every letter exactly as often as the other does. Write "
+        },
+        {
+         "t": "code",
+         "v": "equivalent_routes(codes)"
+        },
+        {
+         "t": "text",
+         "v": ", which groups the positions of equivalent codes together. Within a group, list the positions in increasing order; order the groups by the position at which each group's first member appears. "
+        },
+        {
+         "t": "code",
+         "v": "{\"abc\", \"bca\", \"xyz\", \"cab\", \"zzz\", \"xyz\"}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "{0, 1, 3} {2, 5} {4}"
+        },
+        {
+         "t": "text",
+         "v": ", and an empty input gives no groups at all. Take "
+        },
+        {
+         "t": "code",
+         "v": "const std::vector<std::string>&"
+        },
+        {
+         "t": "text",
+         "v": ", return "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::vector<std::ptrdiff_t>>"
+        },
+        {
+         "t": "text",
+         "v": ", and state the time and space."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This re-solves the pattern from "
+        },
+        {
+         "t": "code",
+         "v": "dsa-hash-maps.md"
+        },
+        {
+         "t": "text",
+         "v": "'s exercise on "
+        },
+        {
+         "t": "code",
+         "v": "group_anagrams"
+        },
+        {
+         "t": "text",
+         "v": ": a key that every member of a group shares, looked up in a hash map that remembers which group owns that key. The words that point to it are \"rearrangement of the other's letters\", which is anagram by another name, and \"at most 12 letters\", which rules out anything that needs the letters kept in order. Sorting a code's letters gives a key that every one of its rearrangements produces too, so a code is looked up by its sorted form rather than by itself:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <unordered_map>\n#include <utility>\n#include <vector>\n\n// Two route codes are equivalent when one is a rearrangement of the other's letters.\n[[nodiscard]] std::vector<std::vector<std::ptrdiff_t>> equivalent_routes(const std::vector<std::string>& codes) {\n  std::unordered_map<std::string, std::ptrdiff_t> group_of;  // sorted letters -> that key's position in groups\n  std::vector<std::vector<std::ptrdiff_t>> groups;\n  for (std::ptrdiff_t i = 0; i < std::ssize(codes); ++i) {\n    std::string key = codes[static_cast<std::size_t>(i)];\n    std::ranges::sort(key);\n    const auto [it, inserted] = group_of.try_emplace(std::move(key), std::ssize(groups));\n    if (inserted) {\n      groups.push_back({i});\n    } else {\n      groups[static_cast<std::size_t>(it->second)].push_back(i);\n    }\n  }\n  return groups;\n}\n\nvoid show(std::string_view label, const std::vector<std::vector<std::ptrdiff_t>>& groups) {\n  std::cout << label << ':';\n  for (const auto& g : groups) {\n    std::cout << \" {\";\n    for (std::size_t k = 0; k < g.size(); ++k) {\n      if (k) std::cout << ' ';\n      std::cout << g[k];\n    }\n    std::cout << '}';\n  }\n  std::cout << '\\n';\n}\n\nint main() {\n  show(\"six codes\", equivalent_routes({\"abc\", \"bca\", \"xyz\", \"cab\", \"zzz\", \"xyz\"}));\n  show(\"empty\", equivalent_routes({}));\n  show(\"single\", equivalent_routes({\"a\"}));\n  show(\"three of one letter set\", equivalent_routes({\"aab\", \"aba\", \"baa\"}));\n}"
+      },
+      {
+       "t": "output",
+       "text": "six codes: {0 1 3} {2 5} {4}\nempty:\nsingle: {0}\nthree of one letter set: {0 1 2}"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Sorting every code costs O(L log L) for a code of length L, so the whole run is O(N · L log L) for N codes, and O(N · L) space for the keys and the groups. "
+        },
+        {
+         "t": "code",
+         "v": "try_emplace"
+        },
+        {
+         "t": "text",
+         "v": " either inserts the position of a new group, when the key has not been seen, or leaves the existing entry alone and hands back where that group already lives, which is what lets one lookup do both jobs. The edge cases are an empty input, a single code, which is its own group of one, and codes that are all rearrangements of each other, which land in one group together."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The group order comes from scanning "
+        },
+        {
+         "t": "code",
+         "v": "codes"
+        },
+        {
+         "t": "text",
+         "v": " once and recording each group's slot the first time its key appears, not from sorting the groups afterwards, which is the detail this version changes from the original: there the groups were sorted to make the test stable, and here the input order does that job instead, so a solution that sorts the groups by their contents produces a different, still defensible order and should be judged on whether it states that choice, not marked down for it."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes, same rules. A warehouse install logs which beacon ids can hear each other directly, as an edge list over beacons numbered 0 to n − 1. A link list may repeat a pair, or pair a beacon with itself, which links it to nothing new. Two beacons share a zone when a chain of direct links connects them. Write "
+        },
+        {
+         "t": "code",
+         "v": "zone_labels(n, links)"
+        },
+        {
+         "t": "text",
+         "v": ", returning one struct with a zone id per beacon, the total number of zones, and the size of the largest zone. Number the zones 0 upward in the order their smallest beacon is reached, scanning beacons 0 upward, so the answer is the same on every run. Use no recursion: an install can have thousands of beacons wired in a single chain."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test the seven-beacon layout "
+        },
+        {
+         "t": "code",
+         "v": "{0, 1}, {1, 2}, {3, 3}, {4, 5}"
+        },
+        {
+         "t": "text",
+         "v": " where beacon 6 has no link at all; zero beacons; one beacon; five beacons with no links; four beacons with the pair "
+        },
+        {
+         "t": "code",
+         "v": "{0, 1}"
+        },
+        {
+         "t": "text",
+         "v": " repeated twice more as "
+        },
+        {
+         "t": "code",
+         "v": "{0, 1}"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "{1, 0}"
+        },
+        {
+         "t": "text",
+         "v": " plus "
+        },
+        {
+         "t": "code",
+         "v": "{2, 3}"
+        },
+        {
+         "t": "text",
+         "v": "; and four beacons wired in a cycle. State the time and the extra space in terms of n and the number of links m."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This re-solves the pattern from "
+        },
+        {
+         "t": "code",
+         "v": "dsa-graphs.md"
+        },
+        {
+         "t": "text",
+         "v": "'s exercise on "
+        },
+        {
+         "t": "code",
+         "v": "components"
+        },
+        {
+         "t": "text",
+         "v": ": build the adjacency list once, then sweep the beacons in order, flood-filling every unlabelled one into a fresh zone. The words that point to it are \"share a zone\" through \"a chain of direct links\", which is reachability rather than a direct link alone, and \"thousands of beacons in a single chain\", which rules out a recursive flood fill on a chain deep enough to overflow the stack. A link that repeats or points a beacon at itself has to be filtered on the way into the adjacency list, or it does no harm beyond a wasted visit, so it needs a decision either way, not silent trust in the input:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <iostream>\n#include <string_view>\n#include <utility>\n#include <vector>\n\nstruct Zones {\n  std::vector<std::ptrdiff_t> zone_of;\n  std::ptrdiff_t count = 0;\n  std::ptrdiff_t largest = 0;\n};\n\n// Beacons 0..n-1 and links (undirected, self-loops and repeats allowed); zones numbered 0 upward in\n// order of the smallest beacon in each. No recursion, so a long chain cannot overflow the stack.\n[[nodiscard]] Zones zone_labels(std::ptrdiff_t n, const std::vector<std::pair<std::ptrdiff_t, std::ptrdiff_t>>& links) {\n  std::vector<std::vector<std::ptrdiff_t>> neighbours(static_cast<std::size_t>(n));\n  for (const auto& [a, b] : links) {\n    if (a == b) continue;  // a self-loop reaches nothing new\n    neighbours[static_cast<std::size_t>(a)].push_back(b);\n    neighbours[static_cast<std::size_t>(b)].push_back(a);\n  }\n\n  Zones zones;\n  zones.zone_of.assign(static_cast<std::size_t>(n), -1);\n  std::vector<std::ptrdiff_t> stack;\n  for (std::ptrdiff_t start = 0; start < n; ++start) {\n    if (zones.zone_of[static_cast<std::size_t>(start)] != -1) continue;\n    const std::ptrdiff_t zone = zones.count++;\n    std::ptrdiff_t size = 0;\n    stack.push_back(start);\n    zones.zone_of[static_cast<std::size_t>(start)] = zone;\n    while (!stack.empty()) {\n      const std::ptrdiff_t v = stack.back();\n      stack.pop_back();\n      ++size;\n      for (const std::ptrdiff_t u : neighbours[static_cast<std::size_t>(v)]) {\n        if (zones.zone_of[static_cast<std::size_t>(u)] == -1) {\n          zones.zone_of[static_cast<std::size_t>(u)] = zone;\n          stack.push_back(u);\n        }\n      }\n    }\n    zones.largest = std::max(zones.largest, size);\n  }\n  return zones;\n}\n\nvoid show(std::string_view label, const Zones& zones) {\n  std::cout << label << \": zones\";\n  for (const std::ptrdiff_t z : zones.zone_of) std::cout << ' ' << z;\n  std::cout << \", count \" << zones.count << \", largest \" << zones.largest << '\\n';\n}\n\nint main() {\n  show(\"mixed\", zone_labels(7, {{0, 1}, {1, 2}, {3, 3}, {4, 5}}));\n  show(\"no beacons\", zone_labels(0, {}));\n  show(\"one beacon\", zone_labels(1, {}));\n  show(\"no links\", zone_labels(5, {}));\n  show(\"duplicate links\", zone_labels(4, {{0, 1}, {0, 1}, {1, 0}, {2, 3}}));\n  show(\"everyone linked\", zone_labels(4, {{0, 1}, {1, 2}, {2, 3}, {3, 0}}));\n}"
+      },
+      {
+       "t": "output",
+       "text": "mixed: zones 0 0 0 1 2 2 3, count 4, largest 3\nno beacons: zones, count 0, largest 0\none beacon: zones 0, count 1, largest 1\nno links: zones 0 1 2 3 4, count 5, largest 1\nduplicate links: zones 0 0 1 1, count 2, largest 2\neveryone linked: zones 0 0 0 0, count 1, largest 4"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n + m) time, since every beacon is pushed and popped once and every link is looked at from both ends, and O(n + m) space for the adjacency list plus the explicit stack. The stack replaces the call stack a recursive flood fill would use, and it holds at most the beacons waiting to be visited, never more than n. The edge cases are zero beacons, an isolated beacon with no links, a beacon linked only to itself, and a repeated link, which the \"duplicate links\" case shows costs nothing beyond the wasted adjacency entries: beacon 0 and 1 still end up in one zone, not counted twice."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes, same rules. A mission plan is a binary decision tree: every node holds a distinct integer id, an optional left branch and an optional right branch, with no relation between a node's id and the ids under it. Nodes are "
+        },
+        {
+         "t": "code",
+         "v": "struct Node { int id = 0; std::unique_ptr<Node> left; std::unique_ptr<Node> right; };"
+        },
+        {
+         "t": "text",
+         "v": ". Write "
+        },
+        {
+         "t": "code",
+         "v": "lowest_shared_step(root, a, b)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the id of the deepest node that has both "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " somewhere in its subtree, counting a node as being in its own subtree, or no value when the tree is empty or either id is missing. Take a "
+        },
+        {
+         "t": "code",
+         "v": "const Node*"
+        },
+        {
+         "t": "text",
+         "v": " to the root, "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " ids, and return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int>"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Test it on a tree with the ids "
+        },
+        {
+         "t": "code",
+         "v": "10, 20, 30, 40, 50, 60, 70"
+        },
+        {
+         "t": "text",
+         "v": ", where 20 and 30 are 10's children, 40 and 50 are 20's children, 70 is 50's left child, and 60 is 30's right child. Run the pairs "
+        },
+        {
+         "t": "code",
+         "v": "(40, 50)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "(40, 70)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "(20, 60)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "(10, 10)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "(20, 30)"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "(50, 70)"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "(40, 99)"
+        },
+        {
+         "t": "text",
+         "v": ", where 99 is not in the tree, then run the empty tree. State the time and the extra space."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This re-solves the second version from "
+        },
+        {
+         "t": "code",
+         "v": "dsa-bst.md"
+        },
+        {
+         "t": "text",
+         "v": "'s exercise on "
+        },
+        {
+         "t": "code",
+         "v": "lowest_common_ancestor"
+        },
+        {
+         "t": "text",
+         "v": ", the one written for a tree with no ordering to steer by. The words that point to it are \"no relation between a node's id and the ids under it\", which rules out the ordering trick a binary search tree would allow, and \"deepest node that has both\", which is a property assembled on the way back up a traversal rather than read off directly on the way down. A node that is "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "b"
+        },
+        {
+         "t": "text",
+         "v": " itself reports itself upward; a node whose two branches each report something different sits between the two and is the answer; a node whose only report comes from one side passes that report further up:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <memory>\n#include <optional>\n#include <string>\n#include <utility>\n\nstruct Node {\n  int id = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int id, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(id, std::move(left), std::move(right));\n}\n\n[[nodiscard]] bool holds(const Node* n, int id) {\n  if (n == nullptr) return false;\n  return n->id == id || holds(n->left.get(), id) || holds(n->right.get(), id);\n}\n\n// Reports itself, or whichever of a and b it finds beneath it, up towards the root.\n[[nodiscard]] const Node* deepest_shared(const Node* n, int a, int b) {\n  if (n == nullptr || n->id == a || n->id == b) return n;\n  const Node* left = deepest_shared(n->left.get(), a, b);\n  const Node* right = deepest_shared(n->right.get(), a, b);\n  if (left != nullptr && right != nullptr) return n;  // a and b are on different sides: this is where they meet\n  return left != nullptr ? left : right;\n}\n\n[[nodiscard]] std::optional<int> lowest_shared_step(const Node* root, int a, int b) {\n  if (!holds(root, a) || !holds(root, b)) return std::nullopt;\n  const Node* found = deepest_shared(root, a, b);\n  return found != nullptr ? std::optional<int>{found->id} : std::nullopt;\n}\n\n[[nodiscard]] std::string text(std::optional<int> value) {\n  return value ? std::format(\"{}\", *value) : \"none\";\n}\n\nint main() {\n  const auto tree = node(10, node(20, node(40), node(50, node(70), nullptr)), node(30, nullptr, node(60)));\n  for (const auto& [a, b] : {std::pair{40, 50}, {40, 70}, {20, 60}, {10, 10}, {20, 30}, {50, 70}, {40, 99}}) {\n    std::cout << std::format(\"({}, {}) -> {}\\n\", a, b, text(lowest_shared_step(tree.get(), a, b)));\n  }\n  std::cout << std::format(\"empty tree -> {}\\n\", text(lowest_shared_step(nullptr, 1, 2)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "(40, 50) -> 20\n(40, 70) -> 20\n(20, 60) -> 10\n(10, 10) -> 10\n(20, 30) -> 10\n(50, 70) -> 50\n(40, 99) -> none\nempty tree -> none"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Checking that both ids are present costs two more passes over the tree, so the whole answer is O(n) time, for n nodes, and O(h) extra space for the recursion stack, for a tree of height h. The edge cases are an empty tree, an id missing from the tree, and a pair where one id is an ancestor of the other, such as "
+        },
+        {
+         "t": "code",
+         "v": "(50, 70)"
+        },
+        {
+         "t": "text",
+         "v": ", where the answer is the ancestor itself rather than some node further up. Skipping the containment check and trusting that both ids are present would drop it to one traversal, which is a fair trade only when the caller already guarantees it, and the statement here does not."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down, for each problem, the pattern you named before coding, whether it matched the one this page names, the committed page and exercise it re-solves, your time against the 40 minutes, and your score out of 3. Add one line on what changed between your first attempt at the original problem and this one, whether the pattern came back on its own or you had to rebuild it from the words in the statement. You pass this set when you earned the first two points on all three problems. A problem where the pattern still would not come is not ready for a third attempt next week; it is ready for the theory step of its page, read again from the start."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "unordered_map::try_emplace",
+      "href": "https://en.cppreference.com/cpp/container/unordered_map/try_emplace"
+     },
+     {
+      "t": "text",
+      "v": ", which the first solution uses to insert a new group and find an existing one with a single lookup, and on "
+     },
+     {
+      "t": "a",
+      "v": "std::optional",
+      "href": "https://en.cppreference.com/cpp/utility/optional"
+     },
+     {
+      "t": "text",
+      "v": ", which the third returns."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "ES.100 to ES.107",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-signed"
+     },
+     {
+      "t": "text",
+      "v": " on signed arithmetic and indices, behind "
+     },
+     {
+      "t": "code",
+      "v": "std::ptrdiff_t"
+     },
+     {
+      "t": "text",
+      "v": " in the first two solutions."
+     }
+    ]
+   ]
+  }
+ ]
+}

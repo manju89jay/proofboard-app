@@ -1,0 +1,436 @@
+{
+ "id": "dsa-mock-2",
+ "check": null,
+ "interview": null,
+ "subs": [
+  {
+   "id": "mock",
+   "title": "Timed mock and failure notes",
+   "steps": [
+    {
+     "kind": "mock",
+     "heading": "Mock",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Set a 45 minute timer for both problems, close every earlier page, and work without notes. Before you write a line of code for a problem, say out loud its return type, the time and space you expect, and which of its edge cases worries you most. Split the time about evenly between the two problems, roughly 20 minutes each, and hold the last 5 minutes back to build what you have, run it against the given examples, and read the code once more."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Grade each problem out of 3 points: one for a solution that compiles and matches every example in the statement, one for the time and space you named being what your code actually does, and one for a test that reaches the edge cases the statement names, past the given examples. A good result has both problems built and tested by minute 40. If problem 1 still does not compile at minute 20, stop there, write down what went wrong, and spend the rest of the clock on problem 2 rather than one stuck problem."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Problem 1"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot logs the calibration weight of every joint along one arm, in order from the shoulder to the wrist, as an integer that may be negative. Write "
+        },
+        {
+         "t": "code",
+         "v": "pivot_index(weights)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the leftmost index whose weights to the left sum to the same total as the weights to its right, counting the joint at that index toward neither side, or no value if there is no such index. "
+        },
+        {
+         "t": "code",
+         "v": "{1, 7, 3, 6, 5, 6}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "3"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{1, 2, 3}"
+        },
+        {
+         "t": "text",
+         "v": " gives no value, and "
+        },
+        {
+         "t": "code",
+         "v": "{2, 1, -1}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "0"
+        },
+        {
+         "t": "text",
+         "v": ". Take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const int>"
+        },
+        {
+         "t": "text",
+         "v": ", return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::ptrdiff_t>"
+        },
+        {
+         "t": "text",
+         "v": ", and do it in O(n) time and O(1) extra space besides the input. There are at most 10⁵ joints, and no weight is beyond what an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": " holds."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is LeetCode's Find Pivot Index. Compute the total once, then walk the array while tracking the running sum of everything already passed. At index "
+        },
+        {
+         "t": "code",
+         "v": "i"
+        },
+        {
+         "t": "text",
+         "v": ", the sum to its right is the total minus that running sum minus "
+        },
+        {
+         "t": "code",
+         "v": "weights[i]"
+        },
+        {
+         "t": "text",
+         "v": " itself, so the whole answer comes from one pass with two running numbers."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\n[[nodiscard]] std::optional<std::ptrdiff_t> pivot_index(std::span<const int> weights) {\n  std::int64_t total = 0;\n  for (const int w : weights) total += w;\n  std::int64_t left = 0;\n  for (std::ptrdiff_t i = 0; i < std::ssize(weights); ++i) {\n    const std::int64_t right = total - left - weights[i];\n    if (left == right) return i;\n    left += weights[i];\n  }\n  return std::nullopt;\n}\n\n[[nodiscard]] std::string show(const std::optional<std::ptrdiff_t>& index) {\n  return index ? std::format(\"{}\", *index) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> a{1, 7, 3, 6, 5, 6};\n  const std::vector<int> b{1, 2, 3};\n  const std::vector<int> c{2, 1, -1};\n  std::cout << std::format(\"{} {} {} {}\\n\", show(pivot_index(a)), show(pivot_index(b)), show(pivot_index(c)),\n                           show(pivot_index({})));\n}"
+      },
+      {
+       "t": "output",
+       "text": "3 no value 0 no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n) time and O(1) extra space besides the input. The running and total sums are kept as "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t"
+        },
+        {
+         "t": "text",
+         "v": " so a long arm of large weights cannot overflow, even though each single weight fits an "
+        },
+        {
+         "t": "code",
+         "v": "int"
+        },
+        {
+         "t": "text",
+         "v": ". The edge cases are the empty log, a pivot at index 0, where the left sum is 0 by an empty range rather than a special case, and negative weights, which the subtraction handles the same way as positive ones."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Problem 2"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A binary search tree is built from "
+        },
+        {
+         "t": "code",
+         "v": "struct Node { int value; std::unique_ptr<Node> left; std::unique_ptr<Node> right; }"
+        },
+        {
+         "t": "text",
+         "v": ", with the usual property: every value under a node's left child is less than the node's own value, and every value under its right child is greater. Write "
+        },
+        {
+         "t": "code",
+         "v": "kth_smallest(root, k)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the k-th smallest value in the tree, counting from 1, or no value when the tree has fewer than k nodes or k is less than 1. Take "
+        },
+        {
+         "t": "code",
+         "v": "const Node*"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t k"
+        },
+        {
+         "t": "text",
+         "v": ", return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int>"
+        },
+        {
+         "t": "text",
+         "v": ", and visit no more of the tree than it takes to find the answer: O(h + k) time, where h is the tree's height, and O(h) extra space."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is LeetCode's Kth Smallest Element in a BST. Walking a BST in order visits its values from smallest to largest, so the k-th value that walk produces is the answer, and stopping the moment you have it is what keeps the cost to O(h + k) rather than the O(n) a full traversal pays on a tree far bigger than k. Doing the walk with your own stack, instead of recursion, is what lets the function return as soon as it has an answer: push every node down the left spine, pop one, count it, then push the left spine of its right child."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <optional>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::unique_ptr<Node> left;\n  std::unique_ptr<Node> right;\n};\n\n[[nodiscard]] std::unique_ptr<Node> node(int value, std::unique_ptr<Node> left = nullptr,\n                                         std::unique_ptr<Node> right = nullptr) {\n  return std::make_unique<Node>(value, std::move(left), std::move(right));\n}\n\n[[nodiscard]] std::optional<int> kth_smallest(const Node* root, std::int64_t k) {\n  if (k < 1) return std::nullopt;\n  std::vector<const Node*> stack;  // ancestors still waiting for their right subtree\n  const Node* current = root;\n  while (current != nullptr || !stack.empty()) {\n    while (current != nullptr) {\n      stack.push_back(current);\n      current = current->left.get();\n    }\n    current = stack.back();\n    stack.pop_back();\n    --k;\n    if (k == 0) return current->value;\n    current = current->right.get();\n  }\n  return std::nullopt;  // k was larger than the number of nodes\n}\n\n[[nodiscard]] std::string show(const std::optional<int>& value) {\n  return value ? std::format(\"{}\", *value) : \"no value\";\n}\n\nint main() {\n  const std::unique_ptr<Node> tree =\n      node(6, node(2, node(1), node(4, node(3), nullptr)), node(8, node(7), node(9)));\n  for (const std::int64_t k : {1, 4, 8, 9, 0}) {\n    std::cout << std::format(\"k={}: {}\\n\", k, show(kth_smallest(tree.get(), k)));\n  }\n  std::cout << \"empty tree: \" << show(kth_smallest(nullptr, 1)) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "k=1: 1\nk=4: 4\nk=8: 9\nk=9: no value\nk=0: no value\nempty tree: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The stack never holds more than one path from the root, so it is O(h) extra space, and the total work is O(h) to reach the smallest value plus O(k) more pops and pushes to reach the k-th, so the whole call costs O(h + k). The edge cases are k below 1, k past the number of nodes, and the empty tree, which the last three lines of output each test."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The recursive form of the same walk, an in-order traversal that counts down a reference parameter and returns as soon as it hits zero, costs the same O(h + k) time, and ties its O(h) space to the call stack rather than to an explicit "
+        },
+        {
+         "t": "code",
+         "v": "std::vector"
+        },
+        {
+         "t": "text",
+         "v": ". Either is a fair answer here. Neither one saves you from a skewed tree with h close to n, which is what the balancing topic exists to bound rather than this problem."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down, for each problem, whether you finished it inside the 45 minutes, how the time and space you named compared with what the tests actually showed, and the one edge case your first attempt missed. Grade both problems with the rubric above. You pass this mock when both reach 3 out of 3. For any problem that fell short, write its failure cause in one line, a compile error, a wrong complexity, a missed edge case, or running out of time before you had a plan, and turn that cause into a follow-up exercise: a short, closed book re-solve of the same shape of problem in a week."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::vector as a stack",
+      "href": "https://en.cppreference.com/cpp/container/vector/push_back"
+     },
+     {
+      "t": "text",
+      "v": ", which the second solution uses instead of "
+     },
+     {
+      "t": "code",
+      "v": "std::stack"
+     },
+     {
+      "t": "text",
+      "v": " because it walks the container's contents through "
+     },
+     {
+      "t": "code",
+      "v": "back"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "code",
+      "v": "pop_back"
+     },
+     {
+      "t": "text",
+      "v": " alone."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "ES.103",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-overflow"
+     },
+     {
+      "t": "text",
+      "v": ", behind the "
+     },
+     {
+      "t": "code",
+      "v": "std::int64_t"
+     },
+     {
+      "t": "text",
+      "v": " running and total sums in the first solution."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "R.3",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-ptr"
+     },
+     {
+      "t": "text",
+      "v": ", on a raw pointer owning nothing, the reason "
+     },
+     {
+      "t": "code",
+      "v": "kth_smallest"
+     },
+     {
+      "t": "text",
+      "v": " takes a "
+     },
+     {
+      "t": "code",
+      "v": "const Node*"
+     },
+     {
+      "t": "text",
+      "v": " rather than the owning "
+     },
+     {
+      "t": "code",
+      "v": "std::unique_ptr"
+     },
+     {
+      "t": "text",
+      "v": "."
+     }
+    ]
+   ]
+  }
+ ]
+}

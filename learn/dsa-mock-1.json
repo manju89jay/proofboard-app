@@ -1,0 +1,405 @@
+{
+ "id": "dsa-mock-1",
+ "check": null,
+ "interview": null,
+ "subs": [
+  {
+   "id": "mock",
+   "title": "Timed mock and failure notes",
+   "steps": [
+    {
+     "kind": "mock",
+     "heading": "Mock",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Set a 45 minute timer for both problems together, close every earlier page, and work without notes. Read a problem once, then say out loud its return type, the time and space you expect, and the edge case you are least sure about, before you write a line of code. Budget about 20 minutes for each problem and keep the last 5 minutes to compile what you have, run it against the examples in the statement, and read the code back once."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Grade each problem out of 3 points: one for a solution that compiles and returns the right answer on every example given, one for the time and space you named matching what your code actually does, and one for a test that reaches every edge case the statement calls out beyond the examples themselves. A strong finish has both problems scored and tested by minute 40, with five minutes to spare. Reaching minute 20 with problem 1 still not compiling is the signal to stop, write down the gap in the summary below, and move to problem 2 rather than spend the rest of the mock on one problem."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Problem 1"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A calibration log is a sorted, non-decreasing array of integer readings. Discounting at most one reading that appears once, every value in the log appears exactly twice. Write "
+        },
+        {
+         "t": "code",
+         "v": "single_reading(v)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns that one unpaired value, or no value when the log has no such reading, meaning every value in it is paired (this also covers the empty log). "
+        },
+        {
+         "t": "code",
+         "v": "{1, 1, 2, 3, 3, 4, 4}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "2"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "{1, 1, 2, 2, 3, 3}"
+        },
+        {
+         "t": "text",
+         "v": " gives no value, and "
+        },
+        {
+         "t": "code",
+         "v": "{5}"
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "5"
+        },
+        {
+         "t": "text",
+         "v": ". Take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const int>"
+        },
+        {
+         "t": "text",
+         "v": ", return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<int>"
+        },
+        {
+         "t": "text",
+         "v": ", and do it in O(log n) time and O(1) extra space."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is LeetCode's Single Element in a Sorted Array, extended to return no value rather than assume a singleton always exists. A log where everything pairs has an even length, and the precondition rules out any imbalance besides the one unpaired reading, so an even length already answers the question without reading a single element."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "For an odd length, pair up the log from the front: index 0 with 1, index 2 with 3, and so on, up to the unpaired reading. Every complete pair starts at an even index, so at an even index "
+        },
+        {
+         "t": "code",
+         "v": "i"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "v[i] == v[i + 1]"
+        },
+        {
+         "t": "text",
+         "v": " exactly when the unpaired reading is still further on. Binary search on that: keep "
+        },
+        {
+         "t": "code",
+         "v": "mid"
+        },
+        {
+         "t": "text",
+         "v": " even, and move "
+        },
+        {
+         "t": "code",
+         "v": "lo"
+        },
+        {
+         "t": "text",
+         "v": " past a matching pair or bring "
+        },
+        {
+         "t": "code",
+         "v": "hi"
+        },
+        {
+         "t": "text",
+         "v": " down to a broken one."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <vector>\n\n[[nodiscard]] std::optional<int> single_reading(std::span<const int> v) {\n  const std::ptrdiff_t n = std::ssize(v);\n  if (n % 2 == 0) return std::nullopt;  // an even count pairs up completely\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = n - 1;\n  while (lo < hi) {\n    std::ptrdiff_t mid = lo + (hi - lo) / 2;\n    if (mid % 2 == 1) --mid;  // keep mid even, so mid and mid + 1 are a candidate pair\n    if (v[mid] == v[mid + 1]) {\n      lo = mid + 2;  // the pair holds, the single value is further right\n    } else {\n      hi = mid;  // the pair is broken, the single value is at or before mid\n    }\n  }\n  return v[lo];\n}\n\n[[nodiscard]] std::string show(const std::optional<int>& value) {\n  return value ? std::format(\"{}\", *value) : \"no value\";\n}\n\nint main() {\n  const std::vector<int> a{1, 1, 2, 3, 3, 4, 4};\n  const std::vector<int> b{1, 1, 2, 2, 3, 3};\n  const std::vector<int> c{5};\n  const std::vector<int> d{1, 1, 2, 2, 3, 4, 4, 5, 5};\n  const std::vector<int> e{1, 1};\n  const std::vector<int> f{1, 1, 2, 2, 3};\n  std::cout << std::format(\"{} {} {} {}\\n\", show(single_reading(a)), show(single_reading(b)),\n                           show(single_reading(c)), show(single_reading(d)));\n  std::cout << std::format(\"{} {} empty: {}\\n\", show(single_reading(e)), show(single_reading(f)),\n                           show(single_reading({})));\n}"
+      },
+      {
+       "t": "output",
+       "text": "2 no value 5 3\nno value 3 empty: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(log n) time and O(1) extra space. The edge cases are the empty log, a matching pair with no singleton ("
+        },
+        {
+         "t": "code",
+         "v": "e"
+        },
+        {
+         "t": "text",
+         "v": "), a single-element log ("
+        },
+        {
+         "t": "code",
+         "v": "c"
+        },
+        {
+         "t": "text",
+         "v": "), and a singleton at the last index of an odd log ("
+        },
+        {
+         "t": "code",
+         "v": "f"
+        },
+        {
+         "t": "text",
+         "v": ", at index 4 of 5); "
+        },
+        {
+         "t": "code",
+         "v": "d"
+        },
+        {
+         "t": "text",
+         "v": "'s singleton sits at index 4 of 9, the ordinary case of a singleton away from either end."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Problem 2"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Two singly linked lists sit in a shared arena, "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Node>"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "struct Node { int value; std::optional<std::ptrdiff_t> next; }"
+        },
+        {
+         "t": "text",
+         "v": ", the same shape the cycle-detection exercise used. Neither list has a cycle. They either never meet, or they meet at one node and share every node from there to the end. Write "
+        },
+        {
+         "t": "code",
+         "v": "first_shared_node(nodes, a, b)"
+        },
+        {
+         "t": "text",
+         "v": ", which takes the two heads as "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::ptrdiff_t>"
+        },
+        {
+         "t": "text",
+         "v": " and returns the index of the first shared node, or no value when the lists never meet, using a hash set of the first list's indices in O(n + m) time and O(n) extra space, where n is the length of the list at "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is LeetCode's Intersection of Two Linked Lists, restated over an arena so the two lists can share a tail without two owners of the same node. Walk the first list and record every index it visits in a hash set. Walk the second list and return the first index already in that set. The lists never diverge again once they meet, so the first shared index found from either side names the same node."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <span>\n#include <string>\n#include <unordered_set>\n#include <vector>\n\nstruct Node {\n  int value = 0;\n  std::optional<std::ptrdiff_t> next;  // index of the next node in the same arena, or no value at the end\n};\n\nusing Link = std::optional<std::ptrdiff_t>;\n\n[[nodiscard]] Link first_shared_node(std::span<const Node> nodes, Link a, Link b) {\n  std::unordered_set<std::ptrdiff_t> seen;\n  for (Link at = a; at; at = nodes[*at].next) seen.insert(*at);\n  for (Link at = b; at; at = nodes[*at].next) {\n    if (seen.contains(*at)) return at;\n  }\n  return std::nullopt;\n}\n\n[[nodiscard]] std::string show(Link at) { return at ? std::format(\"index {}\", *at) : \"no value\"; }\n\nint main() {\n  const std::vector<Node> nodes{\n      {.value = 1, .next = 1},             // 0\n      {.value = 2, .next = 5},             // 1\n      {.value = 9, .next = 3},             // 2\n      {.value = 8, .next = 4},             // 3\n      {.value = 4, .next = 5},             // 4\n      {.value = 7, .next = 6},             // 5, the first shared node\n      {.value = 3, .next = std::nullopt},  // 6\n      {.value = 42, .next = std::nullopt}, // 7, a separate list\n      {.value = 43, .next = std::nullopt}, // 8, another separate list\n  };\n  std::cout << \"shared:      \" << show(first_shared_node(nodes, 0, 2)) << '\\n';\n  std::cout << \"no overlap:  \" << show(first_shared_node(nodes, 7, 8)) << '\\n';\n  std::cout << \"one empty:   \" << show(first_shared_node(nodes, 0, std::nullopt)) << '\\n';\n  std::cout << \"both empty:  \" << show(first_shared_node(nodes, std::nullopt, std::nullopt)) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "shared:      index 5\nno overlap:  no value\none empty:   no value\nboth empty:  no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(n + m) time, and the set costs O(n) space for the list at "
+        },
+        {
+         "t": "code",
+         "v": "a"
+        },
+        {
+         "t": "text",
+         "v": ", so passing the shorter list first keeps the set smaller. The edge cases are one or both lists empty and two lists that share nothing, both tested above. A follow-up worth trying on your own time: walk both lists once to find their lengths, move the longer list's pointer ahead by the difference, then step both together. That finds the same node in O(n + m) time and O(1) space, at the cost of walking each list up to twice."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down, for each problem, whether you finished it inside the 45 minutes, the time and space you named against what the tests actually showed, and the one edge case your first attempt missed. Grade both problems with the rubric above. You pass this mock when both reach 3 out of 3. For any problem that did not, name its failure cause in one line: a compile error you did not catch by reading the code, a wrong complexity, a missed edge case, or running out of time before you had a plan. Turn that cause into a follow-up exercise, a short, closed book re-solve of the same shape of problem in a week, and put it on your list."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "unordered_set::contains",
+      "href": "https://en.cppreference.com/cpp/container/unordered_set/contains"
+     },
+     {
+      "t": "text",
+      "v": ", which the second solution uses to check whether an index has been visited."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "ES.107",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+     },
+     {
+      "t": "text",
+      "v": ", behind the signed "
+     },
+     {
+      "t": "code",
+      "v": "std::ptrdiff_t"
+     },
+     {
+      "t": "text",
+      "v": " indices in both solutions."
+     }
+    ]
+   ]
+  }
+ ]
+}

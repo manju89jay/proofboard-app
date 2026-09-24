@@ -1,0 +1,528 @@
+{
+ "id": "dsa-mixed-2",
+ "check": null,
+ "interview": null,
+ "subs": [
+  {
+   "id": "set",
+   "title": "Three unlabelled problems",
+   "steps": [
+    {
+     "kind": "exercise",
+     "heading": "Exercise 1",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "None of the three problems below says which technique it needs. Spotting that is the point of this set. Run each as its own 40 minute mock: a timer, no notes, and no looking back at an earlier topic's page. Before writing any code, write one line naming the pattern you intend to use and the time and space you expect it to cost. Then write the function and a "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": " that tests it against the examples and the edge cases the statement names."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Score each problem out of 3: one point for naming a working pattern before coding, one point for a correct solution at the complexity you named, and one point for tests that cover the statement's edge cases. Each solution below opens by naming the pattern and the words in the statement that should have pointed to it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A label compresses repeated text: a run of digits gives a repeat count, followed immediately by a bracketed group, the text to repeat that many times. Groups can sit inside other groups, and a letter outside any group stands for itself. "
+        },
+        {
+         "t": "code",
+         "v": "\"3[a2[c]]\""
+        },
+        {
+         "t": "text",
+         "v": " decodes to "
+        },
+        {
+         "t": "code",
+         "v": "\"accaccacc\""
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "\"2[abc]3[cd]ef\""
+        },
+        {
+         "t": "text",
+         "v": " decodes to "
+        },
+        {
+         "t": "code",
+         "v": "\"abcabccdcdcdef\""
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "\"abc\""
+        },
+        {
+         "t": "text",
+         "v": " decodes to itself, unchanged. Write "
+        },
+        {
+         "t": "code",
+         "v": "decode(text)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the fully decoded text. The input always follows this grammar: letters are lowercase, a repeat count is one or more digits with no leading zero, and the decoded result is short enough to keep in memory. Take "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": " and return "
+        },
+        {
+         "t": "code",
+         "v": "std::string"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is LeetCode's Decode String. The pattern is two stacks holding the work a nested group leaves unfinished: one for the repeat count waiting on its "
+        },
+        {
+         "t": "code",
+         "v": "]"
+        },
+        {
+         "t": "text",
+         "v": ", one for the text built up before that group opened. The words that point to it are \"sit inside other groups\", nesting that closes most recently opened first, the same shape as matching brackets."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdint>\n#include <iostream>\n#include <string>\n#include <string_view>\n#include <utility>\n#include <vector>\n\n[[nodiscard]] std::string decode(std::string_view text) {\n  std::vector<std::int64_t> counts;\n  std::vector<std::string> groups;\n  std::string current;\n  std::int64_t number = 0;\n  for (const char c : text) {\n    if (c >= '0' && c <= '9') {\n      number = number * 10 + (c - '0');\n    } else if (c == '[') {\n      counts.push_back(number);\n      groups.push_back(std::move(current));\n      current.clear();\n      number = 0;\n    } else if (c == ']') {\n      const std::int64_t repeat = counts.back();\n      counts.pop_back();\n      std::string previous = std::move(groups.back());\n      groups.pop_back();\n      for (std::int64_t i = 0; i < repeat; ++i) previous += current;\n      current = std::move(previous);\n    } else {\n      current.push_back(c);\n    }\n  }\n  return current;\n}\n\nint main() {\n  std::cout << decode(\"3[a2[c]]\") << '\\n';\n  std::cout << decode(\"2[abc]3[cd]ef\") << '\\n';\n  std::cout << decode(\"abc\") << '\\n';\n  std::cout << decode(\"3[a]2[bc]\") << '\\n';\n  std::cout << \"empty: \\\"\" << decode(\"\") << \"\\\"\\n\";\n}"
+      },
+      {
+       "t": "output",
+       "text": "accaccacc\nabcabccdcdcdef\nabc\naaabcbc\nempty: \"\""
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every character of the decoded result is appended exactly once for each repeat it takes part in, so the cost is O(length of the result), which is what the statement's bound on that length is for. The edge cases are an empty input, a group with no nesting, and two groups back to back rather than nested, which "
+        },
+        {
+         "t": "code",
+         "v": "\"3[a]2[bc]\""
+        },
+        {
+         "t": "text",
+         "v": " tests. A single stack of small structs, each holding one group's count and text so far, does the same work and is an equally fair way to write it."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 2",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes, with the same rules. A robot's obstacle map lists n obstacle positions relative to the robot, each an integer offset in centimetres. Write "
+        },
+        {
+         "t": "code",
+         "v": "k_closest(points, k)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the k obstacles nearest the robot by straight line distance, nearest first, given "
+        },
+        {
+         "t": "code",
+         "v": "1 <= k <= n"
+        },
+        {
+         "t": "text",
+         "v": " and that no two obstacles sit at the same distance. Take "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const Point>"
+        },
+        {
+         "t": "text",
+         "v": ", with "
+        },
+        {
+         "t": "code",
+         "v": "struct Point { std::int64_t x; std::int64_t y; }"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "std::int64_t k"
+        },
+        {
+         "t": "text",
+         "v": ", return "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<Point>"
+        },
+        {
+         "t": "text",
+         "v": ", in O(n log k) time."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is LeetCode's K Closest Points to Origin, restated over obstacles. The pattern is a bounded heap that always holds the k obstacles seen so far that are nearest the robot, and drops the farthest of them the moment a nearer one arrives once it is full. The words that point to it are \"k obstacles nearest\" out of n, with n free to run far larger than k, which is what makes sorting every obstacle the wasteful answer."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <queue>\n#include <span>\n#include <vector>\n\nstruct Point {\n  std::int64_t x = 0;\n  std::int64_t y = 0;\n};\n\n[[nodiscard]] std::int64_t sq_dist(const Point& p) { return p.x * p.x + p.y * p.y; }\n\n// std::priority_queue calls this \"less\": comp(a, b) true means a leaves the heap after b, so the\n// farthest point, the largest squared distance, sits on top and is the one dropped past k.\nstruct FartherFirst {\n  bool operator()(const Point& a, const Point& b) const { return sq_dist(a) < sq_dist(b); }\n};\n\n[[nodiscard]] std::vector<Point> k_closest(std::span<const Point> points, std::int64_t k) {\n  std::priority_queue<Point, std::vector<Point>, FartherFirst> farthest_on_top;\n  for (const Point& p : points) {\n    farthest_on_top.push(p);\n    if (static_cast<std::int64_t>(farthest_on_top.size()) > k) farthest_on_top.pop();\n  }\n  std::vector<Point> closest;\n  closest.reserve(farthest_on_top.size());\n  while (!farthest_on_top.empty()) {\n    closest.push_back(farthest_on_top.top());\n    farthest_on_top.pop();\n  }\n  std::ranges::reverse(closest);  // the heap emptied farthest first; the answer wants nearest first\n  return closest;\n}\n\nint main() {\n  const std::vector<Point> a{{.x = 1, .y = 3}, {.x = -2, .y = 2}};\n  for (const Point& p : k_closest(a, 1)) std::cout << std::format(\"({}, {}) \", p.x, p.y);\n  std::cout << '\\n';\n\n  const std::vector<Point> b{{.x = 3, .y = 3}, {.x = 5, .y = -1}, {.x = -2, .y = 4}};\n  for (const Point& p : k_closest(b, 2)) std::cout << std::format(\"({}, {}) \", p.x, p.y);\n  std::cout << '\\n';\n\n  for (const Point& p : k_closest(b, 3)) std::cout << std::format(\"({}, {}) \", p.x, p.y);\n  std::cout << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "(-2, 2) \n(3, 3) (-2, 4) \n(3, 3) (-2, 4) (5, -1) "
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Each of the n pushes costs O(log k) against a heap that never grows past size k, so the whole pass is O(n log k) time and O(k) space. The distance is kept as the squared length, "
+        },
+        {
+         "t": "code",
+         "v": "x * x + y * y"
+        },
+        {
+         "t": "text",
+         "v": ", so no square root and no floating point rounding decides an order the integers already settle exactly. "
+        },
+        {
+         "t": "code",
+         "v": "std::ranges::nth_element"
+        },
+        {
+         "t": "text",
+         "v": " by the same distance is a fair, faster O(n) average alternative, though it leaves the k obstacles in no particular order, and sorting those k afterwards to report them nearest first adds back O(k log k)."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "exercise",
+     "heading": "Exercise 3",
+     "minutes": 40,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 40 minutes, with the same rules. A robot's occupancy grid is a "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::vector<int>>"
+        },
+        {
+         "t": "text",
+         "v": " of r rows and c columns. Every row is sorted left to right, and the first cell of each row holds a value greater than the last cell of the row above it, so the grid as a whole holds one continuous run of increasing values. Write "
+        },
+        {
+         "t": "code",
+         "v": "find_in_grid(grid, target)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the row and column where "
+        },
+        {
+         "t": "code",
+         "v": "target"
+        },
+        {
+         "t": "text",
+         "v": " sits, or no value if it is nowhere in the grid. Take the grid by "
+        },
+        {
+         "t": "code",
+         "v": "const std::vector<std::vector<int>>&"
+        },
+        {
+         "t": "text",
+         "v": ", return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::pair<std::ptrdiff_t, std::ptrdiff_t>>"
+        },
+        {
+         "t": "text",
+         "v": ", and do it in O(log(r·c)) time. "
+        },
+        {
+         "t": "code",
+         "v": "r"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "c"
+        },
+        {
+         "t": "text",
+         "v": " may be 0, for an empty grid."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is LeetCode's Search a 2D Matrix. The pattern is a single binary search over the grid read as one sorted array, laid out row by row. Index "
+        },
+        {
+         "t": "code",
+         "v": "i"
+        },
+        {
+         "t": "text",
+         "v": " of that imagined flat array is cell "
+        },
+        {
+         "t": "code",
+         "v": "(i / c, i % c)"
+        },
+        {
+         "t": "text",
+         "v": ", and the two guarantees together, sorted along a row and increasing from one row to the next, are exactly what makes that flattened view sorted from end to end. The words that point to it are those two guarantees stated side by side, which is a full order in disguise."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <utility>\n#include <vector>\n\n[[nodiscard]] std::optional<std::pair<std::ptrdiff_t, std::ptrdiff_t>> find_in_grid(\n    const std::vector<std::vector<int>>& grid, int target) {\n  const std::ptrdiff_t rows = std::ssize(grid);\n  if (rows == 0) return std::nullopt;\n  const std::ptrdiff_t cols = std::ssize(grid[0]);\n  if (cols == 0) return std::nullopt;\n  std::ptrdiff_t lo = 0;\n  std::ptrdiff_t hi = rows * cols;  // half-open [lo, hi) over the grid flattened row by row\n  while (lo < hi) {\n    const std::ptrdiff_t mid = lo + (hi - lo) / 2;\n    const std::ptrdiff_t r = mid / cols;\n    const std::ptrdiff_t c = mid % cols;\n    const int value = grid[static_cast<std::size_t>(r)][static_cast<std::size_t>(c)];\n    if (value == target) return std::pair{r, c};\n    if (value < target) {\n      lo = mid + 1;\n    } else {\n      hi = mid;\n    }\n  }\n  return std::nullopt;\n}\n\n[[nodiscard]] std::string show(const std::optional<std::pair<std::ptrdiff_t, std::ptrdiff_t>>& at) {\n  return at ? std::format(\"({}, {})\", at->first, at->second) : \"no value\";\n}\n\nint main() {\n  const std::vector<std::vector<int>> grid{{1, 3, 5, 7}, {10, 11, 16, 20}, {23, 30, 34, 60}};\n  std::cout << std::format(\"{} {} {} {}\\n\", show(find_in_grid(grid, 3)), show(find_in_grid(grid, 13)),\n                           show(find_in_grid(grid, 60)), show(find_in_grid(grid, 1)));\n  std::cout << std::format(\"empty grid: {}, empty row: {}\\n\", show(find_in_grid({}, 5)),\n                           show(find_in_grid({{}}, 5)));\n}"
+      },
+      {
+       "t": "output",
+       "text": "(0, 1) no value (2, 3) (0, 0)\nempty grid: no value, empty row: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "It is O(log(r·c)) time and O(1) extra space, one binary search over "
+        },
+        {
+         "t": "code",
+         "v": "r · c"
+        },
+        {
+         "t": "text",
+         "v": " candidates rather than one search per row. The edge cases are a grid with no rows, a grid with one empty row, and a target at the first or the last cell, all four covered above. Starting at the top right corner and stepping left when the cell is too large or down when it is too small also finds the target, in O(r + c) time; it is a fair answer, though slower than the bound this statement asks for once the grid stops being close to square."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 10,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down, for each problem, the pattern you named before coding, whether it was the one you actually needed, the words in the statement that should have pointed to it, your time, and your score out of 3. Add one line on the mistake you most want not to repeat. You pass this set when you earned the first two points on all three problems. A problem where you named the wrong pattern goes back on your list: re-solve it closed book in a week."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "priority_queue",
+      "href": "https://en.cppreference.com/cpp/container/priority_queue"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ranges::nth_element",
+      "href": "https://en.cppreference.com/cpp/algorithm/ranges/nth_element"
+     },
+     {
+      "t": "text",
+      "v": ", the two ways of finding the k obstacles nearest the robot."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "ES.107",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "ES.103",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-overflow"
+     },
+     {
+      "t": "text",
+      "v": ", behind the signed indices and the "
+     },
+     {
+      "t": "code",
+      "v": "std::int64_t"
+     },
+     {
+      "t": "text",
+      "v": " squared distances."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Abseil tip "
+     },
+     {
+      "t": "a",
+      "v": "#171",
+      "href": "https://abseil.io/tips/171"
+     },
+     {
+      "t": "text",
+      "v": " on sentinel values, the reason the third solution returns "
+     },
+     {
+      "t": "code",
+      "v": "std::optional"
+     },
+     {
+      "t": "text",
+      "v": " rather than an out of range pair."
+     }
+    ]
+   ]
+  }
+ ]
+}

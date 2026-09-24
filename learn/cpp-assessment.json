@@ -1,0 +1,838 @@
+{
+ "id": "cpp-assessment",
+ "check": null,
+ "interview": null,
+ "subs": [
+  {
+   "id": "owning",
+   "title": "Resource-owning type from a blank file",
+   "steps": [
+    {
+     "kind": "mock",
+     "heading": "Mock",
+     "minutes": 60,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 60 minutes, closed book, from a blank file. Build a class "
+        },
+        {
+         "t": "code",
+         "v": "ScratchFile"
+        },
+        {
+         "t": "text",
+         "v": " that creates a uniquely named file inside a directory you are given, and removes that file from disk when the object is destroyed, unless the caller has said to keep it."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The contract: a constructor "
+        },
+        {
+         "t": "code",
+         "v": "ScratchFile(const std::filesystem::path& dir, std::string_view prefix)"
+        },
+        {
+         "t": "text",
+         "v": " creates a new, empty file in "
+        },
+        {
+         "t": "code",
+         "v": "dir"
+        },
+        {
+         "t": "text",
+         "v": " whose name starts with "
+        },
+        {
+         "t": "code",
+         "v": "prefix"
+        },
+        {
+         "t": "text",
+         "v": ", opens it for writing, and throws if the file cannot be created. "
+        },
+        {
+         "t": "code",
+         "v": "write_line(std::string_view text)"
+        },
+        {
+         "t": "text",
+         "v": " appends a line to it. "
+        },
+        {
+         "t": "code",
+         "v": "keep()"
+        },
+        {
+         "t": "text",
+         "v": " marks the file to survive the object, and "
+        },
+        {
+         "t": "code",
+         "v": "path()"
+        },
+        {
+         "t": "text",
+         "v": " returns where it lives, so a test can check it. The type owns a real resource, so it follows the rule of five rather than the rule of zero: work out for yourself which of the five special members you need and what each must do, rather than starting from a member that already has them."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write your own tests for these, and run them under "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=address,undefined"
+        },
+        {
+         "t": "text",
+         "v": "; nothing here needs a second thread."
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "The file exists while the object is alive and is gone once its scope ends."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "A function that creates a "
+         },
+         {
+          "t": "code",
+          "v": "ScratchFile"
+         },
+         {
+          "t": "text",
+          "v": ", writes a line and then throws still has the file removed by the time the exception is caught, wherever it is caught."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Calling "
+         },
+         {
+          "t": "code",
+          "v": "keep()"
+         },
+         {
+          "t": "text",
+          "v": " before the object is destroyed leaves the file on disk, and your test removes it afterwards so the run leaves nothing behind."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Moving a "
+         },
+         {
+          "t": "code",
+          "v": "ScratchFile"
+         },
+         {
+          "t": "text",
+          "v": " transfers ownership: destroying the moved-from source first does not touch the file, and only the destination's eventual destruction removes it."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Move-assigning one live "
+         },
+         {
+          "t": "code",
+          "v": "ScratchFile"
+         },
+         {
+          "t": "text",
+          "v": " onto another removes the file the target held, as well as taking on the source's file, and assigning an object to itself through a function that takes two references to it leaves the file exactly as it was."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A strong answer at 60 minutes has all five special members, each doing one job: the constructor never leaves a caller holding a failed file, the destructor releases exactly once, copying is refused rather than silently allowed, and both moves leave a moved-from object safe to destroy without touching anything. All five tests above pass, and the run is clean under AddressSanitizer. A partial answer gets the single-object behaviour right, tests 1 to 4, but move assignment onto an already-open target either leaks the old file or forgets the self-assignment guard, which test 5 is built to catch. A fail is a class that can still be copied, so two objects fight over deleting the same path, or a destructor that never removes the file at all, which passes every test that only checks existence while the object is alive and none of them notice."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstdio>\n#include <filesystem>\n#include <format>\n#include <iostream>\n#include <memory>\n#include <stdexcept>\n#include <string_view>\n#include <system_error>\n#include <utility>\n\n// Creates a uniquely named file in `dir` and removes it when the object is destroyed, unless\n// keep() was called first. Non-copyable: two owners would race to delete the same path.\nclass ScratchFile {\n public:\n  ScratchFile(const std::filesystem::path& dir, std::string_view prefix)\n      : path_(dir / std::format(\"{}_{}.tmp\", prefix, next_id())), handle_(std::fopen(path_.c_str(), \"w\")) {\n    if (!handle_) throw std::runtime_error(\"cannot create \" + path_.string());\n  }\n  ~ScratchFile() { release(); }\n\n  ScratchFile(const ScratchFile&) = delete;\n  ScratchFile& operator=(const ScratchFile&) = delete;\n  ScratchFile(ScratchFile&&) noexcept = default;\n  ScratchFile& operator=(ScratchFile&& other) noexcept {\n    if (this != &other) {\n      release();\n      path_ = std::move(other.path_);\n      handle_ = std::move(other.handle_);\n      keep_ = other.keep_;\n    }\n    return *this;\n  }\n\n  void write_line(std::string_view text) { std::fputs(std::format(\"{}\\n\", text).c_str(), handle_.get()); }\n  void keep() noexcept { keep_ = true; }\n  [[nodiscard]] const std::filesystem::path& path() const { return path_; }\n\n private:\n  static std::ptrdiff_t next_id() {\n    static std::ptrdiff_t id = 0;\n    return id++;\n  }\n\n  // Closes the handle and, unless keep_ was set, removes the file. A moved-from object has no\n  // handle left, so this is a no-op for it.\n  void release() noexcept {\n    if (!handle_) return;\n    handle_.reset();\n    if (!keep_) {\n      std::error_code ec;\n      std::filesystem::remove(path_, ec);\n    }\n  }\n\n  struct Closer {\n    void operator()(std::FILE* f) const noexcept { std::fclose(f); }\n  };\n  std::filesystem::path path_;\n  std::unique_ptr<std::FILE, Closer> handle_;\n  bool keep_ = false;\n};\n\nvoid copy_into(ScratchFile& target, ScratchFile& source) { target = std::move(source); }\n\nvoid create_then_throw(const std::filesystem::path& dir) {\n  ScratchFile scratch(dir, \"aborted\");\n  scratch.write_line(\"partial\");\n  throw std::runtime_error(\"build step failed\");\n}\n\nint main() {\n  const std::filesystem::path dir = std::filesystem::temp_directory_path();\n\n  // 1. The file exists while the object is alive, and is gone once it is destroyed.\n  std::filesystem::path first_path;\n  {\n    ScratchFile scratch(dir, \"proof\");\n    scratch.write_line(\"hello\");\n    first_path = scratch.path();\n    std::cout << std::format(\"1 exists while alive: {}\\n\", std::filesystem::exists(first_path));\n  }\n  std::cout << std::format(\"1 gone after scope: {}\\n\", !std::filesystem::exists(first_path));\n\n  // 2. An exception in flight still removes the file it was writing.\n  try {\n    create_then_throw(dir);\n  } catch (const std::runtime_error& e) {\n    std::cout << std::format(\"2 caught: {}\\n\", e.what());\n  }\n\n  // 3. keep() survives destruction, and the test cleans up after itself.\n  std::filesystem::path kept_path;\n  {\n    ScratchFile scratch(dir, \"kept\");\n    scratch.write_line(\"keep me\");\n    kept_path = scratch.path();\n    scratch.keep();\n  }\n  std::cout << std::format(\"3 kept after scope: {}\\n\", std::filesystem::exists(kept_path));\n  std::filesystem::remove(kept_path);\n\n  // 4. Moving transfers ownership: destroying the moved-from source first leaves the file alone.\n  std::filesystem::path moved_path;\n  {\n    ScratchFile a(dir, \"move-src\");\n    moved_path = a.path();\n    {\n      ScratchFile b(std::move(a));\n      std::cout << std::format(\"4 file survives the moved-from source's destructor: {}\\n\",\n                               std::filesystem::exists(moved_path));\n    }\n  }\n  std::cout << std::format(\"4 gone once the owner is destroyed: {}\\n\", !std::filesystem::exists(moved_path));\n\n  // 5. Move-assigning onto a live scratch file removes the one it held, not just the one it takes.\n  ScratchFile c(dir, \"c\");\n  ScratchFile d(dir, \"d\");\n  const std::filesystem::path path_c = c.path();\n  const std::filesystem::path path_d = d.path();\n  d = std::move(c);  // d's own file must go, or the assessment leaves it behind on disk\n  std::cout << std::format(\"5 old d file removed by the assignment: {}\\n\", !std::filesystem::exists(path_d));\n  std::cout << std::format(\"5 d now owns c's file: {}\\n\", d.path() == path_c);\n\n  copy_into(d, d);  // self-move-assignment through two references\n  std::cout << std::format(\"5 self-move-assignment left the file in place: {}\\n\", std::filesystem::exists(path_c));\n\n  std::error_code ec;\n  std::filesystem::remove(path_c, ec);\n}"
+      },
+      {
+       "t": "output",
+       "text": "1 exists while alive: true\n1 gone after scope: true\n2 caught: build step failed\n3 kept after scope: true\n4 file survives the moved-from source's destructor: true\n4 gone once the owner is destroyed: true\n5 old d file removed by the assignment: true\n5 d now owns c's file: true\n5 self-move-assignment left the file in place: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "release()"
+        },
+        {
+         "t": "text",
+         "v": " is the one private function every other member routes through, which is what test 5 is checking for: move assignment calls it on "
+        },
+        {
+         "t": "code",
+         "v": "*this"
+        },
+        {
+         "t": "text",
+         "v": " before it takes "
+        },
+        {
+         "t": "code",
+         "v": "other"
+        },
+        {
+         "t": "text",
+         "v": "'s state, so whatever "
+        },
+        {
+         "t": "code",
+         "v": "*this"
+        },
+        {
+         "t": "text",
+         "v": " owned going in is gone before anything is overwritten, the same shape as copy-and-swap using a local instead of a swap. The guard "
+        },
+        {
+         "t": "code",
+         "v": "if (!handle_) return;"
+        },
+        {
+         "t": "text",
+         "v": " is what makes a moved-from object harmless to destroy or to move-assign onto: "
+        },
+        {
+         "t": "code",
+         "v": "handle_"
+        },
+        {
+         "t": "text",
+         "v": "'s own move already clears the source, and "
+        },
+        {
+         "t": "code",
+         "v": "release()"
+        },
+        {
+         "t": "text",
+         "v": " reads that rather than keeping a second flag to track the same fact. "
+        },
+        {
+         "t": "code",
+         "v": "keep()"
+        },
+        {
+         "t": "text",
+         "v": " only ever disables the "
+        },
+        {
+         "t": "code",
+         "v": "remove"
+        },
+        {
+         "t": "text",
+         "v": " call inside "
+        },
+        {
+         "t": "code",
+         "v": "release()"
+        },
+        {
+         "t": "text",
+         "v": ", never the "
+        },
+        {
+         "t": "code",
+         "v": "close"
+        },
+        {
+         "t": "text",
+         "v": ", so a kept file's handle is still closed properly and only the deletion is skipped."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "queue",
+   "title": "Bounded queue with shutdown from a blank file",
+   "steps": [
+    {
+     "kind": "mock",
+     "heading": "Mock",
+     "minutes": 60,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 60 minutes, closed book, from a blank file. Build "
+        },
+        {
+         "t": "code",
+         "v": "template <typename T> class CancellableQueue"
+        },
+        {
+         "t": "text",
+         "v": ", a bounded blocking queue whose shutdown is per caller rather than queue-wide: every call to "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " or "
+        },
+        {
+         "t": "code",
+         "v": "pop"
+        },
+        {
+         "t": "text",
+         "v": " carries its own "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_token"
+        },
+        {
+         "t": "text",
+         "v": ", and no member sets a "
+        },
+        {
+         "t": "code",
+         "v": "closed_"
+        },
+        {
+         "t": "text",
+         "v": " flag the way the plain bounded queue does."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The contract: "
+        },
+        {
+         "t": "code",
+         "v": "explicit CancellableQueue(std::ptrdiff_t capacity)"
+        },
+        {
+         "t": "text",
+         "v": ". "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]] bool push(T item, std::stop_token stop)"
+        },
+        {
+         "t": "text",
+         "v": " waits while the queue is full, hands the item over and returns true, or returns false without adding it if "
+        },
+        {
+         "t": "code",
+         "v": "stop"
+        },
+        {
+         "t": "text",
+         "v": " fires before room appears. "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]] std::optional<T> pop(std::stop_token stop)"
+        },
+        {
+         "t": "text",
+         "v": " waits while the queue is empty, takes the oldest item and returns it, or returns no value if "
+        },
+        {
+         "t": "code",
+         "v": "stop"
+        },
+        {
+         "t": "text",
+         "v": " fires while it is still empty. An item already in the queue is always handed over, even to a call whose token has already fired: the wait drains before it gives up, the same rule the plain bounded queue's "
+        },
+        {
+         "t": "code",
+         "v": "close()"
+        },
+        {
+         "t": "text",
+         "v": " follows. "
+        },
+        {
+         "t": "code",
+         "v": "[[nodiscard]] std::ptrdiff_t size() const"
+        },
+        {
+         "t": "text",
+         "v": " never blocks."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Use "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable_any"
+        },
+        {
+         "t": "text",
+         "v": ", the one with the overload that takes a token, on both waits. Write your own tests for these:"
+        }
+       ]
+      },
+      {
+       "t": "ol",
+       "items": [
+        [
+         {
+          "t": "text",
+          "v": "Push twice into a queue of capacity two with a token that is never stopped, then push a third time with an already-stopped "
+         },
+         {
+          "t": "code",
+          "v": "std::stop_source"
+         },
+         {
+          "t": "text",
+          "v": "'s token: the third call returns false at once rather than waiting, because the queue is full and the stop has already fired."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Pop the queue down by one, then push again with the same never-stopped token: it succeeds, because there is room again."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Push one item, then request a stop on a fresh "
+         },
+         {
+          "t": "code",
+          "v": "std::stop_source"
+         },
+         {
+          "t": "text",
+          "v": " before calling "
+         },
+         {
+          "t": "code",
+          "v": "pop"
+         },
+         {
+          "t": "text",
+          "v": " with its token: the call still returns that item. Pop again with the same stopped token on the now-empty queue: it returns no value."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Several producer threads pushing with tokens that are never stopped, and several consumer threads popping with one "
+         },
+         {
+          "t": "code",
+          "v": "std::stop_token"
+         },
+         {
+          "t": "text",
+          "v": " shared between them, requested only once every producer thread has been joined. Check that every item sent is received exactly once, sorted ids match a plain count from zero, and the queue is left empty. Add a watcher thread that samples "
+         },
+         {
+          "t": "code",
+          "v": "size()"
+         },
+         {
+          "t": "text",
+          "v": " in a tight loop through the run and keeps the largest value it saw, and check it never passed the capacity."
+         }
+        ],
+        [
+         {
+          "t": "text",
+          "v": "Build the stress test from point 4 a second time with "
+         },
+         {
+          "t": "code",
+          "v": "-fsanitize=thread"
+         },
+         {
+          "t": "text",
+          "v": " instead of "
+         },
+         {
+          "t": "code",
+          "v": "-fsanitize=address,undefined"
+         },
+         {
+          "t": "text",
+          "v": ", in a job of its own, and run it more than once."
+         }
+        ]
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A strong answer at 60 minutes has both waits carrying the token into "
+        },
+        {
+         "t": "code",
+         "v": "std::condition_variable_any::wait"
+        },
+        {
+         "t": "text",
+         "v": " rather than a hand-rolled loop that polls "
+        },
+        {
+         "t": "code",
+         "v": "stop_requested()"
+        },
+        {
+         "t": "text",
+         "v": " on its own, gets the five tests above to pass, and comes back clean under both sanitizers. A partial answer gets the single-threaded behaviour right but polls the token in a loop with a timed wait instead of using the predicate-and-token overload, which works but wastes CPU and is harder to reason about under contention. A fail is a queue that still carries a "
+        },
+        {
+         "t": "code",
+         "v": "closed_"
+        },
+        {
+         "t": "text",
+         "v": " flag set by some member function, which answers a different question than the one this task asks, or one where a stopped consumer's wait can also cancel a producer's, because the two waits share one condition variable instead of one each."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "The single-threaded behaviour first, which is where the token-and-predicate contract is easiest to see:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <condition_variable>\n#include <cstddef>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <optional>\n#include <stop_token>\n#include <utility>\n\n// A queue with room for `capacity` items. Each call to push or pop carries its own stop token, so\n// one caller can be cancelled without affecting any other: there is no queue-wide closed flag.\ntemplate <typename T>\nclass CancellableQueue {\n public:\n  explicit CancellableQueue(std::ptrdiff_t capacity) : capacity_(capacity) {}\n\n  // False once `stop` fires before room appears; otherwise it waits for room and hands the item over.\n  [[nodiscard]] bool push(T item, std::stop_token stop) {\n    std::unique_lock<std::mutex> lock(mutex_);\n    if (!not_full_.wait(lock, stop, [this] { return std::ssize(items_) < capacity_; })) return false;\n    items_.push_back(std::move(item));\n    lock.unlock();\n    not_empty_.notify_one();\n    return true;\n  }\n\n  // No value once `stop` fires and the queue is empty; otherwise it waits for an item and takes it.\n  // An item already waiting is handed over even if `stop` has already fired.\n  [[nodiscard]] std::optional<T> pop(std::stop_token stop) {\n    std::unique_lock<std::mutex> lock(mutex_);\n    if (!not_empty_.wait(lock, stop, [this] { return !items_.empty(); })) return std::nullopt;\n    T item = std::move(items_.front());\n    items_.pop_front();\n    lock.unlock();\n    not_full_.notify_one();\n    return item;\n  }\n\n  [[nodiscard]] std::ptrdiff_t size() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return std::ssize(items_);\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::condition_variable_any not_full_;   // waited on by pushers: there is room, or stop fired\n  std::condition_variable_any not_empty_;  // waited on by poppers: there is an item, or stop fired\n  std::deque<T> items_;\n  std::ptrdiff_t capacity_ = 0;\n};\n\nint main() {\n  CancellableQueue<std::int64_t> q(2);\n  std::stop_source never;  // its token is never stopped\n\n  std::cout << std::format(\"push 1: {}\\n\", q.push(1, never.get_token()));\n  std::cout << std::format(\"push 2: {}\\n\", q.push(2, never.get_token()));\n\n  std::stop_source already_stopped;\n  already_stopped.request_stop();\n  std::cout << std::format(\"push 3 into a full queue with a stopped token: {}\\n\",\n                           q.push(3, already_stopped.get_token()));\n\n  std::cout << std::format(\"pop gives {}\\n\", q.pop(never.get_token()).value());\n  std::cout << std::format(\"push 3 now there is room: {}\\n\", q.push(3, never.get_token()));\n  std::cout << std::format(\"size: {}\\n\", q.size());\n\n  // Draining: an item already waiting is handed over even to a stopped token.\n  CancellableQueue<std::int64_t> drain(4);\n  [[maybe_unused]] const bool filled = drain.push(9, never.get_token());\n  std::stop_source stop_now;\n  stop_now.request_stop();\n  std::cout << std::format(\"pop with a stopped token but an item waiting: {}\\n\",\n                           drain.pop(stop_now.get_token()).value());\n  std::cout << std::format(\"pop again, now empty and stopped: {}\\n\", drain.pop(stop_now.get_token()).has_value());\n}"
+      },
+      {
+       "t": "output",
+       "text": "push 1: true\npush 2: true\npush 3 into a full queue with a stopped token: false\npop gives 1\npush 3 now there is room: true\nsize: 2\npop with a stopped token but an item waiting: 9\npop again, now empty and stopped: false"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Then the stress test, with the same class, several producers and consumers, and the watcher that proves the bound holds while it is all happening:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <algorithm>\n#include <condition_variable>\n#include <cstddef>\n#include <cstdint>\n#include <deque>\n#include <format>\n#include <iostream>\n#include <mutex>\n#include <numeric>\n#include <optional>\n#include <ranges>\n#include <stop_token>\n#include <thread>\n#include <utility>\n#include <vector>\n\ntemplate <typename T>\nclass CancellableQueue {\n public:\n  explicit CancellableQueue(std::ptrdiff_t capacity) : capacity_(capacity) {}\n\n  [[nodiscard]] bool push(T item, std::stop_token stop) {\n    std::unique_lock<std::mutex> lock(mutex_);\n    if (!not_full_.wait(lock, stop, [this] { return std::ssize(items_) < capacity_; })) return false;\n    items_.push_back(std::move(item));\n    lock.unlock();\n    not_empty_.notify_one();\n    return true;\n  }\n\n  [[nodiscard]] std::optional<T> pop(std::stop_token stop) {\n    std::unique_lock<std::mutex> lock(mutex_);\n    if (!not_empty_.wait(lock, stop, [this] { return !items_.empty(); })) return std::nullopt;\n    T item = std::move(items_.front());\n    items_.pop_front();\n    lock.unlock();\n    not_full_.notify_one();\n    return item;\n  }\n\n  [[nodiscard]] std::ptrdiff_t size() const {\n    const std::lock_guard<std::mutex> lock(mutex_);\n    return std::ssize(items_);\n  }\n\n private:\n  mutable std::mutex mutex_;\n  std::condition_variable_any not_full_;\n  std::condition_variable_any not_empty_;\n  std::deque<T> items_;\n  std::ptrdiff_t capacity_ = 0;\n};\n\nconstexpr std::int64_t kProducers = 3;\nconstexpr std::int64_t kConsumers = 3;\nconstexpr std::int64_t kPerProducer = 300;\n\nstruct Command {\n  std::int64_t id = 0;\n};\n\nint main() {\n  constexpr std::ptrdiff_t kCapacity = 4;\n  CancellableQueue<Command> queue(kCapacity);\n  std::vector<std::vector<std::int64_t>> received(kConsumers);\n  std::stop_source consumer_stop;  // requested only once every producer is done\n  std::ptrdiff_t high_water = 0;\n  {\n    std::jthread watcher([&queue, &high_water] {\n      for (int k = 0; k < 50'000; ++k) high_water = std::max(high_water, queue.size());\n    });\n    std::vector<std::jthread> consumers;\n    consumers.reserve(kConsumers);\n    for (std::int64_t c = 0; c < kConsumers; ++c) {\n      consumers.emplace_back([&queue, &consumer_stop, mine = &received[c]] {\n        while (const std::optional<Command> command = queue.pop(consumer_stop.get_token())) {\n          mine->push_back(command.value().id);\n        }\n      });\n    }\n    {\n      std::vector<std::jthread> producers;\n      producers.reserve(kProducers);\n      for (std::int64_t p = 0; p < kProducers; ++p) {\n        producers.emplace_back([&queue, p] {\n          for (std::int64_t k = 0; k < kPerProducer; ++k) {\n            [[maybe_unused]] const bool ok = queue.push({.id = p * kPerProducer + k}, std::stop_token{});\n          }\n        });\n      }\n    }  // every producer has finished pushing\n    consumer_stop.request_stop();  // let the consumers drain what is left, then stop\n  }\n\n  std::vector<std::int64_t> all;\n  for (const std::vector<std::int64_t>& mine : received) all.insert(all.end(), mine.begin(), mine.end());\n  std::ranges::sort(all);\n  const std::int64_t expected = kProducers * kPerProducer;\n  std::vector<std::int64_t> wanted(static_cast<std::size_t>(expected));\n  std::iota(wanted.begin(), wanted.end(), 0);\n  std::cout << std::format(\"{} commands sent, {} received, queue left with {}\\n\", expected, std::ssize(all),\n                           queue.size());\n  std::cout << std::format(\"every command exactly once: {}\\n\", all == wanted);\n  std::cout << std::format(\"a watcher sampled the size 50000 times and never saw more than {}: {}\\n\", kCapacity,\n                           high_water <= kCapacity);\n}"
+      },
+      {
+       "t": "output",
+       "text": "900 commands sent, 900 received, queue left with 0\nevery command exactly once: true\na watcher sampled the size 50000 times and never saw more than 4: true"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A producer's token is "
+        },
+        {
+         "t": "code",
+         "v": "std::stop_token{}"
+        },
+        {
+         "t": "text",
+         "v": ", default-constructed with no "
+        },
+        {
+         "t": "code",
+         "v": "stop_source"
+        },
+        {
+         "t": "text",
+         "v": " behind it, which is a legitimate token whose "
+        },
+        {
+         "t": "code",
+         "v": "stop_possible()"
+        },
+        {
+         "t": "text",
+         "v": " is false: it can never fire, so a producer's "
+        },
+        {
+         "t": "code",
+         "v": "push"
+        },
+        {
+         "t": "text",
+         "v": " behaves exactly like the plain bounded queue's, waiting only for room. The three consumers share one token instead, from one "
+        },
+        {
+         "t": "code",
+         "v": "stop_source"
+        },
+        {
+         "t": "text",
+         "v": " local to "
+        },
+        {
+         "t": "code",
+         "v": "main"
+        },
+        {
+         "t": "text",
+         "v": ", and it is requested only after the inner block joins every producer, which is the same shutdown order the earlier topic on cancellation used: stop accepting new work, then tell the readers there will be no more, then let them drain what is already there."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Built again with "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=thread"
+        },
+        {
+         "t": "text",
+         "v": " in place of "
+        },
+        {
+         "t": "code",
+         "v": "-fsanitize=address,undefined"
+        },
+        {
+         "t": "text",
+         "v": ", and run three times. In WSL, ThreadSanitizer needs address space layout randomisation switched off, because the kernel's randomised layout otherwise puts a mapping where TSan wants its shadow memory, and "
+        },
+        {
+         "t": "code",
+         "v": "setarch $(uname -m) -R"
+        },
+        {
+         "t": "text",
+         "v": " is the flag that switches it off for the process it launches. Without it the same binary fails at once with "
+        },
+        {
+         "t": "code",
+         "v": "FATAL: ThreadSanitizer: unexpected memory mapping"
+        },
+        {
+         "t": "text",
+         "v": ", as the earlier topic on threads and mutexes measured:"
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "sh",
+       "tag": "",
+       "expect": "",
+       "text": "g++ -std=c++20 -Wall -Wextra -Werror -g -fsanitize=thread queue_stress.cpp -o queue_stress\nfor i in 1 2 3; do setarch \"$(uname -m)\" -R ./queue_stress; echo \"exit=$?\"; done"
+      },
+      {
+       "t": "code",
+       "lang": "text",
+       "tag": "",
+       "expect": "",
+       "text": "900 commands sent, 900 received, queue left with 0\nevery command exactly once: true\na watcher sampled the size 50000 times and never saw more than 4: true\nexit=0\n900 commands sent, 900 received, queue left with 0\nevery command exactly once: true\na watcher sampled the size 50000 times and never saw more than 4: true\nexit=0\n900 commands sent, 900 received, queue left with 0\nevery command exactly once: true\na watcher sampled the size 50000 times and never saw more than 4: true\nexit=0"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every run prints the same three lines and exits 0: nothing here depends on which thread the scheduler favours, only on totals and an invariant, so ThreadSanitizer has nothing to report and the output has nothing to disagree with either."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Take 15 minutes. For each of the two builds, write down your time against the 60 minutes, whether AddressSanitizer, and for the queue ThreadSanitizer too, came back clean, and which of the tests listed above passed on the first run. Add one line naming the single weakest part of what you wrote: the special member you got wrong first, or the test you had to add after a run failed rather than before it. You pass this assessment when both builds are clean under their sanitizers and every listed test passes, from a blank file, without notes. A build that only compiles after checking a page is not ready to be marked passed; note which page it was and revisit that topic's exercises before the next attempt."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "C.20",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-zero"
+     },
+     {
+      "t": "text",
+      "v": ", "
+     },
+     {
+      "t": "a",
+      "v": "C.21",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rc-five"
+     },
+     {
+      "t": "text",
+      "v": " and "
+     },
+     {
+      "t": "a",
+      "v": "R.1",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#rr-raii"
+     },
+     {
+      "t": "text",
+      "v": ", behind the resource-owning type's special members."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "std::filesystem::remove",
+      "href": "https://en.cppreference.com/cpp/filesystem/remove"
+     },
+     {
+      "t": "text",
+      "v": ", the error-code overload the destructor and the move assignment use so that cleanup cannot throw, and on "
+     },
+     {
+      "t": "a",
+      "v": "std::condition_variable_any::wait",
+      "href": "https://en.cppreference.com/cpp/thread/condition_variable_any/wait"
+     },
+     {
+      "t": "text",
+      "v": ", the token-and-predicate overload both queue operations use."
+     }
+    ],
+    [
+     {
+      "t": "a",
+      "v": "The ThreadSanitizer manual",
+      "href": "https://clang.llvm.org/docs/ThreadSanitizer.html"
+     },
+     {
+      "t": "text",
+      "v": ", on running a build with "
+     },
+     {
+      "t": "code",
+      "v": "-fsanitize=thread"
+     },
+     {
+      "t": "text",
+      "v": " in a job of its own and reading a clean exit as the absence of a race, not proof that none exists."
+     }
+    ]
+   ]
+  }
+ ]
+}

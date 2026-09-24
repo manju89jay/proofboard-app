@@ -1,0 +1,583 @@
+{
+ "id": "dsa-mock-3",
+ "check": null,
+ "interview": null,
+ "subs": [
+  {
+   "id": "mock",
+   "title": "Timed mock and failure notes",
+   "steps": [
+    {
+     "kind": "mock",
+     "heading": "Mock",
+     "minutes": 45,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Set a 45 minute timer for both problems, close every earlier page, and work without notes. Before writing any code for a problem, say out loud its return type, the time and space you expect, and the edge case you are least sure your first draft will handle. Give each problem about 20 minutes and hold the last 5 back to build what you have, run it against the given examples, and read the code once more before the clock runs out."
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Grade each problem out of 3 points: one for a solution that compiles and matches every example, one for the time and space you named matching what your code does, and one for a test that reaches the edge cases the statement names, past the given examples. A good result has both problems built and tested by minute 40. If problem 1 is still not compiling at minute 20, stop, write down where it broke, and give the rest of the time to problem 2."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Problem 1"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "A robot's site map is n numbered stations, 0 to n minus 1, joined by m two way corridors, each with a positive integer length in metres. Write "
+        },
+        {
+         "t": "code",
+         "v": "shortest_distances(n, edges, start)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns, for every station, the length of the shortest route from "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": " to it, or no value for a station "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": " cannot reach at all. "
+        },
+        {
+         "t": "code",
+         "v": "start"
+        },
+        {
+         "t": "text",
+         "v": " itself gets distance 0. Take "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t n"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "std::span<const WeightedEdge> edges"
+        },
+        {
+         "t": "text",
+         "v": " with "
+        },
+        {
+         "t": "code",
+         "v": "struct WeightedEdge { std::ptrdiff_t from; std::ptrdiff_t to; std::int64_t weight; }"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "std::ptrdiff_t start"
+        },
+        {
+         "t": "text",
+         "v": ", and return "
+        },
+        {
+         "t": "code",
+         "v": "std::vector<std::optional<std::int64_t>>"
+        },
+        {
+         "t": "text",
+         "v": " indexed by station."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is Dijkstra's algorithm. Track the shortest distance found so far to every station, and repeatedly settle the closest station not yet settled: once a station is popped with the smallest distance remaining in the frontier, no corridor still unexplored can offer it anything shorter, because every corridor length is positive. A min heap of "
+        },
+        {
+         "t": "code",
+         "v": "(distance, station)"
+        },
+        {
+         "t": "text",
+         "v": " pairs is what lets \"closest not yet settled\" come out in O(log n) instead of a scan over every station on each step."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <queue>\n#include <span>\n#include <string>\n#include <utility>\n#include <vector>\n\nstruct WeightedEdge {\n  std::ptrdiff_t from = 0;\n  std::ptrdiff_t to = 0;\n  std::int64_t weight = 0;\n};\n\nstruct Visit {\n  std::ptrdiff_t station = 0;\n  std::int64_t distance = 0;\n};\n\n// priority_queue calls this \"less\": comp(a, b) true means a leaves the heap after b. The nearest\n// station has to leave first, so the one with the larger distance is the one that leaves after.\nstruct FartherOut {\n  bool operator()(const Visit& a, const Visit& b) const { return a.distance > b.distance; }\n};\n\n[[nodiscard]] std::vector<std::optional<std::int64_t>> shortest_distances(std::ptrdiff_t n,\n                                                                           std::span<const WeightedEdge> edges,\n                                                                           std::ptrdiff_t start) {\n  std::vector<std::vector<std::pair<std::ptrdiff_t, std::int64_t>>> neighbours(static_cast<std::size_t>(n));\n  for (const WeightedEdge& e : edges) {\n    neighbours[static_cast<std::size_t>(e.from)].push_back({e.to, e.weight});\n    neighbours[static_cast<std::size_t>(e.to)].push_back({e.from, e.weight});\n  }\n  std::vector<std::optional<std::int64_t>> best(static_cast<std::size_t>(n));\n  std::priority_queue<Visit, std::vector<Visit>, FartherOut> frontier;\n  best[static_cast<std::size_t>(start)] = 0;\n  frontier.push({.station = start, .distance = 0});\n  while (!frontier.empty()) {\n    const Visit current = frontier.top();\n    frontier.pop();\n    const auto& settled = best[static_cast<std::size_t>(current.station)];\n    if (settled && *settled < current.distance) continue;  // a shorter route already settled this station\n    for (const auto& [neighbour, weight] : neighbours[static_cast<std::size_t>(current.station)]) {\n      const std::int64_t candidate = current.distance + weight;\n      auto& known = best[static_cast<std::size_t>(neighbour)];\n      if (!known || candidate < *known) {\n        known = candidate;\n        frontier.push({.station = neighbour, .distance = candidate});\n      }\n    }\n  }\n  return best;\n}\n\n[[nodiscard]] std::string show(const std::optional<std::int64_t>& d) {\n  return d ? std::format(\"{}\", *d) : \"no value\";\n}\n\nint main() {\n  const std::vector<WeightedEdge> edges{\n      {.from = 0, .to = 1, .weight = 4}, {.from = 0, .to = 2, .weight = 1}, {.from = 2, .to = 1, .weight = 2},\n      {.from = 1, .to = 3, .weight = 1}, {.from = 2, .to = 3, .weight = 5}, {.from = 3, .to = 4, .weight = 3},\n  };\n  const std::vector<std::optional<std::int64_t>> distances = shortest_distances(6, edges, 0);\n  for (std::size_t i = 0; i < distances.size(); ++i) std::cout << std::format(\"{}: {}\\n\", i, show(distances[i]));\n}"
+      },
+      {
+       "t": "output",
+       "text": "0: 0\n1: 3\n2: 1\n3: 4\n4: 7\n5: no value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Every station enters the heap at most once per corridor that improves its distance, so the run is O((n + m) log n) time and O(n + m) space for the adjacency list and the heap. The edge cases are a start station with no corridors, and a station, index 5 above, that no corridor reaches at all, which stays no value. Skipping a popped entry whose distance no longer matches the best on record is what keeps a station from being processed twice after a shorter route to it is found later."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Problem 2"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write "
+        },
+        {
+         "t": "code",
+         "v": "shortest_covering_window(text, pattern)"
+        },
+        {
+         "t": "text",
+         "v": ", which returns the shortest contiguous substring of "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": " that contains every byte of "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": ", counting repeats, so a "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": " with two "
+        },
+        {
+         "t": "code",
+         "v": "'a'"
+        },
+        {
+         "t": "text",
+         "v": " needs two "
+        },
+        {
+         "t": "code",
+         "v": "'a'"
+        },
+        {
+         "t": "text",
+         "v": " inside the window, or no value if no substring of "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": " covers "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": ". When more than one substring shares the shortest length, return the one that starts first. "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": " is not empty. "
+        },
+        {
+         "t": "code",
+         "v": "\"ADOBECODEBANC\""
+        },
+        {
+         "t": "text",
+         "v": " with pattern "
+        },
+        {
+         "t": "code",
+         "v": "\"ABC\""
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "\"BANC\""
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "code",
+         "v": "\"a\""
+        },
+        {
+         "t": "text",
+         "v": " with pattern "
+        },
+        {
+         "t": "code",
+         "v": "\"aa\""
+        },
+        {
+         "t": "text",
+         "v": " gives no value, because "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": " only has one "
+        },
+        {
+         "t": "code",
+         "v": "'a'"
+        },
+        {
+         "t": "text",
+         "v": ", and "
+        },
+        {
+         "t": "code",
+         "v": "\"aa\""
+        },
+        {
+         "t": "text",
+         "v": " with pattern "
+        },
+        {
+         "t": "code",
+         "v": "\"a\""
+        },
+        {
+         "t": "text",
+         "v": " gives "
+        },
+        {
+         "t": "code",
+         "v": "\"a\""
+        },
+        {
+         "t": "text",
+         "v": ", the copy at index 0. Take both as "
+        },
+        {
+         "t": "code",
+         "v": "std::string_view"
+        },
+        {
+         "t": "text",
+         "v": ", return "
+        },
+        {
+         "t": "code",
+         "v": "std::optional<std::string_view>"
+        },
+        {
+         "t": "text",
+         "v": ", in O(n) time, where n is the length of "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": "."
+        }
+       ]
+      },
+      {
+       "t": "h",
+       "c": [
+        {
+         "t": "text",
+         "v": "Solution"
+        }
+       ]
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "This is Minimum Window Substring. Keep a growing window "
+        },
+        {
+         "t": "code",
+         "v": "[left, right]"
+        },
+        {
+         "t": "text",
+         "v": " and a count of how many bytes it still owes the pattern, one shortfall per byte value that has not yet reached the count "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": " needs. Extend "
+        },
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " until the owed count reaches 0, meaning the window covers the pattern, then shrink from "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " while it still covers, recording the shortest window seen at each point where it does."
+        }
+       ]
+      },
+      {
+       "t": "code",
+       "lang": "cpp",
+       "tag": "run",
+       "expect": "",
+       "text": "#include <array>\n#include <cstddef>\n#include <cstdint>\n#include <format>\n#include <iostream>\n#include <optional>\n#include <string>\n#include <string_view>\n\n[[nodiscard]] std::optional<std::string_view> shortest_covering_window(std::string_view text,\n                                                                        std::string_view pattern) {\n  std::array<std::int64_t, 256> need{};\n  for (const char c : pattern) ++need[static_cast<unsigned char>(c)];\n  std::int64_t missing = std::ssize(pattern);  // bytes still short of pattern's required count\n  std::array<std::int64_t, 256> have{};\n  std::ptrdiff_t left = 0;\n  std::ptrdiff_t best_start = 0;\n  std::ptrdiff_t best_len = -1;  // -1 means no covering window found yet\n  for (std::ptrdiff_t right = 0; right < std::ssize(text); ++right) {\n    const auto c = static_cast<unsigned char>(text[right]);\n    if (have[c] < need[c]) --missing;  // this occurrence is still needed\n    ++have[c];\n    while (missing == 0) {\n      if (best_len == -1 || right - left + 1 < best_len) {\n        best_len = right - left + 1;\n        best_start = left;\n      }\n      const auto lc = static_cast<unsigned char>(text[left]);\n      --have[lc];\n      if (have[lc] < need[lc]) ++missing;\n      ++left;\n    }\n  }\n  if (best_len == -1) return std::nullopt;\n  return text.substr(static_cast<std::size_t>(best_start), static_cast<std::size_t>(best_len));\n}\n\n[[nodiscard]] std::string show(const std::optional<std::string_view>& window) {\n  return window ? std::format(\"\\\"{}\\\"\", *window) : \"no value\";\n}\n\nint main() {\n  std::cout << show(shortest_covering_window(\"ADOBECODEBANC\", \"ABC\")) << '\\n';\n  std::cout << show(shortest_covering_window(\"a\", \"a\")) << '\\n';\n  std::cout << show(shortest_covering_window(\"a\", \"aa\")) << '\\n';\n  std::cout << show(shortest_covering_window(\"aa\", \"a\")) << '\\n';\n  std::cout << show(shortest_covering_window(\"\", \"a\")) << '\\n';\n}"
+      },
+      {
+       "t": "output",
+       "text": "\"BANC\"\n\"a\"\nno value\n\"a\"\nno value"
+      },
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "code",
+         "v": "right"
+        },
+        {
+         "t": "text",
+         "v": " and "
+        },
+        {
+         "t": "code",
+         "v": "left"
+        },
+        {
+         "t": "text",
+         "v": " each move forward at most n times, so the two pointers together do O(n) work, plus O(m) to fill "
+        },
+        {
+         "t": "code",
+         "v": "need"
+        },
+        {
+         "t": "text",
+         "v": " from "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": ", for O(n + m) time and O(1) extra space, the two fixed 256-entry tables. The edge cases are an empty "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": ", a "
+        },
+        {
+         "t": "code",
+         "v": "pattern"
+        },
+        {
+         "t": "text",
+         "v": " asking for more of a byte than "
+        },
+        {
+         "t": "code",
+         "v": "text"
+        },
+        {
+         "t": "text",
+         "v": " has, and two windows of the same shortest length, where "
+        },
+        {
+         "t": "code",
+         "v": "\"aa\""
+        },
+        {
+         "t": "text",
+         "v": " with pattern "
+        },
+        {
+         "t": "code",
+         "v": "\"a\""
+        },
+        {
+         "t": "text",
+         "v": " returns the one at index 0 because the shrink only replaces the best window on a strictly shorter one."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "summary",
+     "heading": "Summary",
+     "minutes": 15,
+     "blocks": [
+      {
+       "t": "p",
+       "c": [
+        {
+         "t": "text",
+         "v": "Write down, for each problem, whether you finished it inside the 45 minutes, how the time and space you named compared with what the tests actually showed, and the one edge case your first attempt missed. Grade both problems with the rubric above. You pass this mock when both reach 3 out of 3. For any problem that fell short, write its failure cause in one line, a compile error, a wrong complexity, a missed edge case, or running out of time before you had a plan, and turn that cause into a follow-up exercise: a short, closed book re-solve of the same shape of problem in a week."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "review": null,
+ "sources": [
+  {
+   "t": "ul",
+   "items": [
+    [
+     {
+      "t": "text",
+      "v": "cppreference on "
+     },
+     {
+      "t": "a",
+      "v": "priority_queue",
+      "href": "https://en.cppreference.com/cpp/container/priority_queue"
+     },
+     {
+      "t": "text",
+      "v": ", the container behind the frontier in Dijkstra's algorithm."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "C++ Core Guidelines "
+     },
+     {
+      "t": "a",
+      "v": "ES.107",
+      "href": "https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#res-subscripts"
+     },
+     {
+      "t": "text",
+      "v": ", behind the signed "
+     },
+     {
+      "t": "code",
+      "v": "std::ptrdiff_t"
+     },
+     {
+      "t": "text",
+      "v": " stations and indices in both solutions."
+     }
+    ],
+    [
+     {
+      "t": "text",
+      "v": "Edsger W. Dijkstra, "
+     },
+     {
+      "t": "a",
+      "v": "A note on two problems in connexion with graphs",
+      "href": "https://doi.org/10.1007/BF01386390"
+     },
+     {
+      "t": "text",
+      "v": ", Numerische Mathematik 1, 1959, pages 269 to 271: the original algorithm the first solution follows."
+     }
+    ]
+   ]
+  }
+ ]
+}
